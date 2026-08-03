@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "seoul-crashers",
+      "runtimeExecutable": "/usr/bin/python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8123",
+        "--directory",
+        "/Users/danieldallabenetta/Documents/seoul_crashers"
+      ],
+      "port": 8123
+    }
+  ]
+}

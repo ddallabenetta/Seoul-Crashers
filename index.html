@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seoul Crashers</title>
+<style>
+  :root { color-scheme: dark; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: #07080a;
+    font-family: system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", sans-serif;
+    color: #eef1f6;
+  }
+  /* Il mirino lo disegna l'HUD: il cursore di sistema torna solo nei menu. */
+  #game { display: block; width: 100vw; height: 100vh; cursor: none; }
+
+  #loading {
+    position: fixed; inset: 0; z-index: 10;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 10px;
+    background:
+      radial-gradient(120% 90% at 20% 10%, rgba(255,95,162,0.16), transparent 60%),
+      radial-gradient(120% 90% at 85% 80%, rgba(56,214,255,0.14), transparent 60%),
+      #07080a;
+    transition: opacity .5s ease;
+  }
+  #loading.done { opacity: 0; pointer-events: none; }
+  #loading h1 {
+    font-size: clamp(38px, 8vw, 88px); font-weight: 900; letter-spacing: -0.03em;
+    line-height: .92; text-align: center;
+  }
+  #loading h1 span { color: #ff5fa2; display: block; }
+  #loading .ko {
+    font-size: clamp(14px, 2.4vw, 22px); font-weight: 700; color: rgba(56,214,255,.85);
+    letter-spacing: .28em; margin-top: 6px;
+  }
+  #loading .tag {
+    margin-top: 18px; font-size: 13px; color: rgba(238,241,246,.5); max-width: 30ch;
+    text-align: center; line-height: 1.5;
+  }
+  #loading-track {
+    margin-top: 26px; width: min(340px, 70vw); height: 4px;
+    background: rgba(255,255,255,.12); border-radius: 99px; overflow: hidden;
+  }
+  #loading-bar { height: 100%; width: 0%; background: linear-gradient(90deg,#ff5fa2,#ffd23f); transition: width .3s ease; }
+  #loading-text { margin-top: 10px; font-size: 12px; color: rgba(238,241,246,.45); }
+  noscript { position: fixed; inset: 0; display: grid; place-items: center; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="loading">
+  <h1>SEOUL<span>CRASHERS</span></h1>
+  <div class="ko">서울 크래셔스</div>
+  <div class="tag">Dodici anni fuori. Un funerale. Una città che ha già venduto il nome di tuo padre.</div>
+  <div id="loading-track"><div id="loading-bar"></div></div>
+  <div id="loading-text">Avvio…</div>
+</div>
+
+<noscript>Questo gioco richiede JavaScript abilitato.</noscript>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
