@@ -180,6 +180,8 @@ export class PauseMenu {
       ['Cadaveri lasciati', String(s.kills)],
       ['Volte all\'ospedale', String(s.deaths)],
       ['Quartieri visitati', `${s.districts.size} / 5`],
+      ['Divise stese', String(s.copsKilled || 0)],
+      ['Ricercato massimo', '★'.repeat(s.maxWanted || 0) || '—'],
     ];
     // Due colonne: in una sola il pannello (quadrato, largo quanto 0.44 dello
     // schermo) non ci sta già a sei voci.

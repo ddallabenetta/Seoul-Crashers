@@ -34,6 +34,8 @@ export function createVehicle(kind, x, y, angle = 0, colorIndex = 0) {
     honkT: 0,
     lastHitT: 0,
     slip: 0,
+    flatTires: false, // gomme squarciate dai chiodi della polizia
+    flatPull: 0,
   };
 }
 
@@ -52,7 +54,7 @@ function collisionCircles(v, spec) {
 
 export function vehicleTopSpeed(v) {
   const spec = VEHICLE_TYPES[v.kind];
-  return spec.topSpeed * (v.hp < spec.hp * 0.4 ? 0.75 : 1);
+  return spec.topSpeed * (v.hp < spec.hp * 0.4 ? 0.75 : 1) * (v.flatTires ? 0.6 : 1);
 }
 
 export function updateVehicle(v, dt, world) {
@@ -118,6 +120,8 @@ export function updateVehicle(v, dt, world) {
   const steerAuth = Math.min(1, speedAbs / 55);
   const rate = 3.0 * (1 - 0.52 * speedFrac) * (v.handbrake ? 1.35 : 1);
   v.angle += v.steer * rate * steerAuth * sign(v.speed || 1) * dt;
+  // Gomme a terra (chiodi): tira da un lato e non si tiene la traiettoria.
+  if (v.flatTires) v.angle += v.flatPull * speedFrac * dt;
   if (v.angle > Math.PI) v.angle -= TAU;
   if (v.angle < -Math.PI) v.angle += TAU;
 
@@ -126,7 +130,7 @@ export function updateVehicle(v, dt, world) {
   const sin = Math.sin(v.angle);
   const targetVx = cos * v.speed;
   const targetVy = sin * v.speed;
-  const grip = (v.handbrake ? 1.5 : 8.5) * spec.grip;
+  const grip = (v.handbrake ? 1.5 : 8.5) * spec.grip * (v.flatTires ? 0.72 : 1);
   const k = 1 - Math.exp(-grip * dt);
   v.vx += (targetVx - v.vx) * k;
   v.vy += (targetVy - v.vy) * k;

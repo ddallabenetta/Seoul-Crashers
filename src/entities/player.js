@@ -1,6 +1,6 @@
 // Jae-min Seo: a piedi o al volante. Un solo stato commuta tutto il controllo.
 import { circleRectPush, clamp, approachAngle, damp, dist } from '../core/math.js';
-import { PED_KINDS, VEHICLE_TYPES } from '../render/sprites.js';
+import { VEHICLE_TYPES } from '../render/sprites.js';
 import { vehicleDoorPoint, updateVehicle } from './vehicle.js';
 import { WEAPONS, WEAPON_ORDER, shoot, meleeSwing, assistAim } from './weapons.js';
 
@@ -162,7 +162,11 @@ export class Player {
   attack(game, spec) {
     if (spec.melee) {
       this.fireCd = spec.rate;
-      meleeSwing(game, this, spec, this.x, this.y, this.angle);
+      // Una mazzata a vuoto non è un reato: la centrale se ne accorge solo se
+      // qualcosa (o qualcuno) l'ha incassata.
+      if (meleeSwing(game, this, spec, this.x, this.y, this.angle)) {
+        game.wanted?.report('brawl', game);
+      }
       game.alarm(this.x, this.y, 170, this);
       return;
     }
@@ -173,6 +177,7 @@ export class Player {
     }
     this.fireCd = spec.rate;
     this.ammo[spec.id]--;
+    game.wanted?.report('gunshot', game);
     const ang = assistAim(game, this.x, this.y, this.angle, spec.range, this);
     shoot(game, this, spec, this.x + Math.cos(ang) * 15, this.y + Math.sin(ang) * 15, ang);
     game.camera.addShake(spec.shake);
@@ -227,6 +232,7 @@ export class Player {
     }
     this.fireCd = spec.rate * 1.5;
     this.ammo[spec.id]--;
+    game.wanted?.report('gunshot', game);
     const ang = this.aimAngle;
     const sway = 1 + Math.abs(v.speed) / 240;
     shoot(game, this, spec, v.x + Math.cos(ang) * 26, v.y + Math.sin(ang) * 26, ang, {
@@ -269,10 +275,13 @@ export class Player {
   }
 
   enterVehicle(v, game) {
+    const wasOccupied = v.driver === 'ai' || v.driver === 'cop';
     // Chi era al volante viene sbalzato fuori.
     if (v.driver === 'ai' && v.ai) {
       game.traffic.ejectDriver(v, game);
     }
+    if (v.copUnit) game.police?.releaseVehicle(v, game);
+    v.occupiedTheft = wasOccupied;
     v.driver = 'player';
     v.ai = null;
     v.awake = true;

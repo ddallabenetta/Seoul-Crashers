@@ -56,6 +56,9 @@ export function createPed(kind, x, y, rng) {
     spin: 0,
     hostile: false,
     armed,
+    cop: false,       // in servizio: lo stato lo guida `police.copBehavior`
+    copWeapon: null,
+    gone: false,      // despawnato dallo streaming (vedi `stream`)
     fireT: 0,
     bleedT: 0,
     crossX: 0,
@@ -107,9 +110,14 @@ export class PedestrianSystem {
       const p = this.peds[i];
       if (p.dead) {
         p.deadT += dt;
-        if (p.deadT > 30) { this.peds.splice(i, 1); continue; }
+        if (p.deadT > 30) { p.gone = true; this.peds.splice(i, 1); continue; }
       }
-      if (dist(p.x, p.y, pl.x, pl.y) > ring.despawn) this.peds.splice(i, 1);
+      // `gone` serve a chi tiene riferimenti ai pedoni (la polizia): un agente
+      // despawnato dallo streaming non deve restare a fare la caccia da fantasma.
+      if (dist(p.x, p.y, pl.x, pl.y) > ring.despawn) {
+        p.gone = true;
+        this.peds.splice(i, 1);
+      }
     }
 
     const district = this.city.districtAt(pl.x, pl.y);
@@ -191,6 +199,9 @@ export class PedestrianSystem {
       // Investimento
       if (d < 22 && sp > 85) this.knockDown(p, v, game);
     }
+    // Chi è in servizio non scappa dalle auto: se scappasse, il primo inseguimento
+    // in mezzo al traffico scioglierebbe la pattuglia.
+    if (p.cop) p.panic = 0;
 
     if (p.panic > 0 && !p.hostile) {
       p.panic -= dt;
@@ -252,6 +263,18 @@ export class PedestrianSystem {
             meleeSwing(game, p, WEAPONS.fists, p.x, p.y, aim);
           }
         }
+        break;
+      }
+      case 'duty': {
+        // Poliziotto in servizio: dove andare lo decide `police.copBehavior`, il
+        // come muoversi resta il codice di steering condiviso qui sotto.
+        const order = game.police ? game.police.copBehavior(p, dt, game) : null;
+        if (order) {
+          tx = order.x;
+          ty = order.y;
+          targetSpeed = order.speed;
+        }
+        if (!p.cop) p.state = 'walk';
         break;
       }
       case 'crossing': {
@@ -347,7 +370,7 @@ export class PedestrianSystem {
 
     // Non attraversano i muri. I solidi `vehicleOnly` (le scalinate) sì: sono
     // fatti apposta per lasciar passare chi va a piedi.
-    if (p.state === 'flee' || p.state === 'crossing' || p.state === 'hostile') {
+    if (p.state === 'flee' || p.state === 'crossing' || p.state === 'hostile' || p.state === 'duty') {
       const solids = this.city.solidGrid.queryRect(p.x - 24, p.y - 24, 48, 48);
       for (const s of solids) {
         if (s.vehicleOnly) continue;
@@ -375,6 +398,12 @@ export class PedestrianSystem {
       return;
     }
     p.bleedT = 0.4;
+    if (p.cop) {
+      // Un agente ferito non scappa e non cambia stato: resta in servizio, e la
+      // centrale se lo segna.
+      if (source === game.player) game.wanted?.report('copHit', game);
+      return;
+    }
     if (source === game.player && PED_KINDS[p.kind]?.fights) {
       p.hostile = true;
       p.state = 'hostile';
@@ -406,7 +435,7 @@ export class PedestrianSystem {
     const r2 = r * r;
     const near2 = (r * 0.55) ** 2;
     for (const p of this.peds) {
-      if (p.dead || p.hostile) continue;
+      if (p.dead || p.hostile || p.cop) continue;
       const d2 = (p.x - x) ** 2 + (p.y - y) ** 2;
       if (d2 > r2) continue;
       if (source === game.player && PED_KINDS[p.kind]?.fights && d2 < near2) {

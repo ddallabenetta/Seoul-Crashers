@@ -368,9 +368,11 @@ export const PED_KINDS = {
   tourist:  { coats: ['#d9d4c8', '#e0a85c', '#8fc2d9', '#c9d98f'], pants: '#7d7f86', hair: '#3a2c22', speed: 40, bag: 0.7, cap: true, hp: 28 },
   worker:   { coats: ['#c9942f', '#d9d24a', '#b5651f'], pants: '#4a4f57', hair: '#1d1b1b', speed: 44, bag: 0.15, helmet: true, hp: 38 },
   gangster: { coats: ['#1f2126', '#2a1f24', '#26282e'], pants: '#1a1c20', hair: '#141414', speed: 54, bag: 0.1, hp: 62, fights: true },
-  cop:      { coats: ['#243a63', '#1f3357'], pants: '#1b2436', hair: '#171717', speed: 56, bag: 0.1, helmet: false, hp: 75, fights: true },
-  // Jae-min Seo: bomber nero con fascia rossa, il colpo d'occhio del giocatore.
-  player:   { coats: ['#242629', '#2b1f22'], pants: '#1d2026', hair: '#12100f', speed: 62, bag: 0.1, hero: true },
+  // Divisa: berretto blu e bretelle catarifrangenti. Dall'alto un poliziotto e un
+  // teppista sono due macchie scure identiche: senza questi due segni non si
+  // capisce chi ti sta sparando.
+  cop:      { coats: ['#243a63', '#1f3357'], pants: '#1b2436', hair: '#171717', speed: 56, bag: 0.1, hp: 75, fights: true, police: '#16233c', vest: 'rgba(232,226,160,0.9)' },
+  swat:     { coats: ['#252a33'], pants: '#191d24', hair: '#141414', speed: 52, bag: 0.1, hp: 135, fights: true, police: '#0f1216', vest: 'rgba(120,132,148,0.9)', armor: true },
 };
 
 export const PED_FRAMES = 8;
@@ -443,20 +445,345 @@ export function getPedSprite(kind, colorIndex = 0, frame = 0) {
       g.fillStyle = shade('#c9483a', -0.3);
       roundRect(g, cx + 6, cy - 3.4, 3.2, 6.8, 1.4); g.fill();
     }
-    if (k.hero) {
-      // Bomber con schiena rossa e profilo chiaro: leggibile anche nella folla.
-      g.fillStyle = '#b8342c';
+    if (k.vest) {
+      // Bretelle catarifrangenti sul torso (o piastra antiproiettile per la SWAT).
+      if (k.armor) {
+        g.fillStyle = k.vest;
+        roundRect(g, cx - 4.4, cy - 4.6, 8.4, 9.2, 2.4); g.fill();
+      } else {
+        g.strokeStyle = k.vest;
+        g.lineWidth = 1.5;
+        for (const s of [-1, 1]) {
+          g.beginPath();
+          g.moveTo(cx - 5.6, cy + s * 3.6);
+          g.lineTo(cx + 3.6, cy + s * 2.2);
+          g.stroke();
+        }
+      }
+    }
+    if (k.police) {
+      // Berretto con visiera e distintivo dorato.
+      g.fillStyle = k.police;
+      g.beginPath(); g.arc(cx + 2, cy, 5.4, 0, 6.2832); g.fill();
+      g.fillStyle = shade(k.police, 0.18);
+      roundRect(g, cx + 5.8, cy - 3.2, 2.8, 6.4, 1.2); g.fill();
+      g.fillStyle = k.armor ? '#8d97a4' : '#d9b455';
+      g.fillRect(cx + 3.2, cy - 1, 1.8, 2);
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// JAE-MIN SEO — il protagonista
+// ---------------------------------------------------------------------------
+// Dall'alto un personaggio è una macchia scura larga venti pixel: per riconoscerlo
+// nella folla non serve dettaglio, serve **silhouette**. Tre segni fanno tutto il
+// lavoro, e sono gli stessi che si leggono sulla minimappa e nel ritratto dell'HUD:
+// la fascia rossa con le code che svolazzano, le strisce della tigre bianca
+// (백호, la gang del padre) sulla schiena del bomber, e le spalle più larghe di
+// chiunque altro in strada.
+const HERO = {
+  jacket: '#242935',
+  red: '#c62f2a',
+  bone: '#ece7da',
+  jeans: '#242833',
+  hair: '#16120f',
+  skin: '#d6a883',
+};
+
+/**
+ * Sprite del protagonista. `pose` vale 'walk' o 'aim': con un'arma da fuoco in
+ * pugno le braccia si tendono in avanti, ed è quello che rende leggibile a schermo
+ * la differenza fra camminare e stare puntando qualcuno.
+ */
+export function getHeroSprite(frame = 0, pose = 'walk') {
+  const W = 40, H = 34;
+  return sprite(`hero:${pose}:${frame}`, W, H, (g, w, h) => {
+    const cx = w / 2, cy = h / 2;
+    const ph = Math.sin((frame / PED_FRAMES) * Math.PI * 2);
+    const aiming = pose === 'aim';
+
+    // 1) Gambe. Dall'alto il tronco le copre quasi tutte: quello che si deve
+    // vedere è il piede che sbuca di lato a ogni passo, non la gamba intera.
+    for (const s of [-1, 1]) {
+      const sw = s * ph * 3.2;
+      const y = s > 0 ? cy + 4.6 : cy - 9.4;
+      g.fillStyle = HERO.jeans;
+      roundRect(g, cx - 7.5 + sw, y, 9.5, 4.8, 2.2); g.fill();
+      g.fillStyle = HERO.red; // suola rossa: si legge anche in movimento
+      roundRect(g, cx + 0.4 + sw, y + 0.4, 1.7, 4, 0.8); g.fill();
+    }
+
+    // 2) Braccia, fuori dalla sagoma delle spalle. Da fermo oscillano, in mira
+    // convergono sull'arma: è la differenza che si legge da lontano.
+    g.strokeStyle = shade(HERO.jacket, 0.08);
+    g.lineWidth = 3.2;
+    if (aiming) {
+      g.beginPath(); g.moveTo(cx + 0.6, cy + 6.6); g.lineTo(cx + 8.6, cy + 4); g.stroke();
+      g.beginPath(); g.moveTo(cx + 0.6, cy - 6.6); g.lineTo(cx + 7.4, cy + 1.4); g.stroke();
+    } else {
+      g.beginPath(); g.moveTo(cx + 0.6, cy + 6.6); g.lineTo(cx - 2.8 + ph * 3.6, cy + 8.8); g.stroke();
+      g.beginPath(); g.moveTo(cx + 0.6, cy - 6.6); g.lineTo(cx - 2.8 - ph * 3.6, cy - 8.8); g.stroke();
+    }
+
+    // 3) Tronco: non un'ellisse ma un trapezio arrotondato — spalle larghe davanti,
+    // vita stretta dietro. È la forma che dice "persona, e guarda da quella parte".
+    const torso = () => {
       g.beginPath();
-      g.ellipse(cx - 1.6, cy, 5.2, 5.4, 0, 1.6, 4.7);
-      g.fill();
-      g.strokeStyle = 'rgba(236,240,246,0.85)';
-      g.lineWidth = 1.1;
+      g.moveTo(cx + 4.6, cy - 6.2);
+      g.quadraticCurveTo(cx + 2.2, cy - 8.4, cx - 1, cy - 7.6);
+      g.lineTo(cx - 6.4, cy - 5.4);
+      g.quadraticCurveTo(cx - 9.6, cy, cx - 6.4, cy + 5.4);
+      g.lineTo(cx - 1, cy + 7.6);
+      g.quadraticCurveTo(cx + 2.2, cy + 8.4, cx + 4.6, cy + 6.2);
+      g.quadraticCurveTo(cx + 7.6, cy, cx + 4.6, cy - 6.2);
+      g.closePath();
+    };
+    const grad = g.createLinearGradient(cx, cy - 9, cx, cy + 9);
+    grad.addColorStop(0, shade(HERO.jacket, 0.36));
+    grad.addColorStop(0.5, HERO.jacket);
+    grad.addColorStop(1, shade(HERO.jacket, -0.5));
+    g.fillStyle = grad;
+    torso(); g.fill();
+
+    // 4) Banda rossa lungo la spina dorsale — che è anche una freccia: dice da che
+    // parte guarda — e sopra, l'artigliata bianca della tigre (백호).
+    g.save();
+    torso(); g.clip();
+    g.fillStyle = HERO.red;
+    g.fillRect(cx - 10, cy - 1.6, 16, 3.2);
+    g.fillStyle = 'rgba(0,0,0,0.25)';
+    g.fillRect(cx - 10, cy + 0.7, 16, 0.9);
+    g.strokeStyle = 'rgba(240,236,224,0.9)';
+    g.lineWidth = 0.9;
+    for (const dx of [-7.4, -6, -4.6]) {
       g.beginPath();
-      g.ellipse(cx, cy, 7.6, 6.2, 0, 0, 6.2832);
+      g.moveTo(cx + dx, cy - 2.8);
+      g.lineTo(cx + dx + 1.2, cy + 2.8);
       g.stroke();
-      // Colletto alzato
-      g.fillStyle = '#3a3f46';
-      roundRect(g, cx + 1.4, cy - 4.6, 3.4, 9.2, 1.6);
+    }
+    g.restore();
+
+    g.strokeStyle = 'rgba(0,0,0,0.62)';
+    g.lineWidth = 1.4;
+    torso(); g.stroke();
+
+    // 5) Code della fascia: corte, dietro la nuca. Bastano a dare movimento senza
+    // trasformarsi in due antenne rosse lunghe quanto il personaggio.
+    g.strokeStyle = HERO.red;
+    g.lineWidth = 1.4;
+    for (const s of [-1, 1]) {
+      g.beginPath();
+      g.moveTo(cx + 2.4, cy + s * 2.2);
+      g.quadraticCurveTo(cx - 0.6, cy + s * 4 + ph, cx - 3.4, cy + s * 4.6 + ph * 2.2);
+      g.stroke();
+    }
+
+    // 6) Testa: piccola e spostata avanti, così le spalle restano leggibili dietro.
+    const hx = cx + 3.6;
+    const hr = 4.3;
+    g.fillStyle = 'rgba(0,0,0,0.28)';
+    g.beginPath(); g.arc(hx - 0.6, cy + 0.8, hr + 0.5, 0, 6.2832); g.fill();
+    const hg = g.createRadialGradient(hx + 1.4, cy - 1.6, 0.5, hx, cy, hr + 0.8);
+    hg.addColorStop(0, shade(HERO.hair, 0.45));
+    hg.addColorStop(1, HERO.hair);
+    g.fillStyle = hg;
+    g.beginPath(); g.arc(hx, cy, hr, 0, 6.2832); g.fill();
+    // Rasatura ai lati
+    g.strokeStyle = 'rgba(120,104,88,0.55)';
+    g.lineWidth = 1.2;
+    g.beginPath(); g.arc(hx, cy, hr - 0.7, 1.1, 2.2); g.stroke();
+    g.beginPath(); g.arc(hx, cy, hr - 0.7, -2.2, -1.1); g.stroke();
+    // Ciuffo decolorato
+    g.fillStyle = '#dbd1b0';
+    g.beginPath();
+    g.moveTo(hx - 0.4, cy - 4);
+    g.quadraticCurveTo(hx + 4.2, cy - 2.6, hx + 3.4, cy - 0.3);
+    g.quadraticCurveTo(hx + 1.8, cy - 2.2, hx - 0.8, cy - 3);
+    g.closePath(); g.fill();
+    // Fascia rossa in fronte
+    g.save();
+    g.beginPath(); g.arc(hx, cy, hr, 0, 6.2832); g.clip();
+    g.fillStyle = HERO.red;
+    g.fillRect(hx + 0.5, cy - 5, 1.9, 10);
+    g.fillStyle = 'rgba(255,255,255,0.22)';
+    g.fillRect(hx + 0.5, cy - 5, 0.6, 10);
+    g.restore();
+    // Filo di luce sul cranio: senza, la testa nera sparisce dentro il bomber nero.
+    g.strokeStyle = 'rgba(230,236,244,0.42)';
+    g.lineWidth = 0.9;
+    g.beginPath(); g.arc(hx, cy, hr - 0.3, 3.5, 5.4); g.stroke();
+    // Viso verso la direzione di marcia
+    g.fillStyle = HERO.skin;
+    g.beginPath(); g.arc(hx + 1.9, cy, 2.3, -1.2, 1.2); g.fill();
+    g.fillStyle = 'rgba(20,16,14,0.5)';
+    g.fillRect(hx + 2.9, cy - 1.7, 1.2, 0.7);
+    g.fillRect(hx + 2.9, cy + 1, 1.2, 0.7);
+
+    // 7) Filo di luce sul bordo verso il sole: stacca la sagoma dall'asfalto.
+    g.strokeStyle = 'rgba(238,242,248,0.42)';
+    g.lineWidth = 1;
+    g.beginPath();
+    g.moveTo(cx - 6.4, cy - 5.4);
+    g.quadraticCurveTo(cx - 9.6, cy, cx - 6.4, cy + 5.4);
+    g.stroke();
+  });
+}
+
+/** Ritratto frontale per l'HUD: la faccia che il giocatore associa a sé stesso. */
+export function getHeroPortrait() {
+  return sprite('hero:portrait', 46, 46, (g, w, h) => {
+    const cx = w / 2;
+    const bg = g.createLinearGradient(0, 0, w, h);
+    bg.addColorStop(0, '#3a2026');
+    bg.addColorStop(1, '#101319');
+    g.fillStyle = bg;
+    roundRect(g, 0, 0, w, h, 7); g.fill();
+
+    g.save();
+    roundRect(g, 0.5, 0.5, w - 1, h - 1, 7);
+    g.clip();
+
+    // Spalle e colletto del bomber.
+    g.fillStyle = HERO.jacket;
+    g.beginPath();
+    g.moveTo(cx - 23, h);
+    g.quadraticCurveTo(cx, h - 17, cx + 23, h);
+    g.closePath(); g.fill();
+    g.fillStyle = shade(HERO.skin, -0.24);
+    g.fillRect(cx - 4.6, h - 21, 9.2, 9);
+    g.fillStyle = HERO.red;
+    g.beginPath();
+    g.moveTo(cx - 12, h - 5); g.lineTo(cx, h - 13); g.lineTo(cx + 12, h - 5);
+    g.lineTo(cx + 9, h); g.lineTo(cx - 9, h);
+    g.closePath(); g.fill();
+
+    // Testa: mascella squadrata, luce da sinistra.
+    const fg = g.createLinearGradient(cx - 9, 0, cx + 9, 0);
+    fg.addColorStop(0, shade(HERO.skin, 0.12));
+    fg.addColorStop(1, shade(HERO.skin, -0.28));
+    g.fillStyle = fg;
+    roundRect(g, cx - 8.6, 10, 17.2, 21, 7); g.fill();
+
+    // Capelli: massa alta con rasatura ai lati.
+    g.fillStyle = HERO.hair;
+    g.beginPath();
+    g.moveTo(cx - 9.4, 19);
+    g.quadraticCurveTo(cx - 10, 7, cx, 6.2);
+    g.quadraticCurveTo(cx + 10, 7, cx + 9.4, 19);
+    g.lineTo(cx + 7.4, 15.5);
+    g.quadraticCurveTo(cx, 12.4, cx - 7.4, 15.5);
+    g.closePath(); g.fill();
+    g.fillStyle = '#d9cfae';
+    g.beginPath();
+    g.moveTo(cx - 1, 6.6);
+    g.quadraticCurveTo(cx + 6, 7.6, cx + 6.6, 13.4);
+    g.quadraticCurveTo(cx + 2.6, 9.6, cx - 1.6, 8.6);
+    g.closePath(); g.fill();
+
+    // Fascia rossa.
+    g.fillStyle = HERO.red;
+    roundRect(g, cx - 9.6, 14.4, 19.2, 3.6, 1.2); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.18)';
+    g.fillRect(cx - 9.6, 14.7, 19.2, 1);
+
+    // Occhi, sopracciglia e cicatrice sul sopracciglio destro.
+    g.fillStyle = '#14161a';
+    g.fillRect(cx - 6.4, 20.4, 4.4, 1.5);
+    g.fillRect(cx + 2, 20.4, 4.4, 1.5);
+    g.fillStyle = 'rgba(20,22,26,0.75)';
+    g.fillRect(cx - 6.8, 18.6, 5, 1.1);
+    g.fillRect(cx + 1.8, 18.6, 5, 1.1);
+    g.strokeStyle = 'rgba(232,190,170,0.85)';
+    g.lineWidth = 1;
+    g.beginPath();
+    g.moveTo(cx + 3.4, 16.4);
+    g.lineTo(cx + 5.4, 22.4);
+    g.stroke();
+    // Naso e bocca serrata.
+    g.strokeStyle = 'rgba(0,0,0,0.28)';
+    g.beginPath(); g.moveTo(cx + 0.4, 21); g.lineTo(cx + 1.4, 25.4); g.stroke();
+    g.fillStyle = 'rgba(30,18,18,0.7)';
+    g.fillRect(cx - 3.4, 27.4, 7, 1.3);
+
+    g.restore();
+    g.strokeStyle = 'rgba(236,240,248,0.22)';
+    g.lineWidth = 1.4;
+    roundRect(g, 0.7, 0.7, w - 1.4, h - 1.4, 7);
+    g.stroke();
+  });
+}
+
+/**
+ * Elicottero della polizia. Il corpo è baked, le pale no: girano a runtime, e una
+ * pala ferma su uno sprite in cache si legge come un rottame.
+ */
+export function getChopperSprite() {
+  return sprite('chopper', 96, 40, (g, w, h) => {
+    const cy = h / 2;
+    // Trave di coda e deriva
+    g.fillStyle = '#1b2129';
+    roundRect(g, 6, cy - 3.4, 44, 6.8, 3); g.fill();
+    g.fillStyle = '#243040';
+    roundRect(g, 4, cy - 9, 6, 18, 2); g.fill();
+    // Fusoliera
+    const grad = g.createLinearGradient(0, cy - 14, 0, cy + 14);
+    grad.addColorStop(0, '#3d4a5c');
+    grad.addColorStop(0.5, '#232b36');
+    grad.addColorStop(1, '#12161c');
+    g.fillStyle = grad;
+    g.beginPath(); g.ellipse(64, cy, 28, 13, 0, 0, 6.2832); g.fill();
+    g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 1.6; g.stroke();
+    // Vetratura del muso
+    g.fillStyle = '#0e141c';
+    g.beginPath(); g.ellipse(80, cy, 11, 9, 0, 0, 6.2832); g.fill();
+    g.fillStyle = 'rgba(160,200,240,0.22)';
+    g.beginPath(); g.ellipse(82, cy - 2.5, 7, 4.5, 0, 0, 6.2832); g.fill();
+    // Pattini
+    g.strokeStyle = '#4c545e'; g.lineWidth = 2.4;
+    for (const s of [-1, 1]) {
+      g.beginPath();
+      g.moveTo(50, cy + s * 15);
+      g.lineTo(84, cy + s * 15);
+      g.stroke();
+    }
+    // Livrea 경찰
+    g.fillStyle = '#1c3f8f';
+    g.fillRect(46, cy - 2.4, 34, 4.8);
+    g.fillStyle = 'rgba(255,255,255,0.9)';
+    g.font = 'bold 8px sans-serif';
+    g.textAlign = 'center';
+    g.fillText('경찰', 62, cy + 2.6);
+  });
+}
+
+/** Striscia chiodata: il pettine di punte è tutta la sua leggibilità. */
+export function getSpikeSprite(horiz) {
+  const w = horiz ? 150 : 26;
+  const h = horiz ? 26 : 150;
+  return sprite(`spikes:${horiz ? 'h' : 'v'}`, w, h, (g) => {
+    g.fillStyle = '#1e2126';
+    roundRect(g, horiz ? 2 : 8, horiz ? 8 : 2, horiz ? w - 4 : 10, horiz ? 10 : h - 4, 2);
+    g.fill();
+    // Fasce gialle da attrezzatura di servizio: si legge come roba della polizia
+    // e non come una crepa nell'asfalto.
+    g.fillStyle = '#d9b32a';
+    for (let i = 0; i < (horiz ? w : h); i += 16) {
+      if (horiz) g.fillRect(4 + i, 9, 7, 8);
+      else g.fillRect(9, 4 + i, 8, 7);
+    }
+    g.fillStyle = '#c9ccd2';
+    const n = Math.floor((horiz ? w : h) / 9);
+    for (let i = 0; i < n; i++) {
+      const p = 6 + i * 9;
+      g.beginPath();
+      if (horiz) {
+        g.moveTo(p, 8); g.lineTo(p + 3, 1); g.lineTo(p + 6, 8);
+        g.moveTo(p, 18); g.lineTo(p + 3, 25); g.lineTo(p + 6, 18);
+      } else {
+        g.moveTo(8, p); g.lineTo(1, p + 3); g.lineTo(8, p + 6);
+        g.moveTo(18, p); g.lineTo(25, p + 3); g.lineTo(18, p + 6);
+      }
       g.fill();
     }
   });
@@ -704,6 +1031,12 @@ export function preloadSprites() {
       for (let f = 0; f < PED_FRAMES; f++) getPedSprite(kind, c, f);
     }
   }
+  for (let f = 0; f < PED_FRAMES; f++) {
+    getHeroSprite(f, 'walk');
+    getHeroSprite(f, 'aim');
+  }
+  getHeroPortrait();
+  getChopperSprite();
   for (const type of ['lamp', 'tree', 'bin', 'hydrant', 'bench', 'vending', 'busstop', 'pallet', 'ac_unit', 'barrier']) {
     getPropSprite({ type, tint: 0, r: 12 });
   }
