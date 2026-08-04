@@ -30,8 +30,34 @@ Poi apri <http://localhost:8123>.
 | `F3` | pannello tecnico (fps, entità, posizione) |
 
 Armi e munizioni si raccolgono a terra, nei cortili e nei vicoli. A zero salute ci si
-risveglia davanti all'ospedale del distretto più vicino — con la salute piena e senza
-più un'arma.
+risveglia davanti all'ospedale del distretto più vicino — con la salute piena, senza
+più un'arma e senza più nessuno alle costole.
+
+## Il protagonista
+
+**Jae-min Seo** si riconosce a colpo d'occhio anche in mezzo alla folla di Myeongdong:
+bomber nero con la banda rossa lungo la schiena e l'artigliata della tigre bianca (백호),
+fascia rossa in fronte, suole rosse. Con un'arma da fuoco in pugno cambia posa — braccia
+tese verso il mirino — e il suo ritratto in alto a sinistra lampeggia di rosso quando
+incassa. È tutto disegnato da codice, come il resto.
+
+## Ricercato
+
+Sparare in strada, investire qualcuno o rubare un'auto sotto gli occhi di un testimone
+alza il livello di **수배** (ricercato), da una a cinque stelle:
+
+| ★ | Cosa ti arriva addosso |
+| --- | --- |
+| ★ | pattuglie a piedi |
+| ★★ | volanti con sirena, l'equipaggio scende quando sei a piedi |
+| ★★★ | speronamenti e colpi dal finestrino |
+| ★★★★ | posti di blocco e strisce chiodate sulla tua strada |
+| ★★★★★ | furgoni SWAT ed elicottero col riflettore |
+
+Le stelle scendono **solo se nessuno ti vede**: basta un poliziotto con la linea di vista
+libera, o il cono del riflettore addosso, e il cronometro della fuga riparte da zero. Un
+vicolo, una scalinata che le auto non possono salire o un palazzo in mezzo valgono più di
+un motore grosso. I tre ponti sul Han sono passaggi obbligati: è lì che mettono i blocchi.
 
 ## La lore
 
@@ -107,6 +133,12 @@ Alcune scelte tecniche che spiegano il risultato a schermo:
 - **Scalinate.** Un vicolo passante troppo ripido diventa una scalinata: stessa geometria di
   prima più un solido che ferma le ruote e lascia passare i piedi. È la scorciatoia che le
   auto non possono seguire.
+- **Polizia senza pathfinding.** Le unità sono le entità che esistono già: un agente è un
+  pedone con uno stato in più, una volante è un veicolo con gas e sterzo scritti da un'altra
+  parte. A ogni incrocio la volante prende l'arco che avvicina di più al bersaglio — dieci
+  confronti, nessun grafo di ricerca — e quando resta incastrata manovra in retromarcia come
+  il traffico civile. I posti di blocco sono volanti ferme di traverso più transenne che
+  fermano le ruote e lasciano passare piedi e proiettili: la stessa cosa delle scalinate.
 
 ## Stato
 
@@ -122,8 +154,15 @@ pistola · SMG, drive-by, raccolte a terra, salute e morte con risveglio all'osp
 pedoni che scappano agli spari e teppisti che rispondono al fuoco, sangue persistente e
 ragdoll.
 
-**Fase 2, tappe B e C — da fare.** Sistema di ricercato a 5 livelli (pattuglie, volanti,
-speronamenti, posti di blocco e chiodi, SWAT ed elicottero), poi armi pesanti ed esplosivi.
+**Fase 2, tappa B — completata.** Ricercato a 5 livelli con heat e raffreddamento a vista,
+pattuglie a piedi, volanti che inseguono e speronano, sbarco dell'equipaggio, colpi dal
+finestrino, posti di blocco, strisce chiodate (gomme a terra: meno velocità, meno grip e
+tiraggio da un lato), furgoni SWAT, elicottero con riflettore — abbattibile — e stelle
+sull'HUD, blip su minimappa e mappa.
+
+**Fase 2, tappa C — da fare.** Armi pesanti ed esplosivi (katana, pompa, fucile d'assalto,
+sniper, minigun, molotov, granate, mine): gli esplosivi sono gli unici che vogliono
+proiettili veri al posto del raycast.
 
 **Fase 3 — da fare.** Le 12 missioni con cutscene a fumetti, negozi (armi, garage, ospedale),
 mercato nero dinamico, attività secondarie, ciclo giorno-notte e meteo, audio procedurale,

@@ -14,6 +14,8 @@ import { Player } from './entities/player.js';
 import { TrafficSystem } from './entities/traffic.js';
 import { PedestrianSystem } from './entities/pedestrians.js';
 import { PickupSystem } from './entities/pickups.js';
+import { WantedSystem } from './entities/wanted.js';
+import { PoliceSystem } from './entities/police.js';
 import { Hud } from './ui/hud.js';
 import { MapView } from './ui/mapview.js';
 import { PauseMenu } from './ui/menu.js';
@@ -46,6 +48,9 @@ class Game {
       pedsHit: 0,
       kills: 0,
       deaths: 0,
+      copsKilled: 0,
+      maxWanted: 0,
+      choppers: 0,
       districts: new Set(),
     };
     this._skidT = 0;
@@ -86,6 +91,8 @@ class Game {
     this.traffic = new TrafficSystem(this.city, this.rng, this.vehicles);
     this.pedSystem = new PedestrianSystem(this.city, this.rng, this.peds);
     this.pickups = new PickupSystem(this.city, this.rng);
+    this.wanted = new WantedSystem();
+    this.police = new PoliceSystem(this.city, this.rng);
     this.hud = new Hud(this.city, this.mapTexture);
     this.mapView = new MapView(this.city, this.mapTexture);
     this.menu = new PauseMenu(this.mapView);
@@ -114,6 +121,14 @@ class Game {
     this.stats.stolen++;
     v.protect = true;
     this.hud.toast(`${VEHICLE_TYPES[v.kind].label} acquisita`, 1.8);
+    // Rubare un'auto vuota in un vicolo non lo denuncia nessuno; strapparla dalle
+    // mani di qualcuno sotto gli occhi di un testimone sì, e a una pattuglia ancora di più.
+    if (!v.occupiedTheft) return;
+    const cop = this.police.cops.some((p) => !p.dead && dist(p.x, p.y, v.x, v.y) < 420);
+    if (cop) this.wanted.report('copTheft', this);
+    else if (this.pedGrid.queryCircle(v.x, v.y, 320).some((p) => !p.dead)) {
+      this.wanted.report('theft', this);
+    }
   }
 
   onExitVehicle(v) {
@@ -153,12 +168,23 @@ class Game {
       this.player.damage(60 - pd * 0.3, (this.player.x - v.x) / (pd || 1), (this.player.y - v.y) / (pd || 1), this);
     }
     this.pedSystem.alarm(v.x, v.y, 700, this, null);
+    // Far saltare una macchina è un reato solo se l'hai fatta saltare tu: le
+    // carambole del traffico non devono mandare la centrale in allarme.
+    if (v.lastAttacker === this.player) this.wanted.report('wreck', this);
     v.protect = false;
   }
 
   onPedKilled(p, v, speed, source) {
     this.stats.pedsHit++;
     if (source === this.player) this.stats.kills++;
+    if (source === this.player || (v && v.driver === 'player')) {
+      if (p.cop) {
+        this.stats.copsKilled++;
+        this.wanted.report('copKill', this);
+      } else {
+        this.wanted.report('kill', this);
+      }
+    }
     this.fx.addBlood(p.x, p.y, clamp(speed / 220, 0.5, 1.6));
     if (v) {
       this.fx.addDust(p.x, p.y, v.vx, v.vy, 3);
@@ -180,9 +206,10 @@ class Game {
     this.player.damage(dmg, dx, dy, this);
   }
 
-  damageVehicle(v, dmg, x, y) {
+  damageVehicle(v, dmg, x, y, source) {
     this.fx.addSparks(x, y, -v.vx, -v.vy, 2);
     if (v.dead) return;
+    if (source) v.lastAttacker = source;
     v.hp -= dmg;
     v.awake = true;
     if (v.hp <= 0) {
@@ -207,6 +234,10 @@ class Game {
     }
     pl.revive(best.x, best.y);
     pl.angle = Math.PI / 2;
+    // In corsia il ricercato si azzera: è il prezzo già pagato con la morte, e
+    // svegliarsi con quattro stelle addosso sarebbe una condanna senza uscita.
+    this.wanted.reset();
+    this.police.standDown(this, true);
     this.camera.snapTo(pl.x, pl.y);
     this.fx.clear();
     pl.district = this.city.districtAt(pl.x, pl.y);
@@ -248,6 +279,11 @@ class Game {
     const prevY = this.player.y;
 
     this.player.update(dt, this);
+    // Il ricercato legge l'avvistamento calcolato dalla polizia, la polizia scrive
+    // gas e sterzo delle volanti: la fisica di quei veicoli la integra `traffic`,
+    // che deve girare dopo.
+    this.wanted.update(dt, this);
+    this.police.update(dt, this);
     this.traffic.update(dt, this);
     this.pedSystem.update(dt, this);
     this.pickups.update(dt, this);
@@ -293,6 +329,14 @@ class Game {
       if (strength > 0.5 && Math.random() < 0.4) {
         this.fx.addSmoke(bx, by, 1, 0.5);
       }
+    }
+    // Cerchioni sull'asfalto: chi ha preso i chiodi lascia una scia di scintille.
+    for (const v of this.vehicles) {
+      if (!v.flatTires || v.dead || Math.abs(v.speed) < 35) continue;
+      if (dist(v.x, v.y, this.player.x, this.player.y) > 700) continue;
+      const spec = VEHICLE_TYPES[v.kind];
+      const cos = Math.cos(v.angle), sin = Math.sin(v.angle);
+      this.fx.addSparks(v.x - cos * spec.len * 0.3, v.y - sin * spec.len * 0.3, -v.vx, -v.vy, 2);
     }
   }
 

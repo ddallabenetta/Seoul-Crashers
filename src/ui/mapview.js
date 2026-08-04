@@ -142,6 +142,27 @@ export class MapView {
       ctx.arc(s.x, s.y, 3.5, 0, 6.2832);
       ctx.fill();
     }
+    // Posti di blocco e chiodi: la mappa serve proprio a scegliere un'altra strada.
+    if (game.police) {
+      ctx.strokeStyle = '#5a8cff';
+      ctx.lineWidth = 3;
+      for (const b of game.police.blocks) {
+        const s = toScreen(b.x, b.y);
+        ctx.beginPath();
+        if (b.vertical) { ctx.moveTo(s.x - 7, s.y); ctx.lineTo(s.x + 7, s.y); }
+        else { ctx.moveTo(s.x, s.y - 7); ctx.lineTo(s.x, s.y + 7); }
+        ctx.stroke();
+      }
+      ctx.strokeStyle = '#ffd23f';
+      ctx.lineWidth = 2;
+      for (const sp of game.police.spikes) {
+        const s = toScreen(sp.cx, sp.cy);
+        ctx.beginPath();
+        if (sp.horiz) { ctx.moveTo(s.x - 5, s.y); ctx.lineTo(s.x + 5, s.y); }
+        else { ctx.moveTo(s.x, s.y - 5); ctx.lineTo(s.x, s.y + 5); }
+        ctx.stroke();
+      }
+    }
 
     // Posizione del giocatore: freccia con alone pulsante
     const s = toScreen(p.x, p.y);

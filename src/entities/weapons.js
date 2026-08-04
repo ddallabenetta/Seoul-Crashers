@@ -5,6 +5,7 @@
 // meglio di uno sprite che vola. I proiettili veri servirebbero solo agli esplosivi,
 // che arrivano nella tappa C.
 import { VEHICLE_TYPES } from '../render/sprites.js';
+import { PROJ } from '../render/camera.js';
 import { angleDiff, clamp, wrapAngle } from '../core/math.js';
 
 // spread è in radianti di deviazione standard; rate è il tempo fra due colpi.
@@ -136,6 +137,17 @@ export function rayCast(game, ox, oy, dx, dy, maxDist, ignore = null, ignoreVehi
     if (t !== null && t < bd) { bd = t; hit = pl; type = 'player'; }
   }
 
+  // Elicottero: si colpisce dove lo si *vede*, cioè alla sua posizione proiettata.
+  // In una visuale 2.5D mirare alla sua verticale a terra sarebbe incomprensibile.
+  const chop = game.police && game.police.chopper;
+  if (chop && ignore === pl) {
+    const f = chop.z / PROJ;
+    const cx = chop.x + (chop.x - game.camera.cx) * f;
+    const cy = chop.y + (chop.y - game.camera.cy) * f;
+    const t = rayCircle(ox, oy, dx, dy, cx, cy, 24);
+    if (t !== null && t < bd) { bd = t; hit = chop; type = 'chopper'; }
+  }
+
   return { dist: bd, x: ox + dx * bd, y: oy + dy * bd, hit, type };
 }
 
@@ -220,7 +232,14 @@ export function shoot(game, owner, spec, ox, oy, ang, opts = {}) {
         break;
       case 'vehicle':
         // La lamiera assorbe: servono parecchi colpi per far saltare un'auto.
-        game.damageVehicle(h.hit, spec.damage * 0.55, h.x, h.y);
+        game.damageVehicle(h.hit, spec.damage * 0.55, h.x, h.y, owner);
+        // Un po' di piombo passa dal finestrino: sotto inseguimento restare in
+        // macchina non deve essere gratis.
+        if (h.hit.driver === 'player' && !fromPlayer) game.damagePlayer(spec.damage * 0.16, dx, dy);
+        break;
+      case 'chopper':
+        game.police.damageChopper(spec.damage, game);
+        game.fx.addSparks(h.x, h.y, -dx, -dy, 4);
         break;
       default:
         game.fx.addSparks(h.x, h.y, -dx, -dy, 3);
@@ -269,7 +288,7 @@ export function meleeSwing(game, owner, spec, ox, oy, ang) {
       const d = Math.hypot(_circ[i] - ox, _circ[i + 1] - oy);
       if (d > spec.range + r) continue;
       if (Math.abs(angleDiff(ang, Math.atan2(_circ[i + 1] - oy, _circ[i] - ox))) > spec.arc / 2) continue;
-      game.damageVehicle(v, spec.damage * 0.5, ox + cos * spec.range, oy + sin * spec.range);
+      game.damageVehicle(v, spec.damage * 0.5, ox + cos * spec.range, oy + sin * spec.range, owner);
       v.awake = true;
       return true;
     }

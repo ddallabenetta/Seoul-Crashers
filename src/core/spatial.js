@@ -36,6 +36,27 @@ export class SpatialGrid {
     }
   }
 
+  /**
+   * Toglie un oggetto inserito con `insertRect`. L'oggetto non deve essersi mosso
+   * nel frattempo: si ricalcolano le stesse celle dell'inserimento. Serve agli
+   * ostacoli che nascono e muoiono a runtime (le transenne dei posti di blocco):
+   * lasciarli nella griglia significherebbe muri invisibili per il resto della partita.
+   */
+  removeRect(obj) {
+    const x0 = Math.min(this.cols - 1, this._cellOf(obj.x));
+    const y0 = Math.min(this.rows - 1, this._cellOf(obj.y));
+    const x1 = Math.min(this.cols - 1, this._cellOf(obj.x + obj.w));
+    const y1 = Math.min(this.rows - 1, this._cellOf(obj.y + obj.h));
+    for (let cy = y0; cy <= y1; cy++) {
+      for (let cx = x0; cx <= x1; cx++) {
+        const b = this.buckets[this._idx(cx, cy)];
+        if (!b) continue;
+        const k = b.indexOf(obj);
+        if (k >= 0) b.splice(k, 1);
+      }
+    }
+  }
+
   /** Inserisce un oggetto puntiforme con campi x,y. */
   insertPoint(obj) {
     const cx = Math.min(this.cols - 1, this._cellOf(obj.x));

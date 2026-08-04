@@ -4,7 +4,11 @@
 // (painter's algorithm radiale) e disegnati dal più lontano al più vicino.
 import { PROJ, SUN } from './camera.js';
 import { facadeTexture, facadeGradient, bucketCols, bucketRows, signSprite, FTW, FTH } from './facades.js';
-import { getVehicleSprite, getPedSprite, getPropSprite, getWreckSprite, getPickupSprite, VEHICLE_TYPES, PED_FRAMES } from './sprites.js';
+import {
+  getVehicleSprite, getPedSprite, getPropSprite, getWreckSprite, getPickupSprite,
+  getHeroSprite, getChopperSprite, getSpikeSprite, VEHICLE_TYPES, PED_FRAMES,
+} from './sprites.js';
+import { WEAPONS } from '../entities/weapons.js';
 import { GroundRenderer } from './ground.js';
 import { signalAxis } from '../world/roadgraph.js';
 
@@ -78,8 +82,9 @@ export class Scene {
     // 1) Terreno
     this.ground.draw(ctx, cam);
 
-    // 2) Decalcomanie sul terreno (sangue, gomma, rottami piatti)
+    // 2) Decalcomanie sul terreno (sangue, gomma, rottami piatti) e chiodi
     if (game.fx) game.fx.drawDecals(ctx);
+    if (game.police) this.drawSpikes(ctx, game);
 
     // 3) Ombre proiettate
     ctx.fillStyle = 'rgba(0,0,0,0.34)';
@@ -142,7 +147,14 @@ export class Scene {
       }
     }
 
-    // 6) Effetti sopra il mondo (proiettili, fuoco, particelle)
+    // 6) Transenne dei posti di blocco ed elicottero: stanno sopra tutto il resto
+    // (le prime sono basse ma nascono a runtime, il secondo vola a 210 px di quota).
+    if (game.police) {
+      this.drawRoadblocks(ctx, game, cam);
+      this.drawChopper(ctx, game, cam);
+    }
+
+    // 7) Effetti sopra il mondo (proiettili, fuoco, particelle)
     if (game.fx) game.fx.draw(ctx, cam, game.time);
   }
 
@@ -469,8 +481,8 @@ export class Scene {
     const spr = getPedSprite(p.kind, p.colorIndex, frame);
     // Chi ce l'ha con te va riconosciuto al volo: nella folla un teppista nero
     // è identico a un passante finché non ti spara.
-    if (p.hostile && !p.dead) {
-      ctx.strokeStyle = 'rgba(226,60,52,0.75)';
+    if ((p.hostile || p.cop) && !p.dead) {
+      ctx.strokeStyle = p.cop ? 'rgba(84,132,255,0.7)' : 'rgba(226,60,52,0.75)';
       ctx.lineWidth = 1.8;
       ctx.beginPath();
       ctx.arc(p.x, p.y, 13, 0, 6.2832);
@@ -484,7 +496,7 @@ export class Scene {
       ctx.scale(1.05, 0.75);
     }
     ctx.drawImage(spr.canvas, -spr.w / 2, -spr.h / 2, spr.w, spr.h);
-    if (p.armed && !p.dead) drawHeldWeapon(ctx, 'pistol');
+    if (p.armed && !p.dead) drawHeldWeapon(ctx, p.copWeapon || 'pistol');
     ctx.restore();
   }
 
@@ -494,17 +506,113 @@ export class Scene {
     const ox = (pl.x - cam.cx) * f;
     const oy = (pl.y - cam.cy) * f;
     const frame = pl.dying ? 0 : Math.floor(pl.animT) % PED_FRAMES;
-    const spr = getPedSprite('player', pl.colorIndex, frame);
+    // Con un'arma da fuoco in pugno la posa cambia: braccia tese verso il mirino.
+    const aiming = !pl.dying && !WEAPONS[pl.weapon].melee;
+    const spr = getHeroSprite(frame, aiming ? 'aim' : 'walk');
     ctx.save();
     ctx.translate(pl.x + ox * 0.7, pl.y + oy * 0.7);
     ctx.rotate(pl.angle);
     if (pl.dying) {
       ctx.globalAlpha = 0.95;
       ctx.scale(1.05, 0.75);
-    } else {
-      drawHeldWeapon(ctx, pl.weapon);
     }
     ctx.drawImage(spr.canvas, -spr.w / 2, -spr.h / 2, spr.w, spr.h);
+    // L'arma va sopra la sagoma, non sotto: è quello che si deve leggere per primo.
+    if (!pl.dying) drawHeldWeapon(ctx, pl.weapon);
+    ctx.restore();
+  }
+
+  /** Chiodi: piatti sull'asfalto, quindi vanno col pass delle decalcomanie. */
+  drawSpikes(ctx, game) {
+    for (const s of game.police.spikes) {
+      const spr = getSpikeSprite(s.horiz);
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, 0.35 + s.t * 2);
+      ctx.drawImage(spr.canvas, s.x + s.w / 2 - spr.w / 2, s.y + s.h / 2 - spr.h / 2, spr.w, spr.h);
+      ctx.restore();
+    }
+  }
+
+  drawRoadblocks(ctx, game, cam) {
+    const spr = getPropSprite({ type: 'barrier', tint: 0 });
+    for (const b of game.police.blocks) {
+      for (const bar of b.barriers) {
+        const cx = bar.x + bar.w / 2;
+        const cy = bar.y + bar.h / 2;
+        const f = 20 / PROJ;
+        ctx.save();
+        ctx.translate(cx + (cx - cam.cx) * f * 0.65, cy + (cy - cam.cy) * f * 0.65);
+        ctx.rotate(b.vertical ? 0 : Math.PI / 2);
+        ctx.drawImage(spr.canvas, -spr.w / 2, -spr.h / 2, spr.w, spr.h);
+        ctx.restore();
+      }
+    }
+  }
+
+  /**
+   * Elicottero: ombra a terra, cono del riflettore, poi il velivolo alla sua quota
+   * proiettata. Le pale girano a runtime — una pala ferma sembra un rottame.
+   */
+  drawChopper(ctx, game, cam) {
+    const c = game.police.chopper;
+    if (!c) return;
+    const f = c.z / PROJ;
+    const px = c.x + (c.x - cam.cx) * f;
+    const py = c.y + (c.y - cam.cy) * f;
+
+    // Riflettore
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(c.beamX, c.beamY, 4, c.beamX, c.beamY, 118);
+    g.addColorStop(0, 'rgba(255,248,220,0.34)');
+    g.addColorStop(0.55, 'rgba(255,244,200,0.13)');
+    g.addColorStop(1, 'rgba(255,244,200,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(c.beamX, c.beamY, 118, 0, 6.2832);
+    ctx.fill();
+    // Fascio: dal velivolo alla macchia di luce
+    ctx.strokeStyle = 'rgba(255,246,210,0.10)';
+    ctx.lineWidth = 26;
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(c.beamX, c.beamY);
+    ctx.stroke();
+    ctx.restore();
+
+    // Ombra sotto la verticale
+    ctx.fillStyle = 'rgba(0,0,0,0.26)';
+    ctx.beginPath();
+    ctx.ellipse(c.x + SUN.x * c.z * SUN.scale, c.y + SUN.y * c.z * SUN.scale, 26, 12, c.angle, 0, 6.2832);
+    ctx.fill();
+
+    const spr = getChopperSprite();
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(c.angle);
+    ctx.drawImage(spr.canvas, -spr.w * 0.66, -spr.h / 2, spr.w, spr.h);
+    // Rotore principale e di coda
+    const a = game.time * 26;
+    ctx.strokeStyle = 'rgba(210,220,235,0.34)';
+    ctx.lineWidth = 2.6;
+    for (let i = 0; i < 4; i++) {
+      const ang = a + (i * Math.PI) / 2;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(ang) * 40, Math.sin(ang) * 40);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 0.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, 40, 0, 6.2832);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    // Luce anticollisione: è quello che lo fa leggere come velivolo e non come
+    // una macchia scura che scivola sopra i tetti.
+    ctx.fillStyle = Math.sin(game.time * 6) > 0 ? '#ff5b5b' : 'rgba(120,20,20,0.5)';
+    ctx.beginPath();
+    ctx.arc(-26, 0, 2.6, 0, 6.2832);
+    ctx.fill();
     ctx.restore();
   }
 

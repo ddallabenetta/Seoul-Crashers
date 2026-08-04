@@ -1,7 +1,7 @@
 // HUD: minimappa, tachimetro, salute e arma, cartello del distretto, suggerimenti.
 import { KMH, clamp } from '../core/math.js';
 import { MAP_SIZE } from '../world/maptexture.js';
-import { VEHICLE_TYPES } from '../render/sprites.js';
+import { VEHICLE_TYPES, getHeroPortrait } from '../render/sprites.js';
 import { WEAPONS } from '../entities/weapons.js';
 
 const MINIMAP = 196;
@@ -44,6 +44,7 @@ export class Hud {
     this.drawMinimap(ctx, game, 22, h - MINIMAP - 22);
     if (!game.player.onFoot) this.drawSpeedo(ctx, game, w - 132, h - 112);
     this.drawVitals(ctx, game, 22, 22);
+    if (game.wanted) this.drawWanted(ctx, game, 22, 100);
     this.drawDistrictToast(ctx, game, w, h);
     this.drawHints(ctx, game, w, h);
     this.drawMessages(ctx, w, h);
@@ -54,23 +55,37 @@ export class Hud {
     ctx.restore();
   }
 
-  /** Salute e arma in mano: la colonna di sinistra, sopra la minimappa. */
+  /** Ritratto, salute e arma in mano: la colonna di sinistra, sopra la minimappa. */
   drawVitals(ctx, game, x, y) {
     const p = game.player;
-    const w = 214;
+    const w = 262;
+    const bx = x + 68; // colonna di barre e testo, a destra del ritratto
     ctx.save();
     ctx.fillStyle = 'rgba(10,12,15,0.72)';
     roundPath(ctx, x, y, w, 62, 10);
     ctx.fill();
 
+    // Ritratto di Jae-min: sotto tiro pulsa di rosso.
+    const portrait = getHeroPortrait();
+    ctx.drawImage(portrait.canvas, x + 8, y + 8, 46, 46);
+    if (p.hurtT > 0 || p.hp < p.maxHp * 0.3) {
+      ctx.save();
+      ctx.globalAlpha = Math.max(clamp(p.hurtT / 0.4, 0, 1) * 0.5,
+        p.hp < p.maxHp * 0.3 ? 0.18 + 0.14 * Math.sin(game.time * 5) : 0);
+      ctx.fillStyle = '#c62f2a';
+      roundPath(ctx, x + 8, y + 8, 46, 46, 7);
+      ctx.fill();
+      ctx.restore();
+    }
+
     // Barra della salute
     const t = clamp(p.hp / p.maxHp, 0, 1);
     ctx.fillStyle = 'rgba(255,255,255,0.12)';
-    roundPath(ctx, x + 12, y + 13, w - 24, 12, 6);
+    roundPath(ctx, bx, y + 13, w - 12 - (bx - x), 12, 6);
     ctx.fill();
     ctx.fillStyle = t > 0.5 ? '#4ad98a' : t > 0.22 ? '#e8c33a' : '#e04a3a';
     if (t > 0.01) {
-      roundPath(ctx, x + 12, y + 13, (w - 24) * t, 12, 6);
+      roundPath(ctx, bx, y + 13, (w - 12 - (bx - x)) * t, 12, 6);
       ctx.fill();
     }
     ctx.font = '700 10px system-ui, sans-serif';
@@ -83,11 +98,41 @@ export class Hud {
     ctx.textAlign = 'left';
     ctx.font = '700 13px system-ui, "Apple SD Gothic Neo", sans-serif';
     ctx.fillStyle = '#eef1f6';
-    ctx.fillText(`${spec.hangul}  ${spec.label}`, x + 12, y + 47);
+    ctx.fillText(`${spec.hangul}  ${spec.label}`, bx, y + 47);
     ctx.textAlign = 'right';
     ctx.font = '700 15px ui-monospace, monospace';
     ctx.fillStyle = spec.infinite ? 'rgba(230,235,245,0.45)' : p.shots > 0 ? '#ffd23f' : '#e04a3a';
     ctx.fillText(spec.infinite ? '∞' : String(p.shots), x + w - 12, y + 48);
+    ctx.restore();
+  }
+
+  /**
+   * Livello di ricercato. Le stelle piene sono quelle attive; l'ultima lampeggia
+   * mentre stai riuscendo a seminarli, ed è l'unico modo che ha il giocatore di
+   * sapere che nascondersi sta funzionando.
+   */
+  drawWanted(ctx, game, x, y) {
+    const wanted = game.wanted;
+    if (wanted.level === 0) return;
+    const cooling = wanted.cooling;
+    ctx.save();
+    ctx.textAlign = 'left';
+    ctx.font = '700 11px system-ui, "Apple SD Gothic Neo", sans-serif';
+    ctx.fillStyle = 'rgba(235,240,250,0.5)';
+    ctx.fillText('수배', x + 2, y - 6);
+    for (let i = 0; i < 5; i++) {
+      const active = i < wanted.level;
+      // La stella più alta sfarfalla quando il cronometro della fuga corre.
+      const fading = active && i === wanted.level - 1 && cooling > 0.05;
+      const alpha = fading ? 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(game.time * 9)) * (1 - cooling) : 1;
+      ctx.globalAlpha = active ? alpha : 0.22;
+      star(ctx, x + 12 + i * 26, y + 10, 10);
+      ctx.fillStyle = active ? '#ffd23f' : 'rgba(230,235,245,0.35)';
+      ctx.fill();
+      ctx.lineWidth = 1.4;
+      ctx.strokeStyle = 'rgba(10,12,16,0.85)';
+      ctx.stroke();
+    }
     ctx.restore();
   }
 
@@ -195,15 +240,39 @@ export class Hud {
       ctx.fillRect(m.x - 1, m.y - 3.2, 2, 6.4);
       ctx.fillRect(m.x - 3.2, m.y - 1, 6.4, 2);
     }
-    // Chi ti sta dando la caccia
-    ctx.fillStyle = '#ff4a4a';
+    // Chi ti sta dando la caccia: teppisti in rosso, divise in blu.
     for (const p of game.peds) {
-      if (!p.hostile || p.dead) continue;
+      if ((!p.hostile && !p.cop) || p.dead) continue;
       const m = toMap(p.x, p.y);
       if (m.x < x || m.x > x + MINIMAP || m.y < y || m.y > y + MINIMAP) continue;
+      ctx.fillStyle = p.cop ? '#5a8cff' : '#ff4a4a';
       ctx.beginPath();
       ctx.arc(m.x, m.y, 2.8, 0, 6.2832);
       ctx.fill();
+    }
+    // Posti di blocco e chiodi: si devono vedere prima di prenderli in faccia.
+    if (game.police) {
+      for (const b of game.police.blocks) {
+        const m = toMap(b.x, b.y);
+        if (m.x < x || m.x > x + MINIMAP || m.y < y || m.y > y + MINIMAP) continue;
+        ctx.fillStyle = '#5a8cff';
+        ctx.fillRect(m.x - (b.vertical ? 7 : 2), m.y - (b.vertical ? 2 : 7), b.vertical ? 14 : 4, b.vertical ? 4 : 14);
+      }
+      for (const s of game.police.spikes) {
+        const m = toMap(s.cx, s.cy);
+        if (m.x < x || m.x > x + MINIMAP || m.y < y || m.y > y + MINIMAP) continue;
+        ctx.fillStyle = '#ffd23f';
+        ctx.fillRect(m.x - (s.horiz ? 6 : 1.5), m.y - (s.horiz ? 1.5 : 6), s.horiz ? 12 : 3, s.horiz ? 3 : 12);
+      }
+      const c = game.police.chopper;
+      if (c) {
+        const m = toMap(c.x, c.y);
+        ctx.strokeStyle = '#5a8cff';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.arc(clamp(m.x, x + 5, x + MINIMAP - 5), clamp(m.y, y + 5, y + MINIMAP - 5), 5, 0, 6.2832);
+        ctx.stroke();
+      }
     }
 
     // Marker missione / obiettivi
@@ -382,6 +451,8 @@ export class Hud {
       `edifici ${this.city.stats.buildings}  props ${this.city.stats.props}`,
       `nodi ${this.city.stats.nodes}  archi ${this.city.stats.edges}`,
       `scalinate ${this.city.stats.stairs}  ostili ${game.peds.filter((p) => p.hostile).length}`,
+      `wanted ${game.wanted.level}  heat ${game.wanted.heat.toFixed(0)}  ${game.wanted.seen ? 'visto' : `fuga ${game.wanted.unseenT.toFixed(1)}s`}`,
+      `polizia ${game.police.cops.length}p ${game.police.cars.length}v  blocchi ${game.police.blocks.length}`,
       `pos ${Math.round(game.player.x)}, ${Math.round(game.player.y)}`,
       `zoom ${game.camera.zoom.toFixed(2)}`,
     ];
@@ -389,11 +460,25 @@ export class Hud {
     ctx.font = '500 12px ui-monospace, monospace';
     ctx.textAlign = 'left';
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(w - 210, 14, 196, lines.length * 16 + 12);
+    ctx.fillRect(w - 296, 14, 282, lines.length * 16 + 12);
     ctx.fillStyle = '#8ff0c0';
-    lines.forEach((l, i) => ctx.fillText(l, w - 200, 32 + i * 16));
+    lines.forEach((l, i) => ctx.fillText(l, w - 286, 32 + i * 16));
     ctx.restore();
   }
+}
+
+/** Stella a cinque punte centrata in (cx,cy). */
+function star(ctx, cx, cy, r) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5;
+    const rr = i % 2 === 0 ? r : r * 0.44;
+    const x = cx + Math.cos(a) * rr;
+    const y = cy + Math.sin(a) * rr;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
 }
 
 export function roundPath(ctx, x, y, w, h, r) {

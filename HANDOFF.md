@@ -3,7 +3,8 @@
 Documento per riprendere il lavoro da una sessione pulita. Leggi anche `README.md`
 (descrizione del gioco e comandi) — qui c'è quello che serve a *sviluppare*.
 
-Ultimo aggiornamento: fine Fase 2 tappa A (combattimento base, salute e morte).
+Ultimo aggiornamento: fine Fase 2 tappa B (polizia e ricercato a 5 livelli) + modello
+del protagonista rifatto.
 
 ---
 
@@ -13,12 +14,12 @@ Web game d'azione top-down 2.5D ambientato a Seoul, stile *GTA: Chinatown Wars*.
 Canvas 2D puro, moduli ES nativi, **zero dipendenze, nessun build step**. Tutta la grafica
 (sprite, facciate, terreno, mappa) è generata da codice a runtime: non esistono asset esterni.
 
-Stato: **Fase 1, Fase 1.5 e Fase 2 tappa A completate e collaudate**. 7524 righe in 25
-moduli. 60 fps con ~50 veicoli e ~93 pedoni attivi (~62 e ~112 a Myeongdong, il distretto
-più denso), e restano 60 anche sotto raffica continua di SMG.
+Stato: **Fase 1, Fase 1.5, Fase 2 tappa A e Fase 2 tappa B completate e collaudate**.
+9128 righe in 27 moduli. 60 fps con ~50 veicoli e ~93 pedoni attivi (~62 e ~112 a
+Myeongdong, il distretto più denso), e restano 60 anche sotto raffica continua di SMG.
 
 La Fase 2 è divisa in tre tappe, concordate con l'utente: **A** combattimento base (fatta),
-**B** polizia e ricercato a 5 livelli, **C** armi pesanti, esplosivi, chiodi e posti di blocco.
+**B** polizia e ricercato a 5 livelli (fatta), **C** armi pesanti ed esplosivi.
 
 ### Avvio
 
@@ -112,6 +113,31 @@ const p = game.player;
    sangue: game.fx.decals.filter(d => d.type === 'blood').length })
 ```
 
+Per la caccia (tappa B). `F3` mostra le stesse cose in due righe.
+
+```js
+// ricercato: heat, avvistamento, cronometro della fuga
+({ stelle: game.wanted.level, heat: Math.round(game.wanted.heat),
+   visto: game.wanted.seen, fuga: +game.wanted.unseenT.toFixed(1),
+   raffredda: +game.wanted.cooling.toFixed(2) })
+// unità in campo e quanto sono lontane
+const P = game.police, pl = game.player, d = o => Math.round(Math.hypot(o.x - pl.x, o.y - pl.y));
+({ agenti: P.cops.map(d).sort((a,b)=>a-b), volanti: P.cars.map(d).sort((a,b)=>a-b),
+   sbarcate: P.cars.filter(v => v.deployed).length,
+   blocchi: P.blocks.length, chiodi: P.spikes.length, elicottero: !!P.chopper })
+// prova a freddo: cinque stelle di colpo (e poi si torna puliti)
+game.wanted.add(200, game);   game.wanted.reset();
+```
+
+Valori sani a 5 stelle: `agenti ≤ 16`, `volanti ≤ 6`, `blocchi ≤ 3`, `chiodi ≤ 2`. Se
+crescono oltre, è saltato un tetto in `police.reinforce`/`addCop`. Con `stelle 0` deve
+tornare tutto a zero entro un paio di secondi (`standDown`).
+
+Costo reale della caccia, misurato strumentando il loop: **il tempo di simulazione non
+cambia** (0.91 → 0.86 ms per passo), quello di rendering **raddoppia** (3.9 → 6.4 ms per
+frame) per sirene, riflettore, traccianti e sangue. Il collo di bottiglia della tappa B è
+il disegno, non l'AI.
+
 ---
 
 ## 2. Mappa dei file
@@ -142,12 +168,14 @@ src/render/
   fx.js               decals (gomma, sangue, bruciature) e particelle
 
 src/entities/
-  vehicle.js          fisica arcade, pendenza, collisioni a tre cerchi
+  vehicle.js          fisica arcade, pendenza, collisioni a tre cerchi, gomme a terra
   player.js           a piedi / alla guida, entra-esci, mira, fuoco, salute, morte
   traffic.js          streaming, AI di guida, parcheggi
   pedestrians.js      streaming, marciapiedi, attraversamenti, panico, ostili, ragdoll
   weapons.js          tabella armi, raycast, magnetismo di mira, mischia
   pickups.js          armi/munizioni/kit medici a terra, con ricomparsa
+  wanted.js           heat, 5 livelli di ricercato, raffreddamento a vista
+  police.js           pattuglie, volanti, sbarchi, posti di blocco, chiodi, SWAT, elicottero
 
 src/ui/
   hud.js              minimappa, tachimetro, cartello distretto, toast, debug
@@ -242,6 +270,42 @@ tiro libera. I due numeri sono un compromesso scelto con l'utente: senza assiste
 un pedone largo 20 px a 400 px quasi sempre, con un aggancio duro si smette di mirare. Chi è
 `hostile` ha la precedenza sul passante che gli sta dietro.
 
+**La polizia non ha entità sue.** Un agente è un pedone di `game.peds` con `p.cop = true` e
+stato `duty`: `pedestrians.updatePed` gli chiede dove andare a `police.copBehavior` e poi usa
+lo stesso steering di tutti gli altri (pendenza, collisioni, sangue, ragdoll: gratis). Una
+volante è un veicolo di `game.vehicles` con `driver === 'cop'`: `police.driveCar` scrive solo
+`throttle` e `steer`, la fisica la integra `traffic.update` — **quindi `police.update` deve
+girare prima di `traffic.update`**, ed è così in `main.update`. Corollario: le volanti hanno
+`protect = true`, altrimenti lo streaming del traffico se le porta via a metà inseguimento.
+
+**Inseguimento senza pathfinding.** A ogni nodo `police.chooseEdge` prende l'arco il cui
+estremo lontano è più vicino al bersaglio (greedy, dieci confronti). Su una maglia ortogonale
+arriva quasi sempre; quando sbaglia interviene lo stesso anti-incastro del traffico civile
+(fermo 1.6 s → retromarcia 0.9 s → `snapToRoad`). Sotto i 460 px, in vista e col giocatore in
+auto, si passa allo speronamento diretto. **La riproiezione di `ai.s` al cambio d'arco è
+obbligatoria** anche qui: è la trappola già pagata dal traffico.
+
+**Ricercato = heat + livello.** `wanted.heat` accumula i reati, `wanted.level` è la lettura a
+stelle (soglie in `LEVEL_HEAT`). Si scende **solo restando invisibili**: `police.spotted`
+(pattuglia entro 470/640 px con linea di vista libera, oppure il riflettore addosso) azzera
+`unseenT`, e dopo `COOL_TIME[level]` secondi cade una stella. Sotto la prima stella l'heat si
+scarica da solo a 0.6/s: abbastanza lento da sommare quattro colpi sparati di fila,
+abbastanza veloce da non farti arrivare la volante per una rissa di dieci minuti prima.
+
+**Chiodi e posti di blocco sono `vehicleOnly`.** Le transenne finiscono in `city.solidGrid`
+come le scalinate: fermano le ruote, lasciano passare piedi e proiettili. Nascono a runtime,
+quindi **vanno tolte** quando il blocco si smonta (`SpatialGrid.removeRect`, aggiunto apposta):
+lasciarle dentro significherebbe muri invisibili per il resto della partita. Le strisce
+chiodate invece non stanno nella griglia: sono un rettangolo controllato solo contro il mezzo
+del giocatore (`police.updateSpikes`), perché il traffico civile che si buca non lo guarda
+nessuno e costerebbe un test per veicolo per frame.
+
+**L'elicottero vive nella proiezione.** Vola a `z = 210`, quindi a schermo sta dove lo mette
+la parallasse, non sopra la sua verticale. Due conseguenze: si colpisce alla posizione
+proiettata (c'è un caso apposta in `weapons.rayCast`, ed è l'unico bersaglio che dipende dalla
+camera), e la sua raffica **non passa dal raycast** — un raggio radente sul piano si pianterebbe
+nel primo palazzo. Tira a stima attorno al bersaglio, e chi resta dentro i 13 px incassa.
+
 ---
 
 ## 4. Trappole già pagate — non reintrodurle
@@ -269,6 +333,13 @@ codice spiega il perché nel punto giusto.
 | Modifiche che "non fanno niente" | cache euristica del browser sui moduli ES (vedi §1) | cambiare origine: `127.0.0.1` invece di `localhost` |
 | Teppista armato che non spara mai e avanza al rallentatore | teneva la distanza di tiro anche **senza** linea di tiro: restava a mirare un muro | `pedestrians` case `hostile`, `los` calcolata ogni frame: senza LOS corre a chiudere |
 | Un tap secco del mouse non spara con le automatiche | `mouse.down` è già tornato false se click e rilascio cadono nello stesso frame | `player`, il fuoco guarda `mouse.pressed \|\| (auto && mouse.down)` |
+| Quattro colpi sparati in strada non fanno mai una stella | sotto la prima stella l'heat si scaricava a 3/s: ogni sparo evaporava prima del successivo | `wanted.update`, decadimento a 0.6/s |
+| Volanti che si accumulano finché il gioco non annaspa | dopo lo sbarco la volante restava "viva" ma non contava come unità in caccia, e ne nasceva un'altra a ogni sbarco | `police.reinforce`: tetto sul **totale**, non sulle sole volanti attive; `addCop` ha il suo |
+| Una volante vuota che ti sperona | dopo `deployCrew` la macchina continuava a girare la sua AI | `police.driveCar`, uscita anticipata su `v.deployed` |
+| Muri invisibili dove c'era stato un posto di blocco | `SpatialGrid` non aveva rimozione: le transenne restavano nella griglia per sempre | `SpatialGrid.removeRect` + `police.removeBlock` |
+| I chiodi non comparivano mai in un inseguimento | si mettevano solo dopo aver piazzato *tutti* i posti di blocco previsti, e uno ogni 7 s | `police.manageObstacles`, blocchi e chiodi si alternano |
+| Il protagonista sembra un casco generico | testa grande e centrata sopra un'ellisse: da sopra restava solo una calotta scura | `getHeroSprite`: tronco trapezoidale con spalle larghe, testa piccola spostata avanti, banda rossa lungo la schiena |
+| I fari della polizia accecano in pieno giorno | `lightsOn = true` fisso sulle volanti | `police.spawnCar`, `lightsOn = game.isNight` come per il traffico |
 
 Regola generale emersa: **prima di dare la colpa all'AI, verifica la geometria.** Quasi tutti
 gli "stalli dell'AI" erano problemi di ingombri, corsie o posizionamento.
@@ -366,28 +437,80 @@ combattimento prima del ricercato, **mira libera col mouse più magnetismo**, mo
   garantite davanti alla safehouse; ricompaiono dopo 55 s. Senza negozi (fase 3) sono l'unico
   rifornimento, quindi non possono sparire per sempre.
 
+### 5.5 Fase 2, tappa B — polizia e ricercato
+
+Le scelte di design che nel piano precedente erano "da concordare" sono state prese qui, e
+sono queste (se l'utente ne vuole altre, sono tutte in `wanted.js`, in cima):
+
+- **Cosa alza il livello.** Ogni reato pesa in punti: rissa 1.5 · sparo 3 (al massimo uno
+  ogni 0.55 s, altrimenti una raffica di SMG varrebbe cinque stelle in un secondo) · auto
+  rubata a un testimone 6, a una pattuglia 12 · agente ferito 12 · veicolo fatto saltare 18 ·
+  morto 24 · agente ammazzato 60. Soglie a 10/24/52/92/145. Tradotto: quattro colpi in strada
+  = una stella, un cadavere = due, un poliziotto steso = tre (quattro se avevi già scaldato).
+  Il furto d'auto è l'unico reato che **vuole un testimone**: rubare un'auto vuota in un
+  vicolo non lo denuncia nessuno.
+- **Come scende.** Solo non facendosi vedere: `COOL_TIME` va da 7 s (una stella) a 26 s
+  (cinque). Un'auto veloce non basta, serve rompere la linea di vista — vicoli, scalinate,
+  palazzi. La morte azzera tutto (svegliarsi in ospedale con quattro stelle addosso sarebbe
+  una condanna senza uscita); il pay-n-spray arriva in fase 3.
+- **Niente arresto.** Il "busted" raddoppierebbe i flussi di fine partita (celle, cauzione,
+  arsenale confiscato) per aggiungere poco a una tappa che è già lunga: la polizia spara e
+  basta, e la sconfitta resta una sola, l'ospedale. È il primo candidato se si vuole ampliare.
+- **Scala delle unità** (`police.TIERS`): 1 → tre agenti a piedi · 2 → due volanti, e
+  l'equipaggio scende quando sei a piedi · 3 → speronamenti e colpi dal finestrino · 4 →
+  posti di blocco e strisce chiodate · 5 → SWAT con SMG ed elicottero col riflettore.
+- **Chiodi.** `flatTires` toglie il 40 % di velocità massima, il 28 % di grip e fa tirare da
+  un lato (`flatPull`); i cerchioni fanno scintille (`main.emitSkids`). Non si riparano: si
+  cambia macchina.
+- **Elicottero.** Orbita largo sopra il giocatore, il riflettore lo insegue **più lento del
+  velivolo** — si può uscire dal cono, ed è quello che rende sensato scappare. Abbattibile
+  (260 HP): esplode, e ne arriva un altro dopo 40 s.
+- **Blip e stelle.** Stelle 수배 sotto il pannello vitale (l'ultima lampeggia mentre stai
+  seminando: è l'unico modo che ha il giocatore di sapere che nascondersi funziona), agenti in
+  blu su minimappa e anello blu a terra, blocchi e chiodi su minimappa e mappa piena.
+
+### 5.6 Il protagonista
+
+Il vecchio sprite del giocatore era un pedone generico col flag `hero`: da sopra restava una
+calotta scura, indistinguibile da un teppista. Ora c'è `getHeroSprite(frame, pose)`, disegnato
+apposta e più grande di tutti gli altri (40×34 contro 34×30):
+
+- **tronco trapezoidale** — spalle larghe davanti, vita stretta dietro: è la forma che dice
+  "persona, e guarda da quella parte" meglio di qualsiasi dettaglio;
+- **banda rossa lungo la spina dorsale**, che a colpo d'occhio è anche una freccia, con
+  l'artigliata bianca della tigre (백호, la gang del padre) sopra;
+- **testa piccola e spostata in avanti**, con fascia rossa in fronte, ciuffo decolorato,
+  rasatura ai lati e un filo di luce sul cranio (senza, la testa nera spariva dentro il
+  bomber nero);
+- **due pose**: con un'arma da fuoco le braccia si tendono verso il mirino (`pose: 'aim'`),
+  altrimenti oscillano. L'arma ora si disegna **sopra** la sagoma, non sotto.
+- **ritratto nell'HUD** (`getHeroPortrait`), che pulsa di rosso quando si incassa: è quello che
+  dà una faccia al personaggio, visto che a schermo è alto venti pixel.
+
+Le divise hanno avuto lo stesso trattamento minimo ma indispensabile: berretto blu e bretelle
+catarifrangenti (`PED_KINDS.cop`), nero opaco e piastra antiproiettile per la SWAT.
+
 ---
 
 ## 6. Backlog successivo (già concordato con l'utente)
 
-**Fase 2, tappa B — polizia e ricercato.** È il prossimo step.
-Sistema di ricercato a 5 livelli: 1 pattuglia a piedi · 2 volanti · 3 speronamenti · 4 posti
-di blocco e chiodi · 5 SWAT ed elicottero con riflettore. Il wanted cala nascondendosi (e in
-fase 3 al pay-n-spray).
-Quello che c'è già e va riusato: il flag `vehicleOnly` (chiodi e posti di blocco sono la stessa
-cosa delle scalinate), `game.alarm` per far scattare il livello, `p.hostile` come modello di
-nemico che insegue e spara, `getVehicleSprite` con `police` e `swat`, `PED_KINDS.cop` (75 HP,
-`fights: true`, già armabile), il campo `siren` sui veicoli con i lampeggianti resi in
-`scene.drawVehicle`, e i blip della polizia già disegnati da minimappa e mappa.
-I tre ponti sul Han sono passaggi obbligati: sono il posto giusto per i blocchi stradali.
-Da decidere con l'utente prima di implementare: cosa fa salire il livello (pedone investito?
-sparo in strada? auto rubata a vista?) e come scende (tempo fuori vista, o un raggio in cui
-nessuno ti vede).
-
-**Fase 2, tappa C — arsenale pesante.**
+**Fase 2, tappa C — arsenale pesante.** È il prossimo step.
 Katana, pompa, fucile d'assalto, sniper, minigun, molotov, granate e mine. Gli esplosivi sono
 gli unici che vogliono **proiettili veri** invece del raycast: vanno aggiunti come entità con
 posizione e velocità, e fanno danno ad area come già fa l'esplosione di un veicolo.
+Quello che la tappa B lascia già pronto: `WEAPONS` regge armi nuove aggiungendo una riga
+(`WEAPON_ORDER` decide i tasti, oggi 1-4: da cinque in su serve una barra armi vera);
+`pellets` c'è già ed è quello che serve alla pompa; `police.chopperBurst` è l'esempio di
+danno ad area senza raycast; le mine sono un solido `vehicleOnly` come le transenne, quindi
+`SpatialGrid.removeRect` serve anche a loro.
+
+**Cose rimaste indietro dalla tappa B**, in ordine di quanto si sentono:
+- **Arresto (busted)**: oggi la polizia spara e basta, non ti carica in volante. Vedi §5.5.
+- **Equipaggio che risale in macchina**: dopo lo sbarco la volante resta ferma per sempre.
+- **Commissariati**: nessuna posizione in `city`, le unità nascono sulle strade attorno al
+  giocatore. Un `city.stations` calcolato come `city.hospitals` (senza consumare rng, quindi
+  senza ridisegnare la città) darebbe blip sulla mappa e un punto di partenza più credibile.
+- **Traffico civile e chiodi**: le strisce le controlla solo il mezzo del giocatore.
 
 **Fase 3 — contenuti.**
 12 missioni in 3 atti con cutscene a **pannelli a fumetto**; negozi (armi, garage,
@@ -413,6 +536,10 @@ optional chaining: `honk`, `doorClose`); salvataggio localStorage con 3 slot.
 - **Verifica davvero.** Ogni modifica va provata nel browser, non solo "compilata": screenshot
   per la grafica, snippet della sezione 1 per il traffico. Diversi bug di queste fasi erano
   invisibili nel codice e ovvi a schermo.
+  Per gli sprite conviene guardarli ingranditi invece che a schermo intero: da console basta
+  `game.loop.stop()`, poi `const m = await import('/src/render/sprites.js')` e disegnare
+  `m.getHeroSprite(2, 'aim').canvas` sul canvas con uno `scale(6, 6)` e
+  `imageSmoothingEnabled = false`. Il modello del protagonista è stato rifatto tre volte così.
 - **Consegne a tappe**: l'utente vuole provare ogni fase prima della successiva, ed essere
   consultato sulle scelte di design invece di trovarsele fatte.
 
@@ -442,6 +569,17 @@ optional chaining: `honk`, `doorClose`); salvataggio localStorage con 3 slot.
 | Peggioramento del drive-by | `player.driveBy` | dispersione × 2.4, cadenza × 1.5 |
 | Teppista armato: gittata e cadenza | `pedestrians.GUN_RANGE`, case `hostile` | 330 px, un colpo ogni 0.5-1.3 s |
 | Salute e tempo a terra | `player.maxHp` / `DEATH_TIME` | 100 / 2.8 s |
+| Soglie delle stelle | `wanted.LEVEL_HEAT` | 10 · 24 · 52 · 92 · 145 |
+| Peso dei reati | `wanted.CRIMES` | rissa 1.5 · sparo 3 · furto 6/12 · agente ferito 12 · veicolo 18 · morto 24 · agente ucciso 60 |
+| Secondi invisibili per perdere una stella | `wanted.COOL_TIME` | 7 · 11 · 15 · 20 · 26 |
+| Scarico dell'heat sotto la prima stella | `wanted.update` | 0.6 al secondo |
+| Unità per livello | `police.TIERS` | 3 agenti → 2 volanti → speroni → blocchi+chiodi → SWAT+elicottero |
+| Vista delle pattuglie | `police.SEE_FOOT` / `SEE_CAR` | 470 / 640 px (con linea di vista libera) |
+| Tetti delle unità | `police.MAX_COPS`, `reinforce` | 10 (+6 dai posti di blocco) agenti, `tier.cars + 3` volanti |
+| Gittata di fuoco della polizia | `police.COP_FIRE_RANGE` | 340 px |
+| Riflettore e quota dell'elicottero | `police.BEAM_R` / `CHOPPER_Z` / `CHOPPER_HP` | 118 px / 210 / 260 |
+| Gomme a terra | `vehicle` `flatTires` | velocità × 0.6, grip × 0.72, tiraggio `flatPull` |
+| Ritmo di posa di blocchi e chiodi | `police.manageObstacles` | uno ogni 7 s, alternati |
 | Raccolte a terra | `pickups` densità / `RESPAWN` | 0.4 per cortile (42 totali) / 55 s |
 | Tile terreno | `ground.TILE` / `MAX_TILES` | 512 px / 96 |
 | Limite pixel canvas | `main.MAX_PIXELS` | 2.9 M (scala il DPR) |
