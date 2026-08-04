@@ -34,6 +34,10 @@ export class Player {
     this.enterCooldown = 0;
     this.stamina = 1;
     this.district = null;
+    // Contanti e guardaroba (fase 3): si spendono nei negozi, si rifanno svuotando
+    // le casse. L'abito cambia solo il colore del bomber (vedi `HERO_OUTFITS`).
+    this.money = 60000;
+    this.outfit = 0;
 
     // Arsenale. Si parte con i pugni e una pistola: il resto si raccoglie in giro,
     // e alla morte resta solo quello che non si può perdere.
@@ -91,6 +95,9 @@ export class Player {
     if (this.onFoot) this.updateOnFoot(dt, game);
     else this.updateDriving(dt, game);
 
+    // Dentro un negozio le coordinate sono quelle della pianta, non della città:
+    // chiedere il distretto qui darebbe un cartello a ogni passo.
+    if (game.indoors) return;
     const d = game.city.districtAt(this.x, this.y);
     if (d !== this.district) {
       const prev = this.district;
@@ -152,7 +159,7 @@ export class Player {
     // Con la minigun in braccio si cammina, punto: è il prezzo di 600 colpi.
     if (spec0.heavy) target *= spec0.heavy;
     // La pendenza si sente anche a piedi: in salita si arranca, in discesa si corre.
-    if (mv.len > 0.05 && game.city.elevationAt) {
+    if (mv.len > 0.05 && game.city.elevationAt && !game.indoors) {
       const el = game.city.elevationAt;
       const p = 30;
       const slope = (el(this.x + mv.x * p, this.y + mv.y * p) - el(this.x, this.y)) / p;
@@ -174,7 +181,9 @@ export class Player {
 
     this.resolveCollisions(game);
 
-    if (input.wasPressed('KeyE') && this.enterCooldown <= 0) {
+    // Sulla soglia di un negozio `E` entra, non ruba l'auto parcheggiata dietro:
+    // la porta ha un raggio molto più stretto, quindi vince lei.
+    if (input.wasPressed('KeyE') && this.enterCooldown <= 0 && !game.shops?.near) {
       const v = this.findNearbyVehicle(game);
       if (v) this.enterVehicle(v, game);
     }
@@ -198,7 +207,9 @@ export class Player {
 
     if (held && this.fireCd <= 0 && (!spec.spinUp || this.spin >= 1)) this.attack(game, spec);
 
-    game.camera.setZoomTarget(this.scoping ? 1.12 / spec.scope : 1.12);
+    // Dentro un negozio l'inquadratura è la stanza intera, non il personaggio.
+    const base = game.indoors ? game.shops.roomZoom(game.camera) : 1.12;
+    game.camera.setZoomTarget(this.scoping ? base / spec.scope : base);
   }
 
   /**
@@ -206,7 +217,14 @@ export class Player {
    * cursore, ma di poco e con un tetto: la posizione del cursore in coordinate mondo
    * dipende dalla camera, quindi senza limite le due si rincorrerebbero.
    */
-  cameraTarget() {
+  cameraTarget(game) {
+    // Interno: la camera inquadra il piano e resta ferma. È la scelta classica per
+    // gli interni dall'alto, e qui serve anche a non far scorrere i muri sotto il
+    // naso ogni volta che si fa un passo.
+    if (game && game.indoors) {
+      const f = game.shops.floor;
+      return { x: f.w / 2, y: f.h / 2, vx: 0, vy: 0 };
+    }
     if (!this.onFoot) {
       const v = this.vehicle;
       return { x: v.x, y: v.y, vx: v.vx, vy: v.vy };
@@ -354,7 +372,10 @@ export class Player {
   }
 
   resolveCollisions(game) {
-    const solids = game.city.solidGrid.queryRect(this.x - 30, this.y - 30, 60, 60);
+    // `game.area()` è la città o la pianta del piano in cui si è entrati: muri e
+    // limiti hanno la stessa forma, quindi qui non serve sapere dove siamo.
+    const area = game.area();
+    const solids = area.grid.queryRect(this.x - 30, this.y - 30, 60, 60);
     for (const s of solids) {
       if (s.vehicleOnly) continue; // le scalinate si salgono a piedi
       const push = circleRectPush(this.x, this.y, RADIUS, s);
@@ -367,8 +388,8 @@ export class Player {
         this.vy -= push.ny * vn;
       }
     }
-    this.x = clamp(this.x, 40, game.city.w - 40);
-    this.y = clamp(this.y, 40, game.city.h - 40);
+    this.x = clamp(this.x, area.x0, area.x1);
+    this.y = clamp(this.y, area.y0, area.y1);
   }
 
   findNearbyVehicle(game) {
@@ -423,7 +444,7 @@ export class Player {
 
     let placed = false;
     for (const c of candidates) {
-      const solids = game.city.solidGrid.queryRect(c.x - 24, c.y - 24, 48, 48);
+      const solids = game.area().grid.queryRect(c.x - 24, c.y - 24, 48, 48);
       let blocked = false;
       for (const s of solids) {
         if (circleRectPush(c.x, c.y, RADIUS + 2, s)) { blocked = true; break; }

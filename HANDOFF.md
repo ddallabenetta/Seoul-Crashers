@@ -3,8 +3,8 @@
 Documento per riprendere il lavoro da una sessione pulita. Leggi anche `README.md`
 (descrizione del gioco e comandi) — qui c'è quello che serve a *sviluppare*.
 
-Ultimo aggiornamento: fine Fase 2 tappa C (arsenale pesante ed esplosivi) + strumenti,
-skill e hook per gli agenti che lavorano al progetto (`.claude/`, §9).
+Ultimo aggiornamento: **Fase 3, prima tappa — negozi e interni degli edifici** (§5.8).
+Prima c'erano la Fase 2 tappa C (arsenale pesante) e gli strumenti per gli agenti (`.claude/`, §9).
 
 ---
 
@@ -14,13 +14,15 @@ Web game d'azione top-down 2.5D ambientato a Seoul, stile *GTA: Chinatown Wars*.
 Canvas 2D puro, moduli ES nativi, **zero dipendenze, nessun build step**. Tutta la grafica
 (sprite, facciate, terreno, mappa) è generata da codice a runtime: non esistono asset esterni.
 
-Stato: **Fase 1, Fase 1.5 e Fase 2 tutta e tre le tappe completate e collaudate**.
-10110 righe in 28 moduli. 60 fps con ~50 veicoli e ~93 pedoni attivi (~62 e ~112 a
-Myeongdong, il distretto più denso), e restano 60 anche sotto raffica continua di SMG.
+Stato: **Fase 1, Fase 1.5, Fase 2 (tutte e tre le tappe) e la prima tappa della Fase 3
+completate e collaudate**. ~12.000 righe in 32 moduli. 60 fps con ~50 veicoli e ~93 pedoni
+attivi (~62 e ~112 a Myeongdong, il distretto più denso), e restano 60 anche sotto raffica
+continua di SMG. Dentro un edificio il costo è trascurabile: la città non gira.
 
 La Fase 2 era divisa in tre tappe, concordate con l'utente: **A** combattimento base,
 **B** polizia e ricercato a 5 livelli, **C** armi pesanti ed esplosivi. **Sono tutte fatte.**
-Il prossimo passo è la Fase 3 (contenuti), §6.
+La Fase 3 (contenuti) è cominciata da **negozi e interni** (§5.8), che era una delle tre
+partenze possibili; restano missioni e ciclo giorno-notte, §6.
 
 ### Avvio
 
@@ -105,9 +107,12 @@ game.city.stats // { buildings, props, blocks, nodes, edges, doglegs, stairs }
 ```
 
 Valori attesi con la seed attuale: `buildings 424`, `props 796`, `blocks 119`, `nodes 179`,
-`edges 261`, `doglegs 3`, `stairs 8`, e 43 raccolte a terra (`game.pickups.items.length`).
-I primi sei devono restare **identici** finché non si tocca l'ordine di consumo dell'rng in
+`edges 261`, `doglegs 3`, `stairs 8`, `shops 139`, `venues 369`, `garages 5`, e 43 raccolte a
+terra (`game.pickups.items.length`).
+I primi sette devono restare **identici** finché non si tocca l'ordine di consumo dell'rng in
 generazione: se cambiano, hai spostato una `rng.*` e la città non è più quella collaudata.
+Gli ultimi tre nascono da un rng **separato** (`placeShops`, §5.8): cambiano solo se tocchi
+quella funzione, e non trascinano con sé il resto della città.
 
 Per il combattimento:
 
@@ -140,6 +145,28 @@ game.wanted.add(200, game);   game.wanted.reset();
 Valori sani a 5 stelle: `agenti ≤ 16`, `volanti ≤ 6`, `blocchi ≤ 3`, `chiodi ≤ 2`. Se
 crescono oltre, è saltato un tetto in `police.reinforce`/`addCop`. Con `stelle 0` deve
 tornare tutto a zero entro un paio di secondi (`standDown`).
+
+Per negozi e interni (fase 3):
+
+```js
+// dove sei e cosa c'è nella stanza
+({ dentro: game.indoors, locale: game.shops.floor?.biz.id,
+   piano: game.shops.active && `${game.shops.active.cur + 1}/${game.shops.active.floors.length}`,
+   gente: game.shops.floor?.people.length, cassa: game.shops.floor?.till,
+   azioni: game.shops.actions.map((a) => `${a.key}: ${a.text}`) })
+// contanti e conti
+({ soldi: game.player.money, abito: game.player.outfit,
+   rapine: game.stats.robberies, visite: game.stats.visits })
+// prova a freddo: entra nel negozio più vicino e sali di un piano
+(() => { const p = game.player;
+  const s = game.city.shops.reduce((b, q) =>
+    Math.hypot(q.x - p.x, q.y - p.y) < Math.hypot(b.x - p.x, b.y - p.y) ? q : b);
+  game.shops.enter(s, game); game.shops.useStairs(1, game); return game.shops.floor.biz.id; })()
+```
+
+`game.indoors` è la domanda giusta da fare quasi sempre: se è vero, traffico, pedoni,
+polizia, ricercato e raccolte **non stanno girando**, e `game.area()` restituisce la pianta
+del piano invece della città.
 
 Per l'arsenale pesante (tappa C):
 
@@ -181,7 +208,9 @@ src/core/
 
 src/world/
   districts.js        i 5 distretti (con i parametri di maglia), RIVER, NAMSAN, insegne
-  citygen.js          quota del terreno, maglia stradale, isolati, edifici, props, indici
+  citygen.js          quota del terreno, maglia stradale, isolati, edifici, props, indici,
+                      vetrine (`placeShops`) e officine (`placeGarages`)
+  interiors.js        catalogo delle attività + generazione della pianta di ogni piano
   roadgraph.js        nodi/archi, corsie, semafori, prenotazione incrocio
   maptexture.js       texture 1100×1100 della mappa, con hillshade (minimappa + mappa piena)
 
@@ -192,6 +221,7 @@ src/render/
   ground.js           GroundRenderer: tile 512 px con cache LRU + hillshade
   scene.js            pass di rendering, estrusione, ordinamento radiale
   fx.js               decals (gomma, sangue, bruciature) e particelle
+  interiorscene.js    disegno di un piano: pavimento, muri estrusi, arredo, scale
 
 src/entities/
   vehicle.js          fisica arcade, pendenza, collisioni a tre cerchi, gomme a terra
@@ -203,11 +233,13 @@ src/entities/
   wanted.js           heat, 5 livelli di ricercato, raffreddamento a vista
   police.js           pattuglie, volanti, sbarchi, posti di blocco, chiodi, SWAT, elicottero
   projectiles.js      esplosivi con proiettili veri: granate, molotov, mine, onda d'urto
+  shops.js            interni: entrata/uscita, piani, gente dentro, casse, listini, officine
 
 src/ui/
   hud.js              minimappa, tachimetro, barra armi, cartello distretto, toast, debug
   mapview.js          mappa a tutto schermo (pannello riusato dal menu)
   menu.js             menu di pausa
+  shopmenu.js         pannello del listino (compra/vendi)
 
 .claude/              strumenti per chi sviluppa (non fa parte del gioco), vedi §9
   tools/probe.mjs     avvia il gioco headless, esegue scene, misura, screenshot
@@ -330,6 +362,32 @@ tiro libera. I due numeri sono un compromesso scelto con l'utente: senza assiste
 un pedone largo 20 px a 400 px quasi sempre, con un aggancio duro si smette di mirare. Chi è
 `hostile` ha la precedenza sul passante che gli sta dietro.
 
+**Dentro un edificio si cambia mondo, non motore.** `game.indoors` è vero quando
+`shops.active` esiste. Da lì in poi due indirezioni fanno tutto il lavoro:
+`game.area()` restituisce `{ grid, x0, y0, x1, y1 }` — la città oppure la pianta del piano —
+e la usano `player.resolveCollisions`, `weapons.rayCast`, `hasLineOfSight` e il rimbalzo degli
+esplosivi; `game.peds` viene **scambiato** con l'elenco della gente del piano, così la griglia
+dinamica ricostruita ogni frame contiene loro e mischia, raggi, magnetismo di mira e onde
+d'urto funzionano senza sapere dove sono. Non c'è un "motore per interni": c'è la stessa
+geometria in uno spazio di coordinate diverso, da (0,0) a (w,h) della stanza.
+
+**Le coordinate di un interno non significano niente fuori.** Sono piccole (200-470) e in
+città cadono nell'angolo nord-ovest. Perciò tutto quello che vive nel mondo va azzerato al
+passaggio della porta: `fx.clear()` e `projectiles.clear()` in `enter`/`leave`/`useStairs`.
+Senza il secondo, una mina lasciata in un 노래방 resta armata all'angolo della mappa per il
+resto della partita. Per lo stesso motivo `player.update` salta il cambio distretto e la
+pendenza quando è dentro, e `main` non conta i chilometri durante lo stacco.
+
+**La camera inquadra la stanza, non il personaggio.** Dentro, `player.cameraTarget(game)`
+restituisce il centro del piano e `shops.roomZoom` sceglie lo zoom che ci fa stare tutto:
+una camera che scivola dietro al giocatore in uno spazio di 300 px dà solo il mal di mare.
+È anche il motivo per cui una prova scriptata può mirare col mouse senza aspettare la camera.
+
+**Un edificio alto è una pila di attività, e si legge da fuori.** `placeShops` decide quante
+attività dall'**altezza del volume** (`1 + (h3d-30)/46`, max 4) e `drawBuilding` disegna la
+colonna di insegne più il portone sulla facciata del lato giusto. È il modo in cui a Seoul si
+capisce cosa c'è al terzo piano, ed è l'unica informazione che il giocatore ha prima di entrare.
+
 **La polizia non ha entità sue.** Un agente è un pedone di `game.peds` con `p.cop = true` e
 stato `duty`: `pedestrians.updatePed` gli chiede dove andare a `police.copBehavior` e poi usa
 lo stesso steering di tutti gli altri (pendenza, collisioni, sangue, ragdoll: gratis). Una
@@ -405,6 +463,12 @@ codice spiega il perché nel punto giusto.
 | **In una prova scriptata** il colpo non colpisce mai | `player.angle` a piedi è riscritto ogni frame verso il cursore: impostarlo non serve a niente | si mira muovendo `game.input.mouse.x/y` (vedi §9) |
 | **In una prova scriptata** la mira punta altrove dopo un teletrasporto | la camera arriva smorzata, quindi la conversione mondo→schermo di un istante prima non vale più | `game.camera.snapTo(...)` e un decimo di secondo di attesa prima di mirare |
 | **In una prova scriptata** un bersaglio appena teletrasportato è immune | `pedGrid`/`vehicleGrid` sono ricostruite a ogni frame: la query lo cerca ancora dov'era | aspettare un frame dopo lo spostamento |
+| Ai piani alti le attività erano stanze vuote | i due vani scala occupano tutto il muro di fondo: cucina, frigoriferi e rastrelliere venivano scartati uno per uno | `buildFloor` calcola `f.band` (muro di fondo libero) e `f.body` (sala sotto i pianerottoli), e le piante usano solo quelle |
+| `E` sulla soglia di un negozio rubava l'auto parcheggiata dietro | due sistemi leggevano lo stesso fronte di tasto nello stesso frame | `shops.update` gira **prima** di `player.update` e pubblica `shops.near`; il giocatore salta l'entrata in auto se è pieno |
+| Il primo articolo del listino veniva comprato da solo | `E` apre il pannello e `E` compra: il fronte del tasto era ancora vivo | `ShopMenu.cooldown = 0.25` all'apertura |
+| Una granata lanciata dentro restava appesa a mezz'aria | `projectiles.update` era nel ramo saltato quando si è dentro | gli esplosivi girano sempre; a cambiare è `game.area()` su cui rimbalzano |
+| L'interno sembrava una pianta catastale, minuscola in mezzo allo schermo | zoom 1.12 e camera al seguito, come in strada | `roomZoom` (fit del piano) + camera sul centro della stanza |
+| «NaN colpi inclusi» sulla mazza in vendita | le armi da mischia non hanno `pickup` | `weaponItem` guarda `spec.infinite` prima di moltiplicare |
 
 Regola generale emersa: **prima di dare la colpa all'AI, verifica la geometria.** Quasi tutti
 gli "stalli dell'AI" erano problemi di ingombri, corsie o posizionamento.
@@ -594,13 +658,78 @@ altre, cambiare costa poco e i punti sono tutti indicati:
 - **Morte e mine**: `respawnPlayer` chiama `projectiles.clear()`. Senza, ci si sveglia in
   ospedale con il quartiere minato e nessun modo di saperlo.
 
+### 5.8 Fase 3, prima tappa — negozi e interni
+
+Dodici tipi di attività, 139 vetrine e 369 locali su più piani in tutta Seoul, un'economia in
+contanti e quattro modi di spenderli. Le scelte di design prese qui — cambiare costa poco, i
+punti sono tutti indicati:
+
+- **Dentro, la città si ferma.** Traffico, pedoni, polizia, ricercato e raccolte non girano
+  mentre sei in un negozio (`main.update`, ramo `if (!this.indoors)`). Costa zero CPU e
+  risponde una volta per tutte a "cosa succede fuori mentre compro": niente. Il ricercato
+  resta **congelato**, quindi la porta non è un nascondiglio — per quello c'è l'officina, e
+  si paga. L'alternativa (mondo che continua) vorrebbe dire poliziotti che ti aspettano
+  davvero fuori: è il primo candidato se si vuole ampliare.
+- **La polizia non entra.** Un inseguimento dentro un 편의점 vorrebbe portare pathfinding,
+  streaming e volanti in uno spazio di 300 px. Esci esattamente com'eri entrato, stelle comprese.
+- **L'interno si ricorda** (`shops.cache`, chiave = id del negozio). La cassa svuotata resta
+  vuota, il commesso steso resta a terra. Nasce alla prima visita, non in generazione: 139
+  negozi × fino a 4 piani sarebbero 369 piante costruite al boot per niente.
+- **Gli interni non sono in scala** (footprint × 1.8, limitato a 300-470 × 260-390 px). Un
+  negozio di Hongdae è largo 70 px in pianta e il giocatore ne è largo 18: dentro non ci si
+  girerebbe. È la stessa bugia di tutti i giochi con gli interni.
+- **Comprare è `E`, rapinare è `F`.** Sono la stessa distanza dallo stesso bancone: con un
+  tasto solo si finirebbe per rapinare un negozio volendo comprare pallottole.
+- **Rapinare vuole un'arma in pugno** — o un commesso già a terra. Il commesso di 총포상,
+  술집 e 당구장 è armato e risponde al fuoco: una rapina è una scelta, non un pulsante.
+  Vale `rob: 22` di heat (una stella; un cadavere ne vale due).
+- **I prezzi delle armi stanno in `WEAPONS`** (`price`, `ammoPrice`): la tabella armi è
+  l'unica fonte di verità, e il banco dei pegni ricompra al 45% dello stesso numero.
+- **Il denaro si finisce.** Si parte con ₩60.000 — abbastanza per mangiare e per una scatola
+  di munizioni, **non** per una pompa. Le casse rendono ₩20.000-90.000, la clinica si prende
+  un quarto dei contanti a ogni morte, l'officina ne costa 30.000 e il cambio d'abito 40.000.
+- **L'officina (도색) azzera il ricercato**, ripara e riverniciata: una per distretto, con la
+  piazzola **sulla strada** davanti a una saracinesca. I cortili interni sarebbero il posto
+  giusto ma in tutta Seoul ce ne sono undici e solo quattro abbastanza larghi per una macchina.
+- **Il cambio d'abito toglie una stella** e cambia il colore del bomber (`HERO_OUTFITS`,
+  cinque capi; fascia rossa e tigre restano, o il giocatore smetterebbe di riconoscersi).
+- **L'ospedale è diventato un posto in cui si entra**: `placeShops` promuove a `clinic`
+  l'edificio più vicino al punto che `city.hospitals` aveva già, e sposta il blip (e il
+  risveglio dopo la morte) sulla porta.
+- **Le vetrine non consumano l'rng della città.** `placeShops`/`placeGarages` girano dopo la
+  generazione con un `new Rng` loro: `buildings 424` e compagnia restano identici.
+- **Gli esplosivi funzionano anche dentro** (rimbalzano sui tramezzi, l'onda d'urto prende la
+  gente del piano) ma **non attraversano la porta**: `projectiles.clear()` a ogni passaggio.
+  Una granata in una stanza di 300 px prende in pieno anche chi l'ha tirata, ed è giusto così.
+
+Cosa c'è in un locale, per tipo: 총포상 armeria · 전당포 pegni (compra e vende) · 편의점
+minimarket · 약국 farmacia · 분식 e 술집 da mangiare · 옷가게 vestiti · 병원 ospedale ·
+피시방, 노래방, 당구장, 사무실, 주택 solo da esplorare (ma con la cassa). Sei piante
+condivise — `counter`, `market`, `eatery`, `desks`, `rooms`, `hall` — bastano a farli sembrare
+tutti diversi perché cambiano palette, arredo e gente.
+
 ---
 
 ## 6. Backlog successivo (già concordato con l'utente)
 
-**Fase 3 — contenuti.** È il prossimo step, ed è la fase più grossa del progetto: vedi più
-sotto. Prima di cominciare **conviene farsi dire dall'utente da dove partire** — missioni,
-negozi e ciclo giorno-notte sono tre lavori indipendenti e di taglia molto diversa.
+**Fase 3 — contenuti.** È in corso: negozi e interni sono fatti (§5.8), restano missioni e
+ciclo giorno-notte, che sono due lavori indipendenti e di taglia molto diversa. **Conviene
+farsi dire dall'utente da quale dei due partire.**
+
+**Cose rimaste indietro dai negozi**, in ordine di quanto si sentono:
+- **La polizia non ti aspetta fuori.** Entrare con quattro stelle e uscire dopo un minuto ti
+  ridà la strada esattamente com'era. Basterebbe far girare `police.update` anche mentre sei
+  dentro (il ricercato è già congelato apposta): costa un ramo in `main.update` e regala la
+  scena migliore di tutta la meccanica.
+- **Nessuno chiama la polizia da dentro.** Una rapina alza l'heat, ma il commesso che scappa
+  dalla porta non porta nessuno con sé.
+- **Gli interni non hanno finestre né retro**: una sola uscita, quella da cui sei entrato.
+  Una porta sul retro che dà nel cortile dell'isolato sarebbe la via di fuga che manca.
+- **I locali non hanno orari**: sono tutti aperti sempre. Con il ciclo giorno-notte diventerà
+  la prima cosa da chiedersi (`game.isNight` è già lì).
+- **Il mercato nero dinamico** — prezzi diversi per distretto — è due righe in `stockFor` più
+  un moltiplicatore per distretto, ed è quello che rende sensato attraversare la città.
+- **Niente ruba-e-rivendi**: il banco dei pegni ricompra solo le armi, non le auto.
 
 **Cose rimaste indietro dalla tappa C**, in ordine di quanto si sentono:
 - **Il fuoco non si propaga**: due molotov vicine fanno due pozze separate, e un'auto che
@@ -621,13 +750,13 @@ negozi e ciclo giorno-notte sono tre lavori indipendenti e di taglia molto diver
   senza ridisegnare la città) darebbe blip sulla mappa e un punto di partenza più credibile.
 - **Traffico civile e chiodi**: le strisce le controlla solo il mezzo del giocatore.
 
-**Fase 3 — contenuti.**
-12 missioni in 3 atti con cutscene a **pannelli a fumetto**; negozi (armi, garage,
-ospedale/pay-n-spray) — l'ospedale ha già posizione, piazzola e blip in `city.hospitals`, va
-solo reso un posto dove si entra e si paga; mercato nero dinamico con prezzi per distretto; attività secondarie
-(taxi, consegne, salti); ciclo giorno-notte e meteo (`game.isNight` è già consultato da
-lampioni, fari e insegne); audio procedurale WebAudio (`game.audio` è già chiamato con
-optional chaining: `honk`, `doorClose`); salvataggio localStorage con 3 slot.
+**Fase 3 — quello che resta.**
+12 missioni in 3 atti con cutscene a **pannelli a fumetto** (gli interni sono anche il posto
+dove ambientarne metà: un incontro in un 노래방 non ha bisogno di niente di nuovo); attività
+secondarie (taxi, consegne, salti); ciclo giorno-notte e meteo (`game.isNight` è già
+consultato da lampioni, fari e insegne); audio procedurale WebAudio (`game.audio` è già
+chiamato con optional chaining: `honk`, `doorClose`); salvataggio localStorage con 3 slot —
+ora che c'è del denaro e un arsenale comprato, il salvataggio serve davvero.
 
 ## 7. Vincoli e convenzioni
 
@@ -697,6 +826,17 @@ optional chaining: `honk`, `doorClose`); salvataggio localStorage con 3 slot.
 | Gomme a terra | `vehicle` `flatTires` | velocità × 0.6, grip × 0.72, tiraggio `flatPull` |
 | Ritmo di posa di blocchi e chiodi | `police.manageObstacles` | uno ogni 7 s, alternati |
 | Raccolte a terra | `pickups` densità / `RESPAWN` | 0.4 per cortile (43 totali) / 55 s |
+| Densità delle vetrine | `citygen.placeShops` | `signDensity × 0.55` (139 negozi, 369 locali), una porta ogni 80 px |
+| Attività per edificio | `citygen.makeShop` | `1 + (h3d − 30) / 46`, massimo 4 |
+| Taglia di un interno | `interiors.buildInterior` | footprint × 1.8, limitato a 300-470 × 260-390 |
+| Muri e vani scala | `interiors` `WALL` / `STAIR_W×H` / `DOOR_W` | 12 · 58×78 · 54 |
+| Raggio della porta e del bancone | `shops` `DOOR_REACH` / `DESK_REACH` | 34 px / 54 px |
+| Denaro iniziale · cassa · conto della clinica | `player.money` · `interiors` · `main.respawnPlayer` | ₩60.000 · ₩20.000-90.000 · 25% dei contanti |
+| Officina e cambio d'abito | `shops` `GARAGE_PRICE` / `OUTFIT_PRICE` | ₩30.000 · ₩40.000 (−1 stella) |
+| Prezzi delle armi | `weapons.WEAPONS` `price`/`ammoPrice` | pistola 65k · pompa 145k · SMG 240k · fucile 380k · sniper 620k · minigun 1.25M |
+| Ricompra del banco dei pegni | `shops.stockFor` case `pawn` | 45% del prezzo |
+| Peso della rapina | `wanted.CRIMES.rob` | 22 (una stella) |
+| Zoom dentro un interno | `shops.roomZoom` | fit del piano, limitato a 1.15-2.6 |
 | Tile terreno | `ground.TILE` / `MAX_TILES` | 512 px / 96 |
 | Limite pixel canvas | `main.MAX_PIXELS` | 2.9 M (scala il DPR) |
 

@@ -6,7 +6,8 @@ const CONTROLS = [
   ['W A S D / Frecce', 'muoviti · guida'],
   ['Shift', 'corri (a piedi)'],
   ['Spazio', 'freno a mano'],
-  ['E', 'sali / scendi dal veicolo'],
+  ['E', 'sali / scendi · entra nei negozi · scale'],
+  ['F', 'svuota la cassa di un negozio'],
   ['H', 'clacson'],
   ['Mouse', 'mira dove punti'],
   ['Click sin.', 'spara · colpisci · lancia · drive-by'],
@@ -184,6 +185,9 @@ export class PauseMenu {
       ['Divise stese', String(s.copsKilled || 0)],
       ['Ricercato massimo', '★'.repeat(s.maxWanted || 0) || '—'],
       ['Esplosioni', String(s.blasts || 0)],
+      ['Contanti', `₩${game.player.money.toLocaleString('it-IT')}`],
+      ['Locali visitati', String(s.visits || 0)],
+      ['Casse svuotate', String(s.robberies || 0)],
     ];
     // Due colonne: in una sola il pannello (quadrato, largo quanto 0.44 dello
     // schermo) non ci sta già a sei voci.

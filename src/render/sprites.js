@@ -492,13 +492,28 @@ const HERO = {
 };
 
 /**
+ * Guardaroba. Cambia solo il bomber: fascia rossa, tigre e silhouette restano, o
+ * il giocatore smetterebbe di riconoscersi nella folla. È quello che si compra al
+ * 옷가게 per togliersi una stella di dosso.
+ */
+export const HERO_OUTFITS = [
+  { id: 'baekho', label: 'bomber nero', jacket: '#242935' },
+  { id: 'track', label: 'tuta blu', jacket: '#27466f' },
+  { id: 'work', label: 'giacca da lavoro', jacket: '#5a5343' },
+  { id: 'club', label: 'giacca da club', jacket: '#5c2740' },
+  { id: 'suit', label: 'completo grigio', jacket: '#4a4d55' },
+];
+
+/**
  * Sprite del protagonista. `pose` vale 'walk' o 'aim': con un'arma da fuoco in
  * pugno le braccia si tendono in avanti, ed è quello che rende leggibile a schermo
- * la differenza fra camminare e stare puntando qualcuno.
+ * la differenza fra camminare e stare puntando qualcuno. `outfit` è il bomber
+ * comprato al negozio di vestiti — entra nella chiave di cache, non nel disegno.
  */
-export function getHeroSprite(frame = 0, pose = 'walk') {
+export function getHeroSprite(frame = 0, pose = 'walk', outfit = 0) {
   const W = 40, H = 34;
-  return sprite(`hero:${pose}:${frame}`, W, H, (g, w, h) => {
+  const jacket = (HERO_OUTFITS[outfit] || HERO_OUTFITS[0]).jacket;
+  return sprite(`hero:${pose}:${frame}:${outfit}`, W, H, (g, w, h) => {
     const cx = w / 2, cy = h / 2;
     const ph = Math.sin((frame / PED_FRAMES) * Math.PI * 2);
     const aiming = pose === 'aim';
@@ -516,7 +531,7 @@ export function getHeroSprite(frame = 0, pose = 'walk') {
 
     // 2) Braccia, fuori dalla sagoma delle spalle. Da fermo oscillano, in mira
     // convergono sull'arma: è la differenza che si legge da lontano.
-    g.strokeStyle = shade(HERO.jacket, 0.08);
+    g.strokeStyle = shade(jacket, 0.08);
     g.lineWidth = 3.2;
     if (aiming) {
       g.beginPath(); g.moveTo(cx + 0.6, cy + 6.6); g.lineTo(cx + 8.6, cy + 4); g.stroke();
@@ -540,9 +555,9 @@ export function getHeroSprite(frame = 0, pose = 'walk') {
       g.closePath();
     };
     const grad = g.createLinearGradient(cx, cy - 9, cx, cy + 9);
-    grad.addColorStop(0, shade(HERO.jacket, 0.36));
-    grad.addColorStop(0.5, HERO.jacket);
-    grad.addColorStop(1, shade(HERO.jacket, -0.5));
+    grad.addColorStop(0, shade(jacket, 0.36));
+    grad.addColorStop(0.5, jacket);
+    grad.addColorStop(1, shade(jacket, -0.5));
     g.fillStyle = grad;
     torso(); g.fill();
 

@@ -20,7 +20,8 @@ Poi apri <http://localhost:8123>.
 | `W A S D` / frecce | muoversi a piedi · guidare |
 | `Shift` | correre |
 | `Spazio` | freno a mano (drift) |
-| `E` | salire / scendere dal veicolo |
+| `E` | salire / scendere dal veicolo · entrare in un negozio · scale · listino |
+| `F` | svuotare la cassa di un negozio (rapina) |
 | `H` | clacson |
 | **mouse** | mirare (a piedi si guarda sempre il cursore) |
 | **click sinistro** | sparare / colpire / lanciare · alla guida, drive-by con le armi leggere |
@@ -30,9 +31,10 @@ Poi apri <http://localhost:8123>.
 | `ESC` | menu di pausa (mappa, comandi, statistiche) |
 | `F3` | pannello tecnico (fps, entità, posizione) |
 
-Armi e munizioni si raccolgono a terra, nei cortili e nei vicoli. A zero salute ci si
-risveglia davanti all'ospedale del distretto più vicino — con la salute piena, senza
-più un'arma e senza più nessuno alle costole.
+Armi e munizioni si raccolgono a terra, nei cortili e nei vicoli, oppure si **comprano**
+(vedi sotto). A zero salute ci si risveglia davanti all'ospedale del distretto più vicino —
+con la salute piena, senza più un'arma, senza più nessuno alle costole e con un quarto dei
+contanti in meno: la clinica presenta il conto.
 
 ## L'arsenale
 
@@ -52,11 +54,34 @@ ha una miccia e rotola, la mina si arma quando ti allontani — e si sgancia anc
 dell'auto mentre scappi. Un'auto presa dall'onda d'urto salta a sua volta: le catene di
 esplosioni sono gratis, e la polizia se ne accorge.
 
+## Negozi e interni
+
+Le porte si aprono davvero. Ogni facciata con una soglia illuminata sul marciapiede è un
+posto in cui si entra con `E`, e i palazzi alti sono **pile di attività**: la colonna di
+insegne che si legge dalla strada dice cosa c'è a ogni piano, e le scale ci portano.
+
+| Insegna | Cosa ci si fa |
+| --- | --- |
+| **총포상** armeria | pistole, pompa, SMG, fucile d'assalto e munizioni |
+| **전당포** banco dei pegni | usato a poco prezzo — e **ricompra** il tuo arsenale in contanti |
+| **편의점** minimarket | cibo che rimette in piedi, e soju più benzina per due molotov |
+| **약국** farmacia | antidolorifici e kit di pronto soccorso |
+| **분식 · 술집** tavola calda e bar | si mangia, si beve, si recupera salute |
+| **옷가게** vestiti | cambio d'abito: esci vestito diverso e **perdi una stella** |
+| **병원** ospedale | medicazione e ricovero lampo, senza morire prima |
+| **피시방 · 노래방 · 당구장 · 사무실 · 주택** | non si compra niente: si esplora, e c'è una cassa |
+| **도색** officina | ci si guida dentro: ripara, riverniciata e **azzera il ricercato** |
+
+Il denaro (**₩**) serve e si finisce. Si rifà svuotando le casse con `F`: serve un'arma da
+fuoco in pugno, e il commesso di un'armeria o di un bar non sta a guardare — è armato, e
+spara. Una rapina vale una stella, un cadavere due: la polizia però non entra, ti aspetta
+fuori. Mentre sei dentro la città è ferma, ricercato compreso: la porta non è un nascondiglio.
+
 ## Il protagonista
 
 **Jae-min Seo** si riconosce a colpo d'occhio anche in mezzo alla folla di Myeongdong:
 bomber nero con la banda rossa lungo la schiena e l'artigliata della tigre bianca (백호),
-fascia rossa in fronte, suole rosse. Con un'arma da fuoco in pugno cambia posa — braccia
+fascia rossa in fronte, suole rosse (il bomber cambia colore se ti cambi al 옷가게). Con un'arma da fuoco in pugno cambia posa — braccia
 tese verso il mirino — e il suo ritratto in alto a sinistra lampeggia di rosso quando
 incassa. È tutto disegnato da codice, come il resto.
 
@@ -113,7 +138,7 @@ src/
   core/      loop a passo fisso, input, RNG deterministico, griglie spaziali
   world/     generazione città, grafo stradale, distretti, texture mappa
   render/    camera 2.5D, sprite vettoriali, facciate, terreno a tile, effetti
-  entities/  giocatore, fisica veicoli, traffico, pedoni
+  entities/  giocatore, fisica veicoli, traffico, pedoni, polizia, negozi
   ui/        HUD e minimappa, mappa a tutto schermo, menu di pausa
 ```
 
@@ -156,6 +181,11 @@ Alcune scelte tecniche che spiegano il risultato a schermo:
 - **Scalinate.** Un vicolo passante troppo ripido diventa una scalinata: stessa geometria di
   prima più un solido che ferma le ruote e lascia passare i piedi. È la scorciatoia che le
   auto non possono seguire.
+- **Interni come sotto-mondi.** Ogni piano di un negozio è una piantina generata al volo
+  dal footprint dell'edificio, con muri, arredo e gente in uno spazio di coordinate suo.
+  Collisioni, raggi delle armi e onde d'urto non sanno di essere dentro: interrogano la
+  stessa struttura dati della città, che quando sei in un negozio *è* la stanza. Il resto
+  della città non gira, e la stanza resta com'era — cassa svuotata compresa — se ci torni.
 - **Polizia senza pathfinding.** Le unità sono le entità che esistono già: un agente è un
   pedone con uno stato in più, una volante è un veicolo con gas e sterzo scritti da un'altra
   parte. A ogni incrocio la volante prende l'arco che avvicina di più al bersaglio — dieci
@@ -190,6 +220,11 @@ miccia, mina di prossimità. Onda d'urto condivisa che fa saltare anche i veicol
 esplosioni), barra armi a sei file, mirino che mostra il raggio dello scoppio, SWAT passata
 al fucile d'assalto.
 
-**Fase 3 — da fare.** Le 12 missioni con cutscene a fumetti, negozi (armi, garage, ospedale),
-mercato nero dinamico, attività secondarie, ciclo giorno-notte e meteo, audio procedurale,
+**Fase 3, negozi e interni — completata.** 139 vetrine e 369 attività su più piani in tutta
+Seoul, dodici tipi di locale con pianta, arredo e gente propri; denaro, listini, banco dei
+pegni che ricompra, cambio d'abito che toglie una stella, casse da svuotare, officine di
+verniciatura che azzerano il ricercato.
+
+**Fase 3, il resto — da fare.** Le 12 missioni con cutscene a fumetti, mercato nero dinamico
+con prezzi per distretto, attività secondarie, ciclo giorno-notte e meteo, audio procedurale,
 salvataggio su localStorage.

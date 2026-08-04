@@ -12,6 +12,9 @@ import { angleDiff, clamp, wrapAngle } from '../core/math.js';
 // spread è in radianti di deviazione standard; rate è il tempo fra due colpi.
 // `slot` è la fila della barra armi (tasto 1-6): dentro una fila si scorre premendo
 // di nuovo lo stesso tasto. `driveby: false` = non si usa dal finestrino.
+// `price` e `ammoPrice` sono il listino dei negozi (fase 3): stanno qui perché la
+// tabella armi è l'unica fonte di verità sulle armi, e il banco dei pegni ricompra
+// a una frazione dello stesso numero.
 export const WEAPONS = {
   fists: {
     id: 'fists', label: 'pugni', hangul: '맨주먹', melee: true, slot: 0,
@@ -19,29 +22,35 @@ export const WEAPONS = {
   },
   bat: {
     id: 'bat', label: 'mazza', hangul: '방망이', melee: true, slot: 0,
+    price: 18000,
     damage: 46, rate: 0.52, range: 50, arc: 1.35, knock: 260, infinite: true,
   },
   katana: {
     id: 'katana', label: 'katana', hangul: '일본도', melee: true, slot: 0,
+    price: 95000,
     damage: 92, rate: 0.4, range: 64, arc: 1.55, knock: 230, infinite: true,
   },
   pistol: {
     id: 'pistol', label: 'pistola', hangul: '권총', slot: 1,
+    price: 65000, ammoPrice: 9000,
     damage: 27, rate: 0.22, range: 640, spread: 0.028, pellets: 1,
     shake: 1.6, maxAmmo: 180, pickup: 34,
   },
   shotgun: {
     id: 'shotgun', label: 'pompa', hangul: '산탄총', slot: 2,
+    price: 145000, ammoPrice: 15000,
     damage: 13, rate: 0.84, range: 330, spread: 0.105, pellets: 8,
     shake: 4.4, knock: 210, maxAmmo: 60, pickup: 14,
   },
   smg: {
     id: 'smg', label: 'SMG', hangul: '기관단총', auto: true, slot: 3,
+    price: 240000, ammoPrice: 22000,
     damage: 15, rate: 0.075, range: 520, spread: 0.075, pellets: 1,
     shake: 1.1, maxAmmo: 420, pickup: 90,
   },
   rifle: {
     id: 'rifle', label: 'fucile d\'assalto', hangul: '돌격소총', auto: true, slot: 3,
+    price: 380000, ammoPrice: 34000,
     damage: 24, rate: 0.105, range: 780, spread: 0.042, pellets: 1,
     shake: 2, maxAmmo: 300, pickup: 75, driveby: false,
   },
@@ -51,11 +60,13 @@ export const WEAPONS = {
   // una pallottola grossa: passa da parte a parte e prende chi c'è dietro.
   sniper: {
     id: 'sniper', label: 'fucile di precisione', hangul: '저격총', slot: 4,
+    price: 620000, ammoPrice: 48000,
     damage: 145, rate: 1.35, range: 1900, spread: 0.004, pellets: 1, pierce: 2,
     shake: 6.5, maxAmmo: 30, pickup: 8, scope: 2.3, driveby: false,
   },
   minigun: {
     id: 'minigun', label: 'minigun', hangul: '미니건', auto: true, slot: 4,
+    price: 1250000, ammoPrice: 96000,
     damage: 12, rate: 0.045, range: 660, spread: 0.115, pellets: 1,
     shake: 1.4, maxAmmo: 600, pickup: 180, spinUp: 0.8, heavy: 0.56, driveby: false,
   },
@@ -63,16 +74,19 @@ export const WEAPONS = {
   // (o si rompe) al primo contatto".
   molotov: {
     id: 'molotov', label: 'molotov', hangul: '화염병', slot: 5, thrown: true,
+    price: 26000,
     rate: 1.05, range: 460, fuse: 0, shake: 3,
     fire: { r: 78, life: 9.5, dps: 26 }, maxAmmo: 20, pickup: 5,
   },
   grenade: {
     id: 'grenade', label: 'granata', hangul: '수류탄', slot: 5, thrown: true,
+    price: 45000,
     rate: 1, range: 480, fuse: 2.2, shake: 3,
     blast: { r: 155, dmg: 190 }, maxAmmo: 20, pickup: 5,
   },
   mine: {
     id: 'mine', label: 'mina', hangul: '지뢰', slot: 5, thrown: true, placed: true,
+    price: 62000,
     rate: 0.85, range: 60, shake: 0,
     blast: { r: 140, dmg: 220 }, maxAmmo: 10, pickup: 3,
   },
@@ -168,9 +182,11 @@ export function rayCast(game, ox, oy, dx, dy, maxDist, ignore = null, ignoreVehi
   const qw = Math.abs(ex - ox) + 60;
   const qh = Math.abs(ey - oy) + 60;
 
-  // Muri, edifici e arredo solido. I solidi `vehicleOnly` (gradini, transenne)
-  // fermano le auto ma non i proiettili: si spara sopra.
-  for (const s of game.city.solidGrid.queryRect(qx, qy, qw, qh)) {
+  // Muri, edifici e arredo solido — o le pareti del piano, se si è dentro un
+  // edificio: `game.area()` restituisce la griglia giusta e il resto non cambia.
+  // I solidi `vehicleOnly` (gradini, transenne) fermano le auto ma non i
+  // proiettili: si spara sopra.
+  for (const s of game.area().grid.queryRect(qx, qy, qw, qh)) {
     if (s.vehicleOnly) continue;
     const t = rayAabb(ox, oy, dx, dy, s);
     if (t !== null && t < bd) { bd = t; hit = s; type = 'solid'; }
@@ -219,7 +235,7 @@ export function hasLineOfSight(game, ax, ay, bx, by) {
   const len = Math.hypot(dx, dy) || 1;
   const qx = Math.min(ax, bx) - 8;
   const qy = Math.min(ay, by) - 8;
-  for (const s of game.city.solidGrid.queryRect(qx, qy, Math.abs(dx) + 16, Math.abs(dy) + 16)) {
+  for (const s of game.area().grid.queryRect(qx, qy, Math.abs(dx) + 16, Math.abs(dy) + 16)) {
     if (s.vehicleOnly) continue;
     const t = rayAabb(ax, ay, dx / len, dy / len, s);
     if (t !== null && t < len - 4) return false;

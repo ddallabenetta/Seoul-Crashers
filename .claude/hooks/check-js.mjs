@@ -41,7 +41,8 @@ process.stdin.on('end', () => {
       'Hai toccato la generazione della città: se hai aggiunto, tolto o spostato una '
       + 'chiamata a `rng.*` la Seoul collaudata cambia tutta. Verifica con '
       + '`node .claude/tools/probe.mjs --eval "game.city.stats"` — attesi '
-      + 'buildings 424, props 796, blocks 119, nodes 179, edges 261, doglegs 3, stairs 8.'
+      + 'buildings 424, props 796, blocks 119, nodes 179, edges 261, doglegs 3, stairs 8 '
+      + '(shops 139, venues 369, garages 5 hanno un rng loro e non seguono la città).'
     );
   }
   if (file.endsWith('render/ground.js') || file.endsWith('world/citygen.js')) {

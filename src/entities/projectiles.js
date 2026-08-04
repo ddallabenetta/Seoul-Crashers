@@ -158,7 +158,10 @@ export class ProjectileSystem {
   bounceOnSolids(it, nx, ny, game) {
     it.x = nx;
     it.y = ny;
-    const solids = game.city.solidGrid.queryRect(it.x - 20, it.y - 20, 40, 40, this._q);
+    // `game.area()` è la città o la pianta del piano: una granata rimbalza sui muri
+    // di un negozio esattamente come su quelli di un palazzo.
+    const area = game.area();
+    const solids = area.grid.queryRect(it.x - 20, it.y - 20, 40, 40, this._q);
     for (const s of solids) {
       if (s.vehicleOnly && it.z > 14) continue;
       const push = circleRectPush(it.x, it.y, PR, s);
@@ -174,8 +177,8 @@ export class ProjectileSystem {
         if (!it.spec.fuse) { it.z = 0; }
       }
     }
-    it.x = clamp(it.x, 20, game.city.w - 20);
-    it.y = clamp(it.y, 20, game.city.h - 20);
+    it.x = clamp(it.x, area.x0, area.x1);
+    it.y = clamp(it.y, area.y0, area.y1);
   }
 
   breakItem(it, game) {
