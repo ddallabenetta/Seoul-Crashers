@@ -11,6 +11,7 @@ import {
 import { WEAPONS } from '../entities/weapons.js';
 import { GroundRenderer } from './ground.js';
 import { signalAxis } from '../world/roadgraph.js';
+import { BUSINESSES as SHOP_BIZ } from '../world/interiors.js';
 
 const POLE_PROPS = new Set(['lamp', 'crane']);
 
@@ -105,8 +106,10 @@ export class Scene {
     }
     this.entityShadows(ctx, game);
 
-    // 4) Semafori a terra + segnaletica luminosa
+    // 4) Semafori a terra, segnaletica luminosa, soglie dei negozi e piazzole
+    // delle officine: tutto quello che è dipinto *sull'* asfalto.
     this.drawSignals(ctx, cam, game.time);
+    this.drawThresholds(ctx, game, buildings);
 
     // 5) Oggetti alti ordinati per profondità radiale
     const list = this.list;
@@ -180,6 +183,54 @@ export class Scene {
     }
     for (const p of game.peds) drawShadow(p.x, p.y, 8, 7, 0, 20);
     if (game.player.onFoot) drawShadow(game.player.x, game.player.y, 9, 8, 0, 20);
+  }
+
+  /**
+   * Soglie: lo zerbino luminoso davanti a ogni porta e la piazzola dell'officina.
+   * Da sopra una vetrina è indistinguibile da un muro — senza un segno a terra il
+   * giocatore non saprebbe mai che in quell'edificio si entra.
+   */
+  drawThresholds(ctx, game, buildings) {
+    const pl = game.player;
+    for (const b of buildings) {
+      if (!b.shop) continue;
+      const s = b.shop;
+      const near = (s.x - pl.x) ** 2 + (s.y - pl.y) ** 2 < 210 * 210;
+      const biz = SHOP_BIZ[s.biz[0]];
+      const col = biz ? biz.pal.accent : '#ffd23f';
+      const w = s.nx ? 15 : 34;
+      const h = s.nx ? 34 : 15;
+      ctx.save();
+      // Gradino scuro col filo di neon del locale: si legge come una soglia, non
+      // come una macchia di vernice.
+      ctx.fillStyle = 'rgba(16,18,22,0.55)';
+      ctx.fillRect(s.x - w / 2, s.y - h / 2, w, h);
+      ctx.globalAlpha = near ? 0.7 + 0.3 * Math.sin(game.time * 3.4) : 0.42;
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(s.x - w / 2 + 1, s.y - h / 2 + 1, w - 2, h - 2);
+      ctx.globalAlpha = near ? 0.14 : 0.05;
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, 32, 0, 6.2832);
+      ctx.fill();
+      ctx.restore();
+    }
+    // Piazzola dell'officina: strisce gialle da carrozzeria, si legge da lontano.
+    for (const g of this.city.garages) {
+      if (g.cx < game.camera.cx - 900 || g.cx > game.camera.cx + 900) continue;
+      ctx.save();
+      ctx.fillStyle = 'rgba(24,26,30,0.55)';
+      ctx.fillRect(g.x, g.y, g.w, g.h);
+      ctx.strokeStyle = 'rgba(255,210,63,0.75)';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(g.x + 2, g.y + 2, g.w - 4, g.h - 4);
+      ctx.fillStyle = 'rgba(255,210,63,0.16)';
+      for (let i = 0; i < 6; i++) {
+        ctx.fillRect(g.x + 4 + i * (g.w - 8) / 6, g.y + 4, (g.w - 8) / 12, g.h - 8);
+      }
+      ctx.restore();
+    }
   }
 
   drawSignals(ctx, cam, time) {
@@ -269,6 +320,72 @@ export class Scene {
           FTH * (0.32 + s.h * 0.52) - sh / 2,
           sw, sh
         );
+        ctx.restore();
+      }
+    }
+
+    // Portone e colonna di insegne. A Seoul un palazzo dichiara dalla strada cosa
+    // c'è a ogni piano, una targa per piano: è pittoresco *ed* è l'unico modo che
+    // ha il giocatore di sapere che dietro quella facciata ci sono quattro posti
+    // diversi. Le misure si calcolano in pixel di mondo e poi si riportano in
+    // spazio texture, come per le insegne normali.
+    if (b.shop) {
+      const face = faces.find((fc) => fc.side === b.shop.edge);
+      if (face) {
+        const biz = b.shop.biz;
+        ctx.save();
+        ctx.transform(face.ex / FTW, face.ey / FTW, ox / FTH, oy / FTH, face.px, face.py);
+        const dwWorld = Math.min(face.len * 0.42, 46);
+        const dhWorld = Math.min(h3d * 0.5, 26);
+        const dw = (dwWorld / face.len) * FTW;
+        const dh = (dhWorld / h3d) * FTH;
+        ctx.fillStyle = 'rgba(10,12,16,0.92)';
+        ctx.fillRect(FTW / 2 - dw / 2, 0, dw, dh);
+        const glow = SHOP_BIZ[biz[0]] ? SHOP_BIZ[biz[0]].pal.accent : '#ffd23f';
+        ctx.fillStyle = glow;
+        ctx.globalAlpha = 0.75;
+        ctx.fillRect(FTW / 2 - dw / 2, dh - dh * 0.12, dw, dh * 0.12);
+        ctx.globalAlpha = 1;
+
+        for (let i = 0; i < biz.length; i++) {
+          const spec = SHOP_BIZ[biz[i]];
+          if (!spec) continue;
+          const spr = signSprite(spec.hangul, spec.pal.accent, false);
+          let hWorld = Math.min((h3d * 0.62) / biz.length, 17);
+          let wWorld = hWorld * (spr.w / spr.h);
+          if (wWorld > face.len * 0.82) {
+            wWorld = face.len * 0.82;
+            hWorld = wWorld / (spr.w / spr.h);
+          }
+          const sw = (wWorld / face.len) * FTW;
+          const sh = (hWorld / h3d) * FTH;
+          ctx.drawImage(
+            spr.canvas,
+            FTW / 2 - sw / 2,
+            FTH * (0.26 + (i + 0.5) * (0.66 / biz.length)) - sh / 2,
+            sw, sh
+          );
+        }
+        ctx.restore();
+      }
+    }
+
+    // Saracinesca dell'officina: la stessa idea, ma larga come una macchina.
+    if (b.garage) {
+      const g = this.city.garages.find((q) => q.building === b);
+      const face = g ? faces.find((fc) => fc.side === g.edge) : null;
+      if (face) {
+        ctx.save();
+        ctx.transform(face.ex / FTW, face.ey / FTW, ox / FTH, oy / FTH, face.px, face.py);
+        const dw = (Math.min(face.len * 0.7, 74) / face.len) * FTW;
+        const dh = (Math.min(h3d * 0.6, 34) / h3d) * FTH;
+        ctx.fillStyle = 'rgba(34,37,42,0.95)';
+        ctx.fillRect(FTW / 2 - dw / 2, 0, dw, dh);
+        ctx.fillStyle = 'rgba(255,255,255,0.07)';
+        for (let i = 1; i < 6; i++) ctx.fillRect(FTW / 2 - dw / 2, (dh * i) / 6, dw, dh * 0.05);
+        const spr = signSprite('도색', '#b48cff', false);
+        const sw = dw * 0.6;
+        ctx.drawImage(spr.canvas, FTW / 2 - sw / 2, dh + 4, sw, (sw / (spr.w / spr.h)));
         ctx.restore();
       }
     }
@@ -515,7 +632,7 @@ export class Scene {
     const frame = pl.dying ? 0 : Math.floor(pl.animT) % PED_FRAMES;
     // Con un'arma da fuoco in pugno la posa cambia: braccia tese verso il mirino.
     const aiming = !pl.dying && !WEAPONS[pl.weapon].melee;
-    const spr = getHeroSprite(frame, aiming ? 'aim' : 'walk');
+    const spr = getHeroSprite(frame, aiming ? 'aim' : 'walk', pl.outfit);
     ctx.save();
     ctx.translate(pl.x + ox * 0.7, pl.y + oy * 0.7);
     ctx.rotate(pl.angle);

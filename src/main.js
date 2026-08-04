@@ -17,11 +17,17 @@ import { PickupSystem } from './entities/pickups.js';
 import { ProjectileSystem } from './entities/projectiles.js';
 import { WantedSystem } from './entities/wanted.js';
 import { PoliceSystem } from './entities/police.js';
+import { ShopSystem, won } from './entities/shops.js';
+import { InteriorScene } from './render/interiorscene.js';
 import { Hud } from './ui/hud.js';
 import { MapView } from './ui/mapview.js';
 import { PauseMenu } from './ui/menu.js';
+import { ShopMenu } from './ui/shopmenu.js';
 
 const MAX_PIXELS = 2_900_000;
+// Dentro un edificio non c'è traffico: la griglia dei veicoli si ricostruisce vuota
+// invece di aggiungere un ramo a ogni query.
+const NO_VEHICLES = [];
 
 class Game {
   constructor(canvas) {
@@ -53,6 +59,8 @@ class Game {
       maxWanted: 0,
       choppers: 0,
       blasts: 0,
+      robberies: 0,
+      visits: 0,
       districts: new Set(),
     };
     this._skidT = 0;
@@ -96,9 +104,12 @@ class Game {
     this.projectiles = new ProjectileSystem();
     this.wanted = new WantedSystem();
     this.police = new PoliceSystem(this.city, this.rng);
+    this.shops = new ShopSystem(this.city);
+    this.interiorScene = new InteriorScene(this.scene);
     this.hud = new Hud(this.city, this.mapTexture);
     this.mapView = new MapView(this.city, this.mapTexture);
     this.menu = new PauseMenu(this.mapView);
+    this.shopMenu = new ShopMenu();
 
     // Riempie subito la scena, così il giocatore non parte in una città deserta.
     this.traffic.prewarm(this, 72, 32);
@@ -108,10 +119,29 @@ class Game {
     this.stats.districts.add(this.player.district.id);
     this.hud.toast('E per rubare un\'auto · M per la mappa', 5);
     this.hud.toast('Mouse per mirare e sparare · 1-6 per l\'arma', 6.5);
+    this.hud.toast('E sulla porta di un negozio per entrare · F svuota la cassa', 8);
 
     await onProgress('Pronti.', 1);
     this.loop = new Loop((dt) => this.update(dt), () => this.render());
     this.loop.start();
+  }
+
+  /** True quando il giocatore è dentro un edificio: la città è ferma. */
+  get indoors() {
+    return !!(this.shops && this.shops.active);
+  }
+
+  /**
+   * Il rettangolo giocabile e i suoi solidi: la città, oppure la pianta del piano
+   * in cui si è entrati. Collisioni a piedi e raggi delle armi passano di qui e
+   * non hanno bisogno di sapere dove si trova il giocatore.
+   */
+  area() {
+    if (this.indoors) {
+      const f = this.shops.floor;
+      return { grid: f.grid, x0: 10, y0: 10, x1: f.w - 10, y1: f.h - 10 };
+    }
+    return { grid: this.city.solidGrid, x0: 40, y0: 40, x1: this.city.w - 40, y1: this.city.h - 40 };
   }
 
   // --- callback dal mondo ----------------------------------------------------
@@ -221,14 +251,19 @@ class Game {
     }
   }
 
-  /** Uno sparo si sente: i pedoni nel raggio reagiscono. */
+  /** Uno sparo si sente: i pedoni nel raggio reagiscono — quelli del piano, se dentro. */
   alarm(x, y, r, source) {
-    this.pedSystem.alarm(x, y, r, this, source);
+    if (this.indoors) this.shops.alarm(x, y, r, this, source);
+    else this.pedSystem.alarm(x, y, r, this, source);
   }
 
   /** Risveglio all'ospedale del distretto più vicino, senza arsenale. */
   respawnPlayer() {
     const pl = this.player;
+    // Se si muore dentro un negozio la barella arriva lo stesso: l'interno si
+    // chiude prima di spostare il giocatore, o resterebbe in un limbo con le
+    // coordinate della pianta.
+    if (this.indoors) this.shops.forceExit(this);
     let best = this.city.hospitals[0];
     let bestD = Infinity;
     for (const h of this.city.hospitals) {
@@ -248,7 +283,12 @@ class Game {
     this.projectiles.clear();
     pl.district = this.city.districtAt(pl.x, pl.y);
     this.hud.showDistrict(pl.district);
+    // In corsia si paga: un quarto dei contanti. È il costo della morte adesso che
+    // i soldi servono a qualcosa, e non svuota le tasche a chi ha appena cominciato.
+    const bill = Math.round(pl.money * 0.25);
+    pl.money -= bill;
     this.hud.toast(`Ospedale di ${best.name}: ti hanno ricucito, l'arsenale no`, 4);
+    if (bill > 0) this.hud.toast(`Conto della clinica: ${won(bill)}`, 4);
   }
 
   // --- ciclo ----------------------------------------------------------------
@@ -256,57 +296,75 @@ class Game {
     const input = this.input;
 
     if (input.wasPressed('Escape')) {
-      if (this.mapView.open) this.mapView.open = false;
+      if (this.shopMenu.open) this.shopMenu.close(this);
+      else if (this.mapView.open) this.mapView.open = false;
       else this.menu.toggle();
     }
-    if (input.wasPressed('KeyM')) {
+    // La mappa della città non serve dentro un negozio: le coordinate sono quelle
+    // della pianta, e il puntino finirebbe in un angolo di Seoul a caso.
+    if (input.wasPressed('KeyM') && !this.shopMenu.open && !this.indoors) {
       if (this.menu.open) this.menu.open = false;
       this.mapView.toggle();
     }
     if (input.wasPressed('F3')) this.debug = !this.debug;
 
-    this.paused = this.menu.open || this.mapView.open;
+    this.paused = this.menu.open || this.mapView.open || this.shopMenu.open;
     const cursor = this.paused ? 'default' : 'none';
     if (this.canvas.style.cursor !== cursor) this.canvas.style.cursor = cursor;
 
     if (this.paused) {
       this.menu.update(dt, this);
       this.mapView.update(dt, this);
+      this.shopMenu.update(dt, this);
       this.hud.update(dt);
       input.endFrame();
       return;
     }
 
     this.time += dt;
-    this.vehicleGrid.rebuild(this.vehicles);
+    this.vehicleGrid.rebuild(this.indoors ? NO_VEHICLES : this.vehicles);
     this.pedGrid.rebuild(this.peds);
 
     const prevX = this.player.x;
     const prevY = this.player.y;
 
+    // I negozi girano per primi: decidono se il frame si svolge in strada o dentro
+    // un edificio, e il giocatore deve muoversi già nello spazio giusto.
+    this.shops.update(dt, this);
     this.player.update(dt, this);
-    // Il ricercato legge l'avvistamento calcolato dalla polizia, la polizia scrive
-    // gas e sterzo delle volanti: la fisica di quei veicoli la integra `traffic`,
-    // che deve girare dopo.
-    this.wanted.update(dt, this);
-    this.police.update(dt, this);
-    this.traffic.update(dt, this);
-    this.pedSystem.update(dt, this);
-    this.pickups.update(dt, this);
+    // Dentro un edificio la città si ferma del tutto — traffico, pedoni, polizia e
+    // ricercato. Non è un'ottimizzazione: è la risposta a "cosa succede fuori
+    // mentre compro", che è "niente", e vale anche per chi ti sta cercando.
+    if (!this.indoors) {
+      // Il ricercato legge l'avvistamento calcolato dalla polizia, la polizia scrive
+      // gas e sterzo delle volanti: la fisica di quei veicoli la integra `traffic`,
+      // che deve girare dopo.
+      this.wanted.update(dt, this);
+      this.police.update(dt, this);
+      this.traffic.update(dt, this);
+      this.pedSystem.update(dt, this);
+      this.pickups.update(dt, this);
+    }
+    // Gli esplosivi girano anche dentro: una granata in un 노래방 rimbalza sui
+    // tramezzi e fa danno a chi c'è. Quello che *non* può fare è sopravvivere alla
+    // porta, e infatti `shops` svuota la lista a ogni passaggio (mine comprese).
     this.projectiles.update(dt, this);
     this.fx.update(dt);
     this.hud.update(dt);
 
-    // Statistiche di guida
-    this.stats.distance += dist(prevX, prevY, this.player.x, this.player.y);
+    // Statistiche di guida. Entrare e uscire da una porta è un salto di coordinate,
+    // non un chilometro percorso: durante lo stacco non si conta.
+    if (!this.indoors && this.shops.fade < 0.5) {
+      this.stats.distance += dist(prevX, prevY, this.player.x, this.player.y);
+    }
     const sp = this.player.onFoot ? 0 : Math.abs(this.player.vehicle?.speed || 0);
     if (sp > this.stats.topSpeed) this.stats.topSpeed = sp;
 
-    this.emitSkids(dt);
+    if (!this.indoors) this.emitSkids(dt);
 
     // Col mirino del fucile di precisione la camera non sta più addosso al
     // giocatore: se lo decide `player.cameraTarget`.
-    this.camera.follow(this.player.cameraTarget(), dt, this.player.onFoot ? 0.2 : 0.4);
+    this.camera.follow(this.player.cameraTarget(this), dt, this.player.onFoot ? 0.2 : 0.4);
 
     input.endFrame();
   }
@@ -348,11 +406,13 @@ class Game {
 
   render() {
     const ctx = this.ctx;
-    this.scene.render(ctx, this);
+    if (this.indoors) this.interiorScene.render(ctx, this);
+    else this.scene.render(ctx, this);
     this.camera.applyUI(ctx);
     this.hud.draw(ctx, this);
     this.mapView.draw(ctx, this);
     this.menu.draw(ctx, this);
+    this.shopMenu.draw(ctx, this);
   }
 }
 

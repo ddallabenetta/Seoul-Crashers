@@ -31,6 +31,7 @@ const CRIMES = {
   theft: 6,      // auto rubata sotto gli occhi di qualcuno
   copTheft: 12,  // ... o sotto quelli di una pattuglia
   copHit: 12,    // poliziotto ferito
+  rob: 22,       // cassa di un negozio svuotata
   wreck: 18,     // veicolo fatto esplodere
   kill: 24,      // cadavere
   copKill: 60,   // poliziotto ammazzato

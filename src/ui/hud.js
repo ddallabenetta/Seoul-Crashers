@@ -3,6 +3,7 @@ import { KMH, clamp } from '../core/math.js';
 import { MAP_SIZE } from '../world/maptexture.js';
 import { VEHICLE_TYPES, getHeroPortrait, getWeaponIcon } from '../render/sprites.js';
 import { WEAPONS, WEAPON_SLOTS } from '../entities/weapons.js';
+import { won } from '../entities/shops.js';
 
 const MINIMAP = 196;
 const MINIMAP_WORLD = 1000; // porzione di mondo inquadrata
@@ -16,11 +17,19 @@ export class Hud {
     this.hint = null;
     this.hintT = 0;
     this.messages = [];
+    this.venue = null;
+    this.venueT = 0;
   }
 
   showDistrict(d) {
     this.districtInfo = d;
     this.districtToast = 4.2;
+  }
+
+  /** Cartello di un locale: stesso ruolo di quello del distretto, un piano alla volta. */
+  showVenue(floor) {
+    this.venue = floor;
+    this.venueT = 2.8;
   }
 
   toast(text, seconds = 3) {
@@ -29,6 +38,7 @@ export class Hud {
 
   update(dt) {
     if (this.districtToast > 0) this.districtToast -= dt;
+    if (this.venueT > 0) this.venueT -= dt;
     for (let i = this.messages.length - 1; i >= 0; i--) {
       this.messages[i].t -= dt;
       if (this.messages[i].t <= 0) this.messages.splice(i, 1);
@@ -41,17 +51,21 @@ export class Hud {
     ctx.save();
     ctx.textBaseline = 'alphabetic';
 
-    this.drawMinimap(ctx, game, 22, h - MINIMAP - 22);
+    if (game.indoors) this.drawFloorPlan(ctx, game, 22, h - MINIMAP - 22);
+    else this.drawMinimap(ctx, game, 22, h - MINIMAP - 22);
     if (!game.player.onFoot) this.drawSpeedo(ctx, game, w - 132, h - 112);
     this.drawWeaponBar(ctx, game, w, h);
     this.drawVitals(ctx, game, 22, 22);
-    if (game.wanted) this.drawWanted(ctx, game, 22, 100);
+    this.drawMoney(ctx, game, 22, 88);
+    if (game.wanted) this.drawWanted(ctx, game, 22, 124);
     this.drawDistrictToast(ctx, game, w, h);
+    this.drawVenueToast(ctx, game, w, h);
     this.drawHints(ctx, game, w, h);
     this.drawMessages(ctx, w, h);
     if (game.debug) this.drawDebug(ctx, game, w, h);
     this.drawDamage(ctx, game, w, h);
     this.drawCrosshair(ctx, game);
+    this.drawFade(ctx, game, w, h);
 
     ctx.restore();
   }
@@ -104,6 +118,130 @@ export class Hud {
     ctx.font = '700 15px ui-monospace, monospace';
     ctx.fillStyle = spec.infinite ? 'rgba(230,235,245,0.45)' : p.shots > 0 ? '#ffd23f' : '#e04a3a';
     ctx.fillText(spec.infinite ? '∞' : String(p.shots), x + w - 12, y + 48);
+    ctx.restore();
+  }
+
+  /** Contanti. Sta sotto il pannello vitale perché è un numero che cambia di rado. */
+  drawMoney(ctx, game, x, y) {
+    const p = game.player;
+    ctx.save();
+    ctx.fillStyle = 'rgba(10,12,15,0.66)';
+    roundPath(ctx, x, y, 150, 26, 8);
+    ctx.fill();
+    ctx.textAlign = 'left';
+    ctx.font = '700 15px ui-monospace, monospace';
+    ctx.fillStyle = '#ffd23f';
+    ctx.fillText(won(p.money), x + 10, y + 18);
+    ctx.restore();
+  }
+
+  /**
+   * Pianta del piano al posto della minimappa. Dentro un edificio la mappa della
+   * città non dice niente, e senza un riferimento non si trova più la porta.
+   */
+  drawFloorPlan(ctx, game, x, y) {
+    const f = game.shops.floor;
+    const pl = game.player;
+    const pal = f.biz.pal;
+    const k = Math.min(MINIMAP / f.w, MINIMAP / f.h) * 0.86;
+    const ox = x + (MINIMAP - f.w * k) / 2;
+    const oy = y + (MINIMAP - f.h * k) / 2;
+    const to = (wx, wy) => ({ x: ox + wx * k, y: oy + wy * k });
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(10,12,15,0.82)';
+    roundPath(ctx, x - 4, y - 4, MINIMAP + 8, MINIMAP + 8, 12);
+    ctx.fill();
+    roundPath(ctx, x, y, MINIMAP, MINIMAP, 9);
+    ctx.clip();
+    ctx.fillStyle = '#12151a';
+    ctx.fillRect(x, y, MINIMAP, MINIMAP);
+    ctx.fillStyle = pal.floor;
+    ctx.fillRect(ox, oy, f.w * k, f.h * k);
+    ctx.fillStyle = pal.wall;
+    for (const w of f.walls) ctx.fillRect(ox + w.x * k, oy + w.y * k, w.w * k, w.h * k);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    for (const o of f.furni) if (o.solid) ctx.fillRect(ox + o.x * k, oy + o.y * k, o.w * k, o.h * k);
+    // Scale, porta e cassa: sono le tre cose che si cercano su una pianta.
+    for (const [s, col] of [[f.stairUp, '#4ad98a'], [f.stairDown, '#e8c33a']]) {
+      if (!s) continue;
+      ctx.fillStyle = col;
+      ctx.fillRect(ox + s.x * k, oy + s.y * k, s.w * k, s.h * k);
+    }
+    if (f.idx === 0) {
+      const e = to(f.entry.x, f.entry.y);
+      ctx.fillStyle = '#38d6ff';
+      ctx.fillRect(e.x - 4, e.y - 2, 8, 4);
+    }
+    if (f.till && !f.robbed) {
+      const t = to(f.till.x, f.till.y);
+      ctx.fillStyle = '#ffd23f';
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, 3, 0, 6.2832);
+      ctx.fill();
+    }
+    for (const p of f.people) {
+      if (p.dead) continue;
+      const m = to(p.x, p.y);
+      ctx.fillStyle = p.hostile ? '#ff4a4a' : 'rgba(210,216,226,0.8)';
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, 2.4, 0, 6.2832);
+      ctx.fill();
+    }
+    const m = to(pl.x, pl.y);
+    ctx.save();
+    ctx.translate(m.x, m.y);
+    ctx.rotate(pl.angle);
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(7, 0);
+    ctx.lineTo(-4.5, 4.5);
+    ctx.lineTo(-2, 0);
+    ctx.lineTo(-4.5, -4.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+    ctx.restore();
+
+    ctx.strokeStyle = 'rgba(230,235,245,0.28)';
+    ctx.lineWidth = 1.6;
+    roundPath(ctx, x, y, MINIMAP, MINIMAP, 9);
+    ctx.stroke();
+
+    ctx.font = '600 12px system-ui, "Apple SD Gothic Neo", sans-serif';
+    ctx.fillStyle = pal.accent;
+    ctx.textAlign = 'left';
+    const it = game.shops.active;
+    ctx.fillText(`${f.biz.hangul}  ${f.idx === 0 ? 'PIANO TERRA' : `${f.idx + 1}° PIANO`} / ${it.floors.length}`, x + 2, y - 12);
+  }
+
+  /** Il nero fra una porta e l'altra: una scala senza stacco è un teletrasporto. */
+  drawFade(ctx, game, w, h) {
+    const a = game.shops ? game.shops.fade : 0;
+    if (a <= 0.01) return;
+    ctx.save();
+    ctx.fillStyle = `rgba(4,5,7,${Math.min(1, a)})`;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+  }
+
+  drawVenueToast(ctx, game, w, h) {
+    if (this.venueT <= 0 || !this.venue) return;
+    const f = this.venue;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, this.venueT / 0.6);
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(0,0,0,0.85)';
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = f.biz.pal.accent;
+    ctx.font = '800 42px system-ui, "Apple SD Gothic Neo", sans-serif';
+    ctx.fillText(f.biz.hangul, w / 2, h * 0.17);
+    ctx.fillStyle = '#f0f2f6';
+    ctx.font = '700 17px system-ui, sans-serif';
+    ctx.fillText(f.biz.label.toUpperCase(), w / 2, h * 0.17 + 24);
     ctx.restore();
   }
 
@@ -364,6 +502,31 @@ export class Hud {
       ctx.fillRect(m.x - 1, m.y - 3.2, 2, 6.4);
       ctx.fillRect(m.x - 3.2, m.y - 1, 6.4, 2);
     }
+    // Negozi con un servizio dentro (armeria, pegni, minimarket, farmacia, vestiti):
+    // gli altri locali sono decine per isolato e riempirebbero la minimappa di puntini.
+    for (const sh of this.city.shops || []) {
+      if (!sh.blip) continue;
+      const m = toMap(sh.x, sh.y);
+      if (m.x < x || m.x > x + MINIMAP || m.y < y || m.y > y + MINIMAP) continue;
+      ctx.fillStyle = sh.blip;
+      ctx.fillRect(m.x - 2.6, m.y - 2.6, 5.2, 5.2);
+      ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(m.x - 2.6, m.y - 2.6, 5.2, 5.2);
+    }
+    // Officine: sono la sola via d'uscita rapida dal ricercato, si vedono sempre.
+    for (const g of this.city.garages || []) {
+      const m = toMap(g.cx, g.cy);
+      if (m.x < x || m.x > x + MINIMAP || m.y < y || m.y > y + MINIMAP) continue;
+      ctx.fillStyle = '#b48cff';
+      ctx.beginPath();
+      ctx.moveTo(m.x, m.y - 5);
+      ctx.lineTo(m.x + 5, m.y);
+      ctx.lineTo(m.x, m.y + 5);
+      ctx.lineTo(m.x - 5, m.y);
+      ctx.closePath();
+      ctx.fill();
+    }
     // Chi ti sta dando la caccia: teppisti in rosso, divise in blu.
     for (const p of game.peds) {
       if ((!p.hostile && !p.cop) || p.dead) continue;
@@ -542,28 +705,39 @@ export class Hud {
     ctx.restore();
   }
 
+  /**
+   * Suggerimenti contestuali, impilati verso l'alto. Le azioni dei negozi arrivano
+   * già pronte da `shops.actions`: l'HUD non decide cosa si può fare, lo mostra.
+   */
   drawHints(ctx, game, w, h) {
     const p = game.player;
-    let text = null;
-    if (p.onFoot) {
-      const v = p.findNearbyVehicle(game);
-      if (v) text = `E  —  sali in ${VEHICLE_TYPES[v.kind].label}`;
-    } else if (Math.abs(p.vehicle.speed) < 40) {
-      text = 'E  —  scendi';
+    const lines = [];
+    for (const a of game.shops ? game.shops.actions : []) lines.push(`${a.key}  —  ${a.text}`);
+    if (!game.indoors) {
+      if (p.onFoot) {
+        const v = p.findNearbyVehicle(game);
+        if (v) lines.push(`E  —  sali in ${VEHICLE_TYPES[v.kind].label}`);
+      } else if (Math.abs(p.vehicle.speed) < 40) {
+        lines.push('E  —  scendi');
+      }
     }
-    if (!text) return;
+    if (!lines.length) return;
     ctx.save();
     ctx.textAlign = 'center';
-    ctx.font = '600 14px system-ui, sans-serif';
-    const tw = ctx.measureText(text).width + 26;
-    ctx.fillStyle = 'rgba(12,14,18,0.78)';
-    roundPath(ctx, w / 2 - tw / 2, h - 62, tw, 30, 8);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.16)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    ctx.fillStyle = '#eef1f6';
-    ctx.fillText(text, w / 2, h - 42);
+    ctx.font = '600 14px system-ui, "Apple SD Gothic Neo", sans-serif';
+    let y = h - 62;
+    for (const text of lines) {
+      const tw = ctx.measureText(text).width + 26;
+      ctx.fillStyle = 'rgba(12,14,18,0.78)';
+      roundPath(ctx, w / 2 - tw / 2, y, tw, 30, 8);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = '#eef1f6';
+      ctx.fillText(text, w / 2, y + 20);
+      y -= 34;
+    }
     ctx.restore();
   }
 
@@ -596,6 +770,9 @@ export class Hud {
       `wanted ${game.wanted.level}  heat ${game.wanted.heat.toFixed(0)}  ${game.wanted.seen ? 'visto' : `fuga ${game.wanted.unseenT.toFixed(1)}s`}`,
       `polizia ${game.police.cops.length}p ${game.police.cars.length}v  blocchi ${game.police.blocks.length}`,
       `esplosivi ${game.projectiles.items.length}v ${game.projectiles.mines.length}m ${game.projectiles.fires.length}f  scoppi ${game.stats.blasts || 0}`,
+      game.indoors
+        ? `dentro ${game.shops.floor.biz.id} piano ${game.shops.active.cur + 1}/${game.shops.active.floors.length}  gente ${game.shops.floor.people.length}`
+        : `negozi ${this.city.stats.shops} locali ${this.city.stats.venues}  ₩${game.player.money}`,
       `pos ${Math.round(game.player.x)}, ${Math.round(game.player.y)}`,
       `zoom ${game.camera.zoom.toFixed(2)}`,
     ];

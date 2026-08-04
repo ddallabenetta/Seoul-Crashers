@@ -121,6 +121,34 @@ export class MapView {
       ctx.fillRect(s.x - 4.5, s.y - 1.5, 9, 3);
     }
 
+    // Negozi con un servizio e officine di verniciatura: la mappa piena serve
+    // proprio a decidere dove andare a rifornirsi o a farsi ridipingere l'auto.
+    for (const sh of city.shops || []) {
+      if (!sh.blip) continue;
+      const s2 = toScreen(sh.x, sh.y);
+      ctx.fillStyle = sh.blip;
+      ctx.fillRect(s2.x - 3, s2.y - 3, 6, 6);
+      ctx.strokeStyle = 'rgba(0,0,0,0.65)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(s2.x - 3, s2.y - 3, 6, 6);
+    }
+    for (const g of city.garages || []) {
+      const s2 = toScreen(g.cx, g.cy);
+      ctx.fillStyle = '#b48cff';
+      ctx.beginPath();
+      ctx.moveTo(s2.x, s2.y - 6);
+      ctx.lineTo(s2.x + 6, s2.y);
+      ctx.lineTo(s2.x, s2.y + 6);
+      ctx.lineTo(s2.x - 6, s2.y);
+      ctx.closePath();
+      ctx.fill();
+      if (zoom > 1.6) {
+        ctx.fillStyle = 'rgba(240,244,250,0.8)';
+        ctx.font = '600 9px system-ui, "Apple SD Gothic Neo", sans-serif';
+        ctx.fillText('도색', s2.x, s2.y + 16);
+      }
+    }
+
     // Marker attivi (missioni, negozi)
     for (const mk of game.markers || []) {
       const s = toScreen(mk.x, mk.y);
@@ -234,6 +262,7 @@ export class MapView {
     line('posizione', `${Math.round(game.player.x)} / ${Math.round(game.player.y)}`);
     const veh = game.player.vehicle;
     line('mezzo', game.player.onFoot || !veh ? 'a piedi' : VEHICLE_TYPES[veh.kind].label);
+    line('contanti', `₩${game.player.money.toLocaleString('it-IT')}`, '#ffd23f');
 
     ctx.fillStyle = 'rgba(235,240,250,0.4)';
     ctx.font = '500 12px system-ui, sans-serif';

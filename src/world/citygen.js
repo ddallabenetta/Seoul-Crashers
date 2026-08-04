@@ -3,8 +3,9 @@
 import { Rng } from '../core/rng.js';
 import { SpatialGrid } from '../core/spatial.js';
 import { clamp, smoothstep } from '../core/math.js';
-import { DISTRICTS, districtAtNorm, RIVER, NAMSAN, SIGN_WORDS } from './districts.js';
+import { DISTRICTS, DISTRICT_BY_ID, districtAtNorm, RIVER, NAMSAN, SIGN_WORDS } from './districts.js';
 import { buildRoadGraph } from './roadgraph.js';
+import { BUSINESSES, DISTRICT_MIX } from './interiors.js';
 
 export const WORLD = { w: 4200, h: 4200, margin: 150 };
 export const SIDEWALK = 20; // profondità marciapiede attorno a ogni isolato
@@ -316,6 +317,9 @@ function makeBuilding(rng, district, x, y, w, h, opts = {}) {
     district: district.id,
     solid: true,
     signs: [],
+    // Lati che danno sulla strada: servono alle insegne e, dalla fase 3, a sapere
+    // dove può stare la porta di un negozio.
+    edges: opts.streetEdges || [],
     landmark: !!opts.landmark,
     ac: rng.int(0, 3), // unità di condizionamento sul tetto
     water: rng.chance(0.2), // serbatoio d'acqua
@@ -664,6 +668,150 @@ function decorateYards(rng, city, block) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// NEGOZI E ATTIVITÀ
+// ---------------------------------------------------------------------------
+// Tutto quello che segue gira **dopo** la generazione e con un rng suo: una sola
+// `rng.*` in più sulla sequenza principale ridisegnerebbe l'intera città (vedi
+// HANDOFF, determinismo). Qui si decide solo *chi* sta dietro a una facciata già
+// disegnata — la pianta degli interni nasce a runtime, alla prima visita.
+
+const OUTWARD = { top: [0, -1], bottom: [0, 1], left: [-1, 0], right: [1, 0] };
+const DOOR_OUT = 11; // quanto la porta sporge dalla facciata, sul marciapiede
+
+/** Punto d'ingresso sul lato `edge` di un edificio, già sul marciapiede. */
+function doorPoint(b, edge) {
+  const [nx, ny] = OUTWARD[edge];
+  const cx = edge === 'left' ? b.x : edge === 'right' ? b.x + b.w : b.x + b.w / 2;
+  const cy = edge === 'top' ? b.y : edge === 'bottom' ? b.y + b.h : b.y + b.h / 2;
+  return { x: cx + nx * DOOR_OUT, y: cy + ny * DOOR_OUT, nx, ny, edge };
+}
+
+/** Un edificio può ospitare un'attività solo se ha una facciata sulla strada. */
+function shopCandidate(b) {
+  return b.edges && b.edges.length > 0 && !b.landmark && !b.flat
+    && b.w >= 40 && b.h >= 40 && b.style !== 'container';
+}
+
+function makeShop(city, rng, b, edge, groundId, mix) {
+  const door = doorPoint(b, edge);
+  // Quanti piani: l'altezza del volume, non un tiro di dado. Un palazzo di Gangnam
+  // ha davvero quattro insegne in colonna, una casetta di Hongdae ne ha una.
+  const levels = clamp(1 + Math.floor((b.h3d - 30) / 46), 1, 4);
+  const biz = [groundId];
+  for (let i = 1; i < levels; i++) biz.push(rng.pick(mix.upper));
+  const first = BUSINESSES[groundId];
+  const shop = {
+    id: city.shops.length,
+    x: door.x, y: door.y, nx: door.nx, ny: door.ny, edge,
+    w: b.w, h: b.h,
+    building: b,
+    district: b.district,
+    biz,
+    name: first.label,
+    hangul: first.hangul,
+    blip: first.blip || null,
+    seed: (city.seed + b.x * 7919 + b.y * 104729 + city.shops.length * 31) >>> 0,
+  };
+  b.shop = shop;
+  city.shops.push(shop);
+  return shop;
+}
+
+function placeShops(city) {
+  const rng = new Rng((city.seed ^ 0x5e0c1) >>> 0);
+  city.shops = [];
+  // Una porta ogni 80 px: due vetrine attaccate diventerebbero un suggerimento
+  // illeggibile e una fila di insegne sovrapposte.
+  const doors = new SpatialGrid(city.w, city.h, 160);
+  const near = [];
+
+  for (const b of city.buildings) {
+    if (!shopCandidate(b)) continue;
+    const district = DISTRICT_BY_ID[b.district] || DISTRICTS[0];
+    const mix = DISTRICT_MIX[b.district] || DISTRICT_MIX.hongdae;
+    if (!rng.chance(district.signDensity * 0.55)) continue;
+    const edge = rng.pick(b.edges);
+    const door = doorPoint(b, edge);
+    doors.queryCircle(door.x, door.y, 80, near);
+    if (near.some((d) => (d.px - door.x) ** 2 + (d.py - door.y) ** 2 < 80 * 80)) continue;
+    const shop = makeShop(city, rng, b, edge, rng.pick(mix.ground), mix);
+    doors.insertRect({ x: door.x - 1, y: door.y - 1, w: 2, h: 2, px: shop.x, py: shop.y });
+  }
+
+  // L'ospedale del distretto diventa un posto in cui si entra davvero: la corsia
+  // c'era già come punto di risveglio, mancava la porta.
+  for (const hsp of city.hospitals) {
+    let best = null;
+    let bestD = Infinity;
+    for (const b of city.buildings) {
+      if (b.district !== hsp.district || !shopCandidate(b)) continue;
+      const d = (b.x + b.w / 2 - hsp.x) ** 2 + (b.y + b.h / 2 - hsp.y) ** 2;
+      if (d < bestD) { bestD = d; best = b; }
+    }
+    if (!best) continue;
+    const mix = DISTRICT_MIX[best.district] || DISTRICT_MIX.hongdae;
+    if (best.shop) {
+      best.shop.biz[0] = 'clinic';
+      best.shop.name = BUSINESSES.clinic.label;
+      best.shop.hangul = BUSINESSES.clinic.hangul;
+      best.shop.blip = BUSINESSES.clinic.blip;
+    } else {
+      makeShop(city, rng, best, rng.pick(best.edges), 'clinic', mix);
+    }
+    // Il blip (e il risveglio dopo la morte) si spostano sulla porta.
+    hsp.x = best.shop.x;
+    hsp.y = best.shop.y;
+    hsp.shop = best.shop;
+  }
+}
+
+/**
+ * Officine di verniciatura (도색), una per distretto. La piazzola è **sulla strada**,
+ * davanti a una saracinesca: i cortili interni sarebbero il posto giusto ma in tutta
+ * Seoul ce ne sono undici, e solo quattro abbastanza larghi per una macchina.
+ * Una per distretto è il compromesso: di più e il ricercato diventa una formalità,
+ * di meno e ci si arriva con quattro stelle attaccate al paraurti.
+ */
+const BAY = { len: 56, wid: 78 };
+
+function placeGarages(city) {
+  city.garages = [];
+  for (const d of DISTRICTS) {
+    const dx = d.seed.x * city.w;
+    const dy = d.seed.y * city.h;
+    let best = null;
+    let bestEdge = null;
+    let bestD = Infinity;
+    for (const b of city.buildings) {
+      if (!shopCandidate(b) || b.shop || b.garage) continue;
+      for (const edge of b.edges) {
+        // La saracinesca deve starci: sul lato corto di un negozietto non entra.
+        const span = edge === 'top' || edge === 'bottom' ? b.w : b.h;
+        if (span < BAY.wid + 8) continue;
+        const dd = (b.x + b.w / 2 - dx) ** 2 + (b.y + b.h / 2 - dy) ** 2;
+        if (dd < bestD) { bestD = dd; best = b; bestEdge = edge; }
+      }
+    }
+    if (!best) continue;
+    best.garage = true;
+    const door = doorPoint(best, bestEdge);
+    const horiz = bestEdge === 'top' || bestEdge === 'bottom';
+    const w = horiz ? BAY.wid : BAY.len;
+    const h = horiz ? BAY.len : BAY.wid;
+    const cx = door.x + door.nx * (BAY.len / 2 - DOOR_OUT);
+    const cy = door.y + door.ny * (BAY.len / 2 - DOOR_OUT);
+    city.garages.push({
+      x: cx - w / 2, y: cy - h / 2, w, h,
+      cx, cy, edge: bestEdge, horiz,
+      door: { x: door.x, y: door.y },
+      building: best,
+      district: d.id,
+      name: d.name,
+    });
+  }
+}
+
 export function generateCity(seed = 20260730) {
   const rng = new Rng(seed);
   const W = WORLD.w, H = WORLD.h, M = WORLD.margin;
@@ -951,6 +1099,10 @@ export function generateCity(seed = 20260730) {
     });
   }
 
+  // --- Negozi, attività ai piani e officine ----------------------------------
+  placeShops(city);
+  placeGarages(city);
+
   // --- Parapetti dei ponti (volumi bassi, estrusi come i muri) ---------------
   for (const b of city.river.bridges) {
     const rw = 10;
@@ -1081,6 +1233,9 @@ export function generateCity(seed = 20260730) {
     edges: city.graph.edges.length,
     doglegs: city.doglegs,
     stairs: city.stairs.length,
+    shops: city.shops.length,
+    venues: city.shops.reduce((n, s) => n + s.biz.length, 0),
+    garages: city.garages.length,
   };
 
   return city;
