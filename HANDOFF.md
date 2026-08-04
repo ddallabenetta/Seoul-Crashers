@@ -3,8 +3,8 @@
 Documento per riprendere il lavoro da una sessione pulita. Leggi anche `README.md`
 (descrizione del gioco e comandi) — qui c'è quello che serve a *sviluppare*.
 
-Ultimo aggiornamento: fine Fase 2 tappa B (polizia e ricercato a 5 livelli) + modello
-del protagonista rifatto.
+Ultimo aggiornamento: fine Fase 2 tappa C (arsenale pesante ed esplosivi) + strumenti,
+skill e hook per gli agenti che lavorano al progetto (`.claude/`, §9).
 
 ---
 
@@ -14,21 +14,29 @@ Web game d'azione top-down 2.5D ambientato a Seoul, stile *GTA: Chinatown Wars*.
 Canvas 2D puro, moduli ES nativi, **zero dipendenze, nessun build step**. Tutta la grafica
 (sprite, facciate, terreno, mappa) è generata da codice a runtime: non esistono asset esterni.
 
-Stato: **Fase 1, Fase 1.5, Fase 2 tappa A e Fase 2 tappa B completate e collaudate**.
-9128 righe in 27 moduli. 60 fps con ~50 veicoli e ~93 pedoni attivi (~62 e ~112 a
+Stato: **Fase 1, Fase 1.5 e Fase 2 tutta e tre le tappe completate e collaudate**.
+10110 righe in 28 moduli. 60 fps con ~50 veicoli e ~93 pedoni attivi (~62 e ~112 a
 Myeongdong, il distretto più denso), e restano 60 anche sotto raffica continua di SMG.
 
-La Fase 2 è divisa in tre tappe, concordate con l'utente: **A** combattimento base (fatta),
-**B** polizia e ricercato a 5 livelli (fatta), **C** armi pesanti ed esplosivi.
+La Fase 2 era divisa in tre tappe, concordate con l'utente: **A** combattimento base,
+**B** polizia e ricercato a 5 livelli, **C** armi pesanti ed esplosivi. **Sono tutte fatte.**
+Il prossimo passo è la Fase 3 (contenuti), §6.
 
 ### Avvio
 
 ```bash
-python3 -m http.server 8123 --directory /Users/danieldallabenetta/Documents/seoul_crashers
+python3 -m http.server 8123 --directory .     # dalla radice del repo
 ```
 
 Poi <http://localhost:8123>. Serve un server: i moduli ES non funzionano da `file://`.
 In Claude Code esiste già `.claude/launch.json` (config `seoul-crashers`) per `preview_start`.
+
+**Se non hai uno schermo** (agente, sessione remota, CI) il gioco si fa partire e interrogare
+headless — è il modo normale di verificare, vedi §9:
+
+```bash
+node .claude/tools/probe.mjs --seconds 5 --eval "game.city.stats" --shot /tmp/seoul.png
+```
 
 > **Attenzione alla cache dei moduli.** `python3 -m http.server` non manda `Cache-Control`,
 > quindi il browser applica la freschezza euristica: un file toccato giorni fa viene
@@ -97,7 +105,7 @@ game.city.stats // { buildings, props, blocks, nodes, edges, doglegs, stairs }
 ```
 
 Valori attesi con la seed attuale: `buildings 424`, `props 796`, `blocks 119`, `nodes 179`,
-`edges 261`, `doglegs 3`, `stairs 8`, e 42 raccolte a terra (`game.pickups.items.length`).
+`edges 261`, `doglegs 3`, `stairs 8`, e 43 raccolte a terra (`game.pickups.items.length`).
 I primi sei devono restare **identici** finché non si tocca l'ordine di consumo dell'rng in
 generazione: se cambiano, hai spostato una `rng.*` e la città non è più quella collaudata.
 
@@ -132,6 +140,24 @@ game.wanted.add(200, game);   game.wanted.reset();
 Valori sani a 5 stelle: `agenti ≤ 16`, `volanti ≤ 6`, `blocchi ≤ 3`, `chiodi ≤ 2`. Se
 crescono oltre, è saltato un tetto in `police.reinforce`/`addCop`. Con `stelle 0` deve
 tornare tutto a zero entro un paio di secondi (`standDown`).
+
+Per l'arsenale pesante (tappa C):
+
+```js
+// cosa c'è in aria, per terra e a fuoco
+({ inVolo: game.projectiles.items.length, mine: game.projectiles.mines.length,
+   pozze: game.projectiles.fires.length, scoppi: game.stats.blasts })
+// arsenale in mano al giocatore
+const p = game.player;
+({ arma: p.weapon, colpi: p.shots, spin: +p.spin.toFixed(2), mirino: p.scoping,
+   armi: [...p.owned], munizioni: p.ammo })
+// prova a freddo: tutto l'arsenale addosso
+(async () => { const W = await import('/src/entities/weapons.js');
+  for (const id of W.WEAPON_ORDER) game.player.giveWeapon(id, 40); })()
+```
+
+Con `stelle 0` e nessun esplosivo in giro, `game.projectiles.count` deve essere 0: se resta
+qualcosa, un proiettile non è stato rimosso dalla sua lista e continuerà a girare per sempre.
 
 Costo reale della caccia, misurato strumentando il loop: **il tempo di simulazione non
 cambia** (0.91 → 0.86 ms per passo), quello di rendering **raddoppia** (3.9 → 6.4 ms per
@@ -176,11 +202,18 @@ src/entities/
   pickups.js          armi/munizioni/kit medici a terra, con ricomparsa
   wanted.js           heat, 5 livelli di ricercato, raffreddamento a vista
   police.js           pattuglie, volanti, sbarchi, posti di blocco, chiodi, SWAT, elicottero
+  projectiles.js      esplosivi con proiettili veri: granate, molotov, mine, onda d'urto
 
 src/ui/
-  hud.js              minimappa, tachimetro, cartello distretto, toast, debug
+  hud.js              minimappa, tachimetro, barra armi, cartello distretto, toast, debug
   mapview.js          mappa a tutto schermo (pannello riusato dal menu)
   menu.js             menu di pausa
+
+.claude/              strumenti per chi sviluppa (non fa parte del gioco), vedi §9
+  tools/probe.mjs     avvia il gioco headless, esegue scene, misura, screenshot
+  tools/sprite.mjs    guarda uno sprite generato ingrandito
+  hooks/              controllo sintassi + briefing di sessione
+  skills/             /seoul-verifica /seoul-arma /seoul-sprite /seoul-citta
 ```
 
 ---
@@ -261,8 +294,35 @@ piedi deve saltarli**, e sono tre punti: `player.resolveCollisions`, il blocco a
 **I colpi sono raggi, non proiettili.** `weapons.rayCast` risolve il colpo nello stesso frame
 contro solidi (AABB, metodo delle slab), pedoni (cerchio r=11), veicoli (gli stessi tre cerchi
 della fisica) e giocatore. Quello che vola è solo il tracciante disegnato. A 500-900 px di
-gittata un proiettile vero arriverebbe comunque nello stesso frame; serviranno davvero solo
-per gli esplosivi della tappa C.
+gittata un proiettile vero arriverebbe comunque nello stesso frame. **La perforazione non fa
+eccezione**: è lo stesso raggio rilanciato da dove ha trapassato, con un `Set` di chi ha già
+bucato passato a `rayCast` come `skip`. Solo i pedoni si trapassano — un muro ferma tutto.
+
+**Gli esplosivi sono l'unica eccezione, e non per precisione.** Per una granata il **tempo di
+volo è l'arma**: quella che rimbalza dietro l'angolo e la molotov che cade corta sono la
+ragione per cui esistono. Quindi in `projectiles.js` hanno posizione, velocità e una quota `z`
+che serve a due cose: scavalcare i solidi bassi (i `vehicleOnly` — transenne e gradini —
+contano solo sotto i 14 px di quota) e proiettare un'ombra che dice **dove cadranno**, senza
+la quale in una visuale dall'alto una parabola è illeggibile. La velocità orizzontale del
+lancio non è fissa: è ricavata dal tempo di volo perché l'oggetto atterri *dove punta il
+cursore*, che è l'unico modo di rendere mirabile un'arma che vola.
+
+**Un'unica onda d'urto.** `projectiles.explode` fa danno a pedoni, giocatore e veicoli con
+caduta lineare sul raggio, e i veicoli presi dentro possono saltare a loro volta: le catene
+di esplosioni non sono codice, sono una conseguenza. Chiuso in macchina si incassa il 45%.
+
+**Il mirino allarga, non stringe.** Col fucile di precisione (tasto destro) la camera *si
+allontana* (`zoom 1.12 → 0.49`) e scivola verso il cursore. In una visuale dall'alto uno zoom
+ottico sarebbe assurdo: il bersaglio a 1500 px non è piccolo, è **fuori schermo**. Attenzione
+al giro vizioso — la posizione del cursore in coordinate mondo dipende dalla camera, quindi lo
+scostamento va limitato (`SCOPE_LEAD 0.5` e tetto 300 px in `player.cameraTarget`), altrimenti
+camera e cursore si rincorrono e la vista scappa via.
+
+**Barra armi, non tasti.** Da cinque armi in su un tasto per arma non basta, e una rotella
+sola su undici voci è ingiocabile: `WEAPONS[].slot` e `WEAPON_SLOTS` definiscono sei file
+(tasti 1-6), ripremendo un tasto si scorre la fila, la rotella scorre tutto l'arsenale
+posseduto. `WEAPON_ORDER` è la barra letta da sinistra a destra e si **ricava** da
+`WEAPON_SLOTS`: non va tenuto allineato a mano.
 
 **Magnetismo di mira.** `weapons.assistAim` piega la direzione del cursore di **al massimo
 0.09 rad** verso il bersaglio più allineato entro un cono di 0.17 rad, e solo con linea di
@@ -340,13 +400,18 @@ codice spiega il perché nel punto giusto.
 | I chiodi non comparivano mai in un inseguimento | si mettevano solo dopo aver piazzato *tutti* i posti di blocco previsti, e uno ogni 7 s | `police.manageObstacles`, blocchi e chiodi si alternano |
 | Il protagonista sembra un casco generico | testa grande e centrata sopra un'ellisse: da sopra restava solo una calotta scura | `getHeroSprite`: tronco trapezoidale con spalle larghe, testa piccola spostata avanti, banda rossa lungo la schiena |
 | I fari della polizia accecano in pieno giorno | `lightsOn = true` fisso sulle volanti | `police.spawnCar`, `lightsOn = game.isNight` come per il traffico |
+| Le icone della barra armi sembrano caselle vuote | le armi sono disegnate quasi nere (`#1a1c20`) su un pannello scuro | `getWeaponIcon` le schiarisce con `source-atop`, che tinge i pixel già disegnati e conserva la sagoma |
+| La barra armi finisce sotto il suggerimento «E — sali in…» | il suggerimento è ancorato a `h-62` | barra a `h - CH - 76` in `hud.drawWeaponBar` |
+| **In una prova scriptata** il colpo non colpisce mai | `player.angle` a piedi è riscritto ogni frame verso il cursore: impostarlo non serve a niente | si mira muovendo `game.input.mouse.x/y` (vedi §9) |
+| **In una prova scriptata** la mira punta altrove dopo un teletrasporto | la camera arriva smorzata, quindi la conversione mondo→schermo di un istante prima non vale più | `game.camera.snapTo(...)` e un decimo di secondo di attesa prima di mirare |
+| **In una prova scriptata** un bersaglio appena teletrasportato è immune | `pedGrid`/`vehicleGrid` sono ricostruite a ogni frame: la query lo cerca ancora dov'era | aspettare un frame dopo lo spostamento |
 
 Regola generale emersa: **prima di dare la colpa all'AI, verifica la geometria.** Quasi tutti
 gli "stalli dell'AI" erano problemi di ingombri, corsie o posizionamento.
 
 ---
 
-## 5. Cosa è stato fatto (Fase 1.5 e Fase 2 tappa A)
+## 5. Cosa è stato fatto (Fase 1.5 e Fase 2)
 
 ### 5.1 Urbanistica dinamica
 
@@ -490,19 +555,63 @@ apposta e più grande di tutti gli altri (40×34 contro 34×30):
 Le divise hanno avuto lo stesso trattamento minimo ma indispensabile: berretto blu e bretelle
 catarifrangenti (`PED_KINDS.cop`), nero opaco e piastra antiproiettile per la SWAT.
 
+### 5.7 Fase 2, tappa C — arsenale pesante ed esplosivi
+
+Sette armi nuove più tre esplosivi, e i tre pezzi di sistema che li reggono (barra armi,
+proiettili veri, onda d'urto condivisa). Le scelte di design prese qui — se l'utente ne vuole
+altre, cambiare costa poco e i punti sono tutti indicati:
+
+- **Barra armi a sei file** invece di un tasto per arma (§3). L'alternativa scartata era una
+  ruota alla GTA V: costa un pannello modale e un input nuovo per risolvere un problema che
+  sei file risolvono con i tasti che già c'erano. Sta in `WEAPON_SLOTS`, si riordina in
+  trenta secondi.
+- **Il fucile di precisione trapassa due bersagli** e col tasto destro **allarga** il campo
+  (`scope: 2.3`) invece di stringerlo. Sparato all'anca la dispersione è ×9: senza quel
+  malus sarebbe una pistola che uccide in un colpo a 1900 px.
+- **La minigun costa mobilità e tempo**: `heavy: 0.56` (si cammina, non si corre) e
+  `spinUp: 0.8` s prima del primo colpo, con l'anello del mirino che si chiude a dirlo. È
+  l'unico modo di avere 600 colpi senza cancellare il gioco.
+- **La pompa** tira otto pallini con `knock: 210`: a due passi stende, a mezzo isolato
+  fa il solletico. `pellets` c'era già dalla tappa A e non è stato toccato.
+- **Le mine non sono un solido `vehicleOnly`** — il piano della tappa B lo ipotizzava, ma una
+  mina che *ferma* un'auto invece di saltare non è una mina. Sono un innesco di prossimità
+  (32 px per i veicoli, 18 per chi va a piedi) che **si arma solo quando chi l'ha posata si
+  allontana di 62 px**: piazzarne una ai propri piedi e morire non è una meccanica, è un
+  incidente. Dall'auto si sgancia dalla coda, che è metà del motivo per averla.
+- **La molotov non fa danno d'impatto**: lascia una pozza che brucia 9,5 s a 26 dps, fa
+  scappare i pedoni intorno, danneggia anche i veicoli fermi dentro e lascia una bruciatura
+  permanente sull'asfalto. La granata invece ha miccia 2,2 s, rimbalza e rotola.
+- **Esplosivi ammessi al drive-by** (molotov, granata, mina), fucile d'assalto, sniper e
+  minigun no (`driveby: false`): dal finestrino si tiene quello che si tiene con una mano.
+- **La SWAT è passata al fucile d'assalto.** Misurato: un giocatore fermo a cinque stelle
+  moriva in 10,3 s con la SMG, ora in 8,2 s. È l'escalation che tiene il passo dell'arsenale
+  nuovo; se sembra troppo, è una parola in `police.spawnCar`/`spawnFootCop`.
+- **Il mirino mostra il raggio dello scoppio** dove cadrà il lancio, e la barra armi dice
+  cosa hai e cosa ti manca. Senza questi due, undici armi diventano un menu da imparare a
+  memoria.
+- Le raccolte a terra ora coprono tutto l'arsenale (`pickups.TABLE`, sniper e minigun rari),
+  più una molotov garantita davanti alla safehouse per poter provare la tappa subito.
+- **Morte e mine**: `respawnPlayer` chiama `projectiles.clear()`. Senza, ci si sveglia in
+  ospedale con il quartiere minato e nessun modo di saperlo.
+
 ---
 
 ## 6. Backlog successivo (già concordato con l'utente)
 
-**Fase 2, tappa C — arsenale pesante.** È il prossimo step.
-Katana, pompa, fucile d'assalto, sniper, minigun, molotov, granate e mine. Gli esplosivi sono
-gli unici che vogliono **proiettili veri** invece del raycast: vanno aggiunti come entità con
-posizione e velocità, e fanno danno ad area come già fa l'esplosione di un veicolo.
-Quello che la tappa B lascia già pronto: `WEAPONS` regge armi nuove aggiungendo una riga
-(`WEAPON_ORDER` decide i tasti, oggi 1-4: da cinque in su serve una barra armi vera);
-`pellets` c'è già ed è quello che serve alla pompa; `police.chopperBurst` è l'esempio di
-danno ad area senza raycast; le mine sono un solido `vehicleOnly` come le transenne, quindi
-`SpatialGrid.removeRect` serve anche a loro.
+**Fase 3 — contenuti.** È il prossimo step, ed è la fase più grossa del progetto: vedi più
+sotto. Prima di cominciare **conviene farsi dire dall'utente da dove partire** — missioni,
+negozi e ciclo giorno-notte sono tre lavori indipendenti e di taglia molto diversa.
+
+**Cose rimaste indietro dalla tappa C**, in ordine di quanto si sentono:
+- **Il fuoco non si propaga**: due molotov vicine fanno due pozze separate, e un'auto che
+  brucia non incendia l'asfalto sotto. Propagare vorrebbe dire far generare pozze alle pozze,
+  con un tetto duro: senza, mezza Seoul prende fuoco in venti secondi.
+- **Nessuno tira esplosivi al giocatore**: la polizia spara e basta. Una granata dallo SWAT
+  sarebbe il naturale livello 5 e riuserebbe `throwItem` così com'è.
+- **Gli esplosivi non hanno un peso proprio nel ricercato**: lanciare vale come uno sparo
+  (`gunshot`), e il resto dell'heat arriva dai morti e dai veicoli distrutti. Se serve, è
+  una riga in `wanted.CRIMES`.
+- **La minigun non ha un limite di calore**: 600 colpi si sparano tutti di fila.
 
 **Cose rimaste indietro dalla tappa B**, in ordine di quanto si sentono:
 - **Arresto (busted)**: oggi la polizia spara e basta, non ti carica in volante. Vedi §5.5.
@@ -535,11 +644,8 @@ optional chaining: `honk`, `doorClose`); salvataggio localStorage con 3 slot.
   numeri esatti.
 - **Verifica davvero.** Ogni modifica va provata nel browser, non solo "compilata": screenshot
   per la grafica, snippet della sezione 1 per il traffico. Diversi bug di queste fasi erano
-  invisibili nel codice e ovvi a schermo.
-  Per gli sprite conviene guardarli ingranditi invece che a schermo intero: da console basta
-  `game.loop.stop()`, poi `const m = await import('/src/render/sprites.js')` e disegnare
-  `m.getHeroSprite(2, 'aim').canvas` sul canvas con uno `scale(6, 6)` e
-  `imageSmoothingEnabled = false`. Il modello del protagonista è stato rifatto tre volte così.
+  invisibili nel codice e ovvi a schermo. Chi non ha uno schermo usa `.claude/tools/` (§9),
+  che fa le stesse due cose senza mani: far girare il gioco e guardare gli sprite ingranditi.
 - **Consegne a tappe**: l'utente vuole provare ogni fase prima della successiva, ed essere
   consultato sulle scelte di design invece di trovarsele fatte.
 
@@ -564,7 +670,17 @@ optional chaining: `honk`, `doorClose`); salvataggio localStorage con 3 slot.
 | Auto in sosta | `traffic.MAX_PARKED` | 24 |
 | Pedoni | `pedestrians.BASE_MAX` | 62 (× densità distretto) |
 | Pendenza minima per una scalinata | `citygen.STAIR_GRADE` | 0.018 (→ 8 scalinate su 14 vicoli passanti) |
-| Danno / cadenza delle armi | `weapons.WEAPONS` | pugni 15·0.34 · mazza 46·0.52 · pistola 27·0.22 · SMG 15·0.075 |
+| Danno / cadenza delle armi | `weapons.WEAPONS` | pugni 15·0.34 · mazza 46·0.52 · katana 92·0.4 · pistola 27·0.22 · pompa 13×8·0.84 · SMG 15·0.075 · fucile 24·0.105 · sniper 145·1.35 · minigun 12·0.045 |
+| File della barra armi (tasti 1-6) | `weapons.WEAPON_SLOTS` | mischia · pistola · pompa · SMG+fucile · sniper+minigun · esplosivi |
+| Perforazione del sniper | `weapons.WEAPONS.sniper.pierce` | 2 bersagli oltre il primo (solo pedoni) |
+| Mirino: ingrandimento e scostamento | `sniper.scope`, `player.SCOPE_LEAD/SCOPE_MAX` | 2.3 (zoom 1.12 → 0.49) · 0.5 con tetto 300 px |
+| Malus di mira senza mirino | `player.attack` | dispersione × 9 |
+| Minigun: spin-up e mobilità | `minigun.spinUp` / `heavy` | 0.8 s · velocità × 0.56 (niente scatto) |
+| Esplosivi: raggio e danno | `weapons.WEAPONS` | granata 155 px · 190 · miccia 2.2 s; mina 140 px · 220; molotov pozza 78 px · 9.5 s · 26 dps |
+| Danno d'esplosione in auto | `projectiles.explode` | × 0.45 (a piedi 1.0) |
+| Volo di un lancio | `projectiles` `GRAV`/`THROW_Z` | 620 px/s² · 150 (gittata = distanza del cursore, max `spec.range`) |
+| Innesco della mina | `projectiles.updateMines` | veicolo 32 px · piedi 18 px, si arma a 62 px da chi l'ha posata |
+| Tick di danno del fuoco | `projectiles.FIRE_TICK` | 0.34 s |
 | Magnetismo di mira | `weapons.ASSIST_WINDOW` / `ASSIST_BEND` | cono 0.17 rad / correzione max 0.09 rad |
 | Peggioramento del drive-by | `player.driveBy` | dispersione × 2.4, cadenza × 1.5 |
 | Teppista armato: gittata e cadenza | `pedestrians.GUN_RANGE`, case `hostile` | 330 px, un colpo ogni 0.5-1.3 s |
@@ -580,6 +696,65 @@ optional chaining: `honk`, `doorClose`); salvataggio localStorage con 3 slot.
 | Riflettore e quota dell'elicottero | `police.BEAM_R` / `CHOPPER_Z` / `CHOPPER_HP` | 118 px / 210 / 260 |
 | Gomme a terra | `vehicle` `flatTires` | velocità × 0.6, grip × 0.72, tiraggio `flatPull` |
 | Ritmo di posa di blocchi e chiodi | `police.manageObstacles` | uno ogni 7 s, alternati |
-| Raccolte a terra | `pickups` densità / `RESPAWN` | 0.4 per cortile (42 totali) / 55 s |
+| Raccolte a terra | `pickups` densità / `RESPAWN` | 0.4 per cortile (43 totali) / 55 s |
 | Tile terreno | `ground.TILE` / `MAX_TILES` | 512 px / 96 |
 | Limite pixel canvas | `main.MAX_PIXELS` | 2.9 M (scala il DPR) |
+
+---
+
+## 9. Strumenti per chi sviluppa (`.claude/`)
+
+Il gioco resta senza dipendenze e senza build step: **niente di quello che c'è qui dentro
+viene caricato dalla pagina**. Sono strumenti per chi lavora al progetto — pensati per un
+agente che non ha uno schermo, ma comodi anche a mano. Usano `python3` (il server statico) e
+il `playwright` già installato globalmente nell'ambiente.
+
+### `tools/probe.mjs` — far girare il gioco e guardarci dentro
+
+Alza un server su una porta libera, apre Chromium headless, aspetta il boot ed esegue quello
+che gli chiedi nella pagina. **Esce con codice 1 se la pagina ha sollevato un errore JS o
+loggato un `console.error`**, quindi vale come check secco dopo una modifica.
+
+```bash
+node .claude/tools/probe.mjs --seconds 5 --eval "game.city.stats"
+node .claude/tools/probe.mjs --seconds 6 --shot /tmp/s.png --zoom 2 --clip 420,590,440,110
+node .claude/tools/probe.mjs --seconds 3 --script /tmp/scena.js --shot /tmp/scena.png
+```
+
+`--script` inietta un file come corpo di funzione **async**: è così che si prepara una scena
+(armi addosso, cinque stelle, un lancio) e si aspetta il risultato — il loop continua a
+girare mentre lo script attende. Dentro c'è `game`, e si può `await import('/src/...')`.
+
+Le tre trappole delle prove scriptate (mira dal cursore, camera smorzata, griglie ricostruite
+ogni frame) sono in §4, in fondo: leggerle prima di dare la colpa al codice.
+
+### `tools/sprite.mjs` — guardare uno sprite ingrandito
+
+```bash
+node .claude/tools/sprite.mjs --expr "getHeroSprite(2,'aim')" --scale 8 --out /tmp/hero.png
+node .claude/tools/sprite.mjs --expr "WEAPON_IDS.map(getWeaponIcon)" --scale 6 --cols 4
+```
+
+Nell'espressione sono in scope tutti gli export di `sprites.js` più `WEAPON_IDS`. Fondo a
+scacchi per vedere dove finisce la sagoma, `--bg` per provarla sul colore su cui vivrà
+davvero. È la procedura con cui il protagonista è stato rifatto tre volte, automatizzata.
+
+### Hook (`.claude/settings.json` + `hooks/`)
+
+- **PostToolUse su Write/Edit** → `check-js.mjs`: `node --check` sul file toccato (un errore
+  di sintassi qui si presenta come "schermata di caricamento ferma", che è il sintomo più
+  costoso da diagnosticare), e un promemoria automatico quando si tocca la generazione della
+  città (determinismo dell'rng, cache dei tile, `Math.random()` fuori posto).
+- **SessionStart** → `session-brief.mjs`: quattro righe di briefing (leggi HANDOFF, i vincoli,
+  come si verifica) e un controllo che `python3` e `playwright` ci siano davvero.
+
+### Skill
+
+Quattro, invocabili anche a mano con `/nome`:
+
+| Skill | Quando |
+| --- | --- |
+| `/seoul-verifica` | dopo aver toccato `src/`, e prima di dire che qualcosa funziona |
+| `/seoul-arma` | aggiungere o bilanciare un'arma: i sette punti che devono combaciare |
+| `/seoul-sprite` | disegnare o correggere uno sprite generato |
+| `/seoul-citta` | toccare la generazione senza rompere il determinismo o il traffico |

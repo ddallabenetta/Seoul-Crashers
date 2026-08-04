@@ -9,7 +9,7 @@
         "http.server",
         "8123",
         "--directory",
-        "/Users/danieldallabenetta/Documents/seoul_crashers"
+        "."
       ],
       "port": 8123
     }

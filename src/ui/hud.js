@@ -1,8 +1,8 @@
 // HUD: minimappa, tachimetro, salute e arma, cartello del distretto, suggerimenti.
 import { KMH, clamp } from '../core/math.js';
 import { MAP_SIZE } from '../world/maptexture.js';
-import { VEHICLE_TYPES, getHeroPortrait } from '../render/sprites.js';
-import { WEAPONS } from '../entities/weapons.js';
+import { VEHICLE_TYPES, getHeroPortrait, getWeaponIcon } from '../render/sprites.js';
+import { WEAPONS, WEAPON_SLOTS } from '../entities/weapons.js';
 
 const MINIMAP = 196;
 const MINIMAP_WORLD = 1000; // porzione di mondo inquadrata
@@ -43,6 +43,7 @@ export class Hud {
 
     this.drawMinimap(ctx, game, 22, h - MINIMAP - 22);
     if (!game.player.onFoot) this.drawSpeedo(ctx, game, w - 132, h - 112);
+    this.drawWeaponBar(ctx, game, w, h);
     this.drawVitals(ctx, game, 22, 22);
     if (game.wanted) this.drawWanted(ctx, game, 22, 100);
     this.drawDistrictToast(ctx, game, w, h);
@@ -136,6 +137,79 @@ export class Hud {
     ctx.restore();
   }
 
+  /**
+   * Barra armi: una casella per fila (tasti 1-6) con l'arma scelta in quella fila.
+   * Sta sempre a schermo ma in sordina, e si accende per un paio di secondi quando
+   * si cambia arma — con undici armi il giocatore deve poter sapere cosa ha in mano
+   * e cosa gli manca senza aprire un menu.
+   */
+  drawWeaponBar(ctx, game, w, h) {
+    const p = game.player;
+    const CW = 58, CH = 42, GAP = 6;
+    const total = WEAPON_SLOTS.length * (CW + GAP) - GAP;
+    const x0 = (w - total) / 2;
+    // Sopra la riga dei suggerimenti (`E — sali in…`), che sta a h-62: sotto ci
+    // finirebbe esattamente sopra.
+    const y0 = h - CH - 76;
+    const wake = clamp(p.weaponT / 1.8, 0, 1);
+
+    ctx.save();
+    ctx.textBaseline = 'alphabetic';
+    for (let i = 0; i < WEAPON_SLOTS.length; i++) {
+      const row = WEAPON_SLOTS[i];
+      const owned = row.filter((id) => p.owned.has(id));
+      const id = owned.includes(p.weapon) ? p.weapon : (owned[0] || row[0]);
+      const spec = WEAPONS[id];
+      const has = owned.length > 0;
+      const active = id === p.weapon;
+      const x = x0 + i * (CW + GAP);
+
+      ctx.globalAlpha = active ? 1 : 0.55 + wake * 0.3;
+      ctx.fillStyle = active ? 'rgba(24,18,20,0.9)' : 'rgba(10,12,15,0.78)';
+      roundPath(ctx, x, y0, CW, CH, 8);
+      ctx.fill();
+      if (active) {
+        ctx.strokeStyle = '#ff5fa2';
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+      }
+
+      // Numero della fila e quante armi ci sono dentro (il puntino dice "ripremi").
+      ctx.fillStyle = active ? 'rgba(255,214,80,0.95)' : 'rgba(230,235,245,0.4)';
+      ctx.font = '700 9px ui-monospace, monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(String(i + 1), x + 5, y0 + 11);
+      if (owned.length > 1) {
+        for (let k = 0; k < owned.length; k++) {
+          ctx.fillStyle = owned[k] === p.weapon ? '#ffd23f' : 'rgba(230,235,245,0.35)';
+          ctx.beginPath();
+          ctx.arc(x + CW - 7 - k * 5, y0 + 8, 1.6, 0, 6.2832);
+          ctx.fill();
+        }
+      }
+
+      const icon = getWeaponIcon(id);
+      ctx.globalAlpha *= has ? 1 : 0.35;
+      ctx.drawImage(icon.canvas, x + (CW - icon.w) / 2, y0 + 10, icon.w, icon.h);
+      ctx.globalAlpha = active ? 1 : 0.55 + wake * 0.3;
+
+      ctx.textAlign = 'center';
+      ctx.font = '700 10px ui-monospace, monospace';
+      if (!has) {
+        ctx.fillStyle = 'rgba(230,235,245,0.25)';
+        ctx.fillText('—', x + CW / 2, y0 + CH - 5);
+      } else if (spec.infinite) {
+        ctx.fillStyle = 'rgba(230,235,245,0.5)';
+        ctx.fillText('∞', x + CW / 2, y0 + CH - 5);
+      } else {
+        const n = p.ammo[id] || 0;
+        ctx.fillStyle = n > 0 ? '#ffd23f' : '#e04a3a';
+        ctx.fillText(String(n), x + CW / 2, y0 + CH - 5);
+      }
+    }
+    ctx.restore();
+  }
+
   /** Botte prese: vignettatura rossa. Diventa fissa quando la salute è agli sgoccioli. */
   drawDamage(ctx, game, w, h) {
     const p = game.player;
@@ -166,11 +240,52 @@ export class Hud {
     ctx.restore();
   }
 
+  /**
+   * Mirino. Il raggio segue la dispersione vera dell'arma — la pompa "si apre", il
+   * fucile di precisione si stringe solo col mirino — e per gli esplosivi mostra il
+   * raggio dello scoppio dove cadranno: senza, tirare una granata è tirare a caso.
+   */
   drawCrosshair(ctx, game) {
-    if (game.paused || game.player.dying) return;
+    const p = game.player;
+    if (game.paused || p.dying) return;
     const m = game.input.mouse;
-    const spec = WEAPONS[game.player.weapon];
-    const r = spec.melee ? 5 : 9;
+    const spec = WEAPONS[p.weapon];
+
+    if (spec.thrown && !spec.placed) {
+      const s = game.camera.worldToScreen(p.aimX, p.aimY);
+      const r = ((spec.blast ? spec.blast.r : spec.fire.r) * game.camera.zoom);
+      ctx.save();
+      ctx.setLineDash([5, 5]);
+      ctx.strokeStyle = spec.fire ? 'rgba(255,140,60,0.55)' : 'rgba(255,90,70,0.5)';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, r, 0, 6.2832);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    const spreadMul = spec.scope && !p.scoping ? 9 : 1;
+    const r = spec.melee ? 5 : clamp(6 + (spec.spread || 0) * spreadMul * 92, 6, 34);
+
+    // Fucile di precisione col mirino: croce lunga e cerchio sottile, si legge come
+    // un'ottica anche se la camera si è solo allargata.
+    if (p.scoping) {
+      const w = game.camera.viewW;
+      const h = game.camera.viewH;
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,214,80,0.22)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, m.y); ctx.lineTo(w, m.y);
+      ctx.moveTo(m.x, 0); ctx.lineTo(m.x, h);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,214,80,0.5)';
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, 34, 0, 6.2832);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     ctx.save();
     ctx.translate(m.x, m.y);
     ctx.strokeStyle = spec.melee ? 'rgba(235,240,250,0.55)' : 'rgba(255,214,80,0.9)';
@@ -184,6 +299,15 @@ export class Hud {
         ctx.moveTo(dx * (r + 3), dy * (r + 3));
         ctx.lineTo(dx * (r + 8), dy * (r + 8));
       }
+      ctx.stroke();
+    }
+    // Minigun: l'anello si chiude mentre le canne prendono giro. Finché non è pieno
+    // non parte un colpo, e il giocatore deve poterlo vedere.
+    if (spec.spinUp && p.spin > 0.01) {
+      ctx.strokeStyle = p.spin >= 1 ? 'rgba(255,90,60,0.95)' : 'rgba(255,214,80,0.7)';
+      ctx.lineWidth = 2.6;
+      ctx.beginPath();
+      ctx.arc(0, 0, r + 12, -Math.PI / 2, -Math.PI / 2 + p.spin * 6.2832);
       ctx.stroke();
     }
     ctx.restore();
@@ -272,6 +396,24 @@ export class Hud {
         ctx.beginPath();
         ctx.arc(clamp(m.x, x + 5, x + MINIMAP - 5), clamp(m.y, y + 5, y + MINIMAP - 5), 5, 0, 6.2832);
         ctx.stroke();
+      }
+    }
+
+    // Mine e incendi: sono roba tua, ma sono roba che esplode. Vanno viste.
+    if (game.projectiles) {
+      for (const mine of game.projectiles.mines) {
+        const mm = toMap(mine.x, mine.y);
+        if (mm.x < x || mm.x > x + MINIMAP || mm.y < y || mm.y > y + MINIMAP) continue;
+        ctx.fillStyle = mine.armed ? '#e03a3a' : 'rgba(230,200,80,0.8)';
+        ctx.fillRect(mm.x - 2, mm.y - 2, 4, 4);
+      }
+      for (const f of game.projectiles.fires) {
+        const mm = toMap(f.x, f.y);
+        if (mm.x < x || mm.x > x + MINIMAP || mm.y < y || mm.y > y + MINIMAP) continue;
+        ctx.fillStyle = 'rgba(255,140,50,0.75)';
+        ctx.beginPath();
+        ctx.arc(mm.x, mm.y, 3.4, 0, 6.2832);
+        ctx.fill();
       }
     }
 
@@ -453,6 +595,7 @@ export class Hud {
       `scalinate ${this.city.stats.stairs}  ostili ${game.peds.filter((p) => p.hostile).length}`,
       `wanted ${game.wanted.level}  heat ${game.wanted.heat.toFixed(0)}  ${game.wanted.seen ? 'visto' : `fuga ${game.wanted.unseenT.toFixed(1)}s`}`,
       `polizia ${game.police.cops.length}p ${game.police.cars.length}v  blocchi ${game.police.blocks.length}`,
+      `esplosivi ${game.projectiles.items.length}v ${game.projectiles.mines.length}m ${game.projectiles.fires.length}f  scoppi ${game.stats.blasts || 0}`,
       `pos ${Math.round(game.player.x)}, ${Math.round(game.player.y)}`,
       `zoom ${game.camera.zoom.toFixed(2)}`,
     ];

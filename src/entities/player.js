@@ -2,7 +2,7 @@
 import { circleRectPush, clamp, approachAngle, damp, dist } from '../core/math.js';
 import { VEHICLE_TYPES } from '../render/sprites.js';
 import { vehicleDoorPoint, updateVehicle } from './vehicle.js';
-import { WEAPONS, WEAPON_ORDER, shoot, meleeSwing, assistAim } from './weapons.js';
+import { WEAPONS, WEAPON_ORDER, WEAPON_SLOTS, shoot, meleeSwing, assistAim } from './weapons.js';
 
 const WALK = 74;
 const SPRINT = 126;
@@ -10,7 +10,12 @@ const RADIUS = 9;
 const ENTER_RANGE = 78;
 // Tempo a terra prima di risvegliarsi all'ospedale.
 const DEATH_TIME = 2.8;
-const WEAPON_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4'];
+// Un tasto per fila della barra armi: ripremendolo si scorre la fila.
+const WEAPON_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6'];
+// Quanto la camera si sposta verso il mirino col fucile di precisione, e il tetto
+// oltre il quale non va: senza tetto il punto fisso fra camera e cursore scappa via.
+const SCOPE_LEAD = 0.5;
+const SCOPE_MAX = 300;
 
 export class Player {
   constructor(x, y) {
@@ -42,6 +47,11 @@ export class Player {
     this.hurtT = 0;
     this.dying = false;
     this.deathT = 0;
+    // Tappa C: rotazione delle canne della minigun, mirino del fucile di precisione,
+    // e il lampo della barra armi quando si cambia arma.
+    this.spin = 0;
+    this.scoping = false;
+    this.weaponT = 0;
   }
 
   get spec() {
@@ -62,6 +72,7 @@ export class Player {
     this.enterCooldown = Math.max(0, this.enterCooldown - dt);
     this.fireCd = Math.max(0, this.fireCd - dt);
     this.hurtT = Math.max(0, this.hurtT - dt);
+    this.weaponT = Math.max(0, this.weaponT - dt);
 
     // Il puntatore vale sempre: da fermo, in corsa e al volante.
     const m = game.camera.screenToWorld(game.input.mouse.x, game.input.mouse.y);
@@ -88,20 +99,36 @@ export class Player {
     }
   }
 
-  /** Tasti 1-4 e rotella, ma solo fra le armi che si possiedono davvero. */
+  /**
+   * Barra armi: tasti 1-6 (una fila per tasto, ripremendo si scorre la fila) e
+   * rotella su tutto l'arsenale posseduto. Con undici armi i tasti singoli non
+   * bastano più, e la sola rotella vorrebbe dieci scatti per cambiare idea.
+   */
   selectWeapon(game) {
     const input = game.input;
     for (let i = 0; i < WEAPON_KEYS.length; i++) {
       if (!input.wasPressed(WEAPON_KEYS[i])) continue;
-      const id = WEAPON_ORDER[i];
-      if (this.owned.has(id)) this.weapon = id;
-      else game.hud.toast(`${WEAPONS[id].label}: non ce l'hai`, 1.4);
+      const row = WEAPON_SLOTS[i].filter((id) => this.owned.has(id));
+      if (!row.length) {
+        game.hud.toast(`${WEAPONS[WEAPON_SLOTS[i][0]].label}: non ce l'hai`, 1.3);
+        continue;
+      }
+      // Se l'arma in mano non è di questa fila, indexOf dà -1 e si parte dalla prima.
+      this.setWeapon(row[(row.indexOf(this.weapon) + 1) % row.length]);
     }
     if (input.mouse.wheel) {
       const list = WEAPON_ORDER.filter((id) => this.owned.has(id));
       const i = list.indexOf(this.weapon);
-      this.weapon = list[(i + (input.mouse.wheel > 0 ? 1 : list.length - 1)) % list.length];
+      this.setWeapon(list[(i + (input.mouse.wheel > 0 ? 1 : list.length - 1)) % list.length]);
     }
+  }
+
+  setWeapon(id) {
+    if (!id || id === this.weapon) return;
+    this.weapon = id;
+    this.weaponT = 1.8; // la barra armi si accende: con undici armi serve
+    this.spin = 0;      // la minigun riparte da ferma
+    this.fireCd = Math.max(this.fireCd, 0.12);
   }
 
   updateDying(dt, game) {
@@ -115,12 +142,15 @@ export class Player {
 
   updateOnFoot(dt, game) {
     const input = game.input;
+    const spec0 = this.spec;
     const mv = input.moveVector();
     const sprinting = input.isDown('ShiftLeft') || input.isDown('ShiftRight');
     if (sprinting && mv.len > 0.1) this.stamina = Math.max(0, this.stamina - dt * 0.22);
     else this.stamina = Math.min(1, this.stamina + dt * 0.3);
-    const canSprint = sprinting && this.stamina > 0.02;
+    const canSprint = sprinting && this.stamina > 0.02 && !spec0.heavy;
     let target = canSprint ? SPRINT : WALK;
+    // Con la minigun in braccio si cammina, punto: è il prezzo di 600 colpi.
+    if (spec0.heavy) target *= spec0.heavy;
     // La pendenza si sente anche a piedi: in salita si arranca, in discesa si corre.
     if (mv.len > 0.05 && game.city.elevationAt) {
       const el = game.city.elevationAt;
@@ -153,9 +183,40 @@ export class Player {
     // e finisce dentro lo stesso frame deve sparare lo stesso.
     const spec = this.spec;
     const held = input.mouse.pressed || ((spec.melee || spec.auto) && input.mouse.down);
-    if (held && this.fireCd <= 0) this.attack(game, spec);
 
-    game.camera.setZoomTarget(1.12);
+    // Minigun: le canne devono arrivare in giro prima che parta il primo colpo, e
+    // rallentano da sole appena molli il grilletto. È tutto il carattere dell'arma.
+    if (spec.spinUp) {
+      this.spin = clamp(this.spin + (input.mouse.down ? dt / spec.spinUp : -dt / (spec.spinUp * 0.7)), 0, 1);
+    } else if (this.spin > 0) {
+      this.spin = Math.max(0, this.spin - dt * 2);
+    }
+
+    // Mirino del fucile di precisione (tasto destro): allarga il campo invece di
+    // stringerlo — a 1900 px di gittata il bersaglio è fuori schermo, non lontano.
+    this.scoping = !!spec.scope && input.mouse.right;
+
+    if (held && this.fireCd <= 0 && (!spec.spinUp || this.spin >= 1)) this.attack(game, spec);
+
+    game.camera.setZoomTarget(this.scoping ? 1.12 / spec.scope : 1.12);
+  }
+
+  /**
+   * Dove guarda la camera. Normalmente il giocatore; col mirino si sposta verso il
+   * cursore, ma di poco e con un tetto: la posizione del cursore in coordinate mondo
+   * dipende dalla camera, quindi senza limite le due si rincorrerebbero.
+   */
+  cameraTarget() {
+    if (!this.onFoot) {
+      const v = this.vehicle;
+      return { x: v.x, y: v.y, vx: v.vx, vy: v.vy };
+    }
+    if (!this.scoping) return { x: this.x, y: this.y, vx: this.vx, vy: this.vy };
+    let ox = (this.aimX - this.x) * SCOPE_LEAD;
+    let oy = (this.aimY - this.y) * SCOPE_LEAD;
+    const l = Math.hypot(ox, oy);
+    if (l > SCOPE_MAX) { ox = (ox / l) * SCOPE_MAX; oy = (oy / l) * SCOPE_MAX; }
+    return { x: this.x + ox, y: this.y + oy, vx: 0, vy: 0 };
   }
 
   /** Un colpo dell'arma corrente, dalla posizione attuale verso il cursore. */
@@ -170,6 +231,10 @@ export class Player {
       game.alarm(this.x, this.y, 170, this);
       return;
     }
+    if (spec.thrown) {
+      this.useThrown(game, spec);
+      return;
+    }
     if (this.shots <= 0) {
       this.fireCd = 0.3;
       game.hud.toast(`${spec.label}: caricatore vuoto`, 1.2);
@@ -179,11 +244,51 @@ export class Player {
     this.ammo[spec.id]--;
     game.wanted?.report('gunshot', game);
     const ang = assistAim(game, this.x, this.y, this.angle, spec.range, this);
-    shoot(game, this, spec, this.x + Math.cos(ang) * 15, this.y + Math.sin(ang) * 15, ang);
+    // Un fucile di precisione sparato all'anca è un fucile di precisione sprecato.
+    const spreadMul = spec.scope && !this.scoping ? 9 : 1;
+    shoot(game, this, spec, this.x + Math.cos(ang) * 15, this.y + Math.sin(ang) * 15, ang, { spreadMul });
     game.camera.addShake(spec.shake);
     // Il rinculo si vede: il personaggio arretra di poco.
     this.vx -= Math.cos(ang) * spec.shake * 7;
     this.vy -= Math.sin(ang) * spec.shake * 7;
+  }
+
+  /**
+   * Esplosivi. Le mine si posano dietro di sé (o si sganciano dalla coda dell'auto),
+   * il resto vola verso il cursore: la gittata del lancio è la distanza del mirino,
+   * quindi si mira dove si vuole che cada.
+   */
+  useThrown(game, spec, vehicle = null) {
+    if (this.shots <= 0) {
+      this.fireCd = 0.35;
+      game.hud.toast(`${spec.label}: finite`, 1.2);
+      return;
+    }
+    this.fireCd = spec.rate;
+    this.ammo[spec.id]--;
+    const cos = Math.cos(this.angle);
+    const sin = Math.sin(this.angle);
+
+    if (spec.placed) {
+      // Dall'auto la mina cade dalla coda: seminarla dietro di sé in corsa è mezzo
+      // motivo per averla.
+      const back = vehicle ? 46 : 16;
+      const bx = (vehicle ? vehicle.x : this.x) - cos * back;
+      const by = (vehicle ? vehicle.y : this.y) - sin * back;
+      game.projectiles.place(game, this, spec, bx, by);
+      game.hud.toast('mina posata — si arma quando ti allontani', 1.8);
+      return;
+    }
+
+    const ang = vehicle ? this.aimAngle : this.angle;
+    const ox = (vehicle ? vehicle.x : this.x) + Math.cos(ang) * (vehicle ? 30 : 16);
+    const oy = (vehicle ? vehicle.y : this.y) + Math.sin(ang) * (vehicle ? 30 : 16);
+    const reach = dist(ox, oy, this.aimX, this.aimY);
+    game.projectiles.throwItem(game, this, spec, ox, oy, ang, reach);
+    game.camera.addShake(spec.shake * 0.35);
+    // Una molotov che vola in mezzo alla strada la vede tutto l'isolato.
+    game.wanted?.report('gunshot', game);
+    game.alarm(ox, oy, 300, this);
   }
 
   updateDriving(dt, game) {
@@ -209,13 +314,19 @@ export class Player {
     if (input.wasPressed('KeyE') && this.enterCooldown <= 0) this.exitVehicle(game);
     if (input.wasPressed('KeyH')) game.audio?.honk(v);
 
-    // Drive-by: dal finestrino si usano solo le armi leggere, e si mira peggio
-    // quanto più si va forte.
+    // Drive-by: dal finestrino si usano solo le armi che si tengono con una mano
+    // (`driveby: false` esclude fucile, sniper e minigun), e si mira peggio quanto
+    // più si va forte. Molotov e mine invece dall'auto ci stanno benissimo.
     const gun = this.spec;
-    if (!gun.melee) {
+    if (!gun.melee && gun.driveby !== false) {
       const held = input.mouse.pressed || (gun.auto && input.mouse.down);
-      if (held && this.fireCd <= 0) this.driveBy(game, gun, v);
+      if (held && this.fireCd <= 0) {
+        if (gun.thrown) this.useThrown(game, gun, v);
+        else this.driveBy(game, gun, v);
+      }
     }
+    this.scoping = false;
+    this.spin = 0;
 
     const spec = VEHICLE_TYPES[v.kind];
     const frac = Math.min(1, Math.abs(v.speed) / spec.topSpeed);
@@ -373,8 +484,10 @@ export class Player {
     this.hurtT = 0;
     this.stamina = 1;
     this.owned = new Set(['fists']);
-    this.ammo = { pistol: 0, smg: 0 };
+    this.ammo = {};
     this.weapon = 'fists';
+    this.spin = 0;
+    this.scoping = false;
   }
 
   heal(amount) {
@@ -390,7 +503,10 @@ export class Player {
     this.owned.add(id);
     if (!spec.infinite) this.ammo[id] = Math.min(spec.maxAmmo, (this.ammo[id] || 0) + ammo);
     const cur = WEAPONS[this.weapon];
-    if (cur.melee && (!spec.melee || this.weapon === 'fists')) this.weapon = id;
+    // Il cambio automatico vale solo in salita: nessuno vuole ritrovarsi la mazza
+    // mentre imbraccia una SMG, né tre granate al posto del fucile.
+    if (cur.melee && !spec.thrown && (!spec.melee || this.weapon === 'fists')) this.setWeapon(id);
+    else this.weaponT = 1.8;
   }
 
   giveAmmo(id, n) {
