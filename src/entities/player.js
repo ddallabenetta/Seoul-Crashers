@@ -181,6 +181,16 @@ export class Player {
 
     this.resolveCollisions(game);
 
+    // Il mare e il Han sono un confine vero, non uno sfondo: a piedi si annega.
+    // Il controllo va saltato dentro un edificio — le coordinate di una pianta
+    // sono piccole e cadrebbero tutte dentro il mare, all'angolo nord-ovest.
+    if (!game.indoors && game.city.isWater(this.x, this.y)) {
+      game.fx.addSplash?.(this.x, this.y);
+      game.hud.toast('Sei finito in acqua', 2.4);
+      this.die(game);
+      return;
+    }
+
     // Sulla soglia di un negozio `E` entra, non ruba l'auto parcheggiata dietro:
     // la porta ha un raggio molto più stretto, quindi vince lei.
     if (input.wasPressed('KeyE') && this.enterCooldown <= 0 && !game.shops?.near) {
@@ -316,9 +326,17 @@ export class Player {
       this.onFoot = true;
       return;
     }
+    const vspec = VEHICLE_TYPES[v.kind];
     v.throttle = input.axis(['KeyS', 'ArrowDown'], ['KeyW', 'ArrowUp']);
     v.steer = input.axis(['KeyA', 'ArrowLeft'], ['KeyD', 'ArrowRight']);
-    v.handbrake = input.isDown('Space');
+    if (vspec.air) {
+      // In volo lo spazio non è il freno a mano: è la cloche. Shift scende.
+      v.climb = (input.isDown('Space') ? 1 : 0)
+        - (input.isDown('ShiftLeft') || input.isDown('ShiftRight') ? 1 : 0);
+      v.handbrake = false;
+    } else {
+      v.handbrake = input.isDown('Space');
+    }
 
     // La fisica del mezzo del giocatore gira qui: il sistema del traffico lo salta.
     updateVehicle(v, dt, game);
@@ -329,7 +347,10 @@ export class Player {
     this.vx = v.vx;
     this.vy = v.vy;
 
-    if (input.wasPressed('KeyE') && this.enterCooldown <= 0) this.exitVehicle(game);
+    if (input.wasPressed('KeyE') && this.enterCooldown <= 0) {
+      if (v.z > 8) game.hud.toast('Prima atterra (Shift per scendere)', 1.6);
+      else this.exitVehicle(game);
+    }
     if (input.wasPressed('KeyH')) game.audio?.honk(v);
 
     // Drive-by: dal finestrino si usano solo le armi che si tengono con una mano
@@ -346,9 +367,10 @@ export class Player {
     this.scoping = false;
     this.spin = 0;
 
-    const spec = VEHICLE_TYPES[v.kind];
-    const frac = Math.min(1, Math.abs(v.speed) / spec.topSpeed);
-    game.camera.setZoomTarget(1.0 - frac * 0.16);
+    const frac = Math.min(1, Math.abs(v.speed) / vspec.topSpeed);
+    // In quota la camera si allarga: senza, si vola alla cieca sopra i tetti.
+    const alt = vspec.air ? Math.min(1, v.z / vspec.ceiling) * 0.34 : 0;
+    game.camera.setZoomTarget(1.0 - frac * 0.16 - alt);
 
     if (v.dead) this.exitVehicle(game, true);
   }
@@ -397,7 +419,10 @@ export class Player {
     let bestD = ENTER_RANGE;
     for (const v of game.vehicles) {
       if (v.dead || v.driver === 'player') continue;
-      const d = dist(this.x, this.y, v.x, v.y);
+      // Un battello è lungo 154 px: dal molo il suo centro è più lontano del
+      // raggio buono per una berlina, e senza questo non ci si sale mai.
+      const spec = VEHICLE_TYPES[v.kind];
+      const d = dist(this.x, this.y, v.x, v.y) - spec.len * 0.3;
       if (d < bestD) {
         bestD = d;
         best = v;
@@ -413,6 +438,7 @@ export class Player {
       game.traffic.ejectDriver(v, game);
     }
     if (v.copUnit) game.police?.releaseVehicle(v, game);
+    game.traffic?.releaseMoored(v);
     v.occupiedTheft = wasOccupied;
     v.driver = 'player';
     v.ai = null;
@@ -442,8 +468,12 @@ export class Player {
     candidates.push({ x: v.x - cos * (spec.len * 0.6 + 14), y: v.y - sin * (spec.len * 0.6 + 14) });
     candidates.push({ x: v.x + cos * (spec.len * 0.6 + 14), y: v.y + sin * (spec.len * 0.6 + 14) });
 
+    // Da una barca si sbarca a terra, non in mare: i punti d'uscita bagnati non
+    // valgono, e se non ce n'è uno asciutto non si scende affatto.
+    const wet = (c) => !game.indoors && game.city.isWater(c.x, c.y);
     let placed = false;
     for (const c of candidates) {
+      if (!forced && wet(c)) continue;
       const solids = game.area().grid.queryRect(c.x - 24, c.y - 24, 48, 48);
       let blocked = false;
       for (const s of solids) {
@@ -457,6 +487,10 @@ export class Player {
       }
     }
     if (!placed) {
+      if (!forced && (spec.marine || wet(door))) {
+        game.hud.toast('Accosta a un molo per scendere', 1.8);
+        return;
+      }
       this.x = door.x;
       this.y = door.y;
     }

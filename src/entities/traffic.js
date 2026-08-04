@@ -76,6 +76,29 @@ export class TrafficSystem {
     }
   }
 
+  /**
+   * Velivoli sul piazzale e imbarcazioni all'ormeggio. Non passano dallo streaming:
+   * nascono una volta al boot e restano lì per sempre (`protect`), perché un
+   * aeroporto senza aerei o un porto senza barche sono due piazzali vuoti — e
+   * perché sono l'unico modo di raggiungerli, quindi non possono sparire mentre
+   * ci si arriva. Dormono come le auto in sosta: `moored` fa uscire subito
+   * `updateVehicle`, quindi ventiquattro mezzi fermi non costano niente.
+   */
+  placeSpecialVehicles(game) {
+    const rng = this.rng;
+    const put = (kind, x, y, angle) => {
+      const v = createVehicle(kind, x, y, angle, rng.int(0, 9));
+      v.driver = null;
+      v.handbrake = true;
+      v.moored = true;
+      v.protect = true;
+      this.vehicles.push(v);
+      return v;
+    };
+    for (const s of this.city.airSpots) put(s.kind, s.x, s.y, s.angle);
+    for (const s of this.city.boatSpots) put(s.kind, s.x, s.y, s.angle);
+  }
+
   /** Popola la città al primo avvio, anche a vista del giocatore. */
   prewarm(game, cars = 70, parked = 30) {
     for (let i = 0; i < cars * 3 && this.countTraffic() < cars; i++) {
@@ -96,6 +119,13 @@ export class TrafficSystem {
     let n = 0;
     for (const v of this.vehicles) if (v.spot) n++;
     return n;
+  }
+
+  /** Un mezzo speciale (aereo, elicottero, barca) rubato non torna all'ormeggio. */
+  releaseMoored(v) {
+    if (!v.moored) return;
+    v.moored = false;
+    v.protect = false;
   }
 
   // --- streaming -------------------------------------------------------------

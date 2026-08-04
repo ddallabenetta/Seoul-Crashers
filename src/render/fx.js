@@ -82,6 +82,24 @@ export class Fx {
     }
   }
 
+  /** Spruzzo: entrata in acqua e scia di poppa. Stessa polvere, altro colore. */
+  addSplash(x, y, n = 10, big = 1) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * 6.2832;
+      const sp = (30 + Math.random() * 120) * big;
+      this.addParticle({
+        type: 'dust', x, y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp,
+        r: (2 + Math.random() * 4) * big,
+        grow: 10 * big,
+        life: 0.35 + Math.random() * 0.5,
+        maxLife: 0.9,
+        color: '198,226,238',
+      });
+    }
+  }
+
   addSmoke(x, y, n = 3, big = 1) {
     for (let i = 0; i < n; i++) {
       this.addParticle({

@@ -112,6 +112,7 @@ class Game {
     this.shopMenu = new ShopMenu();
 
     // Riempie subito la scena, così il giocatore non parte in una città deserta.
+    this.traffic.placeSpecialVehicles(this);
     this.traffic.prewarm(this, 72, 32);
     this.pedSystem.prewarm(this, 64);
 
@@ -205,6 +206,25 @@ class Game {
     // carambole del traffico non devono mandare la centrale in allarme.
     if (v.lastAttacker === this.player) this.wanted.report('wreck', this);
     v.protect = false;
+  }
+
+  /**
+   * Un mezzo di terra finito in acqua. Non è un'esplosione: è uno spruzzo, il
+   * relitto che cala e chi era al volante che annega. La macchina va tolta subito
+   * dalla lista, altrimenti resta a galleggiare in fondo al Han per tutta la partita.
+   */
+  onVehicleSunk(v) {
+    this.fx.addSplash(v.x, v.y, 22, 1.6);
+    if (v.driver === 'player') {
+      this.player.exitVehicle(this, true);
+      this.hud.toast('Sei finito in acqua', 2.4);
+      this.player.die(this);
+    }
+    v.dead = true;
+    v.deadT = 24;      // lo streaming lo raccoglie al prossimo giro
+    v.protect = false;
+    const i = this.vehicles.indexOf(v);
+    if (i >= 0) this.vehicles.splice(i, 1);
   }
 
   onPedKilled(p, v, speed, source) {

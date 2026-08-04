@@ -56,6 +56,7 @@ export function createPed(kind, x, y, rng) {
     spin: 0,
     hostile: false,
     armed,
+    turf: null,       // territorio presidiato: lo guida lo stato `guard`
     cop: false,       // in servizio: lo stato lo guida `police.copBehavior`
     copWeapon: null,
     gone: false,      // despawnato dallo streaming (vedi `stream`)
@@ -91,8 +92,36 @@ export class PedestrianSystem {
     this.spawnTimer = 0;
   }
 
+  /**
+   * Chi entra in un territorio con un ferro in mano se ne accorge. La soglia è
+   * volutamente bassa — arma diversa dai pugni, oppure già ricercato — perché una
+   * banda che ti lascia passeggiare in mezzo ai suoi affari non è una banda.
+   * Passarci disarmati e in fretta si può: è l'unica via per andare a trattare.
+   */
+  watchTurfs(game) {
+    const pl = game.player;
+    if (pl.dying) return;
+    const provoking = pl.weapon !== 'fists' || (game.wanted && game.wanted.level > 0);
+    for (const t of this.city.turfs || []) {
+      const inside = pl.x > t.x - 40 && pl.x < t.x + t.w + 40 && pl.y > t.y - 40 && pl.y < t.y + t.h + 40;
+      if (inside && !t.warned) {
+        t.warned = true;
+        game.hud.toast(`${t.hangul} — ${t.place}`, 3);
+      } else if (!inside && t.warned && dist(pl.x, pl.y, t.cx, t.cy) > 700) {
+        t.warned = false;
+      }
+      if (!inside || !provoking) continue;
+      for (const p of this.peds) {
+        if (p.turf !== t || p.dead || p.hostile) continue;
+        p.hostile = true;
+        p.state = 'hostile';
+      }
+    }
+  }
+
   update(dt, game) {
     this.stream(dt, game);
+    this.watchTurfs(game);
     for (const p of this.peds) this.updatePed(p, dt, game);
   }
 
@@ -130,8 +159,44 @@ export class PedestrianSystem {
     }
   }
 
+  /**
+   * Uomini di guardia dentro un territorio vicino. Non usano i marciapiedi (in un
+   * piazzale non ce ne sono) e non passano dagli isolati: stanno nel rettangolo
+   * della banda e basta.
+   */
+  spawnTurf(pl, game, ring) {
+    const rng = this.rng;
+    for (const t of this.city.turfs || []) {
+      const d = dist(t.cx, t.cy, pl.x, pl.y);
+      if (d > ring.max || d < ring.min) continue;
+      let here = 0;
+      for (const p of this.peds) if (p.turf === t) here++;
+      if (here >= 4) continue;
+      const x = t.x + 14 + rng.range(0, Math.max(1, t.w - 28));
+      const y = t.y + 14 + rng.range(0, Math.max(1, t.h - 28));
+      // Un territorio è piccolo e si guarda da fuori: pretendere che nasca *fuori
+      // campo* come i passanti significa non vederci mai nessuno. Basta che non
+      // compaia addosso al giocatore, e i suoi uomini ci sono già quando arrivi.
+      if (dist(x, y, pl.x, pl.y) < 300) continue;
+      const ped = createPed('gangster', x, y, rng);
+      ped.turf = t;
+      ped.gang = t.gang;
+      ped.armed = rng.chance(0.7); // in casa propria sono armati quasi tutti
+      ped.state = 'guard';
+      this.peds.push(ped);
+      return ped;
+    }
+    return null;
+  }
+
   spawnNear(pl, game, ring = ringFor(game)) {
     const rng = this.rng;
+    // Prima i territori: sono pochi e vanno riempiti, altrimenti si arriva in un
+    // piazzale con il tag dipinto a terra e nessuno a difenderlo.
+    if (rng.chance(0.35)) {
+      const g = this.spawnTurf(pl, game, ring);
+      if (g) return g;
+    }
     const r = ring.max;
     const blocks = this.city.blockGrid.queryRect(pl.x - r, pl.y - r, r * 2, r * 2);
     if (!blocks.length) return null;
@@ -263,6 +328,27 @@ export class PedestrianSystem {
             meleeSwing(game, p, WEAPONS.fists, p.x, p.y, aim);
           }
         }
+        break;
+      }
+      case 'guard': {
+        // Presidio: si gira dentro il proprio recinto e non ne esce. Uscire
+        // vorrebbe dire pathfinding e marciapiedi, e un tizio che ciondola
+        // davanti a un magazzino non ha bisogno né dell'uno né degli altri.
+        const t = p.turf;
+        if (!t) { p.state = 'walk'; break; }
+        if (p.idleT > 0) {
+          p.idleT -= dt;
+          targetSpeed = 0;
+          break;
+        }
+        targetSpeed = p.baseSpeed * 0.55;
+        if (!p.postX || dist(p.x, p.y, p.postX, p.postY) < 22) {
+          p.postX = t.x + 18 + Math.random() * Math.max(1, t.w - 36);
+          p.postY = t.y + 18 + Math.random() * Math.max(1, t.h - 36);
+          if (Math.random() < 0.45) p.idleT = 1.5 + Math.random() * 4;
+        }
+        tx = p.postX;
+        ty = p.postY;
         break;
       }
       case 'duty': {

@@ -70,6 +70,23 @@ export const VEHICLE_TYPES = {
   scooter: { len: 44, wid: 17, mass: 0.4,  topSpeed: 290, accel: 260, grip: 1.05, hp: 45,  cabin: [0.3, 0.6], label: 'scooter' },
   police:  { len: 82, wid: 34, mass: 1.1,  topSpeed: 380, accel: 260, grip: 1.06, hp: 150, cabin: [0.30, 0.62], label: 'volante' },
   swat:    { len: 100, wid: 38, mass: 1.9, topSpeed: 320, accel: 200, grip: 0.95, hp: 260, cabin: [0.55, 0.88], label: 'furgone SWAT' },
+  tractor: { len: 80, wid: 40, mass: 1.9,  topSpeed: 135, accel: 105, grip: 0.84, hp: 190, cabin: [0.24, 0.6], label: 'trattore' },
+
+  // Velivoli. `air` è il tipo di sostentamento: 'rotor' sale da fermo, 'wing'
+  // pretende di aver preso velocità sulla pista (`rotate`). `ceiling` è la quota
+  // massima, `climb` quanti px/s si guadagnano tenendo premuto.
+  heli:    {
+    len: 100, wid: 34, mass: 1.7, topSpeed: 460, accel: 190, grip: 1.5, hp: 210,
+    cabin: [0.46, 0.9], label: 'elicottero', air: 'rotor', climb: 130, ceiling: 400, rotor: 56,
+  },
+  plane:   {
+    len: 132, wid: 96, mass: 2.1, topSpeed: 620, accel: 175, grip: 2.4, hp: 190,
+    cabin: [0.5, 0.86], label: 'turboelica', air: 'wing', climb: 105, ceiling: 460, rotate: 250,
+  },
+  // Imbarcazioni. `marine` significa: galleggia, l'asfalto la ferma come un muro,
+  // e il grip laterale bassissimo è quello che fa scarrocciare la poppa in virata.
+  boat:    { len: 90, wid: 30, mass: 1.0, topSpeed: 400, accel: 165, grip: 0.34, hp: 130, cabin: [0.24, 0.6], label: 'motoscafo', marine: true },
+  ferry:   { len: 154, wid: 54, mass: 3.4, topSpeed: 215, accel: 82, grip: 0.26, hp: 340, cabin: [0.34, 0.68], label: 'battello', marine: true },
 };
 
 export const VEHICLE_COLORS = [
@@ -299,6 +316,199 @@ function drawPoliceExtras(g, w, h) {
   g.fillRect(w * 0.41, h * 0.52, w * 0.08, h * 0.26);
 }
 
+/** Trattore: ruote posteriori enormi, cabina arretrata, muso stretto col motore. */
+function drawTractor(g, w, h, color) {
+  // Ruote posteriori enormi e sporgenti: da sopra sono la firma del trattore.
+  g.fillStyle = '#1b1e22';
+  roundRect(g, w * 0.06, -4, w * 0.3, h + 8, 5); g.fill();
+  roundRect(g, w * 0.74, h * 0.06, w * 0.18, h * 0.88, 4); g.fill();
+  g.fillStyle = 'rgba(235,240,248,0.16)';                          // tasselli
+  for (let y = -3; y < h + 4; y += 7) g.fillRect(w * 0.07, y, w * 0.28, 3);
+  for (let y = h * 0.08; y < h * 0.92; y += 6) g.fillRect(w * 0.75, y, w * 0.16, 2.4);
+
+  const grad = g.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, shade(color, 0.3));
+  grad.addColorStop(0.55, color);
+  grad.addColorStop(1, shade(color, -0.34));
+  g.fillStyle = grad;
+  roundRect(g, w * 0.3, h * 0.24, w * 0.56, h * 0.52, 4); g.fill(); // cofano
+  g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 1.4; g.stroke();
+  g.fillStyle = shade(color, -0.18);
+  roundRect(g, w * 0.06, h * 0.12, w * 0.28, h * 0.76, 4); g.fill(); // cabina
+  g.fillStyle = GLASS_DARK;
+  roundRect(g, w * 0.11, h * 0.2, w * 0.18, h * 0.6, 3); g.fill();
+  g.fillStyle = '#2a2d31';                                          // marmitta
+  roundRect(g, w * 0.62, h * 0.06, w * 0.06, h * 0.16, 2); g.fill();
+  g.fillStyle = '#ffeec2';
+  roundRect(g, w * 0.86, h * 0.28, 4, h * 0.13, 1.4); g.fill();
+  roundRect(g, w * 0.86, h * 0.59, 4, h * 0.13, 1.4); g.fill();
+}
+
+/**
+ * Elicottero visto da sopra: fuso a goccia, trave di coda, pattini. Le pale non
+ * stanno qui — le disegna la scena, perché devono girare.
+ */
+function drawHeli(g, w, h, color) {
+  // Pattini: due barre che sporgono, ed è quello che lo fa leggere come posato
+  // e non come una macchia.
+  g.strokeStyle = '#22262c';
+  g.lineWidth = 3;
+  for (const s of [-1, 1]) {
+    const y = h / 2 + s * h * 0.4;
+    g.beginPath(); g.moveTo(w * 0.3, y); g.lineTo(w * 0.72, y); g.stroke();
+  }
+  // Trave di coda
+  const grad = g.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, shade(color, 0.28));
+  grad.addColorStop(0.55, color);
+  grad.addColorStop(1, shade(color, -0.32));
+  g.fillStyle = grad;
+  roundRect(g, w * 0.06, h * 0.4, w * 0.5, h * 0.2, 4); g.fill();
+  // Deriva verticale e stabilizzatore
+  g.fillStyle = shade(color, -0.2);
+  roundRect(g, w * 0.03, h * 0.18, w * 0.09, h * 0.64, 3); g.fill();
+  // Fusoliera a goccia
+  g.fillStyle = grad;
+  g.beginPath();
+  g.moveTo(w * 0.94, h * 0.5);
+  g.bezierCurveTo(w * 0.9, h * 0.06, w * 0.52, h * 0.1, w * 0.44, h * 0.36);
+  g.lineTo(w * 0.44, h * 0.64);
+  g.bezierCurveTo(w * 0.52, h * 0.9, w * 0.9, h * 0.94, w * 0.94, h * 0.5);
+  g.closePath();
+  g.fill();
+  g.strokeStyle = 'rgba(0,0,0,0.55)'; g.lineWidth = 1.5; g.stroke();
+  // Vetratura frontale
+  const gg = g.createLinearGradient(w * 0.7, 0, w, h);
+  gg.addColorStop(0, '#31404e');
+  gg.addColorStop(1, GLASS_DARK);
+  g.fillStyle = gg;
+  g.beginPath();
+  g.ellipse(w * 0.79, h * 0.5, w * 0.13, h * 0.3, 0, 0, 6.2832);
+  g.fill();
+  // Mozzo del rotore
+  g.fillStyle = '#3a4049';
+  g.beginPath(); g.arc(w * 0.62, h * 0.5, 5.5, 0, 6.2832); g.fill();
+  g.fillStyle = '#20242a';
+  g.beginPath(); g.arc(w * 0.62, h * 0.5, 2.4, 0, 6.2832); g.fill();
+}
+
+/** Turboelica leggero: ala centrale, piani di coda, disco dell'elica sul muso. */
+function drawPlane(g, w, h, color) {
+  const cy = h / 2;
+  // Ala: è la parte che dice "aereo" prima di ogni altra cosa.
+  const wg = g.createLinearGradient(0, 0, 0, h);
+  wg.addColorStop(0, shade(color, 0.24));
+  wg.addColorStop(0.5, shade(color, 0.04));
+  wg.addColorStop(1, shade(color, -0.3));
+  g.fillStyle = wg;
+  const cy0 = h / 2;
+  for (const s of [-1, 1]) {
+    // Semiala rastremata e con un filo di freccia: un rettangolo pieno da sopra
+    // si legge come una crocera, non come un'ala.
+    g.beginPath();
+    g.moveTo(w * 0.44, cy0 + s * h * 0.04);
+    g.lineTo(w * 0.53, cy0 + s * h * 0.48);
+    g.lineTo(w * 0.61, cy0 + s * h * 0.48);
+    g.lineTo(w * 0.66, cy0 + s * h * 0.04);
+    g.closePath();
+    g.fill();
+    g.strokeStyle = 'rgba(0,0,0,0.45)'; g.lineWidth = 1.2; g.stroke();
+  }
+  // Gondole motore sotto l'ala, con il loro disco d'elica
+  for (const s of [-1, 1]) {
+    g.fillStyle = '#3d434b';
+    roundRect(g, w * 0.6, cy + s * h * 0.28 - h * 0.04, w * 0.19, h * 0.08, 3); g.fill();
+    g.strokeStyle = 'rgba(200,210,225,0.3)';
+    g.lineWidth = 1.6;
+    g.beginPath(); g.ellipse(w * 0.8, cy + s * h * 0.28, w * 0.015, h * 0.1, 0, 0, 6.2832); g.stroke();
+  }
+  // Piani di coda: piccoli, o rubano la scena all'ala
+  g.fillStyle = wg;
+  for (const s of [-1, 1]) {
+    g.beginPath();
+    g.moveTo(w * 0.06, cy + s * h * 0.03);
+    g.lineTo(w * 0.12, cy + s * h * 0.26);
+    g.lineTo(w * 0.18, cy + s * h * 0.26);
+    g.lineTo(w * 0.2, cy + s * h * 0.03);
+    g.closePath();
+    g.fill();
+  }
+  // Fusoliera
+  g.fillStyle = wg;
+  g.beginPath();
+  g.moveTo(w * 0.93, cy);
+  g.bezierCurveTo(w * 0.88, cy - h * 0.1, w * 0.4, cy - h * 0.085, w * 0.04, cy - h * 0.035);
+  g.lineTo(w * 0.04, cy + h * 0.035);
+  g.bezierCurveTo(w * 0.4, cy + h * 0.085, w * 0.88, cy + h * 0.1, w * 0.93, cy);
+  g.closePath();
+  g.fill();
+  g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 1.5; g.stroke();
+  // Cabina
+  const gg = g.createLinearGradient(w * 0.72, 0, w * 0.92, h);
+  gg.addColorStop(0, '#33414f');
+  gg.addColorStop(1, GLASS_DARK);
+  g.fillStyle = gg;
+  g.beginPath();
+  g.ellipse(w * 0.8, cy, w * 0.08, h * 0.055, 0, 0, 6.2832);
+  g.fill();
+  // Disco dell'elica: un anello traslucido, non tre bastoncini
+  g.strokeStyle = 'rgba(200,210,225,0.35)';
+  g.lineWidth = 2;
+  g.beginPath(); g.ellipse(w * 0.95, cy, w * 0.02, h * 0.2, 0, 0, 6.2832); g.stroke();
+  // Bande di livrea lungo la fusoliera
+  g.fillStyle = 'rgba(255,255,255,0.5)';
+  g.fillRect(w * 0.12, cy - 1.5, w * 0.6, 3);
+}
+
+/** Scafo planante: prua a punta, parabrezza inclinato, scia di poppa. */
+function drawBoatHull(g, w, h, color, big) {
+  const cy = h / 2;
+  const grad = g.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, shade(color, 0.3));
+  grad.addColorStop(0.5, color);
+  grad.addColorStop(1, shade(color, -0.34));
+  g.fillStyle = grad;
+  g.beginPath();
+  g.moveTo(w * 0.99, cy);                          // prua
+  g.bezierCurveTo(w * 0.8, 1, w * 0.4, 1.5, w * 0.04, h * 0.14);
+  g.lineTo(w * 0.04, h * 0.86);                    // specchio di poppa
+  g.bezierCurveTo(w * 0.4, h - 1.5, w * 0.8, h - 1, w * 0.99, cy);
+  g.closePath();
+  g.fill();
+  g.strokeStyle = 'rgba(0,0,0,0.55)'; g.lineWidth = 1.6; g.stroke();
+  // Pozzetto
+  g.fillStyle = shade(color, -0.22);
+  roundRect(g, w * 0.12, h * 0.2, w * (big ? 0.44 : 0.36), h * 0.6, 5); g.fill();
+  // Tuga e parabrezza
+  const gg = g.createLinearGradient(0, 0, 0, h);
+  gg.addColorStop(0, '#33414f');
+  gg.addColorStop(1, GLASS_DARK);
+  g.fillStyle = gg;
+  roundRect(g, w * (big ? 0.56 : 0.5), h * 0.26, w * 0.12, h * 0.48, 3); g.fill();
+  // Coperta chiara di prua: senza, da sopra la barca è una macchia sola
+  g.fillStyle = 'rgba(240,244,248,0.5)';
+  g.beginPath();
+  g.moveTo(w * 0.97, cy);
+  g.bezierCurveTo(w * 0.86, h * 0.2, w * 0.78, h * 0.24, w * 0.72, h * 0.3);
+  g.lineTo(w * 0.72, h * 0.7);
+  g.bezierCurveTo(w * 0.78, h * 0.76, w * 0.86, h * 0.8, w * 0.97, cy);
+  g.closePath();
+  g.fill();
+  if (big) {
+    // Battello: fascia di finestrini e boma di carico
+    g.fillStyle = '#1b232c';
+    g.fillRect(w * 0.16, h * 0.26, w * 0.36, h * 0.08);
+    g.fillRect(w * 0.16, h * 0.66, w * 0.36, h * 0.08);
+    g.fillStyle = '#3d434b';
+    roundRect(g, w * 0.2, h * 0.44, w * 0.3, h * 0.12, 3); g.fill();
+  }
+  // Fanali di via: rosso a sinistra, verde a dritta
+  g.fillStyle = '#c33a33';
+  g.beginPath(); g.arc(w * 0.86, h * 0.24, 2.2, 0, 6.2832); g.fill();
+  g.fillStyle = '#3fbf6a';
+  g.beginPath(); g.arc(w * 0.86, h * 0.76, 2.2, 0, 6.2832); g.fill();
+}
+
 export function getVehicleSprite(kind, colorIndex = 0) {
   const spec = VEHICLE_TYPES[kind] || VEHICLE_TYPES.sedan;
   let color = VEHICLE_COLORS[colorIndex % VEHICLE_COLORS.length];
@@ -307,6 +517,11 @@ export function getVehicleSprite(kind, colorIndex = 0) {
   if (kind === 'police') color = '#e8ecf2';
   if (kind === 'swat') color = '#2b3138';
   if (kind === 'truck') color = ['#7b8288', '#4a5560', '#8f6a42'][colorIndex % 3];
+  if (kind === 'tractor') color = ['#3f7a3a', '#b5502a', '#c9a13c'][colorIndex % 3];
+  if (kind === 'heli') color = ['#2f3b48', '#8a2f2f', '#3f5a3a'][colorIndex % 3];
+  if (kind === 'plane') color = ['#dfe4ea', '#c8ccd2', '#9fb3c8'][colorIndex % 3];
+  if (kind === 'boat') color = ['#e8ecf0', '#2f5f9e', '#c9d0d8'][colorIndex % 3];
+  if (kind === 'ferry') color = ['#4a6a86', '#5c6660', '#8a7a5a'][colorIndex % 3];
 
   const key = `veh:${kind}:${colorIndex}`;
   const pad = 4;
@@ -316,6 +531,10 @@ export function getVehicleSprite(kind, colorIndex = 0) {
     const ih = spec.wid;
     if (kind === 'bus') drawBus(g, iw, ih, color);
     else if (kind === 'scooter') drawScooter(g, iw, ih, color);
+    else if (kind === 'tractor') drawTractor(g, iw, ih, color);
+    else if (kind === 'heli') drawHeli(g, iw, ih, color);
+    else if (kind === 'plane') drawPlane(g, iw, ih, color);
+    else if (spec.marine) drawBoatHull(g, iw, ih, color, kind === 'ferry');
     else if (kind === 'truck' || kind === 'van' || kind === 'swat') {
       drawBoxVehicle(g, iw, ih, color, spec, { livery: kind === 'swat' ? '#1c3f8f' : null });
       if (kind === 'swat') {
@@ -950,6 +1169,78 @@ export function getPropSprite(p) {
       return sprite(key, 22, 12, (g, w, h) => {
         g.fillStyle = '#31353b';
         roundRect(g, 2, h / 2 - 4, w - 4, 8, 2); g.fill();
+      });
+    case 'silo':
+      return sprite(key, 34, 34, (g, w, h) => {
+        const gr = g.createRadialGradient(w * 0.36, h * 0.34, 2, w / 2, h / 2, w / 2);
+        gr.addColorStop(0, '#c9cdd2');
+        gr.addColorStop(1, '#6f757c');
+        g.fillStyle = gr;
+        g.beginPath(); g.arc(w / 2, h / 2, w / 2 - 1, 0, 6.2832); g.fill();
+        g.strokeStyle = 'rgba(0,0,0,0.45)'; g.lineWidth = 1.3; g.stroke();
+        // Cerchiature: da sopra sono l'unica cosa che distingue un silo da un tank
+        g.strokeStyle = 'rgba(0,0,0,0.2)';
+        g.beginPath(); g.arc(w / 2, h / 2, w * 0.3, 0, 6.2832); g.stroke();
+      });
+    case 'windsock':
+      return sprite(key, 34, 20, (g, w, h) => {
+        g.strokeStyle = '#8a9099'; g.lineWidth = 2.4;
+        g.beginPath(); g.moveTo(3, h / 2); g.lineTo(11, h / 2); g.stroke();
+        // Manica a strisce: arancio e bianco, come vuole la norma
+        const bands = ['#ff7a29', '#f0f2f5', '#ff7a29', '#f0f2f5'];
+        for (let i = 0; i < 4; i++) {
+          g.fillStyle = bands[i];
+          const x = 11 + i * 5.4;
+          const hh = h * (0.62 - i * 0.09);
+          g.fillRect(x, h / 2 - hh / 2, 5.2, hh);
+        }
+      });
+    case 'bollard':
+      return sprite(key, 16, 16, (g, w, h) => {
+        g.fillStyle = '#4a4f56';
+        g.beginPath(); g.arc(w / 2, h / 2, 6, 0, 6.2832); g.fill();
+        g.fillStyle = '#6c727a';
+        g.beginPath(); g.arc(w / 2 - 1, h / 2 - 1, 4, 0, 6.2832); g.fill();
+      });
+    case 'crate':
+      return sprite(key, 30, 30, (g, w, h) => {
+        g.fillStyle = '#7d6242';
+        roundRect(g, 2, 2, w - 4, h - 4, 2); g.fill();
+        g.strokeStyle = 'rgba(0,0,0,0.45)'; g.lineWidth = 1.4; g.stroke();
+        g.strokeStyle = 'rgba(40,28,16,0.55)'; g.lineWidth = 2;
+        g.beginPath(); g.moveTo(4, 4); g.lineTo(w - 4, h - 4); g.stroke();
+        g.beginPath(); g.moveTo(w - 4, 4); g.lineTo(4, h - 4); g.stroke();
+      });
+    case 'drum':
+      return sprite(key, 24, 24, (g, w, h) => {
+        const gr = g.createRadialGradient(w * 0.36, h * 0.34, 1, w / 2, h / 2, w / 2);
+        gr.addColorStop(0, '#5c6a4a');
+        gr.addColorStop(1, '#2f3728');
+        g.fillStyle = gr;
+        g.beginPath(); g.arc(w / 2, h / 2, w / 2 - 1, 0, 6.2832); g.fill();
+        g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 1.2; g.stroke();
+        g.fillStyle = 'rgba(220,190,60,0.7)';
+        g.fillRect(w * 0.2, h * 0.46, w * 0.6, 2.4);
+      });
+    case 'brazier':
+      return sprite(key, 24, 24, (g, w, h) => {
+        g.fillStyle = '#3a3a3c';
+        g.beginPath(); g.arc(w / 2, h / 2, w / 2 - 2, 0, 6.2832); g.fill();
+        const gr = g.createRadialGradient(w / 2, h / 2, 1, w / 2, h / 2, w * 0.36);
+        gr.addColorStop(0, '#ffd76a');
+        gr.addColorStop(0.5, '#ff7a29');
+        gr.addColorStop(1, 'rgba(160,40,10,0.2)');
+        g.fillStyle = gr;
+        g.beginPath(); g.arc(w / 2, h / 2, w * 0.36, 0, 6.2832); g.fill();
+      });
+    case 'floodlight':
+      return sprite(key, 26, 18, (g, w, h) => {
+        g.fillStyle = '#3c4149';
+        roundRect(g, 2, h / 2 - 3, w * 0.42, 6, 2); g.fill();
+        g.fillStyle = '#d8dce2';
+        roundRect(g, w * 0.46, 2, w * 0.5, h - 4, 3); g.fill();
+        g.fillStyle = 'rgba(255,244,200,0.85)';
+        roundRect(g, w * 0.52, 4, w * 0.4, h - 8, 2); g.fill();
       });
     default:
       return sprite(`prop:unknown`, 12, 12, (g, w, h) => {

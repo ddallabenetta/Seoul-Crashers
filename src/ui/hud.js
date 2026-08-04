@@ -492,6 +492,34 @@ export class Hud {
       ctx.arc(m.x, m.y, 3.2, 0, 6.2832);
       ctx.fill();
     }
+    // Territori delle bande: un rettangolo del loro colore. Chi ci passa dentro
+    // armato se ne accorge in fretta; la minimappa serve a passarci apposta.
+    for (const t of this.city.turfs || []) {
+      const a = toMap(t.x, t.y);
+      const b = toMap(t.x + t.w, t.y + t.h);
+      if (b.x < x || a.x > x + MINIMAP || b.y < y || a.y > y + MINIMAP) continue;
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      ctx.strokeStyle = t.color;
+      ctx.lineWidth = 1.6;
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(a.x, a.y, Math.max(4, b.x - a.x), Math.max(4, b.y - a.y));
+      ctx.restore();
+    }
+    // Eliporti: un velivolo si posa solo dove c'è la H dipinta.
+    for (const pad of this.city.helipads || []) {
+      const m = toMap(pad.x, pad.y);
+      if (m.x < x || m.x > x + MINIMAP || m.y < y || m.y > y + MINIMAP) continue;
+      ctx.strokeStyle = 'rgba(230,240,250,0.8)';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, 4, 0, 6.2832);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(230,240,250,0.9)';
+      ctx.font = '700 6px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('H', m.x, m.y + 2.2);
+    }
     // Ospedali: sono i punti di risveglio, devono essere sempre localizzabili.
     for (const hsp of this.city.hospitals || []) {
       const m = toMap(hsp.x, hsp.y);
@@ -680,6 +708,17 @@ export class Hud {
     ctx.font = '600 10px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(230,235,245,0.45)';
     ctx.fillText(spec.label.toUpperCase(), cx, cy + 40);
+    // In volo la velocità non basta: senza la quota non si sa se si sta salendo
+    // o se si sta per finire dentro una torre di Gangnam.
+    if (spec.air) {
+      const alt = Math.round(v.z);
+      ctx.font = '700 13px system-ui, sans-serif';
+      ctx.fillStyle = v.z > 6 ? '#7cf3ff' : 'rgba(230,235,245,0.55)';
+      ctx.fillText(`${alt} m`, cx, cy - 20);
+      ctx.font = '600 9px system-ui, sans-serif';
+      ctx.fillStyle = 'rgba(230,235,245,0.45)';
+      ctx.fillText('QUOTA', cx, cy - 32);
+    }
     ctx.restore();
   }
 
@@ -717,6 +756,11 @@ export class Hud {
       if (p.onFoot) {
         const v = p.findNearbyVehicle(game);
         if (v) lines.push(`E  —  sali in ${VEHICLE_TYPES[v.kind].label}`);
+      } else if (VEHICLE_TYPES[p.vehicle.kind].air) {
+        // Comandi di volo: sono l'unica cosa in tutto il gioco che non si indovina
+        // dai tasti di guida, quindi restano scritti finché si è a bordo.
+        lines.push('SPAZIO  —  sali   ·   SHIFT  —  scendi');
+        if (p.vehicle.z <= 6) lines.push('E  —  scendi');
       } else if (Math.abs(p.vehicle.speed) < 40) {
         lines.push('E  —  scendi');
       }
