@@ -15,10 +15,11 @@ consumare rng diverso** (calcolando da dati già generati, come `city.hospitals`
 
 ```bash
 node .claude/tools/probe.mjs --seconds 4 --eval "game.city.stats"
-# atteso, seed attuale: buildings 424, props 796, blocks 119, nodes 179, edges 261,
-# doglegs 3, stairs 8   (+ game.pickups.items.length = 43)
-# shops 139, venues 369, garages 5 nascono da un rng loro (`placeShops`, `placeGarages`,
-# creati DOPO la generazione): si muovono solo se tocchi quelle due funzioni.
+# atteso, seed attuale: buildings 418, props 1299, blocks 122, nodes 196, edges 279,
+# doglegs 4, stairs 3   (+ game.pickups.items.length = 36)
+# shops 113, venues 324, garages 7, turfs 6 nascono da un rng loro (`placeShops`,
+# `placeGarages`, `placeTurfs`, creati DOPO la generazione): si muovono solo se
+# tocchi quelle funzioni.
 ```
 
 `placeShops` è l'esempio da copiare quando serve aggiungere roba alla città senza

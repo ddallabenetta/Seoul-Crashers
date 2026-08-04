@@ -79,11 +79,21 @@ const sp = ai.map(v => Math.abs(v.speed)).sort((a, b) => a - b);
    why: ai.filter(v => Math.abs(v.speed) < 8).reduce((a, v) => (a[v.ai.why] = (a[v.ai.why]||0)+1, a), {}) })
 ```
 
-Sani: `n ~49`, `move 31-35`, `stop < 15`, `med 46-58`. `why: libero` su un'auto ferma
-significa **bloccata fisicamente**, ed è il sintomo da inseguire.
+Sani (in centro, ~43 veicoli): `move ~22`, `stop ~14`, `med 25-35`, `libero ≤ 1`.
+`why` vale `semaforo` / `incrocio` / `sbocco` / `precedenza` / `coda` / `curva` / `libero`, e
+**`libero` su un'auto ferma significa bloccata fisicamente**: è il sintomo da inseguire.
+Non confrontare con i numeri di flusso scritti prima della tappa sul traffico (`med 46-58`):
+erano prodotti da auto che si attraversavano invece di accodarsi.
+
+**Se hai toccato il traffico, non giudicarlo da questa fotografia** — usa la scena, che conta
+anche gli urti e li classifica, ed è l'unica misura che distingue "lento" da "rotto":
+
+```bash
+node .claude/tools/probe.mjs --script .claude/tools/scenes/traffico.mjs --eval "__traffico"
+```
 
 ```js
-game.city.stats            // 424/796/119/179/261/3/8 + shops 139/venues 369/garages 5
+game.city.stats            // 418/1299/122/196/279/4/3 + shops 113/venues 324/garages 7/turfs 6
 game.wanted.level          // stelle
 game.police.cops.length    // ≤16 a cinque stelle; volanti ≤6, blocchi ≤3, chiodi ≤2
 game.projectiles.count     // esplosivi in volo + mine + pozze di fuoco

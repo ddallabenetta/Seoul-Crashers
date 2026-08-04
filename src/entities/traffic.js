@@ -1,6 +1,6 @@
 // Traffico: streaming di veicoli attorno al giocatore, guida AI su grafo stradale,
 // rispetto dei semafori, distanza di sicurezza, auto parcheggiate.
-import { createVehicle, updateVehicle } from './vehicle.js';
+import { createVehicle, updateVehicle, airborne } from './vehicle.js';
 import { VEHICLE_TYPES } from '../render/sprites.js';
 import { lanePoint, laneCount, canPass } from '../world/roadgraph.js';
 import { DISTRICT_BY_ID } from '../world/districts.js';
@@ -9,6 +9,23 @@ import { createPed } from './pedestrians.js';
 
 const MAX_TRAFFIC = 54;
 const MAX_PARKED = 24;
+
+/**
+ * Ingombro di un veicolo proiettato sugli assi di chi lo guarda, data la
+ * differenza fra i due musi. Serve a misurare lo spazio **fra i paraurti**
+ * invece che fra i centri: un autobus è lungo 158 px, e chi misura dai centri
+ * non vede mai la coda della fila davanti a sé. Vale anche per chi attraversa
+ * di traverso, che di lato ingombra per tutta la sua lunghezza.
+ * Riusa un oggetto solo: gira per ogni candidato di ogni veicolo, ogni frame.
+ */
+const EXT = { fwd: 0, side: 0 };
+function halfExtents(spec, da) {
+  const c = Math.abs(Math.cos(da));
+  const s = Math.abs(Math.sin(da));
+  EXT.fwd = spec.len * 0.5 * c + spec.wid * 0.5 * s;
+  EXT.side = spec.len * 0.5 * s + spec.wid * 0.5 * c;
+  return EXT;
+}
 
 /** Anello di streaming legato al viewport: le auto nascono appena fuori vista. */
 function ringFor(game) {
@@ -32,6 +49,7 @@ export class TrafficSystem {
     this.parkingSpots = this.collectParkingSpots();
     this.spawnTimer = 0;
     this.tmp = {};
+    this._q = [];
   }
 
   /**
@@ -176,12 +194,6 @@ export class TrafficSystem {
       const d = dist(pt.x, pt.y, p.x, p.y);
       if (d > ring.max || d < ring.min) continue;
       if (!ring.allowVisible && !outsideView(game, pt.x, pt.y, 70)) continue;
-      // Non far comparire un'auto addosso a un'altra
-      let clear = true;
-      for (const v of this.vehicles) {
-        if (dist(v.x, v.y, pt.x, pt.y) < 88) { clear = false; break; }
-      }
-      if (!clear) continue;
 
       const district = DISTRICT_BY_ID[this.city.districtAt(pt.x, pt.y).id];
       let kind = rng.pick(district.vehicleMix);
@@ -189,6 +201,17 @@ export class TrafficSystem {
       if ((kind === 'bus' || kind === 'truck') && !edge.arterial) {
         kind = rng.pick(district.vehicleMix.filter((k) => k !== 'bus' && k !== 'truck'));
       }
+      // Non far comparire un'auto addosso a un'altra. La distanza dipende da cosa
+      // si immette: 88 px fissi facevano nascere un autobus (158 px) dentro la
+      // berlina che aveva davanti, e la carambola partiva già dallo spawn.
+      const spec = VEHICLE_TYPES[kind];
+      let clear = true;
+      for (const o of this.vehicles) {
+        const room = (spec.len + VEHICLE_TYPES[o.kind].len) * 0.6 + 14;
+        if (dist(o.x, o.y, pt.x, pt.y) < room) { clear = false; break; }
+      }
+      if (!clear) continue;
+
       const v = createVehicle(kind, pt.x, pt.y, pt.angle, rng.int(0, 9));
       v.driver = 'ai';
       v.lightsOn = game.isNight;
@@ -198,9 +221,18 @@ export class TrafficSystem {
         nextChoice: null,
         waitT: 0,
         jamT: 0,
+        deadlockT: 0,
+        skewT: 0,
         recoverT: 0,
         recoverSteer: 0,
-        aggression: rng.range(0.75, 1.2),
+        claimNode: null,   // incrocio prenotato, finché non se ne è usciti
+        claimAxis: null,
+        claimT: 0,
+        // Forbice stretta: su strada a una corsia non si sorpassa, quindi chi va
+        // piano detta il passo a tutta la fila e ogni punto di dispersione in più
+        // si paga in congestione. Con 0.75-1.2 non si vedeva, perché senza
+        // distanza di sicurezza le auto si attraversavano invece di accodarsi.
+        aggression: rng.range(0.9, 1.15),
         honkT: 0,
       };
       this.vehicles.push(v);
@@ -274,8 +306,13 @@ export class TrafficSystem {
     for (const e of near) {
       const p = pointSegment(v.x, v.y, e.ax, e.ay, e.bx, e.by);
       const dot = cos * e.dx + sin * e.dy;
-      const dir = dot >= 0 ? 1 : -1;
-      // Preferisce la strada vicina e il senso di marcia compatibile col muso.
+      // Il senso di marcia lo decide **da che parte della strada ci si trova**,
+      // non dove punta il muso: si tiene la destra, quindi il lato è il dato
+      // affidabile. Dopo un testacoda il muso guarda indietro, ed è così che si
+      // finiva a ripartire contromano. Sulla mezzeria decide il muso.
+      const side = (v.x - e.ax) * -e.dy + (v.y - e.ay) * e.dx;
+      const dir = Math.abs(side) > 10 ? (side >= 0 ? 1 : -1) : (dot >= 0 ? 1 : -1);
+      // Preferisce la strada vicina e quella allineata col nostro asse.
       const score = -p.dist * 0.6 + Math.abs(dot) * 90;
       if (score > bestScore) {
         bestScore = score;
@@ -289,8 +326,62 @@ export class TrafficSystem {
     v.ai.s = best.s;
     v.ai.nextChoice = null;
     v.ai.jamT = 0;
+    v.ai.deadlockT = 0;
+    v.ai.skewT = 0;
     v.ai.recoverT = 0;
+    v.ai.claimNode = null;
     return true;
+  }
+
+  /** Qualcuno attaccato alla coda: in retromarcia lo si prende in pieno. */
+  blockedBehind(v, spec, game) {
+    const cos = Math.cos(v.angle);
+    const sin = Math.sin(v.angle);
+    const reach = spec.len * 0.5 + 120;
+    const near = game.vehicleGrid.queryCircle(
+      v.x - cos * reach * 0.5, v.y - sin * reach * 0.5, reach * 0.5 + 82, this._q
+    );
+    for (const o of near) {
+      if (o === v || airborne(o)) continue;
+      const dx = o.x - v.x;
+      const dy = o.y - v.y;
+      const back = -(dx * cos + dy * sin);
+      if (back <= 0) continue;
+      const ext = halfExtents(VEHICLE_TYPES[o.kind], o.angle - v.angle);
+      if (Math.abs(-dx * sin + dy * cos) - spec.wid * 0.5 - ext.side > -5) continue;
+      if (back - spec.len * 0.5 - ext.fwd < 40) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Svolta a sinistra: taglia la corsia di chi arriva di fronte, e va ceduta.
+   * La prenotazione dell'incrocio è per **asse**, quindi due auto che escono
+   * dallo stesso asse in direzioni opposte hanno via libera tutte e due e si
+   * incrociano dentro l'incrocio: è la seconda fonte di urti dopo i tamponamenti.
+   * (Con y verso il basso, il prodotto vettoriale negativo è la svolta a sinistra.)
+   */
+  mustYieldTurn(v, edge, node, game) {
+    const ai = v.ai;
+    const next = ai.nextChoice;
+    if (!next) return false;
+    const d1x = edge.dx * ai.dir, d1y = edge.dy * ai.dir;
+    const d2x = next.edge.dx * next.dir, d2y = next.edge.dy * next.dir;
+    if (d1x * d2y - d1y * d2x > -0.5) return false; // dritto o a destra: non incrocia
+    for (const o of game.vehicleGrid.queryCircle(node.x, node.y, 190, this._q)) {
+      if (o === v || !o.ai) continue;
+      // Fermo non arriva: senza questa riga due che svoltano opposti si cedono la
+      // strada a vicenda per sempre.
+      if (Math.abs(o.speed) < 30) continue;
+      const oe = o.ai.edge;
+      const ox = oe.dx * o.ai.dir, oy = oe.dy * o.ai.dir;
+      if (ox * d1x + oy * d1y > -0.7) continue;                       // non è di fronte
+      if ((node.x - o.x) * ox + (node.y - o.y) * oy <= 0) continue;   // ha già passato
+      // Sulla nostra strada, non su una parallela un isolato più in là.
+      if (Math.abs((o.x - node.x) * -d1y + (o.y - node.y) * d1x) > 80) continue;
+      return true;
+    }
+    return false;
   }
 
   // --- guida AI --------------------------------------------------------------
@@ -298,15 +389,38 @@ export class TrafficSystem {
     const ai = v.ai;
     if (!ai) return;
     const graph = this.city.graph;
+    const spec = VEHICLE_TYPES[v.kind];
+    const halfLen = spec.len * 0.5;
 
-    // Recupero: manovra in retromarcia dopo essere rimasti incastrati.
+    // Recupero: manovra in retromarcia dopo essere rimasti incastrati. Alla cieca
+    // no: dietro c'è quasi sempre la coda che ci ha spinti fin lì, e la manovra
+    // di recupero era il tamponamento successivo.
     if (ai.recoverT > 0) {
       ai.recoverT -= dt;
-      v.throttle = -0.55;
-      v.steer = ai.recoverSteer;
-      v.handbrake = false;
+      if (this.blockedBehind(v, spec, game)) {
+        v.throttle = 0;
+        v.steer = 0;
+        v.handbrake = true;
+      } else {
+        v.throttle = -0.55;
+        v.steer = ai.recoverSteer;
+        v.handbrake = false;
+      }
       if (ai.recoverT <= 0) this.reacquireLane(v);
       return;
+    }
+
+    // Rinnovo della prenotazione: l'incrocio resta di chi lo sta attraversando
+    // finché la coda non ne è uscita. Con una scadenza a tempo fisso un autobus,
+    // che ci mette il doppio di una berlina, se la vedeva scadere addosso e il
+    // perpendicolare gli entrava nella fiancata. Dopo 3,5 s si molla comunque:
+    // a quel punto siamo incastrati, e tenere fermo anche l'altro asse non aiuta.
+    if (ai.claimNode) {
+      const cn = ai.claimNode;
+      ai.claimT += dt;
+      const box = Math.max(cn.vWidth, cn.hWidth) * 0.5 + halfLen + 10;
+      if (ai.claimT > 3.5 || dist(v.x, v.y, cn.x, cn.y) > box) ai.claimNode = null;
+      else if (cn.claimAxis === ai.claimAxis) cn.claimT = game.time;
     }
 
     // Progresso lungo l'arco corrente: proiezione della posizione sull'asse.
@@ -337,7 +451,6 @@ export class TrafficSystem {
         ai.lane = Math.min(ai.lane, laneCount(choice.edge) - 1);
         ai.nextChoice = null;
         ai.target = this.cruiseSpeed(choice.edge, v.kind, this.rng);
-        if (endNode.claimAxis === edge.axis) endNode.claimAxis = null;
         projectS();
         edge = ai.edge;
         endNode = graph.nodeById(ai.dir > 0 ? edge.b : edge.a);
@@ -373,56 +486,113 @@ export class TrafficSystem {
     let target = ai.target * ai.aggression;
 
     // Curva imminente: rallenta per davvero. A 90 px/s un'auto taglia l'angolo
-    // e finisce sul marciapiede, dove resta piantata.
-    if (ai.nextChoice && ai.nextChoice.edge.axis !== edge.axis && ai.s > edge.len - 175) {
+    // e finisce sul marciapiede, dove resta piantata. L'anticipo però va misurato
+    // sulla velocità, non fisso: 175 px sono più lunghi di un isolato di Hongdae
+    // (passo 126-196), quindi chi doveva svoltare viaggiava a 64 px/s per tutto
+    // il tratto — e con lui tutta la fila dietro.
+    const turnLead = Math.min(175, 40 + Math.abs(v.speed) * 1.1);
+    if (ai.nextChoice && ai.nextChoice.edge.axis !== edge.axis && ai.s > edge.len - turnLead) {
       target = Math.min(target, 64);
     }
     // Anche subito dopo la svolta la velocità va tenuta bassa finché non si è
     // riallineati alla nuova corsia.
     if (Math.abs(heading) > 0.5) target = Math.min(target, 96);
 
+    const stopDist = edge.len - nodeHalf - 10 - ai.s;
+
+    // Distanza di sicurezza. Si misura **fra i paraurti**, non fra i centri: con
+    // la sola distanza dei centri chi si accodava a un autobus (158 px) non
+    // vedeva niente davanti a sé, si dava "libero", riaccelerava e lo tamponava —
+    // e poi l'anti-ingorgo lo mandava pure in retromarcia. Era la prima causa di
+    // urti di tutto il traffico. Dell'altro si prende l'ingombro **longitudinale**
+    // proiettato sul nostro muso, così vale anche per chi è messo di traverso.
+    const cos = Math.cos(v.angle), sin = Math.sin(v.angle);
+    const gapWant = 16 + Math.abs(v.speed) * 0.45;
+    // Vicino a un incrocio si guarda più lontano: serve a sapere se **oltre**
+    // l'incrocio c'è posto per noi, non solo se la strada qui è libera.
+    const scan = halfLen + 82 + (stopDist < 60 ? Math.max(gapWant, nodeHalf * 2 + 70) : gapWant);
+    const ahead = game.vehicleGrid.queryCircle(
+      v.x + cos * scan * 0.5, v.y + sin * scan * 0.5, scan * 0.5 + 82
+    );
+    let blocked = 0;
+    let follow = Infinity;     // velocità che il gap davanti concede
+    let queueGap = Infinity;   // spazio libero davanti, anche oltre l'incrocio
+    let queueSlow = false;
+    for (const o of ahead) {
+      if (o === v || airborne(o)) continue;
+      const dx = o.x - v.x;
+      const dy = o.y - v.y;
+      const forward = dx * cos + dy * sin;
+      if (forward <= 0) continue;
+      const ospec = VEHICLE_TYPES[o.kind];
+      // Di lato la tolleranza è sulle **larghezze**: si frena per chi occupa la
+      // nostra corsia, non per chi è di traverso. Frenare anche per quello sembra
+      // prudente e invece ferma la città — agli incroci ognuno vede la fila
+      // perpendicolare in attesa dentro il proprio cono e non riparte più nessuno.
+      // Chi attraversa lo tiene fuori la prenotazione, che è il posto giusto.
+      if (Math.abs(-dx * sin + dy * cos) > (spec.wid + ospec.wid) * 0.5 - 2) continue;
+      const gap = forward - halfLen - halfExtents(ospec, o.angle - v.angle).fwd;
+      if (gap < queueGap) {
+        queueGap = gap;
+        queueSlow = Math.abs(o.speed) < 12;
+      }
+      if (gap > gapWant) continue;
+      // Velocità concessa: **quella di chi è davanti** più quella che lo spazio
+      // libero consente in più. Senza il primo termine una colonna lanciata a
+      // 120 px/s dovrebbe strisciare a 30 solo perché sta vicina, e ogni coda
+      // diventa una fisarmonica che in una città densa non riparte.
+      const lead = Math.max(0, o.speed * Math.cos(o.angle - v.angle));
+      follow = Math.min(follow, lead + Math.max(0, gap - 12) * 1.9);
+      blocked = Math.max(blocked, gap <= 2 ? 1 : 1 - gap / gapWant);
+    }
+    target = Math.min(target, follow);
+
     // Semaforo
     let waitingAtLight = false;
-    const stopDist = edge.len - nodeHalf - 10 - ai.s;
+    let redLight = false;
     if (endNode.signal && stopDist < 130 && stopDist > -4) {
       if (!canPass(endNode, edge.axis, game.time)) {
         target = stopDist < 22 ? 0 : Math.min(target, stopDist * 1.5);
         waitingAtLight = true;
+        redLight = true;
       }
     }
 
     // Prenotazione dell'incrocio: un asse per volta. La fila che sta già passando
     // rinnova la prenotazione, l'asse perpendicolare aspetta il suo turno.
+    let whyJunction = 'incrocio';
     if (!waitingAtLight && stopDist < 44) {
       const insideJunction = stopDist < 4;
       const free = endNode.claimAxis === null
         || endNode.claimAxis === edge.axis
-        || game.time - endNode.claimT > 1.1;
-      if (free) {
-        endNode.claimAxis = edge.axis;
-        endNode.claimT = game.time;
-      } else if (!insideJunction) {
+        || game.time - endNode.claimT > 0.8;
+      // Non entrare in un incrocio se dall'altra parte non c'è posto: è così che
+      // una coda ferma si mangia l'incrocio e blocca anche l'asse perpendicolare,
+      // che a quel punto non ha nessun modo di sbloccarsi da solo.
+      const exitJammed = queueSlow && queueGap < nodeHalf + halfLen + 20;
+      const yieldTurn = !exitJammed && free && this.mustYieldTurn(v, edge, endNode, game);
+      if (!insideJunction && (!free || exitJammed || yieldTurn)) {
         target = stopDist < 24 ? 0 : Math.min(target, stopDist * 1.4);
         waitingAtLight = true;
+        whyJunction = exitJammed ? 'sbocco' : yieldTurn ? 'precedenza' : 'incrocio';
+      } else if (free && (insideJunction || Math.abs(v.speed) > 8)) {
+        // Prenota solo chi ci sta entrando davvero. Un'auto ferma prima della
+        // linea che tenesse la prenotazione la rinnoverebbe ogni frame senza mai
+        // usarla, e l'asse perpendicolare non passerebbe più.
+        if (ai.claimNode !== endNode) {
+          ai.claimNode = endNode;
+          ai.claimAxis = edge.axis;
+          ai.claimT = 0;
+        }
+        endNode.claimAxis = edge.axis;
+        endNode.claimT = game.time;
       }
     }
 
-    // Distanza di sicurezza
-    const cos = Math.cos(v.angle), sin = Math.sin(v.angle);
+    // Pedoni (e il giocatore a piedi) davanti al muso: frenata d'emergenza. Qui
+    // il taglio secco del gas ci sta — chi attraversa non si "segue", si evita.
     const probe = 30 + Math.abs(v.speed) * 0.6;
-    const ahead = game.vehicleGrid.queryCircle(v.x + cos * probe * 0.6, v.y + sin * probe * 0.6, probe * 0.75);
-    let blocked = 0;
-    for (const o of ahead) {
-      if (o === v) continue;
-      const dx = o.x - v.x;
-      const dy = o.y - v.y;
-      const forward = dx * cos + dy * sin;
-      const lateral = Math.abs(-dx * sin + dy * cos);
-      if (forward > 4 && forward < probe && lateral < 24) {
-        blocked = Math.max(blocked, 1 - (forward - 4) / probe);
-      }
-    }
-    // Pedoni (e il giocatore a piedi) davanti al muso: frenata d'emergenza
+    let hazard = 0;
     const walkers = game.pedGrid
       ? game.pedGrid.queryCircle(v.x + cos * probe * 0.5, v.y + sin * probe * 0.5, probe * 0.7)
       : [];
@@ -432,9 +602,7 @@ export class TrafficSystem {
       const dy = w.y - v.y;
       const forward = dx * cos + dy * sin;
       const lateral = Math.abs(-dx * sin + dy * cos);
-      if (forward > 0 && forward < probe * 0.95 && lateral < 18) {
-        blocked = Math.max(blocked, 0.82);
-      }
+      if (forward > 0 && forward < probe * 0.95 && lateral < 18) hazard = Math.max(hazard, 0.82);
     }
     const pl = game.player;
     if (pl.onFoot) {
@@ -443,7 +611,7 @@ export class TrafficSystem {
       const forward = dx * cos + dy * sin;
       const lateral = Math.abs(-dx * sin + dy * cos);
       if (forward > 0 && forward < probe * 0.9 && lateral < 26) {
-        blocked = Math.max(blocked, 1);
+        hazard = 1;
         ai.honkT -= dt;
         if (ai.honkT <= 0) {
           ai.honkT = 2.2;
@@ -451,10 +619,16 @@ export class TrafficSystem {
         }
       }
     }
-    if (blocked > 0) target *= 1 - Math.min(1, blocked * 1.35);
+    if (hazard > 0) target *= 1 - Math.min(1, hazard * 1.35);
+    blocked = Math.max(blocked, hazard);
 
-    // Etichetta diagnostica (visibile in debug): perché questo veicolo rallenta.
-    ai.why = waitingAtLight ? 'incrocio' : blocked > 0.5 ? 'coda' : target < 20 ? 'curva' : 'libero';
+    // Etichetta diagnostica (visibile in debug e in `ai.why`): perché questo
+    // veicolo rallenta. Distinguere i motivi non è pignoleria — è l'unico modo di
+    // sapere se un ingorgo è una coda, una precedenza o un incastro.
+    ai.why = redLight ? 'semaforo'
+      : waitingAtLight ? whyJunction
+      : blocked > 0.5 ? 'coda'
+      : target < 20 ? 'curva' : 'libero';
 
     // Comando finale
     const diff = target - v.speed;
@@ -470,18 +644,41 @@ export class TrafficSystem {
       ai.waitT = 0;
     }
 
-    // Anti-ingorgo: fermo senza motivo (verde libero, nessuno davanti) -> manovra.
-    if (Math.abs(v.speed) < 12 && !waitingAtLight && blocked < 0.5) {
-      ai.jamT = (ai.jamT || 0) + dt;
-      if (ai.jamT > 1.7) {
-        ai.jamT = 0;
-        ai.jamCount = (ai.jamCount || 0) + 1;
-        // Fermo contro un ostacolo: manovra in retromarcia, poi riprende la corsia.
-        ai.recoverT = 0.9;
-        ai.recoverSteer = this.rng.chance(0.5) ? 1 : -1;
-      }
+    // Anti-ingorgo. Due tempi diversi per due situazioni diverse: fermo *senza
+    // motivo* (nessuno davanti, nessuno a cui cedere) è un incastro fisico e si
+    // manovra subito; fermo in coda o a un incrocio è normale e si smaltisce da
+    // solo — a meno che non sia un incastro vero, e per saperlo bisogna aspettare
+    // più di un rosso, che dura 7,7 s (`SIGNAL_CYCLE`) più il tempo della fila.
+    // Il conteggio lungo esclude **solo** il rosso: un'attesa all'incrocio che non
+    // finisce mai è esattamente il caso da sbloccare, non da tollerare.
+    const still = Math.abs(v.speed) < 12 && !redLight;
+    if (still && !waitingAtLight && blocked < 0.5) {
+      ai.jamT += dt;
+      ai.deadlockT = 0;
+    } else if (still) {
+      ai.deadlockT += dt;
+      ai.jamT = 0;
     } else {
       ai.jamT = 0;
+      ai.deadlockT = 0;
+    }
+    // Fermo **e di traverso** non è mai una coda: è un'auto che un urto ha girato
+    // e che adesso tappa la carreggiata a tutti quelli dietro. È quello che si
+    // vede a schermo quando un incrocio "si riempie di macchine messe di sbieco",
+    // e va sciolto in fretta, non dopo il timeout dell'incastro.
+    if (still && Math.abs(heading) > 0.9) ai.skewT += dt;
+    else ai.skewT = 0;
+    if (ai.jamT > 1.7 || ai.skewT > 2.6 || ai.deadlockT > 14) {
+      ai.skewT = 0;
+      ai.jamT = 0;
+      ai.deadlockT = 0;
+      ai.jamCount = (ai.jamCount || 0) + 1;
+      // Manovra in retromarcia, poi riprende la corsia. Lo sterzo non è a caso:
+      // si gira dalla parte che riporta il muso verso la corsia (in retromarcia
+      // il verso di rotazione è invertito). Tirandolo a sorte, in una coda densa
+      // la manovra peggiorava la situazione una volta su due.
+      ai.recoverT = 0.9;
+      ai.recoverSteer = heading > 0 ? -1 : 1;
     }
   }
 }
