@@ -126,6 +126,14 @@ export const DISTRICT_MIX = {
     ground: ['pawn', 'guns', 'bar', 'conv', 'bunsik'],
     upper: ['home', 'office', 'billiards'],
   },
+  gimpo: {
+    ground: ['conv', 'bunsik', 'bar', 'pharma', 'pawn'],
+    upper: ['office', 'home', 'pcbang'],
+  },
+  gyeonggi: {
+    ground: ['conv', 'bunsik', 'pawn', 'guns', 'bar'],
+    upper: ['home', 'home', 'billiards'],
+  },
 };
 
 // ---------------------------------------------------------------------------

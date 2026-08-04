@@ -96,6 +96,26 @@ export class MapView {
       ctx.restore();
     }
 
+    // Territori delle bande: rettangolo tratteggiato e nome della banda. Sulla
+    // mappa piena servono a decidere dove *non* passare, o dove andare a cercare.
+    for (const t of city.turfs || []) {
+      const a = toScreen(t.x, t.y);
+      const b = toScreen(t.x + t.w, t.y + t.h);
+      ctx.save();
+      ctx.globalAlpha = 0.55;
+      ctx.strokeStyle = t.color;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.strokeRect(a.x, a.y, Math.max(5, b.x - a.x), Math.max(5, b.y - a.y));
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = t.color;
+      ctx.font = `700 ${Math.max(8, 10 * Math.min(2, zoom))}px system-ui, "Apple SD Gothic Neo", sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(t.hangul, (a.x + b.x) / 2, a.y - 3);
+      ctx.restore();
+    }
+
     // Landmark
     for (const lm of city.landmarks) {
       const s = toScreen(lm.x, lm.y);

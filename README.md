@@ -18,8 +18,8 @@ Poi apri <http://localhost:8123>.
 | Tasto | Azione |
 | --- | --- |
 | `W A S D` / frecce | muoversi a piedi · guidare |
-| `Shift` | correre |
-| `Spazio` | freno a mano (drift) |
+| `Shift` | correre · **in volo**: scendere di quota |
+| `Spazio` | freno a mano (drift) · **in volo**: salire di quota |
 | `E` | salire / scendere dal veicolo · entrare in un negozio · scale · listino |
 | `F` | svuotare la cassa di un negozio (rapina) |
 | `H` | clacson |
@@ -111,7 +111,7 @@ parla di un incidente sul lavoro ai moli di Incheon. La versione vera è che qua
 venduto a un consorzio immobiliare che sta ripulendo i quartieri vecchi con la scusa della
 riqualificazione: prima gli sgomberi, poi le gru, poi le torri di vetro di Gangnam.
 
-Tre atti, dodici missioni, cinque quartieri: dai vicoli di Hongdae fino ai piani alti dove
+Tre atti, dodici missioni, sette zone: dai vicoli di Hongdae fino ai piani alti dove
 il crimine indossa un completo. (Missioni e cutscene a fumetti arrivano nella fase 3 —
 vedi *Stato* più sotto.)
 
@@ -123,12 +123,24 @@ vedi *Stato* più sotto.)
 | **Myeongdong** 명동 | insegne, folla, contanti | rosso e oro |
 | **Itaewon** 이태원 | bar internazionali, favori e debiti | ambra |
 | **Gangnam** 강남 | vetro, chaebol, soldi puliti | ciano |
-| **Docks di Incheon** 인천 부두 | container, gru, niente testimoni | giallo industriale |
+| **Porto di Incheon** 인천항 | container, gru, niente testimoni | giallo industriale |
+| **Gimpo** 김포 | piste, hangar e risaie | azzurro |
+| **Gyeonggi** 경기도 | risaie, serre, capannoni senza nome | verde |
 
 Il **fiume Han** taglia la città in orizzontale con tre soli ponti — passaggi obbligati,
 utili quando la polizia comincia a mettere posti di blocco. **Namsan** con la N Seoul Tower
 è la collina al centro, visibile da mezza mappa grazie all'estrusione: il terreno sale
 davvero salendo verso di essa, e l'auto se ne accorge.
+
+La città non riempie la mappa: **ha una sagoma.** A ovest il Han si apre nel **mare** (서해),
+con la battigia irregolare, la piana di marea e il **porto** dove si prendono le barche. Più
+a nord l'**aeroporto di Gimpo**, con la pista, il piazzale e i velivoli parcheggiati. In mezzo
+la **campagna**: risaie, serre e capannoni, dove restano solo le provinciali. Fuori dall'acqua
+si annega, e un'auto che finisce nel Han affonda.
+
+Sparsi per la mappa ci sono i **territori delle bande** (백호파, 흑사파, 철마파, 황소파): un
+cortile, un piazzale di container o un capannone, con il tag dipinto a terra e i loro uomini
+di guardia. Passarci disarmati si può; entrarci con un ferro in pugno, no.
 
 ## Come è fatto
 
@@ -151,7 +163,7 @@ Alcune scelte tecniche che spiegano il risultato a schermo:
   tutte le tinte. Gli oggetti alti vengono ordinati per distanza radiale dal centro camera e
   disegnati dal più lontano al più vicino.
 - **Terreno a tile.** Asfalto, marciapiedi, segnaletica e fiume sono pre-renderizzati in
-  riquadri da 512 px con cache LRU: una mappa 4200×4200 non si ridisegna ogni frame.
+  riquadri da 512 px con cache LRU: una mappa 5400×5400 non si ridisegna ogni frame.
 - **Maglia stradale irregolare.** Le vie non sono una scacchiera: ogni linea esiste o no
   cella per cella, e da quel dato solo derivano superblocchi (isolati fusi), disassamenti
   (una via si interrompe su un'arteria e riprende spostata) e l'interruzione sul fiume.

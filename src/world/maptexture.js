@@ -28,12 +28,38 @@ export function buildMapTexture(city) {
     g.fillRect(0, 0, MAP_SIZE, MAP_SIZE);
   }
 
+  // Campagna: si dipinge *prima* degli isolati, campionando lo stesso campo che
+  // decide dove finisce la maglia fitta. Senza questo strato la mappa resta un
+  // reticolo uniforme da bordo a bordo e la città non si distingue da quello che
+  // la circonda — che è esattamente l'informazione che una mappa deve dare.
+  if (city.urbanAt) {
+    const N = 110;
+    const step = MAP_SIZE / N;
+    for (let j = 0; j < N; j++) {
+      for (let i = 0; i < N; i++) {
+        const u = city.urbanAt(((i + 0.5) * city.w) / N, ((j + 0.5) * city.h) / N);
+        if (u >= 0.26) continue;
+        g.fillStyle = `rgba(46,58,30,${0.55 - u})`;
+        g.fillRect(i * step, j * step, step + 1, step + 1);
+      }
+    }
+  }
+
   // Isolati
+  const BLOCK_FILL = {
+    park: '#22381f', dock: '#23272a', port: '#20262a',
+    rural: '#2f3a1f', airport: '#31353b',
+  };
   for (const b of city.blocks) {
-    if (b.type === 'park') g.fillStyle = '#22381f';
-    else if (b.type === 'dock') g.fillStyle = '#23272a';
-    else g.fillStyle = '#272b31';
+    g.fillStyle = BLOCK_FILL[b.type] || '#272b31';
     g.fillRect(b.x * k, b.y * k, b.w * k, b.h * k);
+    // I campi: le risaie a scacchiera sono il modo in cui la campagna si riconosce
+    // su una mappa, esattamente come gli isolati riconoscono la città.
+    if (!b.fields) continue;
+    for (const f of b.fields) {
+      g.fillStyle = f.wet ? '#35492c' : '#3d4426';
+      g.fillRect(f.x * k, f.y * k, f.w * k, f.h * k);
+    }
   }
 
   // Fiume Han
@@ -45,25 +71,72 @@ export function buildMapTexture(city) {
   g.fillStyle = rg;
   g.fillRect(0, r.y0 * k, MAP_SIZE, (r.y1 - r.y0) * k);
 
-  // Strade
-  for (const l of city.hLines) {
-    g.fillStyle = l.arterial ? '#79808c' : '#5d646e';
-    for (const [a, b] of l.segments) {
-      g.fillRect(a * k, (l.c - l.width / 2) * k, (b - a) * k, l.width * k);
-    }
+  // Mare (서해): la costa segue `coastAt`, quindi il bordo ovest della mappa non
+  // è una riga dritta — ed è metà del motivo per cui Seoul qui ha una sagoma.
+  if (city.waterX > 0) {
+    g.fillStyle = '#123043';
+    g.beginPath();
+    g.moveTo(0, 0);
+    for (let y = 0; y <= city.h; y += 40) g.lineTo(city.coastAt(y) * k, y * k);
+    g.lineTo(0, MAP_SIZE);
+    g.closePath();
+    g.fill();
+    g.strokeStyle = 'rgba(180,210,225,0.25)';
+    g.lineWidth = 1.2;
+    g.stroke();
   }
-  for (const l of city.vLines) {
-    g.fillStyle = l.arterial ? '#79808c' : '#5d646e';
-    for (const [a, b] of l.segments) {
-      g.fillRect((l.c - l.width / 2) * k, a * k, l.width * k, (b - a) * k);
-    }
+  for (const p of city.piers) {
+    g.fillStyle = '#4b5057';
+    g.fillRect(p.x * k, p.y * k, p.w * k, p.h * k);
   }
+
+  // Strade. Fuori città la carreggiata si scurisce: una provinciale in mezzo alle
+  // risaie non deve pesare sulla mappa quanto un boulevard di Gangnam.
+  const urban = city.urbanAt || (() => 1);
+  const road = (l, a, b, vertical) => {
+    const mid = (a + b) / 2;
+    const u = urban(vertical ? l.c : mid, vertical ? mid : l.c);
+    g.fillStyle = u < 0.26
+      ? (l.arterial ? '#5a6060' : '#4a5050')
+      : (l.arterial ? '#79808c' : '#5d646e');
+    if (vertical) g.fillRect((l.c - l.width / 2) * k, a * k, l.width * k, (b - a) * k);
+    else g.fillRect(a * k, (l.c - l.width / 2) * k, (b - a) * k, l.width * k);
+  };
+  for (const l of city.hLines) for (const [a, b] of l.segments) road(l, a, b, false);
+  for (const l of city.vLines) for (const [a, b] of l.segments) road(l, a, b, true);
 
   // Ponti evidenziati
   g.strokeStyle = 'rgba(230,220,190,0.5)';
   g.lineWidth = 1.5;
   for (const br of city.river.bridges) {
     g.strokeRect((br.x - br.w / 2) * k, r.y0 * k, br.w * k, (r.y1 - r.y0) * k);
+  }
+
+  // Piste e piazzali: sulla mappa una pista è la cosa più riconoscibile che c'è.
+  for (const a of city.aprons) {
+    g.fillStyle = '#3a3f46';
+    g.fillRect(a.x * k, a.y * k, a.w * k, a.h * k);
+  }
+  for (const t of city.taxiways) {
+    g.fillStyle = '#44494f';
+    g.fillRect(t.x * k, t.y * k, t.w * k, t.h * k);
+  }
+  for (const rw of city.runways) {
+    g.fillStyle = '#5b626b';
+    g.fillRect(rw.x * k, rw.y * k, rw.w * k, rw.h * k);
+    g.strokeStyle = 'rgba(240,244,250,0.7)';
+    g.lineWidth = 1;
+    g.setLineDash([4, 5]);
+    g.beginPath();
+    if (rw.horiz) {
+      g.moveTo(rw.x * k, (rw.y + rw.h / 2) * k);
+      g.lineTo((rw.x + rw.w) * k, (rw.y + rw.h / 2) * k);
+    } else {
+      g.moveTo((rw.x + rw.w / 2) * k, rw.y * k);
+      g.lineTo((rw.x + rw.w / 2) * k, (rw.y + rw.h) * k);
+    }
+    g.stroke();
+    g.setLineDash([]);
   }
 
   // Edifici alti: leggero rilievo per riconoscere gli skyline

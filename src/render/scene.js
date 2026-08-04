@@ -9,6 +9,7 @@ import {
   getHeroSprite, getChopperSprite, getSpikeSprite, getThrownSprite, VEHICLE_TYPES, PED_FRAMES,
 } from './sprites.js';
 import { WEAPONS } from '../entities/weapons.js';
+import { airborne } from '../entities/vehicle.js';
 import { GroundRenderer } from './ground.js';
 import { signalAxis } from '../world/roadgraph.js';
 import { BUSINESSES as SHOP_BIZ } from '../world/interiors.js';
@@ -51,6 +52,7 @@ export class Scene {
     this._bq = [];
     this._pq = [];
     this._kq = [];
+    this._fq = [];
     this.debug = false;
   }
 
@@ -125,8 +127,11 @@ export class Scene {
       const o = p.prop;
       list.push({ t: 1, o, d: (o.x - ccx) ** 2 + (o.y - ccy) ** 2 });
     }
+    const flying = this._fq;
+    flying.length = 0;
     for (const v of game.vehicles) {
       if (v.x < view.x || v.x > view.x + view.w || v.y < view.y || v.y > view.y + view.h) continue;
+      if (airborne(v)) { flying.push(v); continue; }
       list.push({ t: 2, o: v, d: (v.x - ccx) ** 2 + (v.y - ccy) ** 2 });
     }
     for (const p of game.peds) {
@@ -157,6 +162,7 @@ export class Scene {
 
     // 6) Transenne dei posti di blocco ed elicottero: stanno sopra tutto il resto
     // (le prime sono basse ma nascono a runtime, il secondo vola a 210 px di quota).
+    for (const v of flying) this.drawVehicle(ctx, v, cam, game);
     if (game.police) {
       this.drawRoadblocks(ctx, game, cam);
       this.drawChopper(ctx, game, cam);
@@ -179,7 +185,7 @@ export class Scene {
     };
     for (const v of game.vehicles) {
       const s = VEHICLE_TYPES[v.kind];
-      drawShadow(v.x, v.y, s.len * 0.48, s.wid * 0.5, v.angle, 14);
+      drawShadow(v.x, v.y, s.len * 0.48, s.wid * 0.5, v.angle, 14 + (v.z || 0));
     }
     for (const p of game.peds) drawShadow(p.x, p.y, 8, 7, 0, 20);
     if (game.player.onFoot) drawShadow(game.player.x, game.player.y, 9, 8, 0, 20);
@@ -515,7 +521,9 @@ export class Scene {
 
   drawVehicle(ctx, v, cam, game) {
     const spec = VEHICLE_TYPES[v.kind];
-    const z = 13;
+    // La quota entra nella stessa proiezione dei palazzi: è per questo che un
+    // elicottero a 300 px si vede spostato rispetto alla sua ombra.
+    const z = 13 + (v.z || 0);
     const f = z / PROJ;
     const ox = (v.x - cam.cx) * f;
     const oy = (v.y - cam.cy) * f;
@@ -529,8 +537,17 @@ export class Scene {
 
     if (v.dead) return;
 
-    // Fari e stop
     const cos = Math.cos(v.angle), sin = Math.sin(v.angle);
+    if (spec.air) {
+      this.drawRotors(ctx, v, spec, cam, game, v.x + ox, v.y + oy);
+      return;
+    }
+    if (spec.marine) {
+      this.drawWake(ctx, v, spec, game, cos, sin);
+      return;
+    }
+
+    // Fari e stop
     const nose = spec.len * 0.5;
     const tail = -spec.len * 0.5;
     const side = spec.wid * 0.3;
@@ -594,6 +611,89 @@ export class Scene {
       }
       ctx.restore();
     }
+  }
+
+  /**
+   * Pale del rotore e disco dell'elica. Non stanno nello sprite perché devono
+   * girare, ed è la rotazione l'unica cosa che dice "questo è acceso": un
+   * elicottero fermo con le pale ferme si legge come un rottame sul piazzale.
+   */
+  drawRotors(ctx, v, spec, cam, game, px, py) {
+    const running = v.driver === 'player' || v.z > 0 || Math.abs(v.speed) > 4;
+    const t = game.time * (running ? 26 : 1.2);
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(v.angle);
+    if (spec.air === 'rotor') {
+      const r = spec.rotor;
+      ctx.strokeStyle = `rgba(210,220,235,${running ? 0.32 : 0.6})`;
+      ctx.lineWidth = running ? 2.6 : 4;
+      for (let i = 0; i < 4; i++) {
+        const a = t + (i * Math.PI) / 2;
+        ctx.beginPath();
+        ctx.moveTo(spec.len * 0.12, 0);
+        ctx.lineTo(spec.len * 0.12 + Math.cos(a) * r, Math.sin(a) * r);
+        ctx.stroke();
+      }
+      if (running) {
+        ctx.globalAlpha = 0.4;
+        ctx.beginPath();
+        ctx.arc(spec.len * 0.12, 0, r, 0, 6.2832);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+      // Rotore di coda: due trattini che girano sul piano verticale
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-spec.len * 0.42, -Math.cos(t * 1.4) * 11);
+      ctx.lineTo(-spec.len * 0.42, Math.cos(t * 1.4) * 11);
+      ctx.stroke();
+    } else {
+      ctx.strokeStyle = `rgba(210,220,235,${running ? 0.28 : 0.5})`;
+      ctx.lineWidth = 2.4;
+      for (let i = 0; i < 3; i++) {
+        const a = t + (i * 2.094);
+        ctx.beginPath();
+        ctx.moveTo(spec.len * 0.46, 0);
+        ctx.lineTo(spec.len * 0.46, Math.sin(a) * 22);
+        ctx.stroke();
+      }
+    }
+    // Luce anticollisione: la stessa dell'elicottero della polizia.
+    ctx.fillStyle = Math.sin(game.time * 6) > 0 ? '#ff5b5b' : 'rgba(120,20,20,0.5)';
+    ctx.beginPath();
+    ctx.arc(-spec.len * 0.34, 0, 2.6, 0, 6.2832);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /** Scia di poppa: due baffi di schiuma. Senza, una barca sembra scivolare su un vetro. */
+  drawWake(ctx, v, spec, game, cos, sin) {
+    const sp = Math.abs(v.speed);
+    if (sp < 24) return;
+    const k = Math.min(1, sp / spec.topSpeed);
+    const tail = -spec.len * 0.5;
+    const bx = v.x + cos * tail;
+    const by = v.y + sin * tail;
+    ctx.save();
+    ctx.globalAlpha = 0.16 + k * 0.24;
+    ctx.strokeStyle = '#cfe6f2';
+    ctx.lineWidth = 3 + k * 5;
+    ctx.lineCap = 'round';
+    for (const s of [-1, 1]) {
+      const ox = -sin * spec.wid * 0.4 * s;
+      const oy = cos * spec.wid * 0.4 * s;
+      ctx.beginPath();
+      ctx.moveTo(bx + ox, by + oy);
+      ctx.lineTo(bx + ox - cos * (40 + k * 130) - sin * 26 * s, by + oy - sin * (40 + k * 130) + cos * 26 * s);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 0.3 * k;
+    ctx.beginPath();
+    ctx.ellipse(bx - cos * 12, by - sin * 12, spec.wid * 0.5, spec.wid * 0.3, v.angle, 0, 6.2832);
+    ctx.fillStyle = '#e2f0f7';
+    ctx.fill();
+    ctx.restore();
   }
 
   drawPed(ctx, p, cam) {

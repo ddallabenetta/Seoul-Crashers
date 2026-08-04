@@ -3,8 +3,13 @@
 Documento per riprendere il lavoro da una sessione pulita. Leggi anche `README.md`
 (descrizione del gioco e comandi) — qui c'è quello che serve a *sviluppare*.
 
-Ultimo aggiornamento: **Fase 3, prima tappa — negozi e interni degli edifici** (§5.8).
-Prima c'erano la Fase 2 tappa C (arsenale pesante) e gli strumenti per gli agenti (`.claude/`, §9).
+Ultimo aggiornamento: **Fase 3, seconda tappa — la mappa prende forma** (§5.9): mare, aeroporto,
+porto, campagna, velivoli e imbarcazioni, territori delle bande. Prima c'erano i negozi e gli
+interni (§5.8), la Fase 2 tappa C (arsenale pesante) e gli strumenti per gli agenti (`.claude/`, §9).
+
+> ⚠️ **Aperto e da guardare per primo:** l'utente segnala che **il traffico si muove spesso in
+> modo strano, con molti incidenti e ingorghi.** Vedi §4bis: c'è quello che è stato misurato,
+> quello che sappiamo già essere fragile e da dove conviene ripartire.
 
 ---
 
@@ -14,10 +19,15 @@ Web game d'azione top-down 2.5D ambientato a Seoul, stile *GTA: Chinatown Wars*.
 Canvas 2D puro, moduli ES nativi, **zero dipendenze, nessun build step**. Tutta la grafica
 (sprite, facciate, terreno, mappa) è generata da codice a runtime: non esistono asset esterni.
 
-Stato: **Fase 1, Fase 1.5, Fase 2 (tutte e tre le tappe) e la prima tappa della Fase 3
-completate e collaudate**. ~12.000 righe in 32 moduli. 60 fps con ~50 veicoli e ~93 pedoni
-attivi (~62 e ~112 a Myeongdong, il distretto più denso), e restano 60 anche sotto raffica
-continua di SMG. Dentro un edificio il costo è trascurabile: la città non gira.
+Stato: **Fase 1, Fase 1.5, Fase 2 (tutte e tre le tappe) e le prime due tappe della Fase 3
+completate e collaudate**. ~13.400 righe in 32 moduli. 60 fps con ~50 veicoli e ~93 pedoni
+attivi, e restano 60 anche sotto raffica continua di SMG. Dentro un edificio il costo è
+trascurabile: la città non gira.
+
+**Il mondo è 5400×5400 e la città non lo riempie: ha una sagoma.** A ovest il mare, con
+l'aeroporto di Gimpo e il porto di Incheon sulla costa e la campagna in mezzo; a est, nord e
+sud le colline. Si vola (elicottero, turboelica) e si naviga (motoscafo, battello); in acqua
+si annega e le auto affondano. Sei territori di bande occupano cortili, piazzali e capannoni.
 
 La Fase 2 era divisa in tre tappe, concordate con l'utente: **A** combattimento base,
 **B** polizia e ricercato a 5 livelli, **C** armi pesanti ed esplosivi. **Sono tutte fatte.**
@@ -79,8 +89,16 @@ const sp = ai.map(v => Math.abs(v.speed)).sort((a, b) => a - b);
 `ai.why` vale `incrocio` / `coda` / `curva` / `libero`. **`libero` su un veicolo fermo
 significa che è bloccato fisicamente**: è il sintomo da inseguire.
 
-Valori sani a regime: `fps 60`, `n ~49`, `move 31-35`, `stop < 15`, `med 46-58`, `libero ≤ 2`.
-(`med` oscilla parecchio: dipende da quanto traffico si trova in salita in quel momento.)
+Valori sani a regime: `fps 60`, `n ~49`, `move 32-43`, `stop < 12`, `med 58-100`, `libero ≤ 7`.
+(`med` oscilla parecchio: dipende da quanto traffico si trova in salita — e adesso anche da
+quanto se ne trova sulle provinciali di campagna, dove si viaggia molto più veloci.)
+
+**I numeri vanno confrontati con lo stesso ambiente, non con quelli scritti qui.** In un
+Chromium headless dentro un container questi valori scendono per conto loro: misurati fianco
+a fianco, `main` dà `fps 32-41 · stop 14-19 · move 23-36 · med 22-57 · libero 4-10` e questo
+ramo dà `fps 40-48 · stop 2-10 · move 32-43 · med 58-102 · libero 1-7`. Il modo onesto di
+giudicare una modifica è sempre quello: `git worktree add /tmp/base HEAD` e la stessa scena
+sui due alberi.
 
 **Aspetta almeno 90 s prima di dare un giudizio.** Il `prewarm` immette 72 auto anche in
 campo visivo e ne ammassa qualcuna sull'incrocio di partenza: se il giocatore resta fermo lì
@@ -100,19 +118,22 @@ game.city.elevationAt = window._elev;                                  // ripris
 Dopo aver toccato la generazione, controlla anche la salute della maglia:
 
 ```js
-// vicoli ciechi veri: devono essere 0-2 e solo sul bordo mappa (x o y ≈ 188)
+// vicoli ciechi veri: devono essere ≤ 6 e solo sul bordo mappa (x o y ≈ 188)
 game.city.graph.usableNodes.filter(n => n.out.length === 1).map(n => [n.x | 0, n.y | 0])
 // quanta strada è stata tolta dai superblocchi, e quanti disassamenti sono nati
 game.city.stats // { buildings, props, blocks, nodes, edges, doglegs, stairs }
 ```
 
-Valori attesi con la seed attuale: `buildings 424`, `props 796`, `blocks 119`, `nodes 179`,
-`edges 261`, `doglegs 3`, `stairs 8`, `shops 139`, `venues 369`, `garages 5`, e 43 raccolte a
-terra (`game.pickups.items.length`).
-I primi sette devono restare **identici** finché non si tocca l'ordine di consumo dell'rng in
+Valori attesi con la seed attuale: `buildings 418`, `props 1299`, `blocks 122`, `nodes 196`,
+`edges 279`, `doglegs 4`, `stairs 3`, `rural 5`, `piers 10`, `shops 113`, `venues 324`,
+`garages 7`, `turfs 6`, e 36 raccolte a terra (`game.pickups.items.length`).
+I primi nove devono restare **identici** finché non si tocca l'ordine di consumo dell'rng in
 generazione: se cambiano, hai spostato una `rng.*` e la città non è più quella collaudata.
-Gli ultimi tre nascono da un rng **separato** (`placeShops`, §5.8): cambiano solo se tocchi
-quella funzione, e non trascinano con sé il resto della città.
+`shops`/`venues`/`garages` e `turfs` nascono da rng **separati** (`placeShops`, `placeGarages`,
+`placeTurfs`): cambiano solo se tocchi quelle funzioni, e non trascinano con sé il resto.
+
+`stairs` è sceso da 8 a 3 perché i vicoli passanti candidati sono meno: la città copre la
+stessa area di prima ma su una mappa più grande, e la campagna non ha vicoli.
 
 Per il combattimento:
 
@@ -186,6 +207,33 @@ const p = game.player;
 Con `stelle 0` e nessun esplosivo in giro, `game.projectiles.count` deve essere 0: se resta
 qualcosa, un proiettile non è stato rimosso dalla sua lista e continuerà a girare per sempre.
 
+Per la mappa nuova (fase 3, seconda tappa):
+
+```js
+// dove finisce la città: 0 = campagna, 1 = centro. Sotto 0.26 non c'è più maglia fitta.
+const c = game.city;
+({ urbanita: +c.urbanAt(game.player.x, game.player.y).toFixed(2),
+   inAcqua: c.isWater(game.player.x, game.player.y),
+   costa: [c.waterX | 0, c.quayX | 0], aeroporto: c.airport && [c.airport.w | 0, c.airport.h | 0],
+   porto: c.port && [c.port.w | 0, c.port.h | 0], moli: c.piers.length })
+// velivoli e imbarcazioni: nascono al boot e non passano mai dallo streaming
+game.vehicles.filter(v => v.moored || ['plane','heli','boat','ferry'].includes(v.kind))
+  .reduce((a, v) => (a[v.kind] = (a[v.kind] || 0) + 1, a), {})
+// in volo: quota, velocità, se è ancora attaccato al terreno
+const v = game.player.vehicle;
+v && ({ arma: v.kind, z: Math.round(v.z), vz: Math.round(v.vz), v: Math.round(v.speed) })
+// bande: territori, uomini di guardia in campo e chi è già ostile
+({ territori: game.city.turfs.map(t => `${t.hangul} ${t.place}`),
+   guardie: game.peds.filter(p => p.turf).length,
+   ostili: game.peds.filter(p => p.turf && p.hostile).length })
+```
+
+**In una prova scriptata i comandi si danno da `game.input.down`, non scrivendo sul veicolo:**
+`player.updateDriving` riscrive `throttle`, `steer` e `climb` a ogni frame dall'input, quindi
+impostarli a mano non fa niente (è la stessa trappola della mira, §4). E **non teletrasportare
+il giocatore su una barca**: a piedi in acqua si annega prima di riuscire a salirci: ci si
+mette sul molo e si chiama `enterVehicle`.
+
 Costo reale della caccia, misurato strumentando il loop: **il tempo di simulazione non
 cambia** (0.91 → 0.86 ms per passo), quello di rendering **raddoppia** (3.9 → 6.4 ms per
 frame) per sirene, riflettore, traccianti e sangue. Il collo di bottiglia della tappa B è
@@ -207,9 +255,11 @@ src/core/
   spatial.js          SpatialGrid (statica) e DynamicGrid (ricostruita ogni frame)
 
 src/world/
-  districts.js        i 5 distretti (con i parametri di maglia), RIVER, NAMSAN, insegne
-  citygen.js          quota del terreno, maglia stradale, isolati, edifici, props, indici,
-                      vetrine (`placeShops`) e officine (`placeGarages`)
+  districts.js        i 7 distretti (con i parametri di maglia), RIVER, SEA, HILLS,
+                      URBAN_BLOBS (la sagoma della città), GANGS, insegne
+  citygen.js          quota del terreno, campo di urbanità, maglia stradale, mare e costa,
+                      isolati (urbani, rurali, aeroporto, porto), edifici, props, indici,
+                      vetrine (`placeShops`), officine (`placeGarages`), bande (`placeTurfs`)
   interiors.js        catalogo delle attività + generazione della pianta di ogni piano
   roadgraph.js        nodi/archi, corsie, semafori, prenotazione incrocio
   maptexture.js       texture 1100×1100 della mappa, con hillshade (minimappa + mappa piena)
@@ -224,7 +274,8 @@ src/render/
   interiorscene.js    disegno di un piano: pavimento, muri estrusi, arredo, scale
 
 src/entities/
-  vehicle.js          fisica arcade, pendenza, collisioni a tre cerchi, gomme a terra
+  vehicle.js          fisica arcade, pendenza, collisioni a tre cerchi, gomme a terra,
+                      volo (`updateAircraft`), navigazione (`resolveMarine`), affondamento
   player.js           a piedi / alla guida, entra-esci, mira, fuoco, salute, morte
   traffic.js          streaming, AI di guida, parcheggi
   pedestrians.js      streaming, marciapiedi, attraversamenti, panico, ostili, ragdoll
@@ -304,9 +355,67 @@ l'altezza di proiezione dei volumi (`h3d + b.elev`) e la fisica delle salite. De
 davvero il terreno vorrebbe dire spostare ogni tile per la sua quota (scalini alle giunzioni)
 o rinunciare alla cache: è una scelta consapevole, non una svista.
 
+**La forma della città è un campo, non un contorno.** `city.urbanAt(x, y)` vale 1 nel centro
+dei quartieri e 0 in campagna: è la somma di otto macchie scritte a mano (`URBAN_BLOBS` in
+`districts.js`) più un rumore che ne sfrangia il bordo. Sotto `RURAL_U` (0.26) la maglia fitta
+non esiste: restano **una arteria su due** e qualche strada bianca, e gli isolati diventano
+campi. È l'unico posto in cui è deciso *dove finisce Seoul* — a valle nessuno sa niente di
+forme, si legge solo questo campo. Alzare l'ampiezza del rumore fa nascere risaie in mezzo a
+Gangnam: il bordo va sfrangiato, non bucato.
+
+**Le arterie non sono più intoccabili.** Prima erano continue per definizione; adesso in
+campagna ne sopravvive una su due, altrimenti il reticolo arriva identico fino al bordo mappa
+e la città non ha profilo. Restano continue solo le linee con **`keep`**: il lungomare e i due
+argini del Han. I ponti no — la loro campata sul fiume è forzata a valle (passo 3 di
+`carveMesh`) e gli argini, che sono continui, la raccolgono. Di conseguenza `trimDeadEnds`
+adesso lavora anche sulle arterie (salta solo le `keep`): un moncone di arteria è possibile.
+
+**Il mare è il fiume, ruotato.** A ovest di `city.quayX` non passa più niente: `carveMesh`
+spegne tutte le linee a ovest del **lungomare** (`city.coastLine`, promosso ad arteria come gli
+argini del Han) e le celle diventano acqua invece di isolati. La battigia `city.coastAt(y)`
+ondeggia fino a mezzo chilometro ma **sempre a ovest di `city.waterX`**: la maglia è stata
+tagliata su quel valore, e una costa che sconfinasse annegherebbe la strada. Fra battigia e
+banchina resta la piana di marea (갯벌).
+
+**Aeroporto e porto sono campate, non casi speciali.** `planPlatform` sceglie il rettangolo di
+celle fra due arterie, `carveMesh` spegne tutto quello che c'è dentro e **riaccende le quattro
+arterie di bordo**; la fusione greedy degli isolati restituisce da sola un unico rettangolo. Se
+si dimentica di riaccendere i bordi, la piattaforma si mangia mezza provincia. Pista, raccordi,
+piazzale ed eliporti sono **superfici dipinte** (`city.runways` e compagnia), come le strisce
+pedonali: non fermano niente e non entrano nell'ordinamento radiale.
+
+**Volare è la stessa fisica con una quota.** `v.z` vive nella proiezione dei palazzi, quindi un
+velivolo a 300 px si vede spostato rispetto alla sua ombra — ed è l'ombra a dire dov'è davvero.
+In volo restano solidi **solo i volumi più alti della quota** (`resolveAirCollisions`): si passa
+sopra Hongdae e ci si schianta sulle torri di Gangnam. Le due differenze fra rotore e ala sono
+tutte in `updateAircraft`: il rotore stacca da fermo e **tiene la quota da solo** (in una
+visuale dall'alto un elicottero che cala mentre miri è ingiocabile), l'ala pretende
+`spec.rotate` di velocità e cade se la perde. Chi *sceglie* di scendere si posa sempre
+(effetto suolo); a rompere il carrello è la caduta, non l'atterraggio.
+
+**Per una barca non esistono edifici: esiste la riva.** `resolveMarine` campiona `isWater`
+attorno ai tre punti dello scafo e spinge verso l'acqua. Il grip laterale bassissimo
+(`spec.grip` 0.26-0.34) è quello che fa scarrocciare la poppa in virata, ed è metà del motivo
+per cui una barca si sente diversa da un'auto.
+
+**L'acqua è un confine vero.** A piedi si annega (`player.updateOnFoot`), un mezzo di terra che
+ci finisce affonda senza esplodere (`sink` → `main.onVehicleSunk`), da una barca non si scende
+in mezzo al mare. **Il controllo di annegamento va saltato quando si è dentro un edificio**: le
+coordinate di una pianta sono piccole e cadono tutte dentro il mare, all'angolo nord-ovest.
+
+**Un territorio è un posto che esisteva già.** `placeTurfs` non crea geometria: prende un
+cortile, un piazzale o un capannone che c'erano, ci dipinge il tag della banda e ci mette
+`props`. Le guardie sono pedoni con `p.turf` e stato `guard`, che girano dentro il rettangolo e
+non ne escono. Diventano ostili quando il giocatore entra **con un'arma diversa dai pugni o già
+ricercato** (`pedestrians.watchTurfs`): passarci disarmati e in fretta si può, ed è l'unica via
+per andarci a trattare quando ci saranno le missioni.
+
 **Streaming.** Veicoli e pedoni compaiono **fuori dal rettangolo inquadrato** (`outsideView`)
 e si dissolvono oltre `ring.despawn`. Il `prewarm` al boot è l'unico che può generare in
-campo visivo.
+campo visivo. **Due eccezioni:** velivoli e imbarcazioni (`v.moored`, `protect`) nascono una
+volta sola al boot e non spariscono mai — un aeroporto senza aerei è un piazzale vuoto, e sono
+l'unico modo di raggiungerlo; e le guardie di un territorio, che compaiono anche in campo
+visivo purché a più di 300 px, perché un recinto di cento pixel non sta mai fuori vista.
 
 **Auto in sosta.** Hanno `spot` e dormono (`updateVehicle` esce subito) finché non vengono
 urtate o rubate: `awake = true`. Servono a non pagare CPU e a non farle vibrare.
@@ -469,9 +578,56 @@ codice spiega il perché nel punto giusto.
 | Una granata lanciata dentro restava appesa a mezz'aria | `projectiles.update` era nel ramo saltato quando si è dentro | gli esplosivi girano sempre; a cambiare è `game.area()` su cui rimbalzano |
 | L'interno sembrava una pianta catastale, minuscola in mezzo allo schermo | zoom 1.12 e camera al seguito, come in strada | `roomZoom` (fit del piano) + camera sul centro della stanza |
 | «NaN colpi inclusi» sulla mazza in vendita | le armi da mischia non hanno `pickup` | `weaponItem` guarda `spec.infinite` prima di moltiplicare |
+| Un velivolo in volo viene sbattuto giù da niente | `vehicleGrid` è piatta: la prima berlina che passa *sotto* lo prende in pieno | `resolveVehicleCollisions`, `if (o === v \|\| airborne(o)) continue` |
+| L'aereo parcheggiato non parte, e si rompe | era ormeggiato col muso verso le cisterne invece che verso il raccordo | `airSpots`, `angle: horiz ? -PI/2 : PI`; torre e cisterne spostate fuori dal piazzale |
+| La barca ormeggiata non si muove per due secondi | muso verso terra: `resolveMarine` la respinge finché non gira | `boatSpots`, `angle: Math.PI` (al largo) |
+| Un filare di alberi in mezzo al mare | le strisce dell'Han River Park nascevano su tutte le campate, anche a ovest della costa | `generateCity`, `if (x < city.quayX) continue` |
+| Una barca che risale la costa sbatte contro il nulla | i muretti d'argine del Han partivano da x=0 e continuavano sull'acqua | argini tagliati a `city.quayX`: alla foce l'argine non c'è |
+| L'aeroporto si mangia mezza provincia | una delle quattro arterie di bordo era stata spenta dal diradamento della campagna, e la fusione degli isolati non si fermava più | `carveMesh` passo 5: i bordi della piattaforma vengono **riaccesi** prima di svuotarla |
+| Atterrare costava un terzo della fusoliera | la discesa comandata arrivava a −286 px/s, ben oltre `HARD_LANDING` | effetto suolo in `updateAircraft`: sotto i 60 px con `climb < 0` la caduta si smorza |
+| **In una prova scriptata** il velivolo non si muove | `updateDriving` riscrive `throttle`/`steer`/`climb` dall'input a ogni frame | i comandi si danno con `game.input.down.add('KeyW')` |
+| **In una prova scriptata** il giocatore muore appena teletrasportato | è finito in acqua, e a piedi in acqua si annega | teletrasportarlo sul molo, poi `enterVehicle` |
 
 Regola generale emersa: **prima di dare la colpa all'AI, verifica la geometria.** Quasi tutti
 gli "stalli dell'AI" erano problemi di ingombri, corsie o posizionamento.
+
+---
+
+## 4bis. Aperto: il traffico si muove male
+
+**Segnalazione dell'utente:** *«il traffico si muove spesso in modo strano e fanno molti
+incidenti o ingorghi»*. È il primo problema da guardare, prima di aggiungere altro.
+
+**Cosa è stato misurato** (100 s di gioco, `.claude/tools/probe.mjs`, stessa scena sui due
+alberi): questo ramo non peggiora nessuna metrica rispetto a `main` — anzi le migliora tutte,
+perché in campagna gli incroci sono molti meno. `main`: `stop 14-19 · move 23-36 · med 22-57 ·
+libero 4-10`. Questo ramo: `stop 2-10 · move 32-43 · med 58-102 · libero 1-7`. **Quindi la
+segnalazione non descrive una regressione di questa tappa: descrive un difetto che c'era già,
+e che si nota di più adesso che si vede più strada.** Non è stato risolto.
+
+**Quello che già sappiamo essere fragile**, in ordine di quanto è probabile che sia la causa:
+
+- **Il modello di guida non ha una vera nozione di "corsia occupata".** `driveAI` frena solo
+  per quello che ha *davanti al muso* (`probe` di 30 + velocità × 0.6, laterale < 24 px). Chi
+  arriva di lato o in diagonale — tipico in uscita da un incrocio o dopo una svolta — non viene
+  visto finché non è già addosso. È il candidato numero uno per gli incidenti.
+- **La prenotazione dell'incrocio è per asse, non per veicolo.** `endNode.claimAxis` lascia
+  passare *tutta* la fila di un asse e scade dopo 1.1 s: due auto che svoltano in senso opposto
+  dallo stesso asse si incrociano dentro l'incrocio senza che nessuno ceda.
+- **Il recupero dall'incastro è cieco.** Fermo 1.7 s → retromarcia 0.9 s con sterzo casuale
+  (`ai.recoverSteer = rng.chance(0.5) ? 1 : -1`). In una coda densa la manovra spesso peggiora
+  la situazione e innesca la carambola successiva.
+- **`reacquireLane` può cambiare senso di marcia.** Sceglie l'arco col punteggio migliore fra
+  distanza e allineamento del muso: dopo un urto che ha girato l'auto, il "senso compatibile"
+  può essere quello contrario, e per qualche secondo si guida contromano.
+- **Il traffico civile ignora i chiodi** e **non sa niente della quota**: erano già noti (§6).
+- **Non c'è nessuna nozione di priorità fra i mezzi.** Un autobus (158 px) e uno scooter
+  (44 px) trattano l'incrocio allo stesso modo, e il primo lo occupa per il doppio del tempo.
+
+**Da dove ripartire.** Prima misurare *dove* succede: `ai.why` dice solo perché uno è fermo,
+non chi ha tamponato chi. Serve un contatore di urti per posizione — `game.stats.crashes` esiste
+ma è solo del giocatore. Un `onVehicleImpact` che accumula `{x, y, impact}` per 60 s e poi si
+guarda sulla mappa dice in dieci minuti se il problema è diffuso o è di tre incroci.
 
 ---
 
@@ -708,6 +864,51 @@ minimarket · 약국 farmacia · 분식 e 술집 da mangiare · 옷가게 vestit
 condivise — `counter`, `market`, `eatery`, `desks`, `rooms`, `hall` — bastano a farli sembrare
 tutti diversi perché cambiano palette, arredo e gente.
 
+### 5.9 Fase 3, seconda tappa — la mappa prende forma
+
+Il mondo passa da 4200×4200 a **5400×5400**, ma la città resta grande come prima: quello che
+si aggiunge attorno è il mare, l'aeroporto, il porto e la campagna. Misurato campionando la
+mappa: la strada scende dal 43% al 30% della superficie, l'acqua sale dall'8% al 18%, e gli
+isolati urbani restano 3,9 M px² contro i 4,3 M di prima. **Seoul non è rimpicciolita: si è
+smesso di riempire il rettangolo.**
+
+Le scelte di design prese qui — cambiare costa poco, i punti sono tutti indicati:
+
+- **La mappa resta un quadrato, la città no.** Alternativa scartata: un mondo rettangolare.
+  Sarebbe stato più fedele alla Seoul vera, ma minimappa, mappa piena e texture assumono tutte
+  un mondo quadrato (`MAP_SIZE / city.w` usato per entrambi gli assi), e riscriverle costava più
+  di quanto rendeva. La forma la dà il contenuto: `URBAN_BLOBS`, il mare a ovest, i rilievi a
+  nord-est. Se un giorno serve davvero un mondo rettangolare, i punti da toccare sono tre —
+  `buildMapTexture`, `MapView.drawPanel`, `Hud.drawMinimap`.
+- **Due distretti nuovi**, Gimpo 김포 (aeroporto e risaie: a Gimpo le due cose si toccano
+  davvero) e Gyeonggi 경기도 (campagna), più i moli promossi a **Porto di Incheon** 인천항 e
+  spostati sulla costa. Sette distretti in tutto.
+- **Un aeroporto solo, ma vero.** 1039 × 1530 px: pista da 1377, raccordo, due bretelle,
+  piazzale con cinque piazzole, terminal, torre di controllo, tre hangar, cisterne e maniche a
+  vento. Ci sono **tre turboelica e tre elicotteri** parcheggiati, più un eliporto al porto.
+- **Si vola con due tasti.** `Spazio` sale, `Shift` scende; gas e sterzo restano quelli
+  dell'auto. L'alternativa (assetto a due assi, beccheggio) vuole un modello di volo e una
+  camera nuova per risolvere un problema che in visuale dall'alto non esiste. L'elicottero
+  decolla da fermo, il turboelica vuole 250 px/s di rullaggio prima di staccare.
+- **Il volo non è un cheat**: sopra i 400-460 px di quota non si sale, le torri di Gangnam e la
+  N Seoul Tower restano solide, e la polizia continua a vedere il giocatore. Quello che il volo
+  compra è la geografia — attraversare il Han senza ponte, arrivare al porto senza fare il giro.
+- **Quattro imbarcazioni**: motoscafo e battello, ormeggiati ai moli del porto e agli scali sul
+  Han. Il fiume attraversa tutta la mappa: in barca è la strada più veloce da est a ovest.
+- **L'acqua uccide.** A piedi si annega, un'auto nel Han affonda (niente esplosione: uno spruzzo
+  e il relitto che cala), da una barca non si sbarca in mezzo al mare. Senza questo il mare
+  sarebbe uno sfondo, e con un quarto della mappa coperto d'acqua non poteva restarlo.
+- **La campagna è fatta di campi, non di isolati vuoti.** `block.fields` è un elenco a parte che
+  disegna il terreno: risaie allagate e campi solcati a scacchiera, con serre (비닐하우스),
+  cascine, fienili, silo e filari. Non sono edifici né cortili — non devono fermare nessuno.
+- **Sei territori di bande** (백호파 · 흑사파 · 철마파 · 황소파), piazzati con un rng loro su
+  cortili e piazzali che esistevano già. Reagiscono a chi entra armato o già ricercato; con i
+  pugni in tasca si passa. È il gancio per le missioni: un posto dove andare a trattare, e un
+  posto da cui si esce sparando.
+- **La polizia non è stata toccata.** Non ha elicotteri suoi da mandare dietro a un giocatore in
+  volo (il suo ne ha già uno, ma solo a cinque stelle) e non insegue in barca. È la prima cosa
+  che si sentirà mancare.
+
 ---
 
 ## 6. Backlog successivo (già concordato con l'utente)
@@ -750,6 +951,21 @@ farsi dire dall'utente da quale dei due partire.**
   senza ridisegnare la città) darebbe blip sulla mappa e un punto di partenza più credibile.
 - **Traffico civile e chiodi**: le strisce le controlla solo il mezzo del giocatore.
 
+**Cose rimaste indietro dalla mappa nuova**, in ordine di quanto si sentono:
+- **Il traffico si muove male.** È la segnalazione dell'utente ed è il primo lavoro: §4bis.
+- **In volo e in barca la polizia non ti prende.** A cinque stelle l'elicottero c'è, ma sotto
+  non esiste nessuna unità che segua un velivolo o una barca: si scappa banalmente. Un
+  elicottero d'inseguimento anticipato a tre stelle e una motovedetta al porto sarebbero due
+  riusi quasi diretti di `police.spawnCar`.
+- **Nessun traffico aereo o navale**: aerei e barche sono tutti fermi. Un paio di battelli che
+  fanno la spola sul Han costerebbero un `ai` semplice (nessun grafo: il fiume è una linea).
+- **In campagna non c'è niente da fare**: nessun negozio (le cascine non hanno vetrine), nessuna
+  officina utile, nessuna raccolta. È la superficie migliore su cui mettere le attività
+  secondarie (consegne, salti, corse) quando arriveranno.
+- **Le bande non hanno un'economia.** Occupano, difendono e basta: non vendono, non comprano,
+  non si fanno la guerra. `city.turfs` ha già `trade` per banda e non lo legge nessuno.
+- **L'aeroporto non ha interni**: terminal e hangar sono volumi chiusi.
+
 **Fase 3 — quello che resta.**
 12 missioni in 3 atti con cutscene a **pannelli a fumetto** (gli interni sono anche il posto
 dove ambientarne metà: un incontro in un 노래방 non ha bisogno di niente di nuovo); attività
@@ -782,13 +998,22 @@ ora che c'è del denaro e un arsenale comprato, il salvataggio serve davvero.
 
 | Cosa | Dove | Valore attuale |
 | --- | --- | --- |
-| Dimensione mondo | `citygen.WORLD` | 4200 × 4200, margine 150 |
+| Dimensione mondo | `citygen.WORLD` | 5400 × 5400, margine 150 |
+| Sagoma della città | `districts.URBAN_BLOBS` | 8 macchie, raggio 0.13–0.205 della larghezza |
+| Soglia città/campagna | `citygen.RURAL_U` | 0.26 (sotto: solo una arteria su due) |
+| Strade bianche in campagna | `citygen.carveMesh` | 6% dei tratti non arteriali |
+| Mare: limite di maglia / battigia | `districts.SEA.x1`, `citygen.QUAY_W`, `coastAt` | 0.185 · banchina 128 px · battigia fino a 560 px più a ovest |
+| Piattaforme (aeroporto, porto) | `citygen.planPlatform` | campate fra arterie: 2 bande in y l'aeroporto, 1 il porto |
+| Aeroporto e porto (seed attuale) | `city.airport` / `city.port` | 1039 × 1530 · 1039 × 775 |
+| Moli e ormeggi | `citygen`, sezione costa | 4 al porto + 6 sul Han · 14 imbarcazioni |
+| Velivoli parcheggiati | `city.airSpots` | 3 turboelica + 3 elicotteri |
+| Territori delle bande | `citygen.TURF_ANCHORS` | 6, su cortili e piazzali già esistenti |
 | Passo della maglia | `districts.DISTRICTS[].grid.step` | 126–196 (Hongdae) … 330–480 (moli) |
 | Superblocchi / disassamenti | `districts.DISTRICTS[].grid` | `superblock` 0.20→0.60, `jog` 0.08→0.62 |
 | Isolato minimo ai lati di un dogleg | `citygen.planDoglegs` | `MIN_BLOCK` 62 |
 | Ritaglio che diventa parco | `citygen.generateCity` | lato < 64 px (sopra: fila di negozi) |
 | Vicolo passante | `citygen.fillUrbanBlock` | isolati > 320 px, fessura 38–54 |
-| Quota: pianura / Namsan | `citygen.makeElevation` | 34 + rumore ±31 / +110 |
+| Quota: pianura / rilievi | `citygen.makeElevation` | 34 + rumore ±31 / Namsan +110, Bukhansan +150 |
 | Forza dell'ombreggiatura | `ground.RELIEF_SLOPE` / ampiezza | 0.062 / ±44 (mappa: 0.07 / ±58) |
 | Gravità in pendenza | `vehicle.SLOPE_G` / `MAX_SLOPE` | 780 / 0.14 |
 | Forza della parallasse | `camera.PROJ` | 880 (più basso = più estrusione) |
@@ -838,6 +1063,14 @@ ora che c'è del denaro e un arsenale comprato, il salvataggio serve davvero.
 | Peso della rapina | `wanted.CRIMES.rob` | 22 (una stella) |
 | Zoom dentro un interno | `shops.roomZoom` | fit del piano, limitato a 1.15-2.6 |
 | Tile terreno | `ground.TILE` / `MAX_TILES` | 512 px / 96 |
+| Volo: salita, tetto, velocità di rotazione | `sprites.VEHICLE_TYPES` `climb`/`ceiling`/`rotate` | elicottero 130 · 400 · da fermo; turboelica 105 · 460 · 250 px/s |
+| Atterraggio duro / effetto suolo | `vehicle.HARD_LANDING`, `updateAircraft` | oltre 150 px/s di caduta si rompe; con discesa comandata sotto i 60 px si smorza a 140 |
+| Caduta in stallo | `vehicle.GRAV_AIR` | 210 px/s² (ala sotto `rotate × 0.8`) |
+| Imbarcazioni: grip e velocità | `VEHICLE_TYPES.boat` / `.ferry` | 0.34 · 400 px/s ; 0.26 · 215 px/s |
+| Spinta a riva di una barca | `vehicle.resolveMarine` | 190 px/s verso l'acqua, campionata a 46 px su 8 direzioni |
+| Affondamento di un mezzo di terra | `vehicle.sink` | 0.75 s in acqua, poi `onVehicleSunk` |
+| Guardie per territorio · raggio di spawn | `pedestrians.spawnTurf` | max 4 · almeno 300 px dal giocatore |
+| Provocazione di una banda | `pedestrians.watchTurfs` | arma diversa dai pugni **oppure** ricercato ≥ 1 stella |
 | Limite pixel canvas | `main.MAX_PIXELS` | 2.9 M (scala il DPR) |
 
 ---

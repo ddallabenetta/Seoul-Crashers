@@ -105,6 +105,29 @@ function drawBrick(g, cols, rows, variant) {
   drawWindowGrid(g, cols, rows, variant, { mw: 0.44, mh: 0.42, skip: 10, band: false });
 }
 
+/**
+ * Serra (비닐하우스): telo di plastica teso su centine. Non ha finestre né porte —
+ * ed è proprio l'assenza di aperture a farla leggere come una serra e non come un
+ * capannone basso.
+ */
+function drawGreenhouse(g, cols, rows, variant) {
+  const gr = g.createLinearGradient(0, 0, 0, FTH);
+  gr.addColorStop(0, 'rgba(255,255,255,0.3)');
+  gr.addColorStop(0.45, 'rgba(220,235,225,0.14)');
+  gr.addColorStop(1, 'rgba(120,140,125,0.2)');
+  g.fillStyle = gr;
+  g.fillRect(0, 0, FTW, FTH);
+  // Centine
+  const ribs = Math.max(4, cols * 2);
+  g.fillStyle = 'rgba(255,255,255,0.22)';
+  for (let i = 0; i < ribs; i++) g.fillRect((i * FTW) / ribs, 0, 1.6, FTH);
+  // Riflesso lungo il colmo e cordolo a terra
+  g.fillStyle = 'rgba(255,255,255,0.3)';
+  g.fillRect(0, FTH * 0.1, FTW, FTH * 0.06);
+  g.fillStyle = 'rgba(40,50,40,0.4)';
+  g.fillRect(0, FTH * 0.9, FTW, FTH * 0.1);
+}
+
 function drawWarehouse(g, cols, rows, variant) {
   // Lamiera ondulata verticale
   for (let x = 0; x < FTW; x += 3) {
@@ -196,6 +219,7 @@ export function facadeTexture(style, cols, rows, variant) {
     case 'panel': drawWindowGrid(g, cols, rows, variant, { mw: 0.72, mh: 0.42, band: true, skip: 4 }); break;
     case 'brick': drawBrick(g, cols, rows, variant); break;
     case 'warehouse': drawWarehouse(g, cols, rows, variant); break;
+    case 'greenhouse': drawGreenhouse(g, cols, rows, variant); break;
     case 'container': drawContainer(g, cols, rows, variant); break;
     case 'wall': drawWall(g); break;
     case 'tower': drawTower(g); break;
