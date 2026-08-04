@@ -211,7 +211,10 @@ export class PoliceSystem {
       v.protect = true;
       v.lightsOn = game.isNight;
       v.crew = kind === 'swat' ? 3 : 2;
-      v.copWeapon = kind === 'swat' ? 'smg' : (tier.weapon || 'pistol');
+      // La SWAT è passata al fucile d'assalto con la tappa C: se il giocatore
+      // arriva a cinque stelle con la minigun, dall'altra parte non può esserci
+      // ancora la stessa SMG di due stelle fa.
+      v.copWeapon = kind === 'swat' ? 'rifle' : (tier.weapon || 'pistol');
       v.copAi = { edge, dir, lane, s, jamT: 0, recoverT: 0, recoverSteer: 1, fireT: 0.6 };
       game.vehicles.push(v);
       this.cars.push(v);
@@ -238,7 +241,7 @@ export class PoliceSystem {
       if (d < 380 || d > 1100) continue;
       if (!outsideView(game, x, y, 50)) continue;
       const swat = (tier.swat || 0) > 0 && rng.chance(0.4);
-      return this.addCop(game, x, y, swat ? 'swat' : 'cop', swat ? 'smg' : (tier.weapon || 'pistol'));
+      return this.addCop(game, x, y, swat ? 'swat' : 'cop', swat ? 'rifle' : (tier.weapon || 'pistol'));
     }
     return null;
   }

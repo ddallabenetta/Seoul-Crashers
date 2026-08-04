@@ -2,21 +2,37 @@
 // piazzali dei moli. Senza negozi (fase 3) è l'unico modo di rifornirsi, quindi
 // si riformano dopo un po' invece di sparire per sempre.
 import { SpatialGrid } from '../core/spatial.js';
-import { WEAPONS } from './weapons.js';
+import { WEAPONS, WEAPON_ORDER } from './weapons.js';
 
 const RESPAWN = 55;
 const REACH = 26;
 
 export const PICKUP_KINDS = {
-  bat:    { kind: 'bat', weapon: 'bat', label: 'mazza', color: '#c9a24a' },
-  pistol: { kind: 'pistol', weapon: 'pistol', ammo: 34, label: 'pistola', color: '#8fb6e8' },
-  smg:    { kind: 'smg', weapon: 'smg', ammo: 90, label: 'SMG', color: '#e8a04a' },
-  ammo:   { kind: 'ammo', label: 'munizioni', color: '#c9a24a' },
-  health: { kind: 'health', heal: 45, label: 'kit medico', color: '#e8595e' },
+  bat:     { kind: 'bat', weapon: 'bat', label: 'mazza', color: '#c9a24a' },
+  katana:  { kind: 'katana', weapon: 'katana', label: 'katana', color: '#dfe6ef' },
+  pistol:  { kind: 'pistol', weapon: 'pistol', ammo: 34, label: 'pistola', color: '#8fb6e8' },
+  shotgun: { kind: 'shotgun', weapon: 'shotgun', ammo: 14, label: 'pompa', color: '#e8785a' },
+  smg:     { kind: 'smg', weapon: 'smg', ammo: 90, label: 'SMG', color: '#e8a04a' },
+  rifle:   { kind: 'rifle', weapon: 'rifle', ammo: 75, label: 'fucile d\'assalto', color: '#a0e85a' },
+  sniper:  { kind: 'sniper', weapon: 'sniper', ammo: 8, label: 'fucile di precisione', color: '#5ad2e8' },
+  minigun: { kind: 'minigun', weapon: 'minigun', ammo: 180, label: 'minigun', color: '#ffd23f' },
+  molotov: { kind: 'molotov', weapon: 'molotov', ammo: 5, label: 'molotov', color: '#ff7a2f' },
+  grenade: { kind: 'grenade', weapon: 'grenade', ammo: 5, label: 'granate', color: '#8fbf6a' },
+  mine:    { kind: 'mine', weapon: 'mine', ammo: 3, label: 'mine', color: '#c33a33' },
+  ammo:    { kind: 'ammo', label: 'munizioni', color: '#c9a24a' },
+  health:  { kind: 'health', heal: 45, label: 'kit medico', color: '#e8595e' },
 };
 
-// Distribuzione: le armi pesanti sono rare, i kit medici no.
-const TABLE = ['health', 'health', 'ammo', 'ammo', 'ammo', 'pistol', 'pistol', 'bat', 'smg'];
+// Distribuzione: i kit medici sono comuni, l'arsenale pesante è raro e il fucile di
+// precisione e la minigun compaiono una volta ogni tanto — un cortile su ~42.
+// L'estrazione è `rng.pick`, cioè **una sola** chiamata all'rng: allungare o
+// riordinare questa tabella cambia quali armi escono ma non sposta niente altro
+// nel mondo (vedi HANDOFF, determinismo).
+const TABLE = [
+  'health', 'health', 'health', 'ammo', 'ammo', 'ammo', 'ammo',
+  'pistol', 'pistol', 'bat', 'smg', 'smg', 'shotgun', 'shotgun',
+  'molotov', 'molotov', 'grenade', 'katana', 'rifle', 'mine', 'sniper', 'minigun',
+];
 
 export class PickupSystem {
   constructor(city, rng) {
@@ -47,10 +63,12 @@ export class PickupSystem {
         );
       }
     }
-    // Due certe davanti alla safehouse: la prima prova non deve dipendere dalla fortuna.
+    // Tre certe davanti alla safehouse: la prima prova non deve dipendere dalla
+    // fortuna, e la molotov è il modo più rapido di vedere cosa fa la tappa C.
     const s = this.city.spawn;
     this.add('bat', s.x + 44, s.y + 26);
     this.add('ammo', s.x + 20, s.y + 58);
+    this.add('molotov', s.x + 62, s.y + 58);
   }
 
   update(dt, game) {
@@ -87,10 +105,12 @@ export class PickupSystem {
       return true;
     }
     // Cassa di munizioni: rifornisce l'arma in mano, o la prima che ne ha bisogno.
-    const order = [pl.weapon, 'smg', 'pistol'];
+    // Gli esplosivi restano fuori: una cassa che ricarica granate sarebbe una
+    // fabbrica di granate, e i cortili sono 42.
+    const order = [pl.weapon, ...WEAPON_ORDER];
     for (const id of order) {
       const spec = WEAPONS[id];
-      if (!spec || spec.infinite) continue;
+      if (!spec || spec.infinite || spec.thrown) continue;
       if (pl.giveAmmo(id, Math.round(spec.maxAmmo * 0.28))) {
         game.hud.toast(`munizioni ${spec.label}`, 1.4);
         return true;

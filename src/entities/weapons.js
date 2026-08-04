@@ -2,36 +2,96 @@
 //
 // Tutte le bocche da fuoco sono hitscan: a 500-900 px di gittata un proiettile
 // vero arriverebbe comunque nello stesso frame, e il tracciante disegnato si legge
-// meglio di uno sprite che vola. I proiettili veri servirebbero solo agli esplosivi,
-// che arrivano nella tappa C.
+// meglio di uno sprite che vola. I proiettili veri li vogliono solo gli esplosivi
+// (`thrown: true`), che volano lenti e in alto: lì il tempo di volo *è* l'arma, e
+// li gestisce `projectiles.js`.
 import { VEHICLE_TYPES } from '../render/sprites.js';
 import { PROJ } from '../render/camera.js';
 import { angleDiff, clamp, wrapAngle } from '../core/math.js';
 
 // spread è in radianti di deviazione standard; rate è il tempo fra due colpi.
+// `slot` è la fila della barra armi (tasto 1-6): dentro una fila si scorre premendo
+// di nuovo lo stesso tasto. `driveby: false` = non si usa dal finestrino.
 export const WEAPONS = {
   fists: {
-    id: 'fists', label: 'pugni', hangul: '맨주먹', melee: true,
+    id: 'fists', label: 'pugni', hangul: '맨주먹', melee: true, slot: 0,
     damage: 15, rate: 0.34, range: 36, arc: 1.15, knock: 130, infinite: true,
   },
   bat: {
-    id: 'bat', label: 'mazza', hangul: '방망이', melee: true,
+    id: 'bat', label: 'mazza', hangul: '방망이', melee: true, slot: 0,
     damage: 46, rate: 0.52, range: 50, arc: 1.35, knock: 260, infinite: true,
   },
+  katana: {
+    id: 'katana', label: 'katana', hangul: '일본도', melee: true, slot: 0,
+    damage: 92, rate: 0.4, range: 64, arc: 1.55, knock: 230, infinite: true,
+  },
   pistol: {
-    id: 'pistol', label: 'pistola', hangul: '권총',
+    id: 'pistol', label: 'pistola', hangul: '권총', slot: 1,
     damage: 27, rate: 0.22, range: 640, spread: 0.028, pellets: 1,
     shake: 1.6, maxAmmo: 180, pickup: 34,
   },
+  shotgun: {
+    id: 'shotgun', label: 'pompa', hangul: '산탄총', slot: 2,
+    damage: 13, rate: 0.84, range: 330, spread: 0.105, pellets: 8,
+    shake: 4.4, knock: 210, maxAmmo: 60, pickup: 14,
+  },
   smg: {
-    id: 'smg', label: 'SMG', hangul: '기관단총', auto: true,
+    id: 'smg', label: 'SMG', hangul: '기관단총', auto: true, slot: 3,
     damage: 15, rate: 0.075, range: 520, spread: 0.075, pellets: 1,
     shake: 1.1, maxAmmo: 420, pickup: 90,
   },
+  rifle: {
+    id: 'rifle', label: 'fucile d\'assalto', hangul: '돌격소총', auto: true, slot: 3,
+    damage: 24, rate: 0.105, range: 780, spread: 0.042, pellets: 1,
+    shake: 2, maxAmmo: 300, pickup: 75, driveby: false,
+  },
+  // Il mirino (tasto destro) allarga il campo inquadrato invece di stringerlo: in
+  // una visuale dall'alto "zoomare" su un bersaglio a 1500 px vorrebbe dire non
+  // vederlo proprio. `pierce` è quello che rende la palla da cecchino diversa da
+  // una pallottola grossa: passa da parte a parte e prende chi c'è dietro.
+  sniper: {
+    id: 'sniper', label: 'fucile di precisione', hangul: '저격총', slot: 4,
+    damage: 145, rate: 1.35, range: 1900, spread: 0.004, pellets: 1, pierce: 2,
+    shake: 6.5, maxAmmo: 30, pickup: 8, scope: 2.3, driveby: false,
+  },
+  minigun: {
+    id: 'minigun', label: 'minigun', hangul: '미니건', auto: true, slot: 4,
+    damage: 12, rate: 0.045, range: 660, spread: 0.115, pellets: 1,
+    shake: 1.4, maxAmmo: 600, pickup: 180, spinUp: 0.8, heavy: 0.56, driveby: false,
+  },
+  // Esplosivi: `thrown` li manda a `projectiles.js`. `fuse: 0` significa "esplode
+  // (o si rompe) al primo contatto".
+  molotov: {
+    id: 'molotov', label: 'molotov', hangul: '화염병', slot: 5, thrown: true,
+    rate: 1.05, range: 460, fuse: 0, shake: 3,
+    fire: { r: 78, life: 9.5, dps: 26 }, maxAmmo: 20, pickup: 5,
+  },
+  grenade: {
+    id: 'grenade', label: 'granata', hangul: '수류탄', slot: 5, thrown: true,
+    rate: 1, range: 480, fuse: 2.2, shake: 3,
+    blast: { r: 155, dmg: 190 }, maxAmmo: 20, pickup: 5,
+  },
+  mine: {
+    id: 'mine', label: 'mina', hangul: '지뢰', slot: 5, thrown: true, placed: true,
+    rate: 0.85, range: 60, shake: 0,
+    blast: { r: 140, dmg: 220 }, maxAmmo: 10, pickup: 3,
+  },
 };
 
-// Ordine dei tasti 1-4 e della rotella.
-export const WEAPON_ORDER = ['fists', 'bat', 'pistol', 'smg'];
+// Barra armi: una fila per tasto (1-6). Ripremendo il tasto si scorre la fila —
+// da cinque armi in su i tasti singoli non bastano più, e una rotella sola su
+// undici voci è ingiocabile.
+export const WEAPON_SLOTS = [
+  ['fists', 'bat', 'katana'],
+  ['pistol'],
+  ['shotgun'],
+  ['smg', 'rifle'],
+  ['sniper', 'minigun'],
+  ['molotov', 'grenade', 'mine'],
+];
+
+// Ordine della rotella: la barra letta da sinistra a destra.
+export const WEAPON_ORDER = WEAPON_SLOTS.flat();
 
 const PED_HIT_R = 11;
 const PLAYER_HIT_R = 10;
@@ -94,8 +154,9 @@ const _circ = new Float64Array(6);
 /**
  * Traccia un raggio nel mondo e restituisce il primo bersaglio incontrato.
  * `ignore` è l'entità che spara (e il suo veicolo), che non deve auto-colpirsi.
+ * `skip` è l'insieme di chi il raggio ha già trapassato (proiettili perforanti).
  */
-export function rayCast(game, ox, oy, dx, dy, maxDist, ignore = null, ignoreVehicle = null) {
+export function rayCast(game, ox, oy, dx, dy, maxDist, ignore = null, ignoreVehicle = null, skip = null) {
   let bd = maxDist;
   let hit = null;
   let type = null;
@@ -116,13 +177,13 @@ export function rayCast(game, ox, oy, dx, dy, maxDist, ignore = null, ignoreVehi
   }
 
   for (const p of game.pedGrid.queryRect(qx, qy, qw, qh)) {
-    if (p === ignore || p.dead) continue;
+    if (p === ignore || p.dead || (skip && skip.has(p))) continue;
     const t = rayCircle(ox, oy, dx, dy, p.x, p.y, PED_HIT_R);
     if (t !== null && t < bd) { bd = t; hit = p; type = 'ped'; }
   }
 
   for (const v of game.vehicleGrid.queryRect(qx, qy, qw, qh)) {
-    if (v === ignoreVehicle) continue;
+    if (v === ignoreVehicle || (skip && skip.has(v))) continue;
     const spec = VEHICLE_TYPES[v.kind];
     const r = vehicleCircles(v, spec, _circ);
     for (let i = 0; i < 6; i += 2) {
@@ -220,30 +281,50 @@ export function shoot(game, owner, spec, ox, oy, ang, opts = {}) {
     const a = ang + gauss() * spec.spread * spreadMul;
     const dx = Math.cos(a);
     const dy = Math.sin(a);
-    const h = rayCast(game, ox, oy, dx, dy, spec.range, owner, ignoreVehicle);
-    game.fx.addTracer(ox, oy, h.x, h.y, fromPlayer);
 
-    switch (h.type) {
-      case 'ped':
-        game.damagePed(h.hit, spec.damage, dx, dy, owner);
-        break;
-      case 'player':
-        game.damagePlayer(spec.damage, dx, dy, owner);
-        break;
-      case 'vehicle':
-        // La lamiera assorbe: servono parecchi colpi per far saltare un'auto.
-        game.damageVehicle(h.hit, spec.damage * 0.55, h.x, h.y, owner);
-        // Un po' di piombo passa dal finestrino: sotto inseguimento restare in
-        // macchina non deve essere gratis.
-        if (h.hit.driver === 'player' && !fromPlayer) game.damagePlayer(spec.damage * 0.16, dx, dy);
-        break;
-      case 'chopper':
-        game.police.damageChopper(spec.damage, game);
-        game.fx.addSparks(h.x, h.y, -dx, -dy, 4);
-        break;
-      default:
-        game.fx.addSparks(h.x, h.y, -dx, -dy, 3);
-        game.fx.addDust(h.x, h.y, -dx * 30, -dy * 30, 2);
+    // Un colpo perforante non è un colpo che fa più danno: è un colpo che *non si
+    // ferma*. Si rilancia il raggio da dove ha trapassato, tenendo memoria di chi
+    // ha già bucato, finché non finisce la perforazione o la gittata.
+    let x = ox, y = oy;
+    let left = spec.range;
+    let pierce = spec.pierce || 0;
+    const passed = pierce ? new Set() : null;
+
+    for (;;) {
+      const h = rayCast(game, x, y, dx, dy, left, owner, ignoreVehicle, passed);
+      game.fx.addTracer(x, y, h.x, h.y, fromPlayer);
+
+      switch (h.type) {
+        case 'ped':
+          game.damagePed(h.hit, spec.damage, dx, dy, owner, spec.knock || 0);
+          break;
+        case 'player':
+          game.damagePlayer(spec.damage, dx, dy, owner);
+          break;
+        case 'vehicle':
+          // La lamiera assorbe: servono parecchi colpi per far saltare un'auto.
+          game.damageVehicle(h.hit, spec.damage * 0.55, h.x, h.y, owner);
+          // Un po' di piombo passa dal finestrino: sotto inseguimento restare in
+          // macchina non deve essere gratis.
+          if (h.hit.driver === 'player' && !fromPlayer) game.damagePlayer(spec.damage * 0.16, dx, dy);
+          break;
+        case 'chopper':
+          game.police.damageChopper(spec.damage, game);
+          game.fx.addSparks(h.x, h.y, -dx, -dy, 4);
+          break;
+        default:
+          game.fx.addSparks(h.x, h.y, -dx, -dy, 3);
+          game.fx.addDust(h.x, h.y, -dx * 30, -dy * 30, 2);
+      }
+
+      // Solo la carne si trapassa: un muro ferma anche il calibro grosso.
+      if (pierce <= 0 || h.type !== 'ped') break;
+      pierce--;
+      passed.add(h.hit);
+      left -= h.dist + 3;
+      if (left < 20) break;
+      x = h.x + dx * 3;
+      y = h.y + dy * 3;
     }
   }
   game.alarm(ox, oy, 460, owner);

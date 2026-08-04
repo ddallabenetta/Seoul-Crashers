@@ -954,23 +954,168 @@ function drawGun(g, w, h, kind) {
     roundRect(g, w * 0.1, h * 0.42, w * 0.66, h * 0.17, 1.5); g.fill();
     roundRect(g, w * 0.3, h * 0.55, w * 0.12, h * 0.3, 1.5); g.fill();
     roundRect(g, w * 0.62, h * 0.3, w * 0.1, h * 0.14, 1); g.fill();
-  } else if (kind === 'bat') {
-    g.strokeStyle = '#8a6a42';
-    g.lineWidth = Math.max(2, h * 0.12);
+  } else if (kind === 'rifle') {
+    roundRect(g, w * 0.08, h * 0.42, w * 0.84, h * 0.15, 1.4); g.fill();
+    roundRect(g, w * 0.34, h * 0.55, w * 0.14, h * 0.32, 1.4); g.fill();  // caricatore curvo
+    roundRect(g, w * 0.5, h * 0.32, w * 0.16, h * 0.11, 1); g.fill();     // maniglione
+    g.fillStyle = '#3a3f47';
+    roundRect(g, w * 0.06, h * 0.4, w * 0.12, h * 0.2, 1.4); g.fill();    // calcio
+  } else if (kind === 'shotgun') {
+    roundRect(g, w * 0.1, h * 0.4, w * 0.82, h * 0.13, 1.4); g.fill();
+    g.fillStyle = '#6b4a2e';
+    roundRect(g, w * 0.1, h * 0.38, w * 0.24, h * 0.18, 2); g.fill();     // calcio in legno
+    g.fillStyle = '#1a1c20';
+    roundRect(g, w * 0.46, h * 0.53, w * 0.2, h * 0.1, 1.4); g.fill();    // pompa
+  } else if (kind === 'sniper') {
+    roundRect(g, w * 0.04, h * 0.44, w * 0.9, h * 0.11, 1.2); g.fill();
+    g.fillStyle = '#3a3f47';
+    roundRect(g, w * 0.04, h * 0.4, w * 0.2, h * 0.2, 2); g.fill();
+    g.fillStyle = '#0e1013';
+    roundRect(g, w * 0.36, h * 0.3, w * 0.3, h * 0.1, 1.5); g.fill();     // ottica
+    g.fillStyle = '#8fb6e8';
+    g.fillRect(w * 0.63, h * 0.31, w * 0.03, h * 0.08);                   // lente
+    g.strokeStyle = '#2a2f36'; g.lineWidth = 1.2;
+    g.beginPath(); g.moveTo(w * 0.7, h * 0.55); g.lineTo(w * 0.78, h * 0.72); g.stroke(); // bipiede
+  } else if (kind === 'minigun') {
+    g.fillStyle = '#2a2f36';
+    roundRect(g, w * 0.2, h * 0.34, w * 0.3, h * 0.34, 3); g.fill();      // corpo motore
+    g.fillStyle = '#12141a';
+    for (let i = 0; i < 3; i++) {                                         // canne
+      roundRect(g, w * 0.48, h * (0.36 + i * 0.12), w * 0.44, h * 0.07, 1); g.fill();
+    }
+    g.fillStyle = '#c9a24a';
+    roundRect(g, w * 0.08, h * 0.42, w * 0.14, h * 0.2, 1.5); g.fill();   // nastro
+  } else if (kind === 'bat' || kind === 'katana') {
+    const wood = kind === 'katana';
+    g.strokeStyle = wood ? '#1c2026' : '#8a6a42';
+    g.lineWidth = Math.max(2, h * (wood ? 0.09 : 0.12));
     g.lineCap = 'round';
     g.beginPath();
-    g.moveTo(w * 0.14, h * 0.6);
-    g.lineTo(w * 0.82, h * 0.4);
+    g.moveTo(w * 0.14, h * 0.62);
+    g.lineTo(w * (wood ? 0.34 : 0.82), h * (wood ? 0.56 : 0.4));
     g.stroke();
-    g.lineWidth = Math.max(3, h * 0.2);
-    g.beginPath();
-    g.moveTo(w * 0.56, h * 0.46);
-    g.lineTo(w * 0.84, h * 0.4);
-    g.stroke();
+    if (wood) {
+      // Lama leggermente curva, filo chiaro: da sopra è tutto quello che si vede.
+      g.strokeStyle = '#dfe6ef';
+      g.lineWidth = Math.max(2, h * 0.1);
+      g.beginPath();
+      g.moveTo(w * 0.36, h * 0.55);
+      g.quadraticCurveTo(w * 0.66, h * 0.4, w * 0.94, h * 0.34);
+      g.stroke();
+      g.strokeStyle = '#c33a33';
+      g.lineWidth = Math.max(1, h * 0.05);
+      g.beginPath(); g.moveTo(w * 0.32, h * 0.62); g.lineTo(w * 0.36, h * 0.5); g.stroke();
+    } else {
+      g.lineWidth = Math.max(3, h * 0.2);
+      g.beginPath();
+      g.moveTo(w * 0.56, h * 0.46);
+      g.lineTo(w * 0.84, h * 0.4);
+      g.stroke();
+    }
+  } else if (kind === 'molotov') {
+    g.fillStyle = '#3f6b4a';
+    roundRect(g, w * 0.34, h * 0.34, w * 0.3, h * 0.36, 4); g.fill();     // bottiglia
+    g.fillStyle = 'rgba(255,255,255,0.18)';
+    g.fillRect(w * 0.38, h * 0.38, w * 0.05, h * 0.28);
+    g.fillStyle = '#2f4a37';
+    roundRect(g, w * 0.6, h * 0.42, w * 0.12, h * 0.18, 2); g.fill();     // collo
+    g.fillStyle = '#e8dcc0';
+    roundRect(g, w * 0.7, h * 0.44, w * 0.14, h * 0.12, 2); g.fill();     // straccio
+  } else if (kind === 'grenade') {
+    g.fillStyle = '#3f4a35';
+    g.beginPath(); g.ellipse(w * 0.48, h * 0.52, w * 0.17, h * 0.2, 0, 0, 6.2832); g.fill();
+    g.strokeStyle = 'rgba(0,0,0,0.4)'; g.lineWidth = 1;
+    for (let i = 0; i < 3; i++) {
+      g.beginPath();
+      g.moveTo(w * (0.34 + i * 0.09), h * 0.34);
+      g.lineTo(w * (0.34 + i * 0.09), h * 0.7);
+      g.stroke();
+    }
+    g.fillStyle = '#8d939b';
+    roundRect(g, w * 0.44, h * 0.26, w * 0.09, h * 0.1, 1); g.fill();     // cucchiaio
+    g.strokeStyle = '#c9a24a'; g.lineWidth = 1.4;
+    g.beginPath(); g.arc(w * 0.62, h * 0.3, w * 0.06, 0, 6.2832); g.stroke(); // anello
+  } else if (kind === 'mine') {
+    g.fillStyle = '#2c3138';
+    g.beginPath(); g.ellipse(w * 0.5, h * 0.52, w * 0.24, h * 0.22, 0, 0, 6.2832); g.fill();
+    g.strokeStyle = '#4a5058'; g.lineWidth = 1.4; g.stroke();
+    g.fillStyle = '#c33a33';
+    g.beginPath(); g.arc(w * 0.5, h * 0.52, w * 0.07, 0, 6.2832); g.fill();
   } else {
     roundRect(g, w * 0.22, h * 0.42, w * 0.5, h * 0.15, 1.5); g.fill();
     roundRect(g, w * 0.3, h * 0.54, w * 0.13, h * 0.26, 1.5); g.fill();
   }
+}
+
+/**
+ * Esplosivo in volo o a terra. Piccolo per forza — 12 px — quindi conta solo che si
+ * distingua a colpo d'occhio dalla ghiaia: la bottiglia è verde con lo straccio
+ * acceso, la granata è verde scuro e tozza, la mina è un disco nero col led rosso.
+ */
+export function getThrownSprite(kind) {
+  return sprite(`thrown:${kind}`, 16, 16, (g, w, h) => {
+    const cx = w / 2, cy = h / 2;
+    if (kind === 'molotov') {
+      g.fillStyle = '#3f6b4a';
+      roundRect(g, cx - 3, cy - 5, 6, 10, 2.4); g.fill();
+      g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 1; g.stroke();
+      g.fillStyle = 'rgba(255,255,255,0.22)';
+      g.fillRect(cx - 2.2, cy - 4, 1.4, 7);
+      g.fillStyle = '#ffb03a';
+      g.beginPath(); g.arc(cx, cy - 6.2, 2.4, 0, 6.2832); g.fill();
+      g.fillStyle = '#fff0b0';
+      g.beginPath(); g.arc(cx, cy - 6.6, 1.2, 0, 6.2832); g.fill();
+      return;
+    }
+    if (kind === 'mine') {
+      g.fillStyle = '#22262c';
+      g.beginPath(); g.ellipse(cx, cy, 6.4, 5.4, 0, 0, 6.2832); g.fill();
+      g.strokeStyle = '#4a5058'; g.lineWidth = 1.2; g.stroke();
+      g.fillStyle = '#3a4048';
+      g.beginPath(); g.ellipse(cx, cy, 3.2, 2.6, 0, 0, 6.2832); g.fill();
+      return;
+    }
+    g.fillStyle = '#3f4a35';
+    g.beginPath(); g.ellipse(cx, cy, 4.6, 5.6, 0, 0, 6.2832); g.fill();
+    g.strokeStyle = 'rgba(0,0,0,0.55)'; g.lineWidth = 1.1; g.stroke();
+    g.fillStyle = '#8d939b';
+    roundRect(g, cx - 1.4, cy - 6.6, 2.8, 3, 1); g.fill();
+    g.strokeStyle = 'rgba(0,0,0,0.3)'; g.lineWidth = 0.8;
+    for (const dy of [-2, 0, 2]) {
+      g.beginPath(); g.moveTo(cx - 4, cy + dy); g.lineTo(cx + 4, cy + dy); g.stroke();
+    }
+  });
+}
+
+/**
+ * Icona per la barra armi dell'HUD: la sola sagoma, senza borsone sotto, e
+ * **schiarita** — le armi sono disegnate quasi nere, e su un pannello scuro
+ * sparirebbero. `source-atop` tinge solo i pixel già disegnati, quindi resta la
+ * silhouette e basta, che è tutto quello che serve a 30 px.
+ */
+export function getWeaponIcon(id) {
+  return sprite(`wicon:${id}`, 30, 20, (g, w, h) => {
+    drawIconShape(g, w, h, id);
+    g.globalCompositeOperation = 'source-atop';
+    g.fillStyle = 'rgba(214,226,242,0.82)';
+    g.fillRect(0, 0, w, h);
+  });
+}
+
+function drawIconShape(g, w, h, id) {
+  if (id === 'fists') {
+    g.fillStyle = '#d6a883';
+    roundRect(g, w * 0.3, h * 0.3, w * 0.34, h * 0.44, 3); g.fill();
+    g.strokeStyle = 'rgba(0,0,0,0.4)'; g.lineWidth = 1;
+    for (let i = 0; i < 3; i++) {
+      g.beginPath();
+      g.moveTo(w * 0.34, h * (0.4 + i * 0.13));
+      g.lineTo(w * 0.6, h * (0.4 + i * 0.13));
+      g.stroke();
+    }
+    return;
+  }
+  drawGun(g, w, h, id);
 }
 
 export function getPickupSprite(kind) {
@@ -1037,6 +1182,7 @@ export function preloadSprites() {
   }
   getHeroPortrait();
   getChopperSprite();
+  for (const k of ['molotov', 'grenade', 'mine']) getThrownSprite(k);
   for (const type of ['lamp', 'tree', 'bin', 'hydrant', 'bench', 'vending', 'busstop', 'pallet', 'ac_unit', 'barrier']) {
     getPropSprite({ type, tint: 0, r: 12 });
   }

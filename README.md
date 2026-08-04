@@ -23,8 +23,9 @@ Poi apri <http://localhost:8123>.
 | `E` | salire / scendere dal veicolo |
 | `H` | clacson |
 | **mouse** | mirare (a piedi si guarda sempre il cursore) |
-| **click sinistro** | sparare / colpire · alla guida, drive-by con le armi leggere |
-| `1` `2` `3` `4` | pugni · mazza · pistola · SMG (rotella per scorrere) |
+| **click sinistro** | sparare / colpire / lanciare · alla guida, drive-by con le armi leggere |
+| **click destro** | mirino del fucile di precisione (allarga il campo) |
+| `1` … `6` | barra armi: una fila per tasto, ripremi per scorrere la fila (rotella = tutto l'arsenale) |
 | `M` | mappa a tutto schermo (rotella = zoom, trascina = sposta) |
 | `ESC` | menu di pausa (mappa, comandi, statistiche) |
 | `F3` | pannello tecnico (fps, entità, posizione) |
@@ -32,6 +33,24 @@ Poi apri <http://localhost:8123>.
 Armi e munizioni si raccolgono a terra, nei cortili e nei vicoli. A zero salute ci si
 risveglia davanti all'ospedale del distretto più vicino — con la salute piena, senza
 più un'arma e senza più nessuno alle costole.
+
+## L'arsenale
+
+| Fila | Armi | Come si comportano |
+| --- | --- | --- |
+| `1` | pugni · mazza · **katana** | cono davanti a te; la katana taglia in due colpi |
+| `2` | pistola | precisa, munizioni ovunque |
+| `3` | **pompa** | otto pallini in una rosa larga, gittata corta, spinge indietro |
+| `4` | SMG · **fucile d'assalto** | automatiche; il fucile non si usa dal finestrino |
+| `5` | **fucile di precisione** · **minigun** | il primo trapassa due bersagli e col tasto destro allarga il campo fin dove arriva; la seconda deve prendere giro prima di sparare e ti fa camminare |
+| `6` | **molotov** · **granata** · **mina** | esplosivi: volano davvero dove punti, e il mirino ti mostra il raggio |
+
+Gli esplosivi sono gli unici oggetti che non sono raggi istantanei: hanno una parabola,
+un'ombra che dice dove cadranno e rimbalzano su muri e transenne. La molotov lascia una
+pozza che brucia per una decina di secondi (e la bruciatura resta sull'asfalto), la granata
+ha una miccia e rotola, la mina si arma quando ti allontani — e si sgancia anche dalla coda
+dell'auto mentre scappi. Un'auto presa dall'onda d'urto salta a sua volta: le catene di
+esplosioni sono gratis, e la polizia se ne accorge.
 
 ## Il protagonista
 
@@ -129,7 +148,11 @@ Alcune scelte tecniche che spiegano il risultato a schermo:
 - **Fuoco hitscan con magnetismo.** I colpi sono raggi risolti nello stesso frame contro
   muri, pedoni e veicoli; quello che vola è solo il tracciante. La direzione del cursore viene
   piegata di pochi gradi verso il bersaglio più allineato — abbastanza da non mancare un
-  pedone a mezzo isolato, troppo poco per sostituirsi alla mira.
+  pedone a mezzo isolato, troppo poco per sostituirsi alla mira. I colpi perforanti sono lo
+  stesso raggio rilanciato da dove ha trapassato.
+- **Esplosivi con proiettili veri.** Solo loro: per una granata il tempo di volo *è* l'arma.
+  Hanno una quota, quindi scavalcano le transenne e proiettano un'ombra che dice dove
+  cadranno; l'onda d'urto cala col raggio ed è la stessa che fa saltare i veicoli.
 - **Scalinate.** Un vicolo passante troppo ripido diventa una scalinata: stessa geometria di
   prima più un solido che ferma le ruote e lascia passare i piedi. È la scorciatoia che le
   auto non possono seguire.
@@ -160,9 +183,12 @@ finestrino, posti di blocco, strisce chiodate (gomme a terra: meno velocità, me
 tiraggio da un lato), furgoni SWAT, elicottero con riflettore — abbattibile — e stelle
 sull'HUD, blip su minimappa e mappa.
 
-**Fase 2, tappa C — da fare.** Armi pesanti ed esplosivi (katana, pompa, fucile d'assalto,
-sniper, minigun, molotov, granate, mine): gli esplosivi sono gli unici che vogliono
-proiettili veri al posto del raycast.
+**Fase 2, tappa C — completata.** Arsenale pesante: katana, pompa a otto pallini, fucile
+d'assalto, fucile di precisione (perforante, col mirino che allarga il campo), minigun con
+spin-up, e i tre esplosivi con proiettili veri — molotov con pozza di fuoco, granata a
+miccia, mina di prossimità. Onda d'urto condivisa che fa saltare anche i veicoli (catene di
+esplosioni), barra armi a sei file, mirino che mostra il raggio dello scoppio, SWAT passata
+al fucile d'assalto.
 
 **Fase 3 — da fare.** Le 12 missioni con cutscene a fumetti, negozi (armi, garage, ospedale),
 mercato nero dinamico, attività secondarie, ciclo giorno-notte e meteo, audio procedurale,

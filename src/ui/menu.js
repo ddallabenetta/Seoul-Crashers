@@ -9,8 +9,9 @@ const CONTROLS = [
   ['E', 'sali / scendi dal veicolo'],
   ['H', 'clacson'],
   ['Mouse', 'mira dove punti'],
-  ['Click sin.', 'spara · colpisci · drive-by'],
-  ['1-4 / rotella', 'pugni · mazza · pistola · SMG'],
+  ['Click sin.', 'spara · colpisci · lancia · drive-by'],
+  ['Click des.', 'mirino (fucile di precisione)'],
+  ['1-6 / rotella', 'barra armi (ripremi = scorri la fila)'],
   ['M', 'mappa a tutto schermo'],
   ['ESC', 'pausa'],
   ['F3', 'informazioni tecniche'],
@@ -182,6 +183,7 @@ export class PauseMenu {
       ['Quartieri visitati', `${s.districts.size} / 5`],
       ['Divise stese', String(s.copsKilled || 0)],
       ['Ricercato massimo', '★'.repeat(s.maxWanted || 0) || '—'],
+      ['Esplosioni', String(s.blasts || 0)],
     ];
     // Due colonne: in una sola il pannello (quadrato, largo quanto 0.44 dello
     // schermo) non ci sta già a sei voci.

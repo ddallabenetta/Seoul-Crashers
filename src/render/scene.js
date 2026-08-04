@@ -6,7 +6,7 @@ import { PROJ, SUN } from './camera.js';
 import { facadeTexture, facadeGradient, bucketCols, bucketRows, signSprite, FTW, FTH } from './facades.js';
 import {
   getVehicleSprite, getPedSprite, getPropSprite, getWreckSprite, getPickupSprite,
-  getHeroSprite, getChopperSprite, getSpikeSprite, VEHICLE_TYPES, PED_FRAMES,
+  getHeroSprite, getChopperSprite, getSpikeSprite, getThrownSprite, VEHICLE_TYPES, PED_FRAMES,
 } from './sprites.js';
 import { WEAPONS } from '../entities/weapons.js';
 import { GroundRenderer } from './ground.js';
@@ -82,9 +82,14 @@ export class Scene {
     // 1) Terreno
     this.ground.draw(ctx, cam);
 
-    // 2) Decalcomanie sul terreno (sangue, gomma, rottami piatti) e chiodi
+    // 2) Decalcomanie sul terreno (sangue, gomma, rottami piatti), chiodi, pozze
+    // di fuoco e mine: tutto quello che è *sull'* asfalto e non sopra.
     if (game.fx) game.fx.drawDecals(ctx);
     if (game.police) this.drawSpikes(ctx, game);
+    if (game.projectiles) {
+      this.drawFires(ctx, game);
+      this.drawMines(ctx, game, cam);
+    }
 
     // 3) Ombre proiettate
     ctx.fillStyle = 'rgba(0,0,0,0.34)';
@@ -142,7 +147,7 @@ export class Scene {
         case 1: this.drawProp(ctx, item.o, cam, game); break;
         case 2: this.drawVehicle(ctx, item.o, cam, game); break;
         case 3: this.drawPed(ctx, item.o, cam); break;
-        case 4: this.drawPlayer(ctx, game.player, cam); break;
+        case 4: this.drawPlayer(ctx, game.player, cam, game); break;
         case 5: this.drawPickup(ctx, item.o, cam, game); break;
       }
     }
@@ -153,6 +158,8 @@ export class Scene {
       this.drawRoadblocks(ctx, game, cam);
       this.drawChopper(ctx, game, cam);
     }
+    // Esplosivi in volo: hanno una quota, quindi vanno dopo tutto quello che sta a terra.
+    if (game.projectiles) this.drawThrown(ctx, game, cam);
 
     // 7) Effetti sopra il mondo (proiettili, fuoco, particelle)
     if (game.fx) game.fx.draw(ctx, cam, game.time);
@@ -500,7 +507,7 @@ export class Scene {
     ctx.restore();
   }
 
-  drawPlayer(ctx, pl, cam) {
+  drawPlayer(ctx, pl, cam, game) {
     const z = 21;
     const f = z / PROJ;
     const ox = (pl.x - cam.cx) * f;
@@ -518,7 +525,7 @@ export class Scene {
     }
     ctx.drawImage(spr.canvas, -spr.w / 2, -spr.h / 2, spr.w, spr.h);
     // L'arma va sopra la sagoma, non sotto: è quello che si deve leggere per primo.
-    if (!pl.dying) drawHeldWeapon(ctx, pl.weapon);
+    if (!pl.dying) drawHeldWeapon(ctx, pl.weapon, game ? game.time * 34 * pl.spin : 0);
     ctx.restore();
   }
 
@@ -530,6 +537,78 @@ export class Scene {
       ctx.globalAlpha = Math.min(1, 0.35 + s.t * 2);
       ctx.drawImage(spr.canvas, s.x + s.w / 2 - spr.w / 2, s.y + s.h / 2 - spr.h / 2, spr.w, spr.h);
       ctx.restore();
+    }
+  }
+
+  /**
+   * Pozze di fuoco della molotov. Il disegno è tutto qui dentro: un alone caldo che
+   * pulsa, sopra il quale `fx` fa uscire le fiamme. Le lingue di fuoco vere sono
+   * particelle, così il fuoco si muove anche quando il giocatore sta fermo.
+   */
+  drawFires(ctx, game) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const f of game.projectiles.fires) {
+      const fade = Math.min(1, f.life / 1.6);
+      const puls = 0.86 + 0.14 * Math.sin(game.time * 7 + f.seed);
+      const r = f.r * puls;
+      const g = ctx.createRadialGradient(f.x, f.y, r * 0.12, f.x, f.y, r);
+      g.addColorStop(0, `rgba(255,206,110,${0.62 * fade})`);
+      g.addColorStop(0.42, `rgba(238,116,28,${0.38 * fade})`);
+      g.addColorStop(1, 'rgba(180,60,10,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(f.x, f.y, r, 0, 6.2832);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /** Mine: piatte sull'asfalto, con il led che lampeggia solo quando sono armate. */
+  drawMines(ctx, game, cam) {
+    const spr = getThrownSprite('mine');
+    for (const m of game.projectiles.mines) {
+      ctx.drawImage(spr.canvas, m.x - spr.w / 2, m.y - spr.h / 2, spr.w, spr.h);
+      const on = m.armed ? Math.sin(game.time * 6) > 0 : Math.sin(game.time * 2) > 0;
+      ctx.fillStyle = m.armed
+        ? (on ? '#ff4a4a' : 'rgba(120,20,20,0.5)')
+        : (on ? 'rgba(230,200,80,0.9)' : 'rgba(120,100,30,0.5)');
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, 1.9, 0, 6.2832);
+      ctx.fill();
+    }
+  }
+
+  /**
+   * Granate e molotov in volo. Due segni bastano a leggere la parabola in una
+   * visuale dall'alto: l'ombra resta a terra sotto la verticale e si stringe
+   * salendo, l'oggetto si stacca in proiezione come tutto il resto.
+   */
+  drawThrown(ctx, game, cam) {
+    for (const it of game.projectiles.items) {
+      const z = Math.max(0, it.z);
+      const spr = getThrownSprite(it.spec.id);
+      const sh = 1 / (1 + z / 90);
+      ctx.fillStyle = `rgba(0,0,0,${0.3 * sh})`;
+      ctx.beginPath();
+      ctx.ellipse(it.x + SUN.x * z * SUN.scale, it.y + SUN.y * z * SUN.scale, 5 * sh + 1.5, 4 * sh + 1.2, 0, 0, 6.2832);
+      ctx.fill();
+
+      const f = z / PROJ;
+      ctx.save();
+      ctx.translate(it.x + (it.x - cam.cx) * f, it.y + (it.y - cam.cy) * f);
+      ctx.rotate(it.angle);
+      ctx.drawImage(spr.canvas, -spr.w / 2, -spr.h / 2, spr.w, spr.h);
+      ctx.restore();
+
+      // Scia della miccia: dice che quella cosa sta per esplodere.
+      if (it.spec.fuse) {
+        const blink = Math.sin(game.time * 22) > 0;
+        ctx.fillStyle = blink ? 'rgba(255,120,60,0.9)' : 'rgba(255,220,140,0.5)';
+        ctx.beginPath();
+        ctx.arc(it.x + (it.x - cam.cx) * f, it.y + (it.y - cam.cy) * f - 6, 1.8, 0, 6.2832);
+        ctx.fill();
+      }
     }
   }
 
@@ -634,20 +713,94 @@ export class Scene {
   }
 }
 
-/** Arma stretta in mano, disegnata nello spazio locale del personaggio. */
-function drawHeldWeapon(ctx, id) {
+/**
+ * Arma stretta in mano, disegnata nello spazio locale del personaggio (+x = davanti).
+ * Vent'anni di pixel dicono che da sopra di un'arma si legge solo la **lunghezza**:
+ * pistola corta, fucile lungo, minigun larga. Il resto è decorazione.
+ */
+function drawHeldWeapon(ctx, id, phase = 0) {
   if (!id || id === 'fists') return;
   ctx.fillStyle = '#14161a';
-  if (id === 'bat') {
-    ctx.fillStyle = '#8a6a42';
-    ctx.fillRect(3, 3.4, 16, 2.6);
-    ctx.fillRect(13, 2.6, 6, 4.2);
-  } else if (id === 'smg') {
-    ctx.fillRect(2, 3.2, 13, 3);
-    ctx.fillRect(6, 6, 2.8, 4.4);
-  } else {
-    ctx.fillRect(3, 3.4, 9, 2.8);
-    ctx.fillRect(5, 6, 2.6, 3.6);
+  switch (id) {
+    case 'bat':
+      ctx.fillStyle = '#8a6a42';
+      ctx.fillRect(3, 3.4, 16, 2.6);
+      ctx.fillRect(13, 2.6, 6, 4.2);
+      break;
+    case 'katana':
+      ctx.fillStyle = '#1c2026';
+      ctx.fillRect(2, 3.6, 5, 2.4);
+      ctx.fillStyle = '#dfe6ef';
+      ctx.beginPath();
+      ctx.moveTo(7, 3.4);
+      ctx.lineTo(23, 1.6);
+      ctx.lineTo(23.6, 3);
+      ctx.lineTo(7, 5.6);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    case 'smg':
+      ctx.fillRect(2, 3.2, 13, 3);
+      ctx.fillRect(6, 6, 2.8, 4.4);
+      break;
+    case 'shotgun':
+      ctx.fillRect(1, 3.4, 18, 2.6);
+      ctx.fillStyle = '#6b4a2e';
+      ctx.fillRect(1, 3.2, 6, 3);
+      break;
+    case 'rifle':
+      ctx.fillRect(0, 3.4, 21, 2.6);
+      ctx.fillRect(8, 6, 3.4, 4.6);
+      ctx.fillStyle = '#3a3f47';
+      ctx.fillRect(0, 3, 5, 3.4);
+      break;
+    case 'sniper':
+      ctx.fillRect(-1, 3.6, 26, 2.2);
+      ctx.fillStyle = '#0e1013';
+      ctx.fillRect(7, 1.4, 8, 2);
+      ctx.fillStyle = '#3a3f47';
+      ctx.fillRect(-1, 3.2, 6, 3);
+      break;
+    case 'minigun': {
+      ctx.fillStyle = '#2a2f36';
+      ctx.fillRect(1, 1.6, 8, 7.6);
+      // Canne che girano: la fase arriva dallo spin-up, quindi da fermo stanno ferme.
+      for (let i = 0; i < 3; i++) {
+        const y = 5 + Math.sin(phase + (i * Math.PI * 2) / 3) * 3;
+        ctx.fillStyle = i === 0 ? '#12141a' : '#1c1f26';
+        ctx.fillRect(8, y - 1, 15, 2);
+      }
+      ctx.fillStyle = '#c9a24a';
+      ctx.fillRect(-2, 3.4, 4, 3.4);
+      break;
+    }
+    case 'molotov':
+      ctx.fillStyle = '#3f6b4a';
+      ctx.fillRect(6, 3, 5, 4);
+      ctx.fillStyle = '#ffb03a';
+      ctx.beginPath();
+      ctx.arc(12.4, 5, 1.8, 0, 6.2832);
+      ctx.fill();
+      break;
+    case 'grenade':
+      ctx.fillStyle = '#3f4a35';
+      ctx.beginPath();
+      ctx.ellipse(8, 5, 3, 3.4, 0, 0, 6.2832);
+      ctx.fill();
+      break;
+    case 'mine':
+      ctx.fillStyle = '#2c3138';
+      ctx.beginPath();
+      ctx.ellipse(8, 5, 4, 3, 0, 0, 6.2832);
+      ctx.fill();
+      ctx.fillStyle = '#c33a33';
+      ctx.beginPath();
+      ctx.arc(8, 5, 1.1, 0, 6.2832);
+      ctx.fill();
+      break;
+    default:
+      ctx.fillRect(3, 3.4, 9, 2.8);
+      ctx.fillRect(5, 6, 2.6, 3.6);
   }
 }
 

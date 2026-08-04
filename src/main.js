@@ -14,6 +14,7 @@ import { Player } from './entities/player.js';
 import { TrafficSystem } from './entities/traffic.js';
 import { PedestrianSystem } from './entities/pedestrians.js';
 import { PickupSystem } from './entities/pickups.js';
+import { ProjectileSystem } from './entities/projectiles.js';
 import { WantedSystem } from './entities/wanted.js';
 import { PoliceSystem } from './entities/police.js';
 import { Hud } from './ui/hud.js';
@@ -51,6 +52,7 @@ class Game {
       copsKilled: 0,
       maxWanted: 0,
       choppers: 0,
+      blasts: 0,
       districts: new Set(),
     };
     this._skidT = 0;
@@ -91,6 +93,7 @@ class Game {
     this.traffic = new TrafficSystem(this.city, this.rng, this.vehicles);
     this.pedSystem = new PedestrianSystem(this.city, this.rng, this.peds);
     this.pickups = new PickupSystem(this.city, this.rng);
+    this.projectiles = new ProjectileSystem();
     this.wanted = new WantedSystem();
     this.police = new PoliceSystem(this.city, this.rng);
     this.hud = new Hud(this.city, this.mapTexture);
@@ -104,7 +107,7 @@ class Game {
     this.hud.showDistrict(this.player.district);
     this.stats.districts.add(this.player.district.id);
     this.hud.toast('E per rubare un\'auto · M per la mappa', 5);
-    this.hud.toast('Mouse per mirare e sparare · 1-4 per l\'arma', 6.5);
+    this.hud.toast('Mouse per mirare e sparare · 1-6 per l\'arma', 6.5);
 
     await onProgress('Pronti.', 1);
     this.loop = new Loop((dt) => this.update(dt), () => this.render());
@@ -240,6 +243,9 @@ class Game {
     this.police.standDown(this, true);
     this.camera.snapTo(pl.x, pl.y);
     this.fx.clear();
+    // Le mine restano armate anche dopo la morte di chi le ha messe: al risveglio
+    // in corsia si troverebbe il quartiere minato e nessun modo di saperlo.
+    this.projectiles.clear();
     pl.district = this.city.districtAt(pl.x, pl.y);
     this.hud.showDistrict(pl.district);
     this.hud.toast(`Ospedale di ${best.name}: ti hanno ricucito, l'arsenale no`, 4);
@@ -287,6 +293,7 @@ class Game {
     this.traffic.update(dt, this);
     this.pedSystem.update(dt, this);
     this.pickups.update(dt, this);
+    this.projectiles.update(dt, this);
     this.fx.update(dt);
     this.hud.update(dt);
 
@@ -297,10 +304,9 @@ class Game {
 
     this.emitSkids(dt);
 
-    const target = this.player.onFoot
-      ? { x: this.player.x, y: this.player.y, vx: this.player.vx, vy: this.player.vy }
-      : { x: this.player.vehicle.x, y: this.player.vehicle.y, vx: this.player.vehicle.vx, vy: this.player.vehicle.vy };
-    this.camera.follow(target, dt, this.player.onFoot ? 0.2 : 0.4);
+    // Col mirino del fucile di precisione la camera non sta più addosso al
+    // giocatore: se lo decide `player.cameraTarget`.
+    this.camera.follow(this.player.cameraTarget(), dt, this.player.onFoot ? 0.2 : 0.4);
 
     input.endFrame();
   }
