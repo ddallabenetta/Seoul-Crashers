@@ -16,6 +16,11 @@
 //    più due transenne `vehicleOnly`: fermano le ruote, lasciano passare i piedi e i
 //    proiettili. Identiche alle scalinate, e i ponti sul Han sono il posto giusto
 //    dove metterle perché sono gli unici passaggi obbligati della mappa.
+// 4. **Dentro un negozio la caccia non si ferma, si sposta sulla porta.** Il
+//    ricercato resta congelato (la porta non è un nascondiglio, §5.8), ma le unità
+//    continuano ad arrivare e si dispongono attorno all'uscita: `siege` è la sola
+//    parte di questo file che gira mentre la città è ferma, e per farlo muove le
+//    unità da sé (vedi lì il perché).
 import { createVehicle } from './vehicle.js';
 import { createPed } from './pedestrians.js';
 import { VEHICLE_TYPES } from '../render/sprites.js';
@@ -47,6 +52,42 @@ const CHOPPER_HP = 260;
 
 const MAX_COPS = 10;
 
+// Commissariati: entro questo raggio le unità nuove partono da lì invece che da un
+// punto a caso dell'anello. Più largo di così e la volante ci mette mezzo minuto ad
+// arrivare, più stretto e nell'inseguimento medio il commissariato non si usa mai.
+const STATION_REACH = 1600;
+
+// Equipaggio sbarcato che risale in macchina. `RECALL_FAR` è la distanza oltre la
+// quale un giocatore in auto non lo si prende più a piedi; `RECALL_LOST` i secondi
+// senza contatto dopo i quali si rinuncia comunque.
+const RECALL_FAR = 750;
+const RECALL_LOST = 5;
+const RECALL_R = 260;    // chi è più lontano ha già preso un'altra strada
+const BOARD_R = 30;
+const RECALL_GIVEUP = 12;
+
+// Motovedette (경비정): quante al massimo, e da che stella in su.
+const MAX_BOATS = 2;
+const MARINE_LEVEL = 3;
+
+// Granate della SWAT. Sotto i 200 px si prenderebbe in pieno anche chi la tira,
+// sopra i 430 non arriva; una ogni 9 s per agente, e mai due in volo insieme.
+// `NADE_GAP` è la pausa che la squadra si prende dopo uno scoppio, e non è un
+// doppione del tetto per agente: a cinque stelle in strada ci sono fino a sei
+// uomini della SWAT, e con la sola regola "una in volo" ne arrivava una ogni 2,5 s
+// (misurato) — che è esattamente la condanna senza uscita che si voleva evitare.
+const NADE_MIN = 200;
+const NADE_MAX = 430;
+const NADE_CD = 9;
+const NADE_GAP = 5;
+
+// Chiodi: quanti veicoli AI si controllano per frame, e fin dove. Uno alla volta
+// sarebbe troppo rado (a 250 px/s una striscia larga 22 px si attraversa in 0,09 s),
+// tutti sarebbero un test per veicolo per frame per una cosa che capita due volte
+// a partita. Si guarda una fetta a rotazione, e solo dove il giocatore può vedere.
+const SPIKE_WATCH = 700;
+const SPIKE_SLICE = 6;
+
 /** True se il punto è fuori dal rettangolo inquadrato (con margine). */
 function outsideView(game, x, y, margin = 60) {
   const b = game.camera.bounds(margin);
@@ -59,6 +100,7 @@ export class PoliceSystem {
     this.rng = rng;
     this.cops = [];
     this.cars = [];
+    this.boats = [];
     this.blocks = [];
     this.spikes = [];
     this.chopper = null;
@@ -66,6 +108,14 @@ export class PoliceSystem {
     this.spotted = false;
     this.spawnT = 0;
     this.blockT = 0;
+    this.boatT = 0;
+    this.offT = 0;      // da quanto il giocatore è fuori dalla portata della strada
+    this.nade = null;   // la granata della SWAT in volo: una per tutta la squadra
+    this.nadeCd = 0;
+    this.siegeDoor = null;
+    this.siegeEdge = null;
+    this._spikeI = 0;
+    this._boarded = [];
     this.tmp = {};
   }
 
@@ -73,10 +123,24 @@ export class PoliceSystem {
     return TIERS[this._level] || TIERS[0];
   }
 
+  /**
+   * Punto verso cui lavora la polizia. È il giocatore, tranne mentre lui è dentro
+   * un edificio: lì le sue coordinate sono quelle della pianta (200-470 px) e in
+   * città cadono nell'angolo nord-ovest della mappa. Chiunque legga `player.x/y`
+   * per decidere *dove andare* deve passare di qui.
+   */
+  focus(game) {
+    return this.siegeDoor || game.player;
+  }
+
   // --- ciclo -----------------------------------------------------------------
   update(dt, game) {
+    // Si è appena usciti da una porta assediata: le volanti vanno rimesse in
+    // carreggiata prima che `traffic.update` torni a integrarne la fisica.
+    if (this.siegeDoor) this.endSiege(game);
     this._level = game.wanted.level;
     const tier = this.tier;
+    this.nadeCd = Math.max(0, this.nadeCd - dt);
     this.prune(game);
 
     if (this._level > 0) {
@@ -86,31 +150,193 @@ export class PoliceSystem {
         this.reinforce(game, tier);
       }
       this.manageObstacles(dt, game, tier);
-    } else if (this.cars.length || this.cops.length || this.blocks.length) {
+    } else if (this.cars.length || this.cops.length || this.blocks.length || this.boats.length) {
       this.standDown(game);
     }
 
     for (const v of this.cars) this.driveCar(v, dt, game);
+    this.updateMarine(dt, game, tier);
     this.updateChopper(dt, game, tier);
-    this.updateSpikes(game);
+    this.updateSpikes(dt, game);
     this.spotted = this.computeSpotted(game);
   }
 
   /** Unità perse per strada: morti, despawnate dallo streaming, o troppo lontane. */
   prune(game) {
-    const pl = game.player;
+    const f = this.focus(game);
+    // Chi è risalito in macchina il frame scorso (vedi `boardCop`).
+    if (this._boarded.length) {
+      const list = game.pedSystem.peds;
+      for (const p of this._boarded) {
+        const i = list.indexOf(p);
+        if (i >= 0) list.splice(i, 1);
+      }
+      this._boarded.length = 0;
+    }
     for (let i = this.cops.length - 1; i >= 0; i--) {
       const p = this.cops[i];
-      if (p.dead || p.gone || dist(p.x, p.y, pl.x, pl.y) > 2200) this.cops.splice(i, 1);
+      if (p.dead || p.gone || dist(p.x, p.y, f.x, f.y) > 2200) {
+        p.board = null;
+        this.cops.splice(i, 1);
+      }
     }
     for (let i = this.cars.length - 1; i >= 0; i--) {
       const v = this.cars[i];
-      const far = dist(v.x, v.y, pl.x, pl.y) > 2600;
+      const far = dist(v.x, v.y, f.x, f.y) > 2600;
       if (v.driver !== 'cop' || (v.dead && v.deadT > 18) || far) {
         this.dropVehicle(v, game, !v.dead && far);
         this.cars.splice(i, 1);
       }
     }
+    for (let i = this.boats.length - 1; i >= 0; i--) {
+      const v = this.boats[i];
+      const far = dist(v.x, v.y, f.x, f.y) > 3000;
+      if (v.driver !== 'cop' || (v.dead && v.deadT > 18) || far) {
+        this.dropVehicle(v, game, false);
+        this.boats.splice(i, 1);
+      }
+    }
+    // La granata in volo è una sola per tutta la squadra: finché non è scoppiata
+    // (o non è sparita dietro una porta) nessun altro ne tira una, e dopo lo
+    // scoppio la squadra si prende `NADE_GAP` secondi di solo piombo.
+    if (this.nade && !game.projectiles.items.includes(this.nade)) {
+      this.nade = null;
+      this.nadeCd = NADE_GAP;
+    }
+  }
+
+  // --- assedio della porta ---------------------------------------------------
+  /**
+   * Gira **al posto di** `update` mentre il giocatore è dentro un negozio, ed è
+   * l'unico pezzo di città che continua a muoversi. Tre cose la rendono diversa
+   * dal ciclo normale, e sono tutte obbligate:
+   *
+   * - **Il riferimento è la porta**, non il giocatore (vedi `focus`).
+   * - **Le unità le muove questo metodo.** Dentro un edificio `traffic.update` non
+   *   gira (nessuno integra la fisica delle volanti) e `game.peds` è stato
+   *   scambiato con la gente del piano (nessuno chiama `updatePed` sugli agenti):
+   *   senza questo, arriverebbero rinforzi che restano immobili dove sono nati.
+   *   Lo steering è elementare — punto e velocità, nessuna collisione, nessun
+   *   grafo — perché il giocatore non sta guardando e la città *non deve* tornare
+   *   a girare per il minuto che passa a comprare munizioni.
+   * - **`outsideView` non vuol dire niente**: la camera inquadra la stanza, quindi
+   *   qualunque punto della città è "fuori vista". Il criterio diventa la distanza
+   *   dalla porta, e sta in `spawnCar`/`spawnFootCop`.
+   *
+   * Il ricercato invece resta congelato: `wanted.update` non gira nemmeno qui,
+   * altrimenti la porta diventerebbe il nascondiglio che §5.8 non vuole.
+   */
+  siege(dt, game) {
+    const shop = game.shops.active && game.shops.active.shop;
+    if (!shop) return;
+    if (this.siegeDoor !== shop) {
+      this.siegeDoor = shop;
+      this.planSiege(shop);
+    }
+    this._level = game.wanted.level;
+    const tier = this.tier;
+    if (this._level <= 0) {
+      if (this.cars.length || this.cops.length || this.blocks.length || this.boats.length) {
+        this.standDown(game);
+      }
+      return;
+    }
+
+    this.prune(game);
+    this.spawnT -= dt;
+    if (this.spawnT <= 0) {
+      // Più lento del ciclo normale: da fuori non si vede niente, e riempire la
+      // strada di divise mentre compri sarebbe una punizione per aver aperto un menu.
+      this.spawnT = 1.4;
+      this.reinforce(game, tier);
+    }
+    for (const p of this.cops) this.siegeCop(p, dt, shop);
+    for (let i = 0; i < this.cars.length; i++) this.siegeCar(this.cars[i], i, dt, shop);
+    this.updateChopper(dt, game, tier);
+  }
+
+  /** La strada davanti alla porta: è lì che si mettono le volanti. */
+  planSiege(shop) {
+    const near = this.city.graph.edgesNear(shop.x, shop.y, 620);
+    let best = null;
+    let bestD = Infinity;
+    for (const e of near) {
+      const p = pointSegment(shop.x, shop.y, e.ax, e.ay, e.bx, e.by);
+      if (p.dist < bestD) { bestD = p.dist; best = { edge: e, t: p.t }; }
+    }
+    this.siegeEdge = best;
+  }
+
+  siegeCop(p, dt, shop) {
+    if (p.siegeA === undefined) {
+      // Attorno alla porta ma dal lato della strada: `shop.nx/ny` è la normale
+      // uscente della vetrina, e un agente piazzato dentro il palazzo non lo
+      // vedrebbe nessuno. Fra 60 e 220 px: più vicino si esce addosso a uno, più
+      // lontano non si legge come un'attesa.
+      p.siegeA = Math.atan2(shop.ny, shop.nx) + (Math.random() - 0.5) * 2.6;
+      p.siegeR = 60 + Math.random() * 160;
+    }
+    const tx = shop.x + Math.cos(p.siegeA) * p.siegeR;
+    const ty = shop.y + Math.sin(p.siegeA) * p.siegeR;
+    const dx = tx - p.x;
+    const dy = ty - p.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 4) {
+      const sp = Math.min(p.baseSpeed * 1.7, d * 3);
+      p.x += (dx / d) * sp * dt;
+      p.y += (dy / d) * sp * dt;
+      p.animT += sp * dt * 0.2;
+    }
+    p.vx = 0;
+    p.vy = 0;
+    p.angle = Math.atan2(shop.y - p.y, shop.x - p.x);
+  }
+
+  siegeCar(v, i, dt, shop) {
+    const se = this.siegeEdge;
+    let tx;
+    let ty;
+    let ta;
+    if (se) {
+      // In fila sulla carreggiata, a cavallo della porta e nei due sensi: uscire e
+      // trovarne una di traverso sul marciapiede sarebbe la stessa scena, ma sbagliata.
+      const e = se.edge;
+      const dir = i % 2 ? -1 : 1;
+      const s0 = dir > 0 ? se.t * e.len : (1 - se.t) * e.len;
+      const pt = lanePoint(e, dir, 0, clamp(s0 + 52 + (i >> 1) * 78, 14, e.len - 14), this.tmp);
+      tx = pt.x; ty = pt.y; ta = pt.angle;
+    } else {
+      tx = shop.x + shop.nx * 150;
+      ty = shop.y + shop.ny * 150;
+      ta = Math.atan2(-shop.ny, -shop.nx);
+    }
+    const dx = tx - v.x;
+    const dy = ty - v.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 4) {
+      const sp = Math.min(210, d * 2.2);
+      v.x += (dx / d) * sp * dt;
+      v.y += (dy / d) * sp * dt;
+    }
+    v.angle = d > 44 ? Math.atan2(dy, dx) : ta;
+    // La fisica non gira: azzerare velocità e comandi è quello che impedisce alla
+    // volante di ripartire con lo slancio dell'assedio quando la città riparte.
+    v.vx = 0; v.vy = 0; v.speed = 0; v.slip = 0;
+    v.throttle = 0; v.steer = 0; v.handbrake = true;
+  }
+
+  /** Si torna in strada: le volanti si riagganciano alla corsia su cui sono ferme. */
+  endSiege(game) {
+    this.siegeDoor = null;
+    this.siegeEdge = null;
+    for (const v of this.cars) {
+      v.vx = 0; v.vy = 0; v.speed = 0;
+      v.copAi.edge = null;
+      this.snapToRoad(v);
+      v.copAi.jamT = 0;
+      v.copAi.recoverT = 0;
+    }
+    for (const p of this.cops) p.siegeA = undefined;
   }
 
   /** Rimette in pari il numero di unità previsto dal livello. */
@@ -141,15 +367,24 @@ export class PoliceSystem {
     this.spikes.length = 0;
     for (const v of this.cars) this.dropVehicle(v, game, !hard);
     this.cars.length = 0;
+    // Le motovedette spariscono sempre: una lasciata alla deriva in mezzo al Han
+    // non se la riprende nessuno e resta lì per tutta la partita.
+    for (const v of this.boats) this.dropVehicle(v, game, false);
+    this.boats.length = 0;
     for (const p of this.cops) {
       p.state = 'walk';
       p.cop = false;
       p.armed = false;
+      p.board = null;
+      p.siegeA = undefined;
       if (hard) p.gone = true;
     }
     this.cops.length = 0;
     if (this.chopper) this.chopper = null;
     this.chopperCd = hard ? 0 : 25;
+    this.offT = 0;
+    this.nade = null;
+    this.nadeCd = 0;
   }
 
   /**
@@ -159,6 +394,11 @@ export class PoliceSystem {
   dropVehicle(v, game, leave = true) {
     v.siren = false;
     v.copUnit = false;
+    // `deployed` va spento con l'unità: chi era stato richiamato a bordo
+    // continuerebbe a camminare verso una macchina che non è più di nessuno.
+    v.recall = false;
+    v.deployed = false;
+    for (const p of this.cops) if (p.board === v) p.board = null;
     if (v.driver === 'cop') v.driver = null;
     v.protect = false;
     if (!leave) {
@@ -174,19 +414,52 @@ export class PoliceSystem {
   releaseVehicle(v, game) {
     const i = this.cars.indexOf(v);
     if (i >= 0) this.cars.splice(i, 1);
+    const j = this.boats.indexOf(v);
+    if (j >= 0) this.boats.splice(j, 1);
     v.siren = false;
     v.copUnit = false;
-    if (v.crew > 0) {
-      this.deployCrew(v, game, true);
-    }
+    v.recall = false;
+    v.deployed = false;
+    for (const p of this.cops) if (p.board === v) p.board = null;
+    // Da una motovedetta l'equipaggio non "sbarca": finisce a mare, e due agenti
+    // che camminano sull'acqua sarebbero peggio di due agenti che spariscono.
+    if (v.crew > 0 && !VEHICLE_TYPES[v.kind].marine) this.deployCrew(v, game, true);
+    else v.crew = 0;
   }
 
   // --- spawn -----------------------------------------------------------------
+  /** Commissariato più vicino a un punto, se la città ne ha uno. */
+  nearestStation(x, y) {
+    let best = null;
+    let bestD = Infinity;
+    for (const s of this.city.stations || []) {
+      const d = dist(s.x, s.y, x, y);
+      if (d < bestD) { bestD = d; best = s; }
+    }
+    return best && bestD < STATION_REACH ? best : null;
+  }
+
+  /**
+   * Una volante in più. Se c'è un commissariato entro `STATION_REACH` parte da lì:
+   * è quello che rende credibile *da dove* arriva la polizia, invece di farla
+   * comparire su un arco a caso dell'anello attorno al giocatore. Se attorno al
+   * commissariato non c'è un punto buono (troppo addosso, o in campo visivo) si
+   * ricade sull'anello di prima — che resta il comportamento in campagna, dove
+   * commissariati non ce ne sono.
+   */
   spawnCar(game, kind, tier) {
-    const graph = this.city.graph;
-    const pl = game.player;
+    const f = this.focus(game);
+    const st = this.nearestStation(f.x, f.y);
+    if (st) {
+      const v = this.trySpawnCar(game, kind, tier, this.city.graph.edgesNear(st.x, st.y, 460));
+      if (v) return v;
+    }
+    return this.trySpawnCar(game, kind, tier, this.city.graph.edgesNear(f.x, f.y, 1500));
+  }
+
+  trySpawnCar(game, kind, tier, near) {
     const rng = this.rng;
-    const near = graph.edgesNear(pl.x, pl.y, 1500);
+    const f = this.focus(game);
     if (!near.length) return null;
     for (let attempt = 0; attempt < 24; attempt++) {
       const edge = rng.pick(near);
@@ -194,10 +467,12 @@ export class PoliceSystem {
       const lane = rng.int(0, laneCount(edge) - 1);
       const s = rng.range(20, Math.max(24, edge.len - 20));
       const pt = lanePoint(edge, dir, lane, s, this.tmp);
-      const d = dist(pt.x, pt.y, pl.x, pl.y);
+      const d = dist(pt.x, pt.y, f.x, f.y);
       // Non troppo addosso (comparirebbe a vista) né troppo lontana (non arriva mai).
       if (d < 520 || d > 1500) continue;
-      if (!outsideView(game, pt.x, pt.y, 80)) continue;
+      // Sotto assedio la camera inquadra una stanza: `outsideView` direbbe di sì
+      // ovunque, e la distanza dalla porta è l'unico criterio che resta.
+      if (!this.siegeDoor && !outsideView(game, pt.x, pt.y, 80)) continue;
       let clear = true;
       for (const o of game.vehicles) {
         if (dist(o.x, o.y, pt.x, pt.y) < 90) { clear = false; break; }
@@ -227,8 +502,11 @@ export class PoliceSystem {
     const graph = this.city.graph;
     const w = game.wanted;
     const rng = this.rng;
-    // Arrivano da dove ti hanno visto l'ultima volta, non da dove sei adesso.
-    const near = graph.edgesNear(w.lastX, w.lastY, 900);
+    // Arrivano da dove ti hanno visto l'ultima volta, non da dove sei adesso —
+    // e sotto assedio "l'ultima volta" è la porta in cui sei sparito.
+    const f = this.focus(game);
+    const from = this.siegeDoor || { x: w.lastX, y: w.lastY };
+    const near = graph.edgesNear(from.x, from.y, 900);
     if (!near.length) return null;
     for (let attempt = 0; attempt < 20; attempt++) {
       const edge = rng.pick(near);
@@ -237,9 +515,9 @@ export class PoliceSystem {
       const off = edge.width / 2 + 16;
       const x = edge.ax + edge.dx * s - edge.dy * off * side;
       const y = edge.ay + edge.dy * s + edge.dx * off * side;
-      const d = dist(x, y, game.player.x, game.player.y);
+      const d = dist(x, y, f.x, f.y);
       if (d < 380 || d > 1100) continue;
-      if (!outsideView(game, x, y, 50)) continue;
+      if (!this.siegeDoor && !outsideView(game, x, y, 50)) continue;
       const swat = (tier.swat || 0) > 0 && rng.chance(0.4);
       return this.addCop(game, x, y, swat ? 'swat' : 'cop', swat ? 'rifle' : (tier.weapon || 'pistol'));
     }
@@ -257,7 +535,11 @@ export class PoliceSystem {
     p.state = 'duty';
     p.hostile = false;
     p.fireT = this.rng.range(0.2, 1);
-    game.peds.push(p);
+    p.nadeT = this.rng.range(3, NADE_CD);
+    p.board = null;
+    // Mentre il giocatore è dentro un negozio `game.peds` è la gente del piano
+    // (§5.8): un agente spinto lì comparirebbe fra gli scaffali del 편의점.
+    (game.indoors ? game.pedSystem.peds : game.peds).push(p);
     this.cops.push(p);
     return p;
   }
@@ -294,6 +576,20 @@ export class PoliceSystem {
     const pl = game.player;
     const w = game.wanted;
     p.fireT -= dt;
+    p.nadeT -= dt;
+
+    // Richiamato a bordo: torna alla sua volante e ci sale. Ha la precedenza su
+    // tutto il resto, altrimenti bastava un colpo sparato a farlo tornare indietro.
+    if (p.board) {
+      const v = p.board;
+      if (v.dead || !v.deployed || w.level === 0) p.board = null;
+      else if (dist(p.x, p.y, v.x, v.y) < BOARD_R) {
+        this.boardCop(p, v, game);
+        return { x: p.x, y: p.y, speed: 0 };
+      } else {
+        return { x: v.x, y: v.y, speed: p.baseSpeed * 1.9 };
+      }
+    }
 
     if (w.level === 0 || pl.dying) {
       // Cessato allarme: si rimette a camminare per i fatti suoi.
@@ -306,13 +602,33 @@ export class PoliceSystem {
 
     if (los) {
       const aim = Math.atan2(pl.y - p.y, pl.x - p.x);
+      // Granata della SWAT: è la risposta di livello 5 a un giocatore che si è
+      // imboscato dietro un riparo e non si muove più. Vuole distanza (sotto i
+      // 200 px salterebbe in aria anche chi la tira) e **una sola in volo per
+      // tutta la squadra**: due insieme sono una condanna senza uscita.
+      if (p.kind === 'swat' && this._level >= 5 && !this.nade && this.nadeCd <= 0 &&
+          p.nadeT <= 0 && d > NADE_MIN && d < NADE_MAX && !pl.dying) {
+        p.nadeT = NADE_CD + Math.random() * 2;
+        p.angle = aim;
+        this.nade = game.projectiles.throwItem(
+          game, p, WEAPONS.grenade,
+          p.x + Math.cos(aim) * 14, p.y + Math.sin(aim) * 14, aim, d
+        );
+        game.hud.toast('Granata in arrivo', 1.6);
+        return { x: p.x, y: p.y, speed: 0 };
+      }
       if (d < COP_FIRE_RANGE && p.fireT <= 0) {
         p.fireT = spec.rate * (spec.auto ? 6 : 2.6) + Math.random() * 0.5;
         p.angle = aim;
         shoot(game, p, spec, p.x + Math.cos(aim) * 13, p.y + Math.sin(aim) * 13, aim, { spreadMul: 2.6 });
       }
       // Distanza di ingaggio: se sei troppo vicino arretrano, se sei lontano avanzano.
-      const push = d < 120 ? -1 : d > 240 ? 1 : 0;
+      // La SWAT la tiene più larga di un agente in divisa: col fucile d'assalto ci
+      // arriva lo stesso, e senza quello stacco la finestra della granata non
+      // esisterebbe (misurato: parcheggiati fra 120 e 240 px ne tiravano una ogni
+      // 40 s, perché chi era pronto era sempre troppo vicino).
+      const swat = p.kind === 'swat';
+      const push = d < (swat ? 190 : 120) ? -1 : d > (swat ? 320 : 240) ? 1 : 0;
       if (push === 0) return { x: p.x, y: p.y, speed: 0 };
       return {
         x: p.x + Math.cos(aim) * 130 * push,
@@ -332,12 +648,14 @@ export class PoliceSystem {
     const w = game.wanted;
     ai.fireT -= dt;
 
-    // Sbarcato l'equipaggio la volante ha finito il suo lavoro: resta lì coi
-    // lampeggianti accesi. Una volante vuota che continua a speronare non si spiega.
+    // Sbarcato l'equipaggio la volante resta ferma coi lampeggianti accesi: una
+    // volante *vuota* che continua a speronare non si spiega (§4). Non è però più
+    // per sempre — vedi `manageDeployed`.
     if (v.deployed) {
       v.throttle = 0;
       v.steer = 0;
       v.handbrake = true;
+      this.manageDeployed(v, dt, game);
       return;
     }
 
@@ -397,6 +715,68 @@ export class PoliceSystem {
     } else {
       ai.jamT = 0;
     }
+  }
+
+  /**
+   * Equipaggio che risale in macchina. Due sole ragioni per richiamarlo: il
+   * giocatore è risalito in auto e se n'è andato (a piedi non lo prendi più), o
+   * l'hanno perso di vista da qualche secondo. Il richiamo non è istantaneo — gli
+   * agenti tornano a piedi alla loro volante, e chi è troppo lontano non torna.
+   *
+   * **Se non risale nessuno la volante non riparte.** Una volante vuota che ti
+   * sperona è la trappola già pagata in §4, e riaprirla per far ripartire prima
+   * l'inseguimento sarebbe un pessimo affare.
+   */
+  manageDeployed(v, dt, game) {
+    const ai = v.copAi;
+    const pl = game.player;
+    if (game.wanted.level === 0) return;
+
+    if (!v.recall) {
+      ai.lostT = this.spotted ? 0 : (ai.lostT || 0) + dt;
+      const away = !pl.onFoot && dist(v.x, v.y, pl.x, pl.y) > RECALL_FAR;
+      if (!away && ai.lostT < RECALL_LOST) return;
+      const crew = [];
+      for (const p of this.cops) {
+        if (p.dead || p.board || dist(p.x, p.y, v.x, v.y) > RECALL_R) continue;
+        crew.push(p);
+        if (crew.length >= (v.kind === 'swat' ? 3 : 2)) break;
+      }
+      // Nessuno abbastanza vicino: la volante resta dov'è e ci si riprova dopo.
+      if (!crew.length) { ai.lostT = 0; return; }
+      for (const p of crew) p.board = v;
+      v.recall = true;
+      ai.recallT = 0;
+      return;
+    }
+
+    ai.recallT += dt;
+    let waiting = false;
+    for (const p of this.cops) if (p.board === v && !p.dead) { waiting = true; break; }
+    if (waiting && ai.recallT < RECALL_GIVEUP) return;
+    for (const p of this.cops) if (p.board === v) p.board = null;
+    v.recall = false;
+    ai.lostT = 0;
+    if (v.crew > 0) {
+      v.deployed = false;
+      v.handbrake = false;
+      ai.jamT = 0;
+      ai.edge = null;
+      this.snapToRoad(v);
+    }
+  }
+
+  /** Un agente sale a bordo: sparisce dalla strada e torna equipaggio. */
+  boardCop(p, v, game) {
+    v.crew++;
+    p.board = null;
+    p.gone = true;   // chi tiene un riferimento (posti di blocco, raggi) lo scarta
+    const i = this.cops.indexOf(p);
+    if (i >= 0) this.cops.splice(i, 1);
+    // Toglierlo da `peds` adesso vorrebbe dire tagliare l'array su cui
+    // `pedSystem.update` sta iterando proprio in questo istante: si rimanda al
+    // `prune` del frame dopo, e per un frame lo si vede fermo alla portiera.
+    this._boarded.push(p);
   }
 
   followRoads(v, dt, game, tx, ty) {
@@ -658,36 +1038,208 @@ export class PoliceSystem {
     return strip;
   }
 
-  /** Le gomme a terra le prende solo chi guida: il traffico civile le schiva. */
-  updateSpikes(game) {
+  /**
+   * Chi passa sui chiodi buca. Il mezzo del giocatore si controlla ogni frame; il
+   * traffico civile **a rotazione**, una fetta per frame e solo nei paraggi (un
+   * test per veicolo per frame costerebbe più di quanto rende, e una gomma a terra
+   * fuori campo non la guarda nessuno). Con un campionamento così rado il centro
+   * del veicolo salterebbe la striscia una volta su due: si guardano i due assi
+   * oltre al centro, che è poi dove stanno davvero le gomme.
+   */
+  updateSpikes(dt, game) {
+    if (!this.spikes.length) return;
     const pl = game.player;
-    const v = pl.vehicle;
-    if (!v || v.flatTires || Math.abs(v.speed) < 20) return;
+    if (pl.vehicle) this.spikeTest(pl.vehicle, game, true);
+
+    const list = game.vehicles;
+    if (!list.length) return;
+    for (let k = 0; k < SPIKE_SLICE; k++) {
+      this._spikeI = (this._spikeI + 1) % list.length;
+      const o = list[this._spikeI];
+      if (!o || o.driver !== 'ai' || o.dead || o.flatTires) continue;
+      if (dist(o.x, o.y, pl.x, pl.y) > SPIKE_WATCH) continue;
+      this.spikeTest(o, game, false);
+    }
+  }
+
+  spikeTest(v, game, isPlayer) {
+    if (v.flatTires || Math.abs(v.speed) < 20) return;
+    const spec = VEHICLE_TYPES[v.kind];
+    if (spec.marine || spec.air) return;
+    const cos = Math.cos(v.angle), sin = Math.sin(v.angle);
+    const half = spec.len * 0.4;
     for (const s of this.spikes) {
-      if (v.x < s.x || v.x > s.x + s.w || v.y < s.y || v.y > s.y + s.h) continue;
+      let on = false;
+      for (const at of [half, 0, -half]) {
+        const x = v.x + cos * at;
+        const y = v.y + sin * at;
+        if (x >= s.x && x <= s.x + s.w && y >= s.y && y <= s.y + s.h) { on = true; break; }
+      }
+      if (!on) continue;
       v.flatTires = true;
       v.flatPull = (Math.random() - 0.5) * 0.5;
-      game.fx.addSparks(v.x, v.y, -v.vx, -v.vy, 12);
-      game.camera.addShake(7);
-      game.hud.toast('Gomme a terra', 2.6);
+      game.fx.addSparks(v.x, v.y, -v.vx, -v.vy, isPlayer ? 12 : 6);
+      if (isPlayer) {
+        game.camera.addShake(7);
+        game.hud.toast('Gomme a terra', 2.6);
+      }
       break;
+    }
+  }
+
+  // --- acqua e cielo ---------------------------------------------------------
+  /**
+   * Il giocatore è su qualcosa che la strada non raggiunge? In volo o in barca
+   * volanti, blocchi e chiodi non contano niente: è la sola ragione per cui
+   * l'elicottero si alza già a tre stelle e per cui esistono le motovedette.
+   */
+  offRoad(game) {
+    const pl = game.player;
+    const v = pl.vehicle;
+    if (v) {
+      const spec = VEHICLE_TYPES[v.kind];
+      return !!(spec.air || spec.marine);
+    }
+    return this.city.isWater(pl.x, pl.y);
+  }
+
+  /**
+   * Motovedette (경비정). Dalle tre stelle in su e solo se il giocatore è in acqua
+   * o su una barca: in mare non c'è grafo da seguire, quindi l'inseguimento è
+   * diretto e la fisica è già quella delle imbarcazioni (`vehicle.resolveMarine`).
+   * Tetto duro a due — un branco di scafi in un fiume largo 300 px non lascia
+   * scampo, ed è la stessa ragione per cui le volanti sono tre.
+   */
+  updateMarine(dt, game, tier) {
+    const want = this._level >= MARINE_LEVEL && this.offRoad(game)
+      ? Math.min(MAX_BOATS, this._level - MARINE_LEVEL + 1)
+      : 0;
+    if (!want) {
+      if (this.boats.length) {
+        for (const v of this.boats) this.dropVehicle(v, game, false);
+        this.boats.length = 0;
+      }
+      return;
+    }
+    this.boatT -= dt;
+    if (this.boats.length < want && this.boatT <= 0) {
+      this.boatT = 4;
+      this.spawnBoat(game, tier);
+    }
+    for (const v of this.boats) this.driveBoat(v, dt, game);
+  }
+
+  spawnBoat(game, tier) {
+    const pl = game.player;
+    let pier = null;
+    let bestD = Infinity;
+    for (const p of this.city.piers) {
+      const d = dist(p.x + p.w / 2, p.y + p.h / 2, pl.x, pl.y);
+      if (d < bestD) { bestD = d; pier = p; }
+    }
+    if (!pier || bestD > 3200) return null;
+    // Accanto alla testata del molo, ma **in acqua**: un mezzo marino nato sul
+    // cemento resta lì a farsi respingere finché non gira il muso (§4).
+    const cx = pier.x + pier.w / 2;
+    const cy = pier.y + pier.h / 2;
+    const reach = Math.max(pier.w, pier.h) * 0.6 + 70;
+    let spot = null;
+    let spotD = Infinity;
+    for (let i = 0; i < 12; i++) {
+      const a = (i * Math.PI) / 6;
+      const x = cx + Math.cos(a) * reach;
+      const y = cy + Math.sin(a) * reach;
+      if (!this.city.isWater(x, y)) continue;
+      const d = dist(x, y, pl.x, pl.y);
+      if (d < 300 || d > spotD) continue;
+      spotD = d;
+      spot = { x, y };
+    }
+    if (!spot) return null;
+
+    const v = createVehicle('patrol', spot.x, spot.y, Math.atan2(pl.y - spot.y, pl.x - spot.x), 0);
+    v.driver = 'cop';
+    v.copUnit = true;
+    v.siren = true;
+    v.protect = true;
+    v.lightsOn = game.isNight;
+    v.crew = 2;
+    v.copWeapon = tier.weapon || 'pistol';
+    v.copAi = { edge: null, dir: 1, lane: 0, s: 0, jamT: 0, recoverT: 0, recoverSteer: 1, fireT: 1.2 };
+    game.vehicles.push(v);
+    this.boats.push(v);
+    game.hud.toast('경비정 — motovedetta in arrivo', 2.6);
+    return v;
+  }
+
+  /**
+   * Guida di una motovedetta: inseguimento diretto, niente grafo. Non sperona —
+   * uno scafo che ti affonda in mezzo al Han è una morte senza appello, e il
+   * mestiere della motovedetta è tenerti sotto tiro finché non tocchi terra.
+   */
+  driveBoat(v, dt, game) {
+    if (v.dead || v.driver !== 'cop') return;
+    const ai = v.copAi;
+    const pl = game.player;
+    ai.fireT -= dt;
+
+    // Anti-incastro, come per le volanti: una motovedetta che si pianta contro un
+    // molo ci resta per sempre — in acqua non passa nessuno a spostarla.
+    if (ai.recoverT > 0) {
+      ai.recoverT -= dt;
+      v.throttle = -0.8;
+      v.steer = ai.recoverSteer;
+      v.handbrake = false;
+      return;
+    }
+
+    const d = dist(v.x, v.y, pl.x, pl.y);
+    const aim = Math.atan2(pl.y - v.y, pl.x - v.x);
+    v.steer = clamp(angleDiff(v.angle, aim) * 2.2, -1, 1);
+    v.throttle = d > 300 ? 1 : d > 170 ? 0.3 : -0.35;
+    v.handbrake = false;
+
+    if (Math.abs(v.speed) < 14 && d > 190) {
+      ai.jamT += dt;
+      if (ai.jamT > 1.8) {
+        ai.jamT = 0;
+        ai.recoverT = 1.1;
+        ai.recoverSteer = this.rng.chance(0.5) ? 1 : -1;
+      }
+    } else {
+      ai.jamT = 0;
+    }
+
+    if (v.crew > 0 && d < COP_FIRE_RANGE && ai.fireT <= 0 && !pl.dying) {
+      ai.fireT = 0.9 + Math.random() * 0.8;
+      const spec = WEAPONS[v.copWeapon] || WEAPONS.pistol;
+      shoot(game, v, spec, v.x + Math.cos(aim) * 28, v.y + Math.sin(aim) * 28, aim, {
+        spreadMul: 3.4,
+        ignoreVehicle: v,
+      });
     }
   }
 
   // --- elicottero ------------------------------------------------------------
   updateChopper(dt, game, tier) {
     const c = this.chopper;
-    if (!tier.chopper) {
+    // In volo o in barca l'elicottero è l'unica unità che ti segue davvero: da
+    // roba di cinque stelle diventa roba di tre. La memoria di qualche secondo
+    // (`offT`) serve a non farlo sparire ogni volta che una barca tocca la riva.
+    this.offT = this.offRoad(game) ? 6 : Math.max(0, this.offT - dt);
+    const wanted = tier.chopper || (this._level >= MARINE_LEVEL && this.offT > 0);
+    if (!wanted) {
       if (c) this.chopper = null;
       return;
     }
+    // Sotto assedio la porta è l'unico riferimento valido: `player.x/y` è la pianta.
+    const f = this.focus(game);
     if (!c) {
       this.chopperCd -= dt;
       if (this.chopperCd > 0) return;
-      const pl = game.player;
       this.chopper = {
-        x: pl.x - 900, y: pl.y - 700, z: CHOPPER_Z, angle: 0,
-        beamX: pl.x, beamY: pl.y, lit: false,
+        x: f.x - 900, y: f.y - 700, z: CHOPPER_Z, angle: 0,
+        beamX: f.x, beamY: f.y, lit: false,
         hp: CHOPPER_HP, fireT: 3, t: 0,
       };
       game.hud.toast('Elicottero in arrivo', 2.6);
@@ -699,17 +1251,18 @@ export class PoliceSystem {
     // Orbita larga sopra il giocatore, con ritardo: un inseguimento perfetto
     // sarebbe una scatola incollata alla camera.
     const orbit = 120;
-    const tx = pl.x + Math.cos(c.t * 0.42) * orbit;
-    const ty = pl.y + Math.sin(c.t * 0.42) * orbit;
+    const tx = f.x + Math.cos(c.t * 0.42) * orbit;
+    const ty = f.y + Math.sin(c.t * 0.42) * orbit;
     c.x = damp(c.x, tx, 0.85, dt);
     c.y = damp(c.y, ty, 0.85, dt);
     const heading = Math.atan2(ty - c.y, tx - c.x);
     if (Math.hypot(tx - c.x, ty - c.y) > 24) c.angle = heading;
 
-    // Il riflettore insegue più lento del velivolo: si può uscire dal cono.
-    c.beamX = damp(c.beamX, pl.x, 0.62, dt);
-    c.beamY = damp(c.beamY, pl.y, 0.62, dt);
-    c.lit = !pl.dying && dist(pl.x, pl.y, c.beamX, c.beamY) < BEAM_R;
+    // Il riflettore insegue più lento del velivolo: si può uscire dal cono. Sotto
+    // assedio non c'è niente da illuminare: il giocatore è sotto un tetto.
+    c.beamX = damp(c.beamX, f.x, 0.62, dt);
+    c.beamY = damp(c.beamY, f.y, 0.62, dt);
+    c.lit = !this.siegeDoor && !pl.dying && dist(pl.x, pl.y, c.beamX, c.beamY) < BEAM_R;
 
     if (c.lit) {
       c.fireT -= dt;
@@ -793,11 +1346,18 @@ export class PoliceSystem {
       if (dist(v.x, v.y, pl.x, pl.y) > car) continue;
       if (hasLineOfSight(game, v.x, v.y, pl.x, pl.y)) return true;
     }
+    // Anche la motovedetta ha due occhi: senza questa riga il ricercato si
+    // raffredda mentre te la ritrovi a cinquanta metri di poppa.
+    for (const v of this.boats) {
+      if (v.dead) continue;
+      if (dist(v.x, v.y, pl.x, pl.y) > car) continue;
+      if (hasLineOfSight(game, v.x, v.y, pl.x, pl.y)) return true;
+    }
     return false;
   }
 
   /** Numero di unità in campo, per il pannello di debug. */
   get unitCount() {
-    return this.cops.length + this.cars.length + (this.chopper ? 1 : 0);
+    return this.cops.length + this.cars.length + this.boats.length + (this.chopper ? 1 : 0);
   }
 }
