@@ -1672,6 +1672,41 @@ export function generateCity(seed = 20260730) {
     });
   }
 
+  // --- Commissariati ---------------------------------------------------------
+  // Stesso metodo degli ospedali, e per la stessa ragione: si sceglie fra isolati
+  // che esistono già, quindi **non si pesca un solo numero dall'rng** e la città
+  // resta identica a quella collaudata. Uno per distretto urbano — dove non ci
+  // sono isolati di città (campagna, aeroporto) non ce n'è nessuno, e la polizia
+  // arriva da fuori come faceva prima.
+  city.stations = [];
+  for (const d of DISTRICTS) {
+    const hsp = city.hospitals.find((h) => h.district === d.id);
+    const cx = d.seed.x * W;
+    const cy = d.seed.y * H;
+    let best = null;
+    let bestD = Infinity;
+    for (const b of city.blocks) {
+      if (b.district !== d.id || b.type !== 'urban' || b.hospital) continue;
+      if (b.w < 150 || b.h < 150) continue;
+      const bx = b.x + b.w / 2;
+      const by = b.y + b.h / 2;
+      // Lontano dall'ospedale: due blip a due passi sulla minimappa sono un blip solo.
+      if (hsp && (bx - hsp.x) ** 2 + (by - hsp.y) ** 2 < 420 * 420) continue;
+      const dd = (bx - cx) ** 2 + (by - cy) ** 2;
+      if (dd < bestD) { bestD = dd; best = b; }
+    }
+    if (!best) continue;
+    best.station = true;
+    // Sul marciapiede a sud, mentre l'ospedale sta su quello a nord: quando i due
+    // finiscono sullo stesso isolato restano comunque due posti diversi.
+    city.stations.push({
+      x: best.x + best.w / 2,
+      y: best.y + best.h - SIDEWALK * 0.78,
+      district: d.id,
+      name: d.name,
+    });
+  }
+
   // --- Negozi, attività ai piani e officine ----------------------------------
   placeShops(city);
   placeGarages(city);
