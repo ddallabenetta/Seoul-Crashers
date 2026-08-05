@@ -120,6 +120,13 @@ export class ShopMenu {
     ctx.fillStyle = pal.accent;
     ctx.font = '800 30px system-ui, "Apple SD Gothic Neo", sans-serif';
     ctx.fillText(biz.hangul, x + 26, y + 46);
+    const titleW = ctx.measureText(biz.hangul).width;
+    // Il quartiere in cui stai comprando, accanto all'insegna: senza dirlo, prezzi
+    // diversi da un negozio all'altro sembrano un bug invece che un mercato.
+    const market = marketFor(game);
+    ctx.font = '700 13px system-ui, "Apple SD Gothic Neo", sans-serif';
+    ctx.fillStyle = hexA(pal.accent, 0.6);
+    ctx.fillText(`시세 ${market.hangul}`, x + 42 + titleW, y + 44);
     ctx.fillStyle = 'rgba(238,242,248,0.9)';
     ctx.font = '700 16px system-ui, sans-serif';
     const label = biz.label.toUpperCase();
@@ -127,13 +134,7 @@ export class ShopMenu {
     // L'orario sta qui perché è qui che si decide di spendere: sapere che fra
     // un'ora chiude cambia quanto ci si carica addosso adesso.
     ctx.fillStyle = 'rgba(238,242,248,0.42)';
-    const after = x + 40 + ctx.measureText(label).width;
-    ctx.fillText(hoursLabel(biz), after, y + 68);
-    // Il quartiere in cui stai comprando: senza dirlo, i prezzi che cambiano da un
-    // negozio all'altro sembrano un bug invece che un mercato.
-    const market = marketFor(game);
-    ctx.fillStyle = hexA(pal.accent, 0.75);
-    ctx.fillText(`· 시세 ${market.hangul}`, after + ctx.measureText(hoursLabel(biz)).width + 12, y + 68);
+    ctx.fillText(hoursLabel(biz), x + 40 + ctx.measureText(label).width, y + 68);
     ctx.textAlign = 'right';
     ctx.fillStyle = '#ffd23f';
     ctx.font = '700 22px ui-monospace, monospace';
@@ -205,7 +206,7 @@ export class ShopMenu {
         deviation = true;
         ctx.font = '700 11px system-ui, sans-serif';
         ctx.fillStyle = (sell ? dev > 0 : dev < 0) ? 'rgba(74,217,138,0.85)' : 'rgba(224,90,74,0.9)';
-        ctx.fillText(`${dev > 0 ? '+' : ''}${dev}% sul listino`, rx + rw - 14, ry + 38);
+        ctx.fillText(`${dev > 0 ? '+' : ''}${dev}%`, rx + rw - 14, ry + 38);
       }
       ctx.globalAlpha = 1;
       ry += ROW;
@@ -228,7 +229,7 @@ export class ShopMenu {
     if (deviation) {
       ctx.fillStyle = 'rgba(235,240,250,0.32)';
       ctx.font = '500 11px system-ui, sans-serif';
-      ctx.fillText(`prezzi di ${market.hangul}: rosso = ci rimetti, verde = ci guadagni`, x + pw / 2, y + ph - 56);
+      ctx.fillText(`${market.hangul} — scostamento dal listino di Seoul: rosso = ci rimetti, verde = ci guadagni`, x + pw / 2, y + ph - 56);
     }
     ctx.restore();
   }

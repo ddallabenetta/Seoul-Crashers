@@ -229,7 +229,7 @@ export function stockFor(bizId, game) {
           base: -Math.round(s.price * MARKET_BASE.pawn),
           mul: m.pawn / MARKET_BASE.pawn,
           price: -roundPrice(s.price * m.pawn),
-          detail: () => `te la ricomprano al ${pct}% del listino, munizioni comprese`,
+          detail: () => `ricomprata al ${pct}%, munizioni comprese`,
           buy(game) {
             game.player.owned.delete(id);
             game.player.ammo[id] = 0;
