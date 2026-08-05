@@ -5,6 +5,7 @@ export const FTW = 64;   // larghezza texture (mappata sulla lunghezza del muro)
 export const FTH = 160;  // altezza texture (mappata sull'altezza dell'edificio)
 
 const texCache = new Map();
+const lightCache = new Map();
 const gradCache = new Map();
 const signCache = new Map();
 let gradCtx = null;
@@ -230,6 +231,104 @@ export function facadeTexture(style, cols, rows, variant) {
   return c;
 }
 
+// --- Finestre accese ---------------------------------------------------------
+// Overlay separato, disegnato in `lighter` sopra la facciata con l'intensità
+// della sera. Vale la pena di una seconda cache: il palazzo di giorno e quello
+// di notte sono la stessa texture più questa, non due texture diverse.
+
+// Tinte delle finestre accese: il giallo caldo è casa, il bianco freddo è un
+// neon d'ufficio. Averle mescolate è quello che fa leggere un palazzo come
+// abitato invece che come un pannello luminoso.
+const BULBS = ['rgba(255,206,120,', 'rgba(255,184,96,', 'rgba(214,232,255,', 'rgba(255,232,178,'];
+
+/** Quante finestre restano accese, e di che colore. Deterministico dal seed della facciata. */
+function litWindows(g, cols, rows, variant, opts) {
+  const cw = FTW / cols;
+  const rh = FTH / rows;
+  const mw = cw * (opts.mw ?? 0.56);
+  const mh = rh * (opts.mh ?? 0.5);
+  for (let r = 0; r < rows; r++) {
+    const y = FTH - (r + 1) * rh;
+    for (let c = 0; c < cols; c++) {
+      const seedv = (r * 31 + c * 17 + variant * 11) % 100;
+      if (seedv < (opts.skip ?? 6)) continue;          // qui la finestra non c'è
+      const roll = (seedv * 7 + r * 13 + c * 5) % 100;
+      if (roll > (opts.lit ?? 46)) continue;
+      const x = c * cw + (cw - mw) / 2;
+      const wy = y + (rh - mh) / 2;
+      const bulb = BULBS[(seedv + r) % BULBS.length];
+      g.fillStyle = `${bulb}${(0.5 + (roll % 5) * 0.09).toFixed(2)})`;
+      g.fillRect(x, wy, mw, mh);
+      // Un'ombra dentro al vetro: senza, la finestra accesa è un rettangolo piatto.
+      g.fillStyle = 'rgba(0,0,0,0.22)';
+      g.fillRect(x + mw * 0.55, wy + mh * 0.45, mw * 0.45, mh * 0.55);
+      // Alone sul muro attorno
+      g.fillStyle = `${bulb}0.12)`;
+      g.fillRect(x - 1.4, wy - 1.4, mw + 2.8, mh + 2.8);
+    }
+  }
+}
+
+function litGlass(g, cols, rows, variant) {
+  const rh = FTH / rows;
+  for (let r = 0; r < rows; r++) {
+    if ((r * 11 + variant * 7) % 5 > 2) continue;
+    const y = FTH - (r + 1) * rh;
+    // Nei grattacieli si accende il piano intero, non la singola finestra: sono
+    // open space, e di notte da fuori si vede la fascia illuminata.
+    g.fillStyle = `rgba(206,228,255,${(0.24 + ((r * 3 + variant) % 4) * 0.05).toFixed(2)})`;
+    g.fillRect(0, y + rh * 0.12, FTW, rh * 0.62);
+  }
+}
+
+function litWarehouse(g) {
+  g.fillStyle = 'rgba(226,238,255,0.4)';
+  g.fillRect(2, FTH * 0.06, FTW - 4, FTH * 0.1);
+}
+
+function litGreenhouse(g) {
+  // Le serre coreane si illuminano di notte per allungare la giornata alle
+  // piante: da lontano sono lanterne posate nei campi, ed è uno dei pochi segni
+  // di vita che ha la campagna dopo il tramonto.
+  const gr = g.createLinearGradient(0, 0, 0, FTH);
+  gr.addColorStop(0, 'rgba(255,238,190,0.4)');
+  gr.addColorStop(1, 'rgba(255,214,140,0.16)');
+  g.fillStyle = gr;
+  g.fillRect(0, 0, FTW, FTH);
+}
+
+function litTower(g) {
+  g.fillStyle = 'rgba(150,230,255,0.55)';
+  g.fillRect(0, FTH * 0.03, FTW, FTH * 0.03);
+  g.fillStyle = 'rgba(255,120,150,0.22)';
+  g.fillRect(0, FTH * 0.09, FTW, FTH * 0.012);
+}
+
+/**
+ * Strato delle luci accese di una facciata, o null se quello stile non si
+ * illumina (muri di cinta, container, colline). Va disegnato in `lighter` con
+ * alpha pari a quanto è calata la sera.
+ */
+export function facadeLights(style, cols, rows, variant) {
+  const key = `${style}:${cols}:${rows}:${variant}`;
+  if (lightCache.has(key)) return lightCache.get(key);
+  let c = null;
+  const make = () => { c = newTex(); return c.getContext('2d'); };
+  switch (style) {
+    case 'glass': litGlass(make(), cols, rows, variant); break;
+    case 'concrete': litWindows(make(), cols, rows, variant, { lit: 52 }); break;
+    case 'panel': litWindows(make(), cols, rows, variant, { mw: 0.72, mh: 0.42, skip: 4, lit: 58 }); break;
+    case 'brick': litWindows(make(), cols, rows, variant, { mw: 0.44, mh: 0.42, skip: 10, lit: 44 }); break;
+    case 'warehouse': litWarehouse(make()); break;
+    case 'greenhouse': litGreenhouse(make()); break;
+    case 'tower': litTower(make()); break;
+    case 'container': case 'wall': case 'hill': break;
+    default: litWindows(make(), cols, rows, variant, { lit: 50 }); break;
+  }
+  lightCache.set(key, c);
+  return c;
+}
+
 /**
  * Gradiente verticale in coordinate texture (0 = base a terra, FTH = tetto).
  * side determina quanta luce prende la facciata (sole da nord-ovest).
@@ -251,7 +350,8 @@ export function facadeGradient(ctx, color, side) {
   return gr;
 }
 
-function mix(hex, amt) {
+/** Schiarisce (amt > 0) o scurisce (amt < 0) un colore esadecimale. */
+export function mix(hex, amt) {
   const h = hex.replace('#', '');
   const r = parseInt(h.slice(0, 2), 16);
   const g = parseInt(h.slice(2, 4), 16);

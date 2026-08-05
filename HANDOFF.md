@@ -3,15 +3,17 @@
 Documento per riprendere il lavoro da una sessione pulita. Leggi anche `README.md`
 (descrizione del gioco e comandi) — qui c'è quello che serve a *sviluppare*.
 
-Ultimo aggiornamento: **il traffico si muove bene** (§5.10) — la segnalazione aperta dell'utente
-(«si muove in modo strano, molti incidenti o ingorghi») è chiusa: **−83% di urti** a flusso
-sostanzialmente invariato. Prima c'era la mappa (§5.9: mare, aeroporto, porto, campagna, bande),
-i negozi e gli interni (§5.8), la Fase 2 tappa C (arsenale pesante) e gli strumenti (`.claude/`, §9).
+Ultimo aggiornamento: **ciclo giorno-notte, meteo e orari** (§5.11) — Seoul ha un orologio
+(24 minuti reali = 24 ore), quattro condizioni di tempo con la pioggia che si sente al volante,
+e i negozi che aprono e chiudono. Prima c'era il traffico (§5.10), la mappa (§5.9: mare,
+aeroporto, porto, campagna, bande), i negozi e gli interni (§5.8) e la Fase 2 tappa C.
 
-> 📌 **Da concordare con l'utente prima di scrivere codice:** la Fase 3 ha ancora due lavori
-> indipendenti, **missioni** e **ciclo giorno-notte**. Sono di taglia molto diversa e l'utente
-> vuole essere consultato sulle scelte di design (§7): chiedigli da quale partire. §6 ha
-> l'elenco completo di quello che resta indietro, in ordine di quanto si sente.
+> 📌 **Da concordare con l'utente prima di scrivere codice:** della Fase 3 restano le
+> **missioni**, che sono il lavoro grosso e pieno di scelte di design (quante, come si
+> attivano, cutscene a fumetti, fallimento e ripetizione). L'utente vuole essere consultato
+> invece di trovarsele fatte (§7): **chiediglielo in apertura di sessione.** §6 ha l'elenco
+> completo di quello che resta indietro, in ordine di quanto si sente — e adesso in cima c'è
+> il ciclo giorno-notte, che ha appena aperto una lista tutta sua.
 
 ---
 
@@ -21,10 +23,17 @@ Web game d'azione top-down 2.5D ambientato a Seoul, stile *GTA: Chinatown Wars*.
 Canvas 2D puro, moduli ES nativi, **zero dipendenze, nessun build step**. Tutta la grafica
 (sprite, facciate, terreno, mappa) è generata da codice a runtime: non esistono asset esterni.
 
-Stato: **Fase 1, Fase 1.5, Fase 2 (tutte e tre le tappe) e le prime due tappe della Fase 3
-completate e collaudate**, più la revisione della guida AI del traffico (§5.10). ~13.500 righe
-in 32 moduli. 60 fps con ~44 veicoli e ~93 pedoni attivi, e restano 60 anche sotto raffica
-continua di SMG. Dentro un edificio il costo è trascurabile: la città non gira.
+Stato: **Fase 1, Fase 1.5, Fase 2 (tutte e tre le tappe) e le prime tre tappe della Fase 3
+completate e collaudate**, più la revisione della guida AI del traffico (§5.10). ~14.500 righe
+in 33 moduli. 60 fps con ~44 veicoli e ~93 pedoni attivi, e restano 60 anche sotto raffica
+continua di SMG. Dentro un edificio il costo è trascurabile: la città non gira. Il ciclo
+giorno-notte costa **1,5 ms di JS per frame nel caso peggiore** (notte con temporale) — ma i
+veli a schermo intero non sono misurabili onestamente in headless, vedi l'avvertenza in §5.11.
+
+**Seoul ha un'ora e un tempo.** L'orologio gira sempre (24 minuti reali = 24 ore, anche dentro
+un negozio), la luce cambia con l'ora, il cielo passa da sereno a temporale e viceversa, e i
+locali hanno un orario di apertura. Non è una decorazione: di notte la polizia vede meno lontano,
+sotto l'acqua si frena peggio, e alle tre del mattino l'unica insegna accesa è quella del 편의점.
 
 **Il mondo è 5400×5400 e la città non lo riempie: ha una sagoma.** A ovest il mare, con
 l'aeroporto di Gimpo e il porto di Incheon sulla costa e la campagna in mezzo; a est, nord e
@@ -208,7 +217,30 @@ Per negozi e interni (fase 3):
 
 `game.indoors` è la domanda giusta da fare quasi sempre: se è vero, traffico, pedoni,
 polizia, ricercato e raccolte **non stanno girando**, e `game.area()` restituisce la pianta
-del piano invece della città.
+del piano invece della città. **L'unica eccezione è l'orologio**, che gira comunque (§5.11).
+
+Per l'ora, la luce e il meteo (fase 3, terza tappa):
+
+```js
+// che ora è, che tempo fa, e cosa ne consegue
+const dc = game.dayCycle;
+({ ora: dc.clock, giorno: dc.day, fase: dc.phase, notte: dc.isNight,
+   meteo: dc.weather.label, pioggia: +dc.rain.toFixed(2), bagnato: +dc.wet.toFixed(2),
+   nuvole: +dc.cloudiness.toFixed(2), traffico: +dc.trafficScale.toFixed(2) })
+// la luce del momento: è tutto quello che legge la scena
+dc.light   // { amb:[r,g,b], k, warm:[r,g,b], w, sx, sy, shadow, lamps }
+// comandi: spostare l'ora, forzare il tempo, fermare l'orologio
+dc.hour = 21.5;  dc.setWeather('storm');  dc.paused = true;
+// negozi: chi è aperto adesso
+game.city.shops.filter((s) => game.shops.shopOpen(s, game)).length   // su 113
+game.shops.isOpen('guns', game)          // un tipo di attività
+game.shops.nextOpening(s, game)          // { biz, at, wait } del piano che riapre prima
+```
+
+`dc.light.lamps` (0..1) è la manopola da cui scende tutto quello che si accende: fari,
+lampioni, insegne, finestre. `isNight` è solo `lamps > 0.5`. Per un giro completo delle 24 ore
+in forma di tabella, senza guardare ventiquattro screenshot, c'è
+`.claude/tools/scenes/daylight-sweep.scene` (§9).
 
 Per l'arsenale pesante (tappa C):
 
@@ -281,7 +313,8 @@ src/world/
   citygen.js          quota del terreno, campo di urbanità, maglia stradale, mare e costa,
                       isolati (urbani, rurali, aeroporto, porto), edifici, props, indici,
                       vetrine (`placeShops`), officine (`placeGarages`), bande (`placeTurfs`)
-  interiors.js        catalogo delle attività + generazione della pianta di ogni piano
+  daycycle.js         orologio, tabella della luce ora per ora, meteo a catena di Markov
+  interiors.js        catalogo delle attività (con gli orari) + pianta di ogni piano
   roadgraph.js        nodi/archi, corsie, semafori, prenotazione incrocio
   maptexture.js       texture 1100×1100 della mappa, con hillshade (minimappa + mappa piena)
 
@@ -561,6 +594,38 @@ chiodate invece non stanno nella griglia: sono un rettangolo controllato solo co
 del giocatore (`police.updateSpikes`), perché il traffico civile che si buca non lo guarda
 nessuno e costerebbe un test per veicolo per frame.
 
+**La luce è un velo, non un motore.** Il terreno è fatto di tile da 512 px messi in cache: se
+l'illuminazione entrasse nel disegno, ogni minuto di orologio butterebbe via la cache e
+ridisegnerebbe la città. Quindi la scena si disegna **sempre a mezzogiorno** e alla fine
+(`scene.drawLight`, passo 8) ci passa sopra un velo a schermo intero: una tinta in `multiply`
+per l'ora, un velo caldo in `lighter` per alba e tramonto, uno in `overlay` per il bagnato. Ne
+segue una cosa da sapere prima di stupirsi: **tutto quello che viene disegnato dopo il velo non
+è illuminato** — HUD, mappa e menu stanno fuori apposta, e ci si tingono da soli se serve
+(`hud.drawMinimap`, `mapview.drawPanel`). E **dentro un edificio il velo non c'è**: la luce di
+un interno è artificiale, un negozio aperto è uguale alle tre di notte e a mezzogiorno. Quello
+che cambia è se l'interruttore è acceso, e lo dice l'orario (`floor.openNow`), non il sole.
+
+**Le ombre si muovono a scatti, il rilievo non si muove affatto.** L'ombra di un volume è un
+poligono cachato sull'edificio (`b._shadow`): seguirla con continuità vorrebbe dire un hull per
+palazzo per frame. La direzione del sole viene quindi arrotondata a una griglia (`SUN_STEP`) e
+le ombre si rifanno solo quando scatta la tacca — ogni 30-50 s reali. L'**hillshade** del
+terreno e quello della mappa invece restano fermi sul `SUN` fisso di `camera.js`: sono lettura
+del rilievo, non ora del giorno, e ruotarli vorrebbe dire invalidare la cache dei tile. Per
+questo il vettore d'ombra di `daycycle` vale esattamente `SUN` a mezzogiorno: **il mezzogiorno
+è il fotogramma di riferimento**, e da lì la giornata si allontana in avanti e indietro.
+
+**Il vettore dell'ombra si interpola, l'angolo no.** In `KEYS` la luce è `(sx, sy)` = direzione
+per lunghezza, non un angolo con una lunghezza a parte. Interpolando l'angolo, al tramonto
+l'ombra ruoterebbe all'indietro attraversando tutta la giornata per tornare all'alba;
+interpolando il vettore si accorcia fino a sparire e ricompare dall'altra parte, che è quello
+che fa il sole quando passa sotto l'orizzonte.
+
+**Il meteo è una catena, non un dado.** `NEXT` in `daycycle.js` dice cosa può venire dopo cosa:
+da sereno non si arriva mai direttamente a temporale, il cielo si copre prima. Serve a non
+avere un muro d'acqua che compare in due secondi sopra una città col sole. La transizione dura
+25 s e `blend` va **da `weather` (0) a `next` (1)**: sbagliarne il verso fa una transizione che
+va a ritroso e finisce con uno scatto, ed è un bug che nel sorgente si legge come corretto.
+
 **L'elicottero vive nella proiezione.** Vola a `z = 210`, quindi a schermo sta dove lo mette
 la parallasse, non sopra la sua verticale. Due conseguenze: si colpisce alla posizione
 proiettata (c'è un caso apposta in `weapons.rayCast`, ed è l'unico bersaglio che dipende dalla
@@ -631,6 +696,12 @@ codice spiega il perché nel punto giusto.
 | La manovra di sblocco sbatte le auto contro i palazzi | si indietreggiava senza guardare cosa c'è dietro | `startRecovery` controlla veicoli **e** `solidGrid` dietro; se è chiuso forza il passaggio invece di indietreggiare |
 | Auto che nascono dentro un autobus | lo spazio libero preteso allo spawn era 88 px fissi, e un autobus è lungo 158 | `spawnTrafficNear`, `54 + len/2 + GAP_STOP` |
 | Le code crescono finché non si smaltiscono più | con una distanza di sicurezza vera, 54 auto nell'anello di streaming superano la capacità degli incroci semaforizzati | `MAX_TRAFFIC` 54 → 44 (misurato: a 48 il flusso cala del 23%, a 44 del 6%) |
+| Il temporale arriva a ritroso e finisce con uno scatto | `lerp(next, weather, blend)` invece di `lerp(weather, next, blend)`: a `blend = 0` restituisce già la condizione nuova, poi per 25 s torna verso la vecchia | `daycycle.apply`, `blend` va **da `weather` a `next`** |
+| Un tramonto col temporale è viola invece che plumbeo | la nuvolosità alzava solo la forza della tinta, non ne cambiava il colore: restava quella dell'ora | `daycycle.apply`, `amb` tirata verso `SLATE` in funzione di `cloudiness` |
+| `TypeError: … reading 'dayCycle'` a ogni pedone dentro un negozio | `interiorscene` chiama `scene.drawPed` con tre argomenti, e `drawPed` ne ha preso un quarto (`game`) per la pioggia | firma cambiata in un posto solo su due: `scene.drawPed` è **condiviso** fra strada e interni, come `drawPlayer` |
+| La gente al tavolo di un 분식 apre l'ombrello | `drawPed` è lo stesso codice dentro e fuori, e leggeva `rain` senza guardare dove si trova | guardia `game.indoors` in `drawPed` |
+| L'orologio dell'HUD è un emoji che cambia da macchina a macchina | `weather.icon` usato come glifo | icone del meteo disegnate con path (`hud.drawWeatherIcon`), come tutto il resto della grafica |
+| L'asfalto resta bagnato per minuti dopo aver forzato `clear` in una prova | `setWeather` saltava alla nuova condizione ma lasciava `wet` a asciugarsi da solo (0.0016/frame) | `setWeather` porta `wet` a 0 o 1 insieme al resto |
 | **In una prova scriptata** il ricercato torna a 0 da solo | il giocatore fermo allo spawn viene investito, oppure a cinque stelle la SWAT lo ammazza in ~8 s: la morte azzera tutto | metterlo su un marciapiede (`city.hospitals[i]`) e campionare entro 7 s |
 
 Regola generale emersa: **prima di dare la colpa all'AI, verifica la geometria.** Quasi tutti
@@ -1014,14 +1085,154 @@ si riuniscono, e il guadagno sul rettilineo si perde tutto lì. Se qualcuno ci r
 che manca è la scelta della corsia **in funzione della svolta successiva**: senza quella, il
 sorpasso è un debito che si paga all'incrocio dopo.
 
+### 5.11 Fase 3, terza tappa — il tempo passa
+
+Seoul ha un orologio, quattro condizioni di tempo e dei negozi che chiudono. Tutto nasce da un
+modulo solo, `world/daycycle.js`, che è l'unica fonte di verità su che ora è e che tempo fa:
+scena, HUD, negozi, polizia e traffico leggono di lì e non tengono stato proprio.
+
+Le scelte di design prese qui — cambiare costa poco, i punti sono tutti indicati:
+
+- **Un giro dura 24 minuti reali**, cioè un minuto di orologio al secondo (`DAY_SECONDS`). È la
+  scala di GTA III, ed è il compromesso che regge: più lento e in una partita non si vede mai
+  la notte, più veloce e il cielo lampeggia. Si comincia alle 8:24 del mattino.
+- **L'orologio è l'unico sistema che gira anche dentro un negozio.** Tutto il resto è fermo per
+  progetto (§5.8), ma un orologio che si ferma è un orologio a cui il giocatore smette di
+  credere, e restare al riparo aspettando che faccia giorno deve poter funzionare.
+- **La luce è un velo a schermo intero, non un motore** (§3). L'alternativa — illuminare i tile
+  del terreno — vorrebbe dire buttare la cache a ogni minuto di orologio: la si è scartata
+  prima di provarla, e non è una perdita, perché la parallasse di questo gioco non ha normali
+  su cui far cadere una luce vera.
+- **Il colore del cielo è una tabella, non una formula** (`KEYS`). Il blu della notte fonda, il
+  viola dell'alba e l'arancio del tramonto sono scelte: in tabella si cambiano guardando il
+  gioco, in una sinusoide si cambiano rifacendo i conti. Un giro completo si legge con
+  `daylight-sweep.scene` (§9).
+- **Le ombre girano col sole, il rilievo no** (§3). Ombre lunghe e radenti all'alba e al
+  tramonto, corte a mezzogiorno, quasi nulle di notte; l'hillshade del terreno resta fermo
+  perché è lettura del rilievo e non ora del giorno. È la stessa scelta consapevole del
+  «terreno disegnato in pianta».
+- **Le finestre si accendono.** Ogni facciata ha un secondo strato di texture
+  (`facades.facadeLights`) disegnato in `lighter` con l'intensità della sera: giallo caldo per
+  le case, bianco freddo per gli uffici, piani interi per i grattacieli di vetro, la corona
+  della N Seoul Tower, e le serre della campagna che di notte diventano lanterne. Senza, un
+  palazzo di notte è una sagoma nera.
+- **Quattro condizioni di tempo, legate in catena** (§3): sereno · nuvoloso · pioggia ·
+  temporale. Durano da 2 a 22 ore di gioco, la transizione è di 25 s.
+- **La pioggia si sente al volante.** Grip laterale −17% e frenata −14% sul bagnato, e
+  l'asfalto **si asciuga piano** dopo che ha smesso (i riflessi e la scarsa aderenza restano un
+  po'). I numeri sono volutamente modesti: il traffico civile frena a distanze tarate a secco
+  (§5.10) e non sa che piove — raddoppiare lo spazio di frenata rimetterebbe in strada i
+  tamponamenti che sono costati una sessione intera. Misurato, sotto: non li rimette.
+- **Di notte e sotto l'acqua la polizia vede meno lontano** (`police.visionScale`, fino a
+  −26% al buio e −20% sotto il temporale, cumulativi). È quello che dà un senso di *gioco* al
+  ciclo: seminare una caccia di notte con la pioggia è davvero più facile. Il riflettore
+  dell'elicottero resta assoluto — è fatto apposta per vedere di notte.
+- **La città si popola per fascia oraria.** `dayCycle.trafficScale`/`pedScale` scrivono in
+  `game.trafficScale`/`pedScale`, che traffico e pedoni già leggevano: ora di punta la sera
+  (×1.15), notte fonda deserta (×0.34 il traffico, ×0.2 i pedoni), e sotto l'acqua i
+  marciapiedi si svuotano molto più delle strade (−55% contro −18%).
+- **Gli ombrelli.** In una visuale dall'alto un passante sotto l'acqua *è* un ombrello: 62% dei
+  pedoni ne ha uno, deciso alla nascita e non quando comincia a piovere (vederli comparire
+  tutti insieme tradirebbe che sono un effetto). Poliziotti, ostili, guardie di un territorio e
+  chi è in panico non ce l'hanno aperto.
+- **I locali hanno un orario.** 편의점 e 병원 ventiquattr'ore (il secondo è anche il punto di
+  risveglio dopo la morte: chiuderlo chiuderebbe la partita), negozi di giorno, 술집 · 노래방 ·
+  피시방 · 당구장 di sera e notte. Fuori orario la porta non si apre e il cartello dice a che
+  ora riapre. **La porta segue il palazzo, non il negozio**: la scala è in comune, quindi se il
+  piano terra è chiuso ma sopra c'è un 당구장 aperto si entra lo stesso, e il piano chiuso si
+  attraversa al buio e vuoto — una porta che non si apre senza nemmeno una serratura da
+  guardare è una parete invisibile, una sala buia si spiega da sola.
+- **Un locale chiuso non ha cassa e non ha listino.** Senza, un 총포상 alle tre di notte
+  sarebbe contante gratis senza nessuno a difenderlo.
+- **La soglia luminosa ha tre stati**, non due: aperto · chiuso ma con qualcosa di aperto sopra
+  (metà intensità) · tutto chiuso (spenta). La saracinesca abbassata si deve vedere da lontano
+  quanto l'insegna accesa, o di notte si attraversa mezza Seoul per niente.
+- **La minimappa si tinge, la mappa piena si tinge a metà.** Una mappa aperta va letta, e lì
+  non c'è la scena attorno a dare il contesto dell'ora.
+
+**Quanto costa, misurato.** Strumentando il loop, per frame:
+
+| | mezzogiorno sereno | notte + temporale |
+| --- | --- | --- |
+| `scene.render` | 2,25 ms | 2,99 ms |
+| `hud.draw` | 0,40 ms | 0,45 ms |
+| `update` | 1,61 ms | 2,29 ms |
+| **JS per frame** | **4,3 ms** | **5,8 ms** |
+
+Cioè il caso peggiore costa **1,5 ms di JS in più**, e `scene.render` resta sotto quello che
+misura `main` sullo stesso albero (3,0 ms). ⚠️ **Il tempo di parete però, in container, passa
+da 23 a 32 ms per frame**, e quegli ~8 ms non sono nostri: sono il rasterizzatore software di
+Chromium headless che paga i riempimenti a schermo intero in `multiply`/`lighter`/`overlay` e
+tutto il blending `lighter` di fari, aloni e finestre. **Su una GPU vera quei passaggi sono
+sostanzialmente gratis, ma in questo ambiente non è verificabile**: se qualcuno ha uno schermo,
+la prima cosa da controllare è `F3` di notte sotto il temporale. Se davvero costasse, la leva è
+una sola — accorpare i veli, oggi sono fino a tre `fillRect` a tutto schermo in `drawLight`.
+
+**Il conto della pioggia sul traffico, misurato.** Con `traffic-census.scene` (§9), 170 s su
+cinque zone, orologio fermo alle 8:24. Attenzione a leggere la colonna giusta: **il temporale
+toglie da solo il 18% dei veicoli** (`trafficScale`), quindi il confronto onesto è la terza
+colonna, dove il numero di auto è stato riportato a mano a quello del sereno.
+
+| | sereno | temporale | temporale, **stesso traffico** |
+| --- | --- | --- | --- |
+| veicoli seguiti | 188 | 149 | 172 |
+| urti al minuto | 32,1 | 31,9 | **41,6** |
+| di cui tamponamenti | 4 | 4 | 5 |
+| di cui laterali all'incrocio | 39 | 37 | 51 |
+| flusso mediano (px/min) | 3818 | 4402 | 4390 |
+
+Tradotto: **sul bagnato il traffico si tocca il 30% in più, ma non si tampona.** Gli urti in
+più sono laterali e frontali, cioè auto che scodano in curva — che è esattamente quello che
+deve fare un'auto con meno aderenza. Il difetto chiuso in §5.10 (la distanza di sicurezza) non
+si riapre, perché la frenata è quasi intatta (−14%) e la legge di inseguimento non è stata
+toccata.
+
+**Provate e scartate, due.** *(1)* **Far rallentare l'AI in curva quando piove**
+(`driveAI`, target di svolta × 0,78): −12% di urti, ma **−22% di flusso mediano** e *più*
+tamponamenti, perché una fila che rallenta in curva se la trova addosso chi sta dietro. Per i
+criteri del §5.10 — il flusso conta più del conteggio degli urti, e i tamponamenti sono il
+difetto vero — è un cattivo affare. *(2)* **Abbassare il grip bagnato** da 0,17 a 0,11:
+misurato 44,1 urti/min, cioè *peggio* del valore più alto. Non è un paradosso, è il rumore di
+questa scena: qualunque modifica alla guida sposta le traiettorie e cambia lo scenario, e
+l'HANDOFF lo dice da §5.10 — «una differenza del 10% non significa niente». Fra due valori
+indistinguibili alla misura si tiene quello che si sente meglio col volante in mano, ed è 0,17.
+
+**Quello che non è stato fatto, e perché.** Niente neve né nebbia: la prima vorrebbe un
+accumulo a terra (cioè toccare i tile, cioè la cache), la seconda in una visuale dall'alto
+toglie solo informazione. Niente stagioni. Gli orari non cambiano il *contenuto* di un locale:
+un 술집 alle nove di sera ha la stessa gente di uno alle due di notte.
+
 ---
 
 ## 6. Backlog successivo (già concordato con l'utente)
 
-**Fase 3 — contenuti.** È in corso: negozi e interni (§5.8) e la mappa (§5.9) sono fatti, e la
-segnalazione sul traffico è chiusa (§5.10). Restano **missioni** e **ciclo giorno-notte**, due
-lavori indipendenti e di taglia molto diversa. **Conviene farsi dire dall'utente da quale dei
-due partire** — è la prima cosa da chiedere in apertura di sessione.
+**Fase 3 — contenuti.** È in corso: negozi e interni (§5.8), la mappa (§5.9) e il ciclo
+giorno-notte (§5.11) sono fatti, e la segnalazione sul traffico è chiusa (§5.10). Restano le
+**missioni**, che sono il lavoro grosso: impianto (attivazione sulla mappa, obiettivi,
+fallimento e ripetizione), cutscene a pannelli a fumetto, e i contenuti. **Le scelte di design
+vanno concordate con l'utente prima di scrivere codice** — è la prima cosa da chiedere in
+apertura di sessione.
+
+**Cose rimaste indietro dal ciclo giorno-notte** (§5.11), in ordine di quanto si sentono:
+- **Nessuno si ripara dalla pioggia.** I pedoni aprono l'ombrello e basta: non si infilano
+  sotto una tettoia, non affrettano il passo, non entrano nei locali. Il pezzo che manca è uno
+  stato `shelter` in `pedestrians`, e i portoni dei negozi sono già dei punti noti.
+- **La pioggia non bagna niente di quello che è già lì.** Non spegne le pozze della molotov,
+  non lava il sangue, non fa slittare chi va a piedi. La prima delle tre è quella che si nota.
+- **Il traffico non sa che piove**: frena alle stesse distanze, e sul bagnato scoda in curva
+  (+30% di urti laterali, §5.11). Farlo rallentare in curva è già stato provato e **misurato
+  peggiore** — costa più flusso di quanti urti risparmia. Se qualcuno ci riprova, il pezzo che
+  manca è rallentare *prima* della curva invece che dentro, cioè guardare `nextChoice` un arco
+  più avanti.
+- **Non c'è modo di far passare il tempo.** Se un giorno una missione dirà «vediamoci
+  all'alba», servirà un letto nella safehouse o un'attesa: oggi si aspettano venti minuti veri.
+- **Gli interni non cambiano con l'ora**: un 술집 alle nove di sera ha la stessa gente delle
+  due di notte, e i lampioni degli interni sono sempre accesi finché il locale è aperto.
+- **Il sole non entra nella scelta dei colori delle facciate**: `facadeGradient` ha una
+  direzione di luce fissa, quindi al tramonto le ombre sono lunghe ma il lato illuminato di un
+  palazzo è sempre lo stesso. Renderlo mobile costa l'invalidazione di `gradCache` a ogni tacca
+  del sole — fattibile, ma è la cosa che si nota meno di tutto l'elenco.
+- **Niente neve, nebbia o stagioni**, per le ragioni in §5.11.
 
 **Cose rimaste indietro dai negozi**, in ordine di quanto si sentono:
 - **La polizia non ti aspetta fuori.** Entrare con quattro stelle e uscire dopo un minuto ti
@@ -1032,8 +1243,6 @@ due partire** — è la prima cosa da chiedere in apertura di sessione.
   dalla porta non porta nessuno con sé.
 - **Gli interni non hanno finestre né retro**: una sola uscita, quella da cui sei entrato.
   Una porta sul retro che dà nel cortile dell'isolato sarebbe la via di fuga che manca.
-- **I locali non hanno orari**: sono tutti aperti sempre. Con il ciclo giorno-notte diventerà
-  la prima cosa da chiedersi (`game.isNight` è già lì).
 - **Il mercato nero dinamico** — prezzi diversi per distretto — è due righe in `stockFor` più
   un moltiplicatore per distretto, ed è quello che rende sensato attraversare la città.
 - **Niente ruba-e-rivendi**: il banco dei pegni ricompra solo le armi, non le auto.
@@ -1084,11 +1293,12 @@ due partire** — è la prima cosa da chiedere in apertura di sessione.
 
 **Fase 3 — quello che resta.**
 12 missioni in 3 atti con cutscene a **pannelli a fumetto** (gli interni sono anche il posto
-dove ambientarne metà: un incontro in un 노래방 non ha bisogno di niente di nuovo); attività
-secondarie (taxi, consegne, salti); ciclo giorno-notte e meteo (`game.isNight` è già
-consultato da lampioni, fari e insegne); audio procedurale WebAudio (`game.audio` è già
-chiamato con optional chaining: `honk`, `doorClose`); salvataggio localStorage con 3 slot —
-ora che c'è del denaro e un arsenale comprato, il salvataggio serve davvero.
+dove ambientarne metà: un incontro in un 노래방 non ha bisogno di niente di nuovo, e adesso
+un appuntamento può anche avere un'ora); attività secondarie (taxi, consegne, salti); audio
+procedurale WebAudio (`game.audio` è già chiamato con optional chaining: `honk`, `doorClose` —
+e adesso ci sarebbe anche la pioggia da far sentire); salvataggio localStorage con 3 slot —
+ora che c'è del denaro, un arsenale comprato e un orologio che avanza, il salvataggio serve
+davvero.
 
 ## 7. Vincoli e convenzioni
 
@@ -1185,6 +1395,20 @@ ora che c'è del denaro e un arsenale comprato, il salvataggio serve davvero.
 | Ricompra del banco dei pegni | `shops.stockFor` case `pawn` | 45% del prezzo |
 | Peso della rapina | `wanted.CRIMES.rob` | 22 (una stella) |
 | Zoom dentro un interno | `shops.roomZoom` | fit del piano, limitato a 1.15-2.6 |
+| Durata di un giorno · ora d'inizio | `daycycle.DAY_SECONDS` · `DayCycle` | 24 minuti reali (1 min di orologio al secondo) · si parte alle 8:24 |
+| Colore e forza della luce, ora per ora | `daycycle.KEYS` | 11 chiavi: `amb`+`k` (tinta), `warm`+`w` (velo caldo), `sx`/`sy` (ombra), `sh` (opacità) |
+| Accensione delle luci artificiali | `daycycle.lampsAt` | 0 fino alle 17, 1 dalle 19:30 alle 5; `isNight` = `lamps > 0.5` |
+| Tinta del cielo coperto | `daycycle.SLATE` · `apply` | `#8e96a4`, pesata `cloudiness × 0.62` |
+| Durata delle condizioni di tempo | `daycycle.WEATHERS[].hours` | sereno 7-22 h · nuvoloso 5-16 · pioggia 4-12 · temporale 2-6 (ore di gioco) |
+| Transizione fra due condizioni | `daycycle.updateWeather` | 25 s |
+| Asciugatura dell'asfalto | `daycycle.update` (`wet`) | misurato: bagnato in 4,4 s, asciutto in 30 s |
+| Passo di rotazione del sole | `scene.SUN_STEP` / `SHADOW_K` | 0.055 (una tacca ogni 30-50 s reali) / 0.84 |
+| Gocce disegnate col temporale | `scene.RAIN_DROPS` | 340 tratti in un path solo |
+| Aderenza e frenata sul bagnato | `vehicle.updateVehicle` | grip × (1 − wet·0.17), freno × (1 − wet·0.14) |
+| Vista della polizia col buio e la pioggia | `police.visionScale` | × (1 − lamps·0.26) × (1 − rain·0.20) |
+| Popolamento per fascia oraria | `daycycle.trafficScale` / `pedScale` | punta serale ×1.15 · notte fonda ×0.34 e ×0.2 · pioggia −18% e −55% |
+| Pedoni con l'ombrello | `pedestrians.createPed` | 62%, tinta fra 6 (`UMBRELLAS`) |
+| Orari dei locali | `interiors.BUSINESSES[].open` | `[apre, chiude]`, `[0,24]` = sempre; 편의점 · 병원 · 주택 non chiudono mai |
 | Tile terreno | `ground.TILE` / `MAX_TILES` | 512 px / 96 |
 | Volo: salita, tetto, velocità di rotazione | `sprites.VEHICLE_TYPES` `climb`/`ceiling`/`rotate` | elicottero 130 · 400 · da fermo; turboelica 105 · 460 · 250 px/s |
 | Atterraggio duro / effetto suolo | `vehicle.HARD_LANDING`, `updateAircraft` | oltre 150 px/s di caduta si rompe; con discesa comandata sotto i 60 px si smorza a 140 |
@@ -1235,6 +1459,12 @@ e un `return` a livello di file lo farebbe fallire.
 | Scena | Cosa misura |
 | --- | --- |
 | `traffic-census.scene` | urti al minuto e loro tipo, flusso in px/min per veicolo, su cinque zone. È la misura con cui è stato tarato §5.10 — e l'unica onesta per giudicare una modifica alla guida AI |
+| `daylight-sweep.scene` | la luce ora per ora su tutto il giro, più quattro campioni col temporale. Serve a vedere in una tabella quello che altrimenti vuole ventiquattro screenshot: tinta, velo caldo, lampioni, ombre, popolamento |
+
+Per forzare ora e meteo in una scena qualunque: `game.dayCycle.hour = 21.5`,
+`game.dayCycle.setWeather('storm')`, `game.dayCycle.paused = true`. Per misurare qualcosa che
+dipende dal traffico **a tempo fermo**, incolla le prime due righe davanti a
+`traffic-census.scene` — è così che è stato misurato il traffico sotto la pioggia in §5.11.
 
 ### `tools/sprite.mjs` — guardare uno sprite ingrandito
 

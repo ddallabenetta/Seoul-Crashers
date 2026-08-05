@@ -6,6 +6,7 @@ import { DynamicGrid } from './core/spatial.js';
 import { KMH, clamp, dist } from './core/math.js';
 import { generateCity } from './world/citygen.js';
 import { buildMapTexture } from './world/maptexture.js';
+import { DayCycle } from './world/daycycle.js';
 import { Camera } from './render/camera.js';
 import { Scene } from './render/scene.js';
 import { Fx } from './render/fx.js';
@@ -39,9 +40,12 @@ class Game {
     this.time = 0;
     this.debug = false;
     this.paused = false;
-    this.isNight = false;
+    // Il meteo ha un rng suo: pescare da `this.rng` sposterebbe tutto quello che
+    // ci pesca dopo (spawn del traffico, dei pedoni) a ogni cambio di tempo.
+    this.dayCycle = new DayCycle(new Rng(20260731));
     this.trafficScale = 1;
     this.pedScale = 1;
+    this._wasNight = this.dayCycle.isNight;
     this.vehicles = [];
     this.peds = [];
     this.markers = [];
@@ -130,6 +134,11 @@ class Game {
   /** True quando il giocatore è dentro un edificio: la città è ferma. */
   get indoors() {
     return !!(this.shops && this.shops.active);
+  }
+
+  /** Notte di gioco: la decide l'orologio, e da lì scendono fari, lampioni e insegne. */
+  get isNight() {
+    return this.dayCycle.isNight;
   }
 
   /**
@@ -342,6 +351,14 @@ class Game {
     }
 
     this.time += dt;
+    // L'orologio è l'unico sistema che gira anche dentro un negozio. Un orologio
+    // che si ferma è un orologio a cui il giocatore smette di credere, e restare
+    // al riparo aspettando che faccia giorno deve poter funzionare.
+    this.dayCycle.update(dt);
+    this.trafficScale = this.dayCycle.trafficScale;
+    this.pedScale = this.dayCycle.pedScale;
+    if (this.dayCycle.isNight !== this._wasNight) this.switchLights();
+
     this.vehicleGrid.rebuild(this.indoors ? NO_VEHICLES : this.vehicles);
     this.pedGrid.rebuild(this.peds);
 
@@ -387,6 +404,19 @@ class Game {
     this.camera.follow(this.player.cameraTarget(this), dt, this.player.onFoot ? 0.2 : 0.4);
 
     input.endFrame();
+  }
+
+  /**
+   * Cala la sera: si accendono i fari di quello che è già in strada. Si fa al
+   * cambio di fase e non a ogni frame perché `lightsOn` è anche una scelta del
+   * giocatore (`player.updateDriving`), e riscriverla di continuo gliela toglierebbe.
+   */
+  switchLights() {
+    this._wasNight = this.dayCycle.isNight;
+    for (const v of this.vehicles) {
+      if (v.driver !== 'player') v.lightsOn = this._wasNight;
+    }
+    this.hud.toast(this._wasNight ? 'Cala la sera su Seoul' : 'Sorge il sole', 3);
   }
 
   /** Tracce di gomma per i veicoli che slittano nei paraggi. */

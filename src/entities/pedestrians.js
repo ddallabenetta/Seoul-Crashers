@@ -12,6 +12,9 @@ const BASE_MAX = 62;
 const GUN_RANGE = 330;
 const FIST_RANGE = 34;
 
+/** Tinte degli ombrelli. La trasparente è quella coreana per eccellenza. */
+export const UMBRELLAS = ['#1c2029', '#2f4f7a', '#8c2f3c', '#3f6b4a', '#d9dde4', '#b8b0d8'];
+
 /** Anello di streaming: i pedoni nascono appena oltre il bordo dello schermo. */
 function ringFor(game) {
   const cam = game.camera;
@@ -64,6 +67,11 @@ export function createPed(kind, x, y, rng) {
     bleedT: 0,
     crossX: 0,
     crossY: 0,
+    // Chi si porta dietro l'ombrello. Si decide alla nascita e non quando
+    // comincia a piovere: in una visuale dall'alto un passante sotto l'acqua
+    // *è* un ombrello, e vederli comparire tutti insieme sopra le teste
+    // tradirebbe che sono un effetto e non una cosa che la gente ha con sé.
+    umbrella: rng.chance(0.62) ? rng.int(0, UMBRELLAS.length - 1) : -1,
   };
 }
 

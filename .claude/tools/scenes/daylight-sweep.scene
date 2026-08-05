@@ -1,0 +1,66 @@
+// Giro completo di 24 ore, campionato ora per ora: dice cosa fa la luce senza
+// bisogno di guardare 24 screenshot. È il modo veloce per accorgersi che una
+// modifica alla tabella `KEYS` di `daycycle.js` ha lasciato un buco (un'ora in
+// cui è già buio ma i lampioni sono spenti, un mezzogiorno che tinge, una notte
+// più chiara del tramonto).
+//
+//   node .claude/tools/probe.mjs --seconds 0 --quiet \
+//     --script .claude/tools/scenes/daylight-sweep.scene
+//
+// Le colonne, in ordine:
+//   k       quanto morde la tinta ambientale (0 = nessun velo, mezzogiorno)
+//   amb     la tinta stessa
+//   w       velo caldo additivo (alba e tramonto)
+//   lamp    quanto sono accese le luci artificiali, 0..1
+//   ombra   opacità delle ombre proiettate
+//   sx,sy   vettore dell'ombra: direzione × lunghezza (vedi il commento su KEYS)
+//   traf    moltiplicatore del traffico · ped: quello dei pedoni
+//
+// Quello che deve restare vero, e che si legge a colpo d'occhio:
+//   - `k` ha un solo minimo, a mezzogiorno, e un solo massimo, a notte fonda;
+//   - `lamp` passa da 0 a 1 e viceversa **senza scalini** (una colonna che salta
+//     da 0 a 1 in un'ora è un tramonto che scatta invece di calare);
+//   - `sx` cambia segno una volta sola, attorno a mezzogiorno: è il sole che
+//     passa da est a ovest. Due cambi di segno vogliono dire che l'ombra torna
+//     indietro, che è la cosa che si vede peggio a schermo.
+// Estensione `.scene` e non `.js` perché è il corpo di una funzione async.
+const dc = game.dayCycle;
+const was = dc.hour;
+const paused = dc.paused;
+dc.paused = true;
+dc.setWeather('clear', 1e9);
+
+const hex = (c) => c.map((v) => (v | 0).toString(16).padStart(2, '0')).join('');
+const rows = [];
+for (let h = 0; h < 24; h++) {
+  dc.hour = h;
+  const L = dc.light;
+  rows.push({
+    ora: dc.clock,
+    fase: dc.phase,
+    notte: dc.isNight,
+    k: +L.k.toFixed(2),
+    amb: `#${hex(L.amb)}`,
+    w: +L.w.toFixed(2),
+    lamp: +L.lamps.toFixed(2),
+    ombra: +L.shadow.toFixed(2),
+    sx: +L.sx.toFixed(2),
+    sy: +L.sy.toFixed(2),
+    traf: +dc.trafficScale.toFixed(2),
+    ped: +dc.pedScale.toFixed(2),
+  });
+}
+
+// Lo stesso giro col cielo coperto: sotto il temporale la tinta deve andare
+// verso l'ardesia e le ombre sparire, non limitarsi a scurire i colori dell'ora.
+dc.setWeather('storm', 1e9);
+const storm = [6, 12, 18, 22].map((h) => {
+  dc.hour = h;
+  const L = dc.light;
+  return { ora: dc.clock, k: +L.k.toFixed(2), amb: `#${hex(L.amb)}`, ombra: +L.shadow.toFixed(2), lamp: +L.lamps.toFixed(2) };
+});
+
+dc.setWeather('clear', 1e9);
+dc.hour = was;
+dc.paused = paused;
+return { giorno: rows, temporale: storm };

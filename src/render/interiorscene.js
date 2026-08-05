@@ -59,13 +59,27 @@ export class InteriorScene {
       switch (item.t) {
         case 0: this.drawWall(ctx, item.o, cam, pal); break;
         case 1: this.drawFurniture(ctx, item.o, cam, pal, game); break;
-        case 2: this.scene.drawPed(ctx, item.o, cam); break;
+        case 2: this.scene.drawPed(ctx, item.o, cam, game); break;
         case 3: this.scene.drawPlayer(ctx, game.player, cam, game); break;
       }
     }
 
     this.scene.drawThrown(ctx, game, cam);
     if (game.fx) game.fx.draw(ctx, cam, game.time);
+
+    // Locale chiuso: luci spente. Dentro non arriva l'ora del giorno — la luce
+    // di un interno è artificiale, e infatti un negozio aperto è illuminato
+    // uguale alle tre di notte e a mezzogiorno. Quello che cambia è se
+    // l'interruttore è acceso, e a dirlo è l'orario, non il sole.
+    if (f.openNow === false) {
+      cam.applyUI(ctx);
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.globalAlpha = 0.66;
+      ctx.fillStyle = '#4a5474';
+      ctx.fillRect(0, 0, cam.viewW, cam.viewH);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+    }
   }
 
   drawFloor(ctx, f, pal, game) {

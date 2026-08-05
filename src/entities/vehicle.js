@@ -103,6 +103,12 @@ export function updateVehicle(v, dt, world) {
 
   const top = vehicleTopSpeed(v);
   const throttle = clamp(v.throttle, -1, 1);
+  // Asfalto bagnato: è l'unico effetto del meteo che si sente col volante in
+  // mano, ed è la ragione per cui la pioggia non è solo una decorazione. Resta
+  // volutamente modesto: il traffico civile frena a distanze tarate a secco
+  // (§5.10 dell'HANDOFF) e non sa che piove — raddoppiare lo spazio di frenata
+  // rimetterebbe in strada i tamponamenti che sono costati una sessione.
+  const wet = !spec.marine && world && world.dayCycle ? world.dayCycle.wet : 0;
 
   // Accelerazione / frenata
   if (throttle > 0.01) {
@@ -110,7 +116,7 @@ export function updateVehicle(v, dt, world) {
     v.speed += spec.accel * throttle * boost * dt;
   } else if (throttle < -0.01) {
     if (v.speed > 6) {
-      v.speed += spec.accel * throttle * 2.1 * dt; // freno
+      v.speed += spec.accel * throttle * 2.1 * (1 - wet * 0.14) * dt; // freno
       v.braking = true;
     } else {
       v.speed += spec.accel * throttle * 0.75 * dt; // retromarcia
@@ -158,7 +164,7 @@ export function updateVehicle(v, dt, world) {
   const sin = Math.sin(v.angle);
   const targetVx = cos * v.speed;
   const targetVy = sin * v.speed;
-  const grip = (v.handbrake ? 1.5 : 8.5) * spec.grip * (v.flatTires ? 0.72 : 1);
+  const grip = (v.handbrake ? 1.5 : 8.5) * spec.grip * (v.flatTires ? 0.72 : 1) * (1 - wet * 0.17);
   const k = 1 - Math.exp(-grip * dt);
   v.vx += (targetVx - v.vx) * k;
   v.vy += (targetVy - v.vy) * k;

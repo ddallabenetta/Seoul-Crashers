@@ -302,7 +302,7 @@ export class PoliceSystem {
 
     const spec = WEAPONS[p.copWeapon] || WEAPONS.pistol;
     const d = dist(p.x, p.y, pl.x, pl.y);
-    const los = d < SEE_FOOT && hasLineOfSight(game, p.x, p.y, pl.x, pl.y);
+    const los = d < SEE_FOOT * this.visionScale(game) && hasLineOfSight(game, p.x, p.y, pl.x, pl.y);
 
     if (los) {
       const aim = Math.atan2(pl.y - p.y, pl.x - p.x);
@@ -353,7 +353,7 @@ export class PoliceSystem {
     const tx = w.seen ? pl.x : w.lastX;
     const ty = w.seen ? pl.y : w.lastY;
     const d = dist(v.x, v.y, pl.x, pl.y);
-    const los = d < SEE_CAR && hasLineOfSight(game, v.x, v.y, pl.x, pl.y);
+    const los = d < SEE_CAR * this.visionScale(game) && hasLineOfSight(game, v.x, v.y, pl.x, pl.y);
     const tier = this.tier;
 
     // Sbarco: il giocatore è a piedi e siamo addosso. Da qui in poi è un problema
@@ -763,18 +763,34 @@ export class PoliceSystem {
   }
 
   // --- avvistamento ----------------------------------------------------------
+  /**
+   * Quanto lontano vede una pattuglia adesso. Al buio e sotto l'acqua si vede
+   * meno, ed è quello che dà un senso di gioco al ciclo giorno-notte: seminare
+   * una caccia di notte con la pioggia è davvero più facile, non solo più bello.
+   * Il riflettore dell'elicottero però resta assoluto — è fatto apposta per
+   * vedere di notte, e togliergli quel privilegio lo renderebbe un ornamento.
+   */
+  visionScale(game) {
+    const dc = game.dayCycle;
+    if (!dc) return 1;
+    return (1 - dc.light.lamps * 0.26) * (1 - dc.rain * 0.2);
+  }
+
   computeSpotted(game) {
     const pl = game.player;
     if (pl.dying) return false;
     if (this.chopper && this.chopper.lit) return true;
+    const k = this.visionScale(game);
+    const foot = SEE_FOOT * k;
+    const car = SEE_CAR * k;
     for (const p of this.cops) {
       if (p.dead) continue;
-      if (dist(p.x, p.y, pl.x, pl.y) > SEE_FOOT) continue;
+      if (dist(p.x, p.y, pl.x, pl.y) > foot) continue;
       if (hasLineOfSight(game, p.x, p.y, pl.x, pl.y)) return true;
     }
     for (const v of this.cars) {
       if (v.dead) continue;
-      if (dist(v.x, v.y, pl.x, pl.y) > SEE_CAR) continue;
+      if (dist(v.x, v.y, pl.x, pl.y) > car) continue;
       if (hasLineOfSight(game, v.x, v.y, pl.x, pl.y)) return true;
     }
     return false;

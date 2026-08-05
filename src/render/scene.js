@@ -3,18 +3,42 @@
 // Tutti gli oggetti alti vengono ordinati per distanza radiale dal centro camera
 // (painter's algorithm radiale) e disegnati dal più lontano al più vicino.
 import { PROJ, SUN } from './camera.js';
-import { facadeTexture, facadeGradient, bucketCols, bucketRows, signSprite, FTW, FTH } from './facades.js';
+import {
+  facadeTexture, facadeLights, facadeGradient, bucketCols, bucketRows, signSprite, mix, FTW, FTH,
+} from './facades.js';
 import {
   getVehicleSprite, getPedSprite, getPropSprite, getWreckSprite, getPickupSprite,
   getHeroSprite, getChopperSprite, getSpikeSprite, getThrownSprite, VEHICLE_TYPES, PED_FRAMES,
 } from './sprites.js';
 import { WEAPONS } from '../entities/weapons.js';
 import { airborne } from '../entities/vehicle.js';
+import { UMBRELLAS } from '../entities/pedestrians.js';
 import { GroundRenderer } from './ground.js';
 import { signalAxis } from '../world/roadgraph.js';
 import { BUSINESSES as SHOP_BIZ } from '../world/interiors.js';
 
 const POLE_PROPS = new Set(['lamp', 'crane']);
+
+// Il vettore d'ombra di `daycycle` è espresso in unità del `SUN` di riferimento:
+// questa costante lo riporta in pixel di mondo, e a mezzogiorno restituisce
+// esattamente le ombre che il gioco aveva prima del ciclo giorno-notte.
+const SHADOW_K = 0.84;
+// L'ombra di un volume è un poligono cachato per edificio: se il sole si
+// muovesse con continuità servirebbe un hull per palazzo per frame. La
+// direzione viene quindi arrotondata a una griglia, e le ombre si rifanno solo
+// quando scatta la tacca — ogni 30-50 secondi reali, cioè mai durante un
+// inseguimento.
+const SUN_STEP = 0.055;
+
+// Gocce disegnate sotto il temporale più fitto. Sono tratti di linea in un
+// unico path: 340 tratti costano meno di un decimo di millisecondo.
+const RAIN_DROPS = 340;
+
+function hash1(i) {
+  let h = Math.imul(i | 0, 374761393) + 668265263;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
 
 /**
  * Altezza di proiezione di un volume: altezza propria più la quota del terreno.
@@ -53,15 +77,33 @@ export class Scene {
     this._pq = [];
     this._kq = [];
     this._fq = [];
+    this._sun = { x: SUN.x * SUN.scale, y: SUN.y * SUN.scale, key: -1 };
     this.debug = false;
   }
 
+  /**
+   * Il sole del momento, a scatti (vedi SUN_STEP). Restituisce già il fattore
+   * per cui moltiplicare l'altezza di un volume per ottenere lo scostamento
+   * dell'ombra.
+   */
+  sunNow(game) {
+    const L = game.dayCycle.light;
+    const gx = Math.round(L.sx / SUN_STEP);
+    const gy = Math.round(L.sy / SUN_STEP);
+    const key = gx * 4096 + gy;
+    if (key !== this._sun.key) {
+      this._sun = { x: gx * SUN_STEP * SHADOW_K, y: gy * SUN_STEP * SHADOW_K, key };
+    }
+    return this._sun;
+  }
+
   /** Ombra statica di un volume: hull tra footprint e footprint traslato dal sole. */
-  buildingShadow(b) {
-    if (b._shadow) return b._shadow;
+  buildingShadow(b, sun) {
+    if (b._shadow && b._sunKey === sun.key) return b._shadow;
     const h = projHeight(b);
-    const ox = SUN.x * h * SUN.scale;
-    const oy = SUN.y * h * SUN.scale;
+    const ox = sun.x * h;
+    const oy = sun.y * h;
+    b._sunKey = sun.key;
     const pts = [
       { x: b.x, y: b.y }, { x: b.x + b.w, y: b.y },
       { x: b.x + b.w, y: b.y + b.h }, { x: b.x, y: b.y + b.h },
@@ -94,19 +136,21 @@ export class Scene {
       this.drawMines(ctx, game, cam);
     }
 
-    // 3) Ombre proiettate
-    ctx.fillStyle = 'rgba(0,0,0,0.34)';
+    // 3) Ombre proiettate: direzione, lunghezza e opacità le dà l'ora del giorno.
+    const sun = this.sunNow(game);
+    const shade = game.dayCycle.light.shadow;
+    ctx.fillStyle = `rgba(0,0,0,${shade.toFixed(3)})`;
     const buildings = city.buildingGrid.queryRect(view.x, view.y, view.w, view.h, this._bq);
     for (const b of buildings) {
       if (b.isBelt) continue;
-      const hull = this.buildingShadow(b);
+      const hull = this.buildingShadow(b, sun);
       ctx.beginPath();
       ctx.moveTo(hull[0].x, hull[0].y);
       for (let i = 1; i < hull.length; i++) ctx.lineTo(hull[i].x, hull[i].y);
       ctx.closePath();
       ctx.fill();
     }
-    this.entityShadows(ctx, game);
+    this.entityShadows(ctx, game, sun, shade);
 
     // 4) Semafori a terra, segnaletica luminosa, soglie dei negozi e piazzole
     // delle officine: tutto quello che è dipinto *sull'* asfalto.
@@ -151,10 +195,10 @@ export class Scene {
 
     for (const item of list) {
       switch (item.t) {
-        case 0: this.drawBuilding(ctx, item.o, cam); break;
+        case 0: this.drawBuilding(ctx, item.o, cam, game); break;
         case 1: this.drawProp(ctx, item.o, cam, game); break;
         case 2: this.drawVehicle(ctx, item.o, cam, game); break;
-        case 3: this.drawPed(ctx, item.o, cam); break;
+        case 3: this.drawPed(ctx, item.o, cam, game); break;
         case 4: this.drawPlayer(ctx, game.player, cam, game); break;
         case 5: this.drawPickup(ctx, item.o, cam, game); break;
       }
@@ -172,13 +216,110 @@ export class Scene {
 
     // 7) Effetti sopra il mondo (proiettili, fuoco, particelle)
     if (game.fx) game.fx.draw(ctx, cam, game.time);
+
+    // 8) Luce dell'ora e meteo: un velo a schermo intero sopra il mondo già
+    // disegnato. È l'unico modo di illuminare una città fatta di tile cachati
+    // da 512 px senza rigenerarli a ogni minuto di orologio.
+    this.drawLight(ctx, game);
   }
 
-  entityShadows(ctx, game) {
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  drawLight(ctx, game) {
+    const cam = game.camera;
+    const dc = game.dayCycle;
+    const L = dc.light;
+    const w = cam.viewW;
+    const h = cam.viewH;
+    cam.applyUI(ctx);
+
+    if (L.k > 0.004) {
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.globalAlpha = L.k;
+      ctx.fillStyle = `rgb(${L.amb[0] | 0},${L.amb[1] | 0},${L.amb[2] | 0})`;
+      ctx.fillRect(0, 0, w, h);
+    }
+    // Il velo caldo è additivo e va *dopo* la tinta: all'alba il cielo non è
+    // arancione perché toglie blu, è arancione perché aggiunge rosso.
+    if (L.w > 0.004) {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = L.w;
+      ctx.fillStyle = `rgb(${L.warm[0] | 0},${L.warm[1] | 0},${L.warm[2] | 0})`;
+      ctx.fillRect(0, 0, w, h);
+    }
+    // Bagnato: `overlay` scurisce l'asfalto e schiarisce quello che è già
+    // chiaro, cioè fa esattamente quello che fa l'acqua su una strada — alza il
+    // contrasto invece di abbassarlo. `soft-light` su un asfalto #34373d non
+    // morderebbe (è la stessa trappola già pagata dall'hillshade).
+    if (dc.wet > 0.02) {
+      ctx.globalCompositeOperation = 'overlay';
+      ctx.globalAlpha = dc.wet * 0.26;
+      ctx.fillStyle = '#3d4c66';
+      ctx.fillRect(0, 0, w, h);
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    this.drawWeather(ctx, dc, game.time, w, h);
+  }
+
+  /**
+   * Pioggia e lampi, in spazio schermo. Le gocce non sono entità: posizione e
+   * velocità si ricavano da un hash dell'indice più il tempo, quindi non
+   * esistono fra un frame e l'altro e non costano né memoria né aggiornamento.
+   */
+  drawWeather(ctx, dc, time, w, h) {
+    if (dc.flash > 0.01) {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = dc.flash * 0.32;
+      ctx.fillStyle = '#b9cbe6';
+      ctx.fillRect(0, 0, w, h);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+    }
+    if (dc.rain < 0.02) return;
+
+    const n = Math.round(RAIN_DROPS * dc.rain);
+    const span = h + 260;
+    const vy = 1350 + 800 * dc.rain;
+    const slant = 0.16 + dc.wind * 0.5;
+    ctx.save();
+    ctx.strokeStyle = `rgba(196,218,244,${(0.13 + 0.2 * dc.rain).toFixed(2)})`;
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const near = 0.55 + hash1(i * 3 + 1) * 0.85;      // gocce a distanze diverse
+      const y = ((time * vy * near + hash1(i) * span) % span) - 190;
+      const x = (hash1(i * 7 + 5) * (w + 520)) - 260 - y * slant;
+      const len = (11 + 26 * dc.rain) * near;
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + len * slant, y + len);
+    }
+    ctx.stroke();
+
+    // Schizzi: le gocce che toccano terra. Senza, la pioggia sembra passare
+    // davanti alla città invece che caderci dentro.
+    ctx.strokeStyle = `rgba(214,232,252,${(0.1 + 0.14 * dc.rain).toFixed(2)})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    const splashes = Math.round(46 * dc.rain);
+    for (let i = 0; i < splashes; i++) {
+      const step = Math.floor(time * 13 + i * 97);
+      const sx = hash1(step * 2 + i) * w;
+      const sy = hash1(step * 5 + i * 3) * h;
+      const r = 2 + hash1(step + i) * 3.5;
+      ctx.moveTo(sx - r, sy);
+      ctx.arc(sx, sy, r, Math.PI, Math.PI * 2, true);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  entityShadows(ctx, game, sun, shade) {
+    // Un'ombra a terra non sparisce mai del tutto come quella di un palazzo: di
+    // notte resta il contatto col suolo, che è quello che tiene le figure
+    // appoggiate invece che galleggianti.
+    ctx.fillStyle = `rgba(0,0,0,${Math.max(0.14, shade * 0.88).toFixed(3)})`;
     const drawShadow = (x, y, rx, ry, ang, z) => {
-      const ox = SUN.x * z * SUN.scale;
-      const oy = SUN.y * z * SUN.scale;
+      const ox = sun.x * z;
+      const oy = sun.y * z;
       ctx.beginPath();
       ctx.ellipse(x + ox, y + oy, rx, ry, ang, 0, 6.2832);
       ctx.fill();
@@ -198,12 +339,21 @@ export class Scene {
    */
   drawThresholds(ctx, game, buildings) {
     const pl = game.player;
+    const lamps = game.dayCycle.light.lamps;
     for (const b of buildings) {
       if (!b.shop) continue;
       const s = b.shop;
       const near = (s.x - pl.x) ** 2 + (s.y - pl.y) ** 2 < 210 * 210;
       const biz = SHOP_BIZ[s.biz[0]];
       const col = biz ? biz.pal.accent : '#ffd23f';
+      // Tre stati, non due: il locale su strada è aperto · è chiuso ma sopra c'è
+      // qualcosa di aperto (la scala è in comune, quindi si entra lo stesso) ·
+      // è tutto chiuso. La saracinesca abbassata si deve vedere da lontano
+      // quanto l'insegna accesa, o di notte si attraversa mezza Seoul per niente.
+      const shops = game.shops;
+      const lit = !shops.isOpen ? 1
+        : shops.isOpen(s.biz[0], game) ? 1
+          : shops.shopOpen(s, game) ? 0.45 : 0.12;
       const w = s.nx ? 15 : 34;
       const h = s.nx ? 34 : 15;
       ctx.save();
@@ -211,14 +361,14 @@ export class Scene {
       // come una macchia di vernice.
       ctx.fillStyle = 'rgba(16,18,22,0.55)';
       ctx.fillRect(s.x - w / 2, s.y - h / 2, w, h);
-      ctx.globalAlpha = near ? 0.7 + 0.3 * Math.sin(game.time * 3.4) : 0.42;
+      ctx.globalAlpha = (near ? 0.7 + 0.3 * Math.sin(game.time * 3.4) : 0.42) * (0.72 + lamps * 0.4) * lit;
       ctx.strokeStyle = col;
       ctx.lineWidth = 2;
       ctx.strokeRect(s.x - w / 2 + 1, s.y - h / 2 + 1, w - 2, h - 2);
-      ctx.globalAlpha = near ? 0.14 : 0.05;
+      ctx.globalAlpha = (near ? 0.14 : 0.05) * (1 + lamps * 2.2) * lit;
       ctx.fillStyle = col;
       ctx.beginPath();
-      ctx.arc(s.x, s.y, 32, 0, 6.2832);
+      ctx.arc(s.x, s.y, 32 * (1 + lamps * 0.3), 0, 6.2832);
       ctx.fill();
       ctx.restore();
     }
@@ -275,7 +425,8 @@ export class Scene {
     }
   }
 
-  drawBuilding(ctx, b, cam) {
+  drawBuilding(ctx, b, cam, game) {
+    const lamps = game.dayCycle.light.lamps;
     const h3d = projHeight(b);
     const f = h3d / PROJ;
     const bcx = b.x + b.w / 2;
@@ -301,6 +452,19 @@ export class Scene {
       ctx.fillStyle = facadeGradient(ctx, b.color, face.side);
       ctx.fillRect(0, 0, FTW, FTH);
       ctx.drawImage(tex, 0, 0, FTW, FTH);
+      // Finestre accese: sono l'unica cosa che distingue un palazzo di notte da
+      // una sagoma nera, e vanno in `lighter` perché una luce si somma al muro,
+      // non lo copre.
+      if (lamps > 0.02) {
+        const lit = facadeLights(b.style, cols, rows, stackVariant);
+        if (lit) {
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.globalAlpha = lamps;
+          ctx.drawImage(lit, 0, 0, FTW, FTH);
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.globalAlpha = 1;
+        }
+      }
       ctx.restore();
     }
 
@@ -319,13 +483,18 @@ export class Scene {
         const sh = (hWorld / h3d) * FTH;
         ctx.save();
         ctx.transform(face.ex / FTW, face.ey / FTW, ox / FTH, oy / FTH, face.px, face.py);
-        const sx = FTW * s.t - sw / 2;
-        ctx.drawImage(
-          spr.canvas,
-          Math.max(1, Math.min(FTW - sw - 1, sx)),
-          FTH * (0.32 + s.h * 0.52) - sh / 2,
-          sw, sh
-        );
+        const sx = Math.max(1, Math.min(FTW - sw - 1, FTW * s.t - sw / 2));
+        const sy = FTH * (0.32 + s.h * 0.52) - sh / 2;
+        ctx.drawImage(spr.canvas, sx, sy, sw, sh);
+        // Di sera l'insegna si riaccende sopra sé stessa: un neon di giorno è
+        // una targa colorata, di notte è la cosa più luminosa della strada.
+        if (lamps > 0.02) {
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.globalAlpha = lamps * 0.6;
+          ctx.drawImage(spr.canvas, sx, sy, sw, sh);
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.globalAlpha = 1;
+        }
         ctx.restore();
       }
     }
@@ -365,12 +534,15 @@ export class Scene {
           }
           const sw = (wWorld / face.len) * FTW;
           const sh = (hWorld / h3d) * FTH;
-          ctx.drawImage(
-            spr.canvas,
-            FTW / 2 - sw / 2,
-            FTH * (0.26 + (i + 0.5) * (0.66 / biz.length)) - sh / 2,
-            sw, sh
-          );
+          const sy = FTH * (0.26 + (i + 0.5) * (0.66 / biz.length)) - sh / 2;
+          ctx.drawImage(spr.canvas, FTW / 2 - sw / 2, sy, sw, sh);
+          if (lamps > 0.02) {
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = lamps * 0.6;
+            ctx.drawImage(spr.canvas, FTW / 2 - sw / 2, sy, sw, sh);
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = 1;
+          }
         }
         ctx.restore();
       }
@@ -484,15 +656,20 @@ export class Scene {
       ctx.moveTo(0, 0);
       ctx.lineTo(len, 0);
       ctx.stroke();
-      ctx.fillStyle = game.isNight ? '#ffe9b0' : '#9aa2ac';
+      const dc = game.dayCycle;
+      const on = dc.light.lamps;
+      ctx.fillStyle = on > 0.5 ? '#ffe9b0' : '#9aa2ac';
       ctx.beginPath();
       ctx.ellipse(len + 2, 0, 5.5, 3, 0, 0, 6.2832);
       ctx.fill();
-      if (game.isNight) {
-        ctx.globalAlpha = 0.16;
+      if (on > 0.02) {
+        // Sull'asfalto bagnato la pozza di luce si allunga e si intensifica: è
+        // il riflesso, ed è metà di quello che fa sembrare bagnata una strada
+        // che non ha specchi.
+        ctx.globalAlpha = 0.16 * on * (1 + dc.wet * 0.5);
         ctx.fillStyle = '#ffe9b0';
         ctx.beginPath();
-        ctx.arc(len + 2, 0, 26, 0, 6.2832);
+        ctx.arc(len + 2, 0, 26 * (1 + dc.wet * 0.35), 0, 6.2832);
         ctx.fill();
         ctx.globalAlpha = 1;
       }
@@ -555,7 +732,9 @@ export class Scene {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
       const grad = ctx.createRadialGradient(v.x + cos * nose, v.y + sin * nose, 2, v.x + cos * nose, v.y + sin * nose, 120);
-      grad.addColorStop(0, 'rgba(255,240,200,0.35)');
+      // Il fascio morde di più sul bagnato, come la pozza dei lampioni.
+      const beam = 0.35 * (1 + game.dayCycle.wet * 0.55);
+      grad.addColorStop(0, `rgba(255,240,200,${beam.toFixed(2)})`);
       grad.addColorStop(1, 'rgba(255,240,200,0)');
       ctx.fillStyle = grad;
       ctx.beginPath();
@@ -696,7 +875,7 @@ export class Scene {
     ctx.restore();
   }
 
-  drawPed(ctx, p, cam) {
+  drawPed(ctx, p, cam, game) {
     const z = 20;
     const f = z / PROJ;
     const ox = (p.x - cam.cx) * f;
@@ -721,6 +900,55 @@ export class Scene {
     }
     ctx.drawImage(spr.canvas, -spr.w / 2, -spr.h / 2, spr.w, spr.h);
     if (p.armed && !p.dead) drawHeldWeapon(ctx, p.copWeapon || 'pistol');
+    ctx.restore();
+
+    // Ombrello: da sopra copre la persona, ed è il modo in cui una folla dice
+    // "sta piovendo" senza una sola particella addosso. Chi è a terra, in
+    // panico, in servizio o di guardia a un territorio non ce l'ha aperto.
+    // Dentro non piove: `drawPed` è lo stesso codice per la strada e per la
+    // sala di un 분식, e senza questa guardia la gente al tavolo apre l'ombrello.
+    const rain = game.indoors ? 0 : game.dayCycle.rain;
+    if (rain > 0.25 && p.umbrella >= 0 && !p.dead && !p.cop && !p.hostile && !p.turf && p.panic <= 0) {
+      // Sta sopra la testa, quindi si proietta più in fuori del pedone: è quello
+      // scarto a dire che è un oggetto tenuto in alto e non un disco dipinto a terra.
+      const uf = 34 / PROJ;
+      this.drawUmbrella(ctx, p, (p.x - cam.cx) * uf, (p.y - cam.cy) * uf, rain);
+    }
+  }
+
+  drawUmbrella(ctx, p, ox, oy, rain) {
+    const r = 11;
+    const col = UMBRELLAS[p.umbrella];
+    ctx.save();
+    ctx.translate(p.x + ox, p.y + oy);
+    ctx.globalAlpha = Math.min(1, (rain - 0.25) * 5);
+    // Cupola: il gradiente sposta il colmo verso la luce e scurisce il bordo.
+    // Senza, da sopra un ombrello è un bottone.
+    const g = ctx.createRadialGradient(-r * 0.3, -r * 0.34, r * 0.15, 0, 0, r);
+    g.addColorStop(0, mix(col, 0.34));
+    g.addColorStop(0.6, col);
+    g.addColorStop(1, mix(col, -0.4));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, 6.2832);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.rotate(p.angle);
+    ctx.strokeStyle = 'rgba(255,255,255,0.13)';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    for (let i = 0; i < 4; i++) {
+      const a = i * 0.7854;
+      ctx.moveTo(-Math.cos(a) * r, -Math.sin(a) * r);
+      ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(20,20,24,0.7)';
+    ctx.beginPath();
+    ctx.arc(0, 0, 1.5, 0, 6.2832);
+    ctx.fill();
     ctx.restore();
   }
 

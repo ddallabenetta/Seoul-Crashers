@@ -4,6 +4,7 @@
 import { roundPath } from './hud.js';
 import { clamp } from '../core/math.js';
 import { stockFor, won } from '../entities/shops.js';
+import { bizAlwaysOpen, clockLabel } from '../world/interiors.js';
 import { getWeaponIcon } from '../render/sprites.js';
 
 const ROW = 46;
@@ -121,7 +122,12 @@ export class ShopMenu {
     ctx.fillText(biz.hangul, x + 26, y + 46);
     ctx.fillStyle = 'rgba(238,242,248,0.9)';
     ctx.font = '700 16px system-ui, sans-serif';
-    ctx.fillText(biz.label.toUpperCase(), x + 26, y + 68);
+    const label = biz.label.toUpperCase();
+    ctx.fillText(label, x + 26, y + 68);
+    // L'orario sta qui perché è qui che si decide di spendere: sapere che fra
+    // un'ora chiude cambia quanto ci si carica addosso adesso.
+    ctx.fillStyle = 'rgba(238,242,248,0.42)';
+    ctx.fillText(hoursLabel(biz), x + 40 + ctx.measureText(label).width, y + 68);
     ctx.textAlign = 'right';
     ctx.fillStyle = '#ffd23f';
     ctx.font = '700 22px ui-monospace, monospace';
@@ -204,6 +210,10 @@ export class ShopMenu {
     ctx.fillText('W / S — scegli · E — compra · ESC — esci', x + pw / 2, y + ph - 18);
     ctx.restore();
   }
+}
+
+function hoursLabel(biz) {
+  return bizAlwaysOpen(biz.id) ? '· 24 ORE' : `· CHIUDE ALLE ${clockLabel(biz.open[1])}`;
 }
 
 function hexA(hex, a) {
