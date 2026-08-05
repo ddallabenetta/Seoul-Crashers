@@ -29,30 +29,100 @@ import { clamp, damp, dist, approachAngle, circleRectPush, pointInRect } from '.
 import { createPed } from './pedestrians.js';
 import { WEAPONS, shoot, hasLineOfSight } from './weapons.js';
 import { buildInterior, BUSINESSES, bizOpenAt, clockLabel } from '../world/interiors.js';
-import { HERO_OUTFITS, VEHICLE_COLORS } from '../render/sprites.js';
+import { HERO_OUTFITS, VEHICLE_COLORS, VEHICLE_TYPES } from '../render/sprites.js';
 
 const DOOR_REACH = 34;   // quanto ci si deve avvicinare alla porta dalla strada
 const DESK_REACH = 54;   // raggio del bancone: comprare e rapinare
 const STAIR_PAD = 10;
 const GARAGE_PRICE = 30000;
 const OUTFIT_PRICE = 40000;
+// Quanto lontano dalla porta del 전당포 può stare il mezzo da vendere: 108 px sono
+// nove metri, cioè la carreggiata davanti alla vetrina. Con meno non basta
+// accostare — un'auto ferma al cordolo ha il centro a mezza corsia dalla porta.
+const SELL_REACH = 108;
+const ALARM_DELAY = 17;  // secondi fra il testimone che vede e la centrale che sa
 
 /** ₩ con i punti delle migliaia: un prezzo a sei cifre senza va solo letto male. */
 export function won(n) {
   return `₩${Math.round(n).toLocaleString('it-IT')}`;
 }
 
+// --- mercato nero -------------------------------------------------------------
+
+/**
+ * Ogni distretto ha i suoi prezzi, e sono **scritti a mano**, non un rumore sulla
+ * seed: un moltiplicatore casuale è indistinguibile da un prezzo sbagliato, mentre
+ * questi si spiegano guardando il quartiere. Le armi arrivano dal porto (0.68) e a
+ * Gangnam si paga l'indirizzo (1.30); le munizioni in campagna costano perché non
+ * c'è concorrenza (1.40); un'auto rubata vale dove partono i container (인천항
+ * 1.35) e non vale niente dove si controllano le targhe (강남 0.85).
+ *
+ * `pawn` è la frazione del listino che il banco dei pegni ti ridà. Segue le armi —
+ * dove valgono di più si rivende meglio — ma il valore più alto (0.50) resta sotto
+ * al prezzo d'acquisto più basso della mappa (usato al porto: 0.68 × 0.72 = 0.49):
+ * comprare in un posto e rivendere in un altro va **in pari**, non in guadagno, o
+ * il giro diventerebbe una zecca che stampa denaro. Quello che il mercato paga
+ * davvero è la roba che non hai comprato.
+ */
+export const MARKETS = {
+  hongdae:    { hangul: '홍대',   guns: 1.00, ammo: 0.95, goods: 0.92, cars: 1.00, pawn: 0.42 },
+  myeongdong: { hangul: '명동',   guns: 1.10, ammo: 1.05, goods: 1.15, cars: 0.95, pawn: 0.44 },
+  itaewon:    { hangul: '이태원', guns: 0.92, ammo: 1.00, goods: 1.05, cars: 1.10, pawn: 0.48 },
+  gangnam:    { hangul: '강남',   guns: 1.30, ammo: 1.22, goods: 1.35, cars: 0.85, pawn: 0.50 },
+  docks:      { hangul: '인천항', guns: 0.68, ammo: 0.78, goods: 1.00, cars: 1.35, pawn: 0.34 },
+  gimpo:      { hangul: '김포',   guns: 0.86, ammo: 0.95, goods: 1.10, cars: 1.15, pawn: 0.38 },
+  gyeonggi:   { hangul: '경기도', guns: 1.05, ammo: 1.40, goods: 1.12, cars: 0.90, pawn: 0.40 },
+};
+
+// Il listino "di Seoul": è il riferimento rispetto a cui il pannello mostra gli
+// scostamenti, ed è quello che valeva prima che i distretti avessero un prezzo.
+const MARKET_BASE = { hangul: '서울', guns: 1, ammo: 1, goods: 1, cars: 1, pawn: 0.45 };
+
+export function marketOf(districtId) {
+  return MARKETS[districtId] || MARKET_BASE;
+}
+
+/** Il mercato in cui si sta trattando: quello del negozio, o quello dei tuoi piedi. */
+export function marketFor(game) {
+  const shop = game.shops && game.shops.active ? game.shops.active.shop : null;
+  return marketOf(shop ? shop.district : game.player.district && game.player.district.id);
+}
+
+/** Un prezzo di mercato resta un prezzo da cartello: niente ₩2.763. */
+function roundPrice(n) {
+  const step = n < 20000 ? 100 : 500;
+  return Math.max(step, Math.round(n / step) * step);
+}
+
+/**
+ * Quanto vale un mezzo al banco dei pegni, a targhe pulite. Non è il prezzo di
+ * listino di un concessionario: è quello che ti dà chi lo smonta o lo imbarca, ed
+ * è per questo che una sportiva rende come sei berline e uno scooter come niente.
+ * I mezzi che non ci sono (velivoli, barche) hanno un prezzo lo stesso: a un
+ * 전당포 sul lungomare un motoscafo ci arriva davvero.
+ */
+const CAR_VALUE = {
+  scooter: 18000, hatch: 42000, taxi: 48000, sedan: 55000, tractor: 60000,
+  van: 70000, suv: 90000, bus: 95000, truck: 120000, sport: 210000,
+  boat: 260000, ferry: 320000, heli: 850000, plane: 900000,
+};
+
 // --- listini -----------------------------------------------------------------
 // Un articolo è un oggetto con `buy(game)`: il pannello di `ui/shopmenu.js` non sa
 // niente di armi, cure o vestiti, disegna una riga e chiama questa funzione.
 
-function weaponItem(id, mul = 1) {
+function weaponItem(id, m, used = 1) {
   const s = WEAPONS[id];
+  // `base` è il listino (usato compreso), `mul` quanto lo piega il quartiere: il
+  // pannello disegna lo scostamento, non può ricavarlo da un prezzo solo.
+  const base = Math.round(s.price * used);
   return {
     key: `w:${id}`,
     label: s.label,
     hangul: s.hangul,
-    price: Math.round(s.price * mul),
+    base,
+    mul: m.guns,
+    price: roundPrice(base * m.guns),
     detail: (game) => {
       if (s.infinite) return 'non finisce mai';
       if (game.player.owned.has(id)) return `ce l'hai già: ricarica ${s.pickup * 2} colpi`;
@@ -65,14 +135,16 @@ function weaponItem(id, mul = 1) {
   };
 }
 
-function ammoItem(id) {
+function ammoItem(id, m) {
   const s = WEAPONS[id];
   const n = s.pickup * 3;
   return {
     key: `a:${id}`,
     label: `munizioni ${s.label}`,
     hangul: '탄약',
-    price: s.ammoPrice,
+    base: s.ammoPrice,
+    mul: m.ammo,
+    price: roundPrice(s.ammoPrice * m.ammo),
     detail: (game) => `${n} colpi · hai ${game.player.ammo[id] || 0}/${s.maxAmmo}`,
     need: (game) => game.player.owned.has(id),
     buy(game) {
@@ -82,12 +154,14 @@ function ammoItem(id) {
   };
 }
 
-function healItem(key, label, hangul, price, heal) {
+function healItem(key, label, hangul, price, heal, m) {
   return {
     key,
     label,
     hangul,
-    price,
+    base: price,
+    mul: m.goods,
+    price: roundPrice(price * m.goods),
     detail: () => (heal >= 100 ? 'rimette in piedi del tutto' : `+${heal} salute`),
     buy(game) {
       const p = game.player;
@@ -98,40 +172,49 @@ function healItem(key, label, hangul, price, heal) {
   };
 }
 
-const OUTFIT_ITEM = {
-  key: 'outfit',
-  label: 'cambio d\'abito',
-  hangul: '옷 갈아입기',
-  price: OUTFIT_PRICE,
-  // Uscire vestito diverso è l'unico modo di far calare le stelle senza nasconderti,
-  // e costa: senza prezzo sarebbe un pulsante "annulla il ricercato".
-  detail: (game) => (game.wanted.level > 0 ? 'e una stella in meno' : 'nuovo colore del bomber'),
-  buy(game) {
-    const p = game.player;
-    p.outfit = (p.outfit + 1) % HERO_OUTFITS.length;
-    if (game.wanted.level > 0) {
-      game.wanted.drop(game);
-      return `${HERO_OUTFITS[p.outfit].label} — non ti riconoscono più`;
-    }
-    return HERO_OUTFITS[p.outfit].label;
-  },
-};
+function outfitItem(m) {
+  return {
+    key: 'outfit',
+    label: 'cambio d\'abito',
+    hangul: '옷 갈아입기',
+    base: OUTFIT_PRICE,
+    mul: m.goods,
+    price: roundPrice(OUTFIT_PRICE * m.goods),
+    // Uscire vestito diverso è l'unico modo di far calare le stelle senza nasconderti,
+    // e costa: senza prezzo sarebbe un pulsante "annulla il ricercato".
+    detail: (game) => (game.wanted.level > 0 ? 'e una stella in meno' : 'nuovo colore del bomber'),
+    buy(game) {
+      const p = game.player;
+      p.outfit = (p.outfit + 1) % HERO_OUTFITS.length;
+      if (game.wanted.level > 0) {
+        game.wanted.drop(game);
+        return `${HERO_OUTFITS[p.outfit].label} — non ti riconoscono più`;
+      }
+      return HERO_OUTFITS[p.outfit].label;
+    },
+  };
+}
 
-/** Listino di un'attività, montato al momento: il banco dei pegni compra da te. */
+/**
+ * Listino di un'attività, montato al momento: il banco dei pegni compra da te, e
+ * **i prezzi sono quelli del quartiere in cui ti trovi** (vedi `MARKETS`).
+ */
 export function stockFor(bizId, game) {
+  const m = marketFor(game);
   switch (bizId) {
     case 'guns':
       return [
-        weaponItem('pistol'), ammoItem('pistol'),
-        weaponItem('shotgun'), ammoItem('shotgun'),
-        weaponItem('smg'), ammoItem('smg'),
-        weaponItem('rifle'), ammoItem('rifle'),
-        weaponItem('bat'),
+        weaponItem('pistol', m), ammoItem('pistol', m),
+        weaponItem('shotgun', m), ammoItem('shotgun', m),
+        weaponItem('smg', m), ammoItem('smg', m),
+        weaponItem('rifle', m), ammoItem('rifle', m),
+        weaponItem('bat', m),
       ];
     case 'pawn': {
       // Usato: costa meno e non fa domande. In cambio ricompra il tuo arsenale a
       // meno della metà, che è l'unico modo di trasformare un fucile in contanti.
-      const list = [weaponItem('bat', 0.7), weaponItem('katana', 0.75), weaponItem('pistol', 0.72)];
+      const list = [weaponItem('bat', m, 0.7), weaponItem('katana', m, 0.75), weaponItem('pistol', m, 0.72)];
+      const pct = Math.round(m.pawn * 100);
       for (const id of game.player.owned) {
         const s = WEAPONS[id];
         if (!s || s.infinite || !s.price) continue;
@@ -139,8 +222,10 @@ export function stockFor(bizId, game) {
           key: `s:${id}`,
           label: `vendi ${s.label}`,
           hangul: '팝니다',
-          price: -Math.round(s.price * 0.45),
-          detail: () => 'te la ricomprano, munizioni comprese',
+          base: -Math.round(s.price * MARKET_BASE.pawn),
+          mul: m.pawn / MARKET_BASE.pawn,
+          price: -roundPrice(s.price * m.pawn),
+          detail: () => `te la ricomprano al ${pct}% del listino, munizioni comprese`,
           buy(game) {
             game.player.owned.delete(id);
             game.player.ammo[id] = 0;
@@ -153,31 +238,32 @@ export function stockFor(bizId, game) {
     }
     case 'conv':
       return [
-        healItem('kimbap', 'triangolo di riso', '삼각김밥', 3000, 20),
-        healItem('dosirak', 'schiscetta calda', '도시락', 9000, 55),
+        healItem('kimbap', 'triangolo di riso', '삼각김밥', 3000, 20, m),
+        healItem('dosirak', 'schiscetta calda', '도시락', 9000, 55, m),
         {
-          key: 'molotov', label: 'soju e benzina', hangul: '화염병 재료', price: 24000,
+          key: 'molotov', label: 'soju e benzina', hangul: '화염병 재료',
+          base: 24000, mul: m.goods, price: roundPrice(24000 * m.goods),
           detail: () => 'due molotov, nessuna domanda',
           buy(game) { game.player.giveWeapon('molotov', 2); return 'due molotov nel borsone'; },
         },
       ];
     case 'pharma':
       return [
-        healItem('pain', 'antidolorifici', '진통제', 12000, 45),
-        healItem('kit', 'kit di pronto soccorso', '구급상자', 26000, 100),
+        healItem('pain', 'antidolorifici', '진통제', 12000, 45, m),
+        healItem('kit', 'kit di pronto soccorso', '구급상자', 26000, 100, m),
       ];
     case 'food':
       return [
-        healItem('soju', 'soju', '소주', 3000, 15),
-        healItem('tteok', 'tteokbokki', '떡볶이', 6000, 35),
-        healItem('samgyup', 'samgyeopsal', '삼겹살', 16000, 70),
+        healItem('soju', 'soju', '소주', 3000, 15, m),
+        healItem('tteok', 'tteokbokki', '떡볶이', 6000, 35, m),
+        healItem('samgyup', 'samgyeopsal', '삼겹살', 16000, 70, m),
       ];
     case 'clothes':
-      return [OUTFIT_ITEM];
+      return [outfitItem(m)];
     case 'clinic':
       return [
-        healItem('visit', 'medicazione', '치료', 14000, 50),
-        healItem('surgery', 'ricovero lampo', '입원', 32000, 100),
+        healItem('visit', 'medicazione', '치료', 14000, 50, m),
+        healItem('surgery', 'ricovero lampo', '입원', 32000, 100, m),
       ];
     default:
       return [];
@@ -197,6 +283,10 @@ export class ShopSystem {
     this.garageT = 0;
     this.robbed = 0;
     this.spent = 0;
+    this.sold = 0;
+    // Allarme silenzioso: chi ha visto la rapina, e quanto manca alla telefonata.
+    this.alarmT = 0;
+    this.alarmCaller = null;
     // Porta a portata di mano: la calcola `updateOutside` e la legge anche il
     // giocatore, perché `E` sulla soglia di un negozio non deve rubare l'auto
     // parcheggiata dietro di lui.
@@ -419,6 +509,9 @@ export class ShopSystem {
 
   updateOutside(dt, game) {
     this.updateGarage(dt, game);
+    // Il banco dei pegni compra solo quello che hai guidato tu: il marchio si mette
+    // qui, che è l'unico posto in cui si sa che al volante c'era il giocatore.
+    if (!game.player.onFoot && game.player.vehicle) game.player.vehicle.hotwired = true;
     const shop = this.nearestDoor(game);
     this.near = shop;
     if (!shop) return;
@@ -446,7 +539,33 @@ export class ShopSystem {
       };
     }
     this.actions.push(act);
-    if (game.input.wasPressed('KeyE') && game.player.enterCooldown <= 0) act.run();
+
+    // Ruba-e-rivendi. `F` è già il tasto della cassa: qui e al bancone fa la stessa
+    // cosa — trasforma in contanti qualcosa che non è tuo. Con `E` si finirebbe per
+    // vendere il mezzo volendo entrare a comprare.
+    if (shop.biz[0] === 'pawn' && this.isOpen('pawn', game)) {
+      const { v, cop } = this.vehicleAtDoor(shop, game);
+      if (cop && !v) {
+        this.actions.push({ key: 'F', text: '전당포 — una volante non la compra nessuno', run: () => {
+          game.hud.toast('전당포 — «quella riportala dove l\'hai presa»', 2.4);
+        } });
+      } else if (v) {
+        const price = this.vehiclePrice(v, marketOf(shop.district));
+        this.actions.push({
+          key: 'F',
+          text: `vendi ${VEHICLE_TYPES[v.kind].label} — ${won(price)}`,
+          run: () => this.sellVehicle(v, shop, game),
+        });
+      }
+    }
+
+    for (const a of this.actions) {
+      if (game.input.wasPressed(`Key${a.key}`) && game.player.enterCooldown <= 0) {
+        game.player.enterCooldown = 0.35;
+        a.run();
+        break;
+      }
+    }
   }
 
   updateInside(dt, game) {
@@ -511,6 +630,68 @@ export class ShopSystem {
     this.alarm(f.till.x, f.till.y, 900, game, pl);
   }
 
+  // --- ruba-e-rivendi ---------------------------------------------------------
+
+  /**
+   * Un mezzo che il banco dei pegni comprerebbe. Due condizioni, e sono tutte e
+   * due di regia: **l'hai guidato tu** (`hotwired`, scritto in `updateOutside`),
+   * perché rivendere l'auto in sosta di uno sconosciuto senza toccarla è una
+   * scorciatoia che svuota il gioco; e **non è della polizia**, che è la prima
+   * cosa che prova chiunque. La volante ha una targa che conoscono tutti.
+   */
+  sellable(v) {
+    if (!v || v.dead || !v.hotwired) return null;
+    if (v.kind === 'police' || v.kind === 'swat' || v.driver === 'cop' || v.crew) return 'cop';
+    if (!CAR_VALUE[v.kind]) return null;
+    return 'ok';
+  }
+
+  /** Prezzo: tipo del mezzo × quanto è malmesso × il mercato del quartiere. */
+  vehiclePrice(v, market) {
+    const base = CAR_VALUE[v.kind] || 0;
+    // Un rottame vale ancora qualcosa (i pezzi), un mezzo intatto non vale il
+    // doppio di uno ammaccato: la forbice è 0.35-1, non 0-1.
+    const cond = 0.35 + 0.65 * clamp(v.hp / (v.maxHp || 1), 0, 1);
+    return roundPrice(base * cond * (v.flatTires ? 0.88 : 1) * market.cars);
+  }
+
+  /** Il mezzo fermo più vicino alla porta, fra quelli che si possono vendere. */
+  vehicleAtDoor(shop, game) {
+    let best = null;
+    let bestD = SELL_REACH;
+    let cop = false;
+    for (const v of game.vehicles) {
+      const d = dist(v.x, v.y, shop.x, shop.y);
+      if (d > SELL_REACH || Math.abs(v.speed) > 24) continue;
+      const kind = this.sellable(v);
+      if (kind === 'cop') { cop = true; continue; }
+      if (kind && d < bestD) { bestD = d; best = v; }
+    }
+    return { v: best, cop };
+  }
+
+  /**
+   * Venduto. Il mezzo deve sparire **pulito**, come fa `main.onVehicleSunk` con un
+   * relitto: se restasse in `game.vehicles` continuerebbe a girare la sua AI in
+   * mezzo alla strada dopo essere stato pagato. E lo stallo va liberato, o quel
+   * posto auto resta occupato da un fantasma per il resto della partita.
+   */
+  sellVehicle(v, shop, game) {
+    const price = this.vehiclePrice(v, marketOf(shop.district));
+    game.player.money += price;
+    this.sold++;
+    game.stats.soldCars = (game.stats.soldCars || 0) + 1;
+    if (v.driver === 'player') game.player.exitVehicle(game, true);
+    v.dead = true;
+    v.deadT = 24;
+    v.protect = false;
+    if (v.spot) v.spot.taken = false;
+    const i = game.vehicles.indexOf(v);
+    if (i >= 0) game.vehicles.splice(i, 1);
+    game.fx.addSmoke(v.x, v.y, 4, 1.3);
+    game.hud.toast(`전당포 — ${won(price)} per ${VEHICLE_TYPES[v.kind].label}, e non l'hai mai vista`, 3.2);
+  }
+
   /** Officina: ci si guida dentro, si paga, si esce puliti. */
   updateGarage(dt, game) {
     this.garageT = Math.max(0, this.garageT - dt);
@@ -519,17 +700,21 @@ export class ShopSystem {
     const v = pl.vehicle;
     for (const g of this.city.garages) {
       if (!pointInRect(v.x, v.y, g)) continue;
+      // Anche la verniciatura ha il prezzo del quartiere: è l'unico pezzo di
+      // mercato che esiste in tutti e sette i distretti, perché di officine ce n'è
+      // una per distretto e di negozi no (al porto e in campagna non ce n'è nessuno).
+      const price = roundPrice(GARAGE_PRICE * marketOf(g.district).goods);
       if (Math.abs(v.speed) > 60) {
         game.hud.toast('도색 — fermati nella piazzola', 1.2);
         return;
       }
-      if (pl.money < GARAGE_PRICE) {
-        game.hud.toast(`도색 — ${won(GARAGE_PRICE)}, non ce li hai`, 2);
+      if (pl.money < price) {
+        game.hud.toast(`도색 — ${won(price)}, non ce li hai`, 2);
         this.garageT = 3;
         return;
       }
-      pl.money -= GARAGE_PRICE;
-      this.spent += GARAGE_PRICE;
+      pl.money -= price;
+      this.spent += price;
       this.garageT = 6;
       v.hp = v.maxHp;
       v.dead = false;
@@ -541,7 +726,7 @@ export class ShopSystem {
       const had = game.wanted.level;
       game.wanted.reset();
       game.police.standDown(game, true);
-      game.hud.toast(had > 0 ? `도색 — ${won(GARAGE_PRICE)}: verniciata e nessuno ti cerca` : `도색 — ${won(GARAGE_PRICE)}: come nuova`, 3);
+      game.hud.toast(had > 0 ? `도색 — ${won(price)}: verniciata e nessuno ti cerca` : `도색 — ${won(price)}: come nuova`, 3);
       return;
     }
   }

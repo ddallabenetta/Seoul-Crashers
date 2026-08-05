@@ -3,7 +3,7 @@
 // chiama `buy(game)` su quello scelto. Aggiungere merce non passa da qui.
 import { roundPath } from './hud.js';
 import { clamp } from '../core/math.js';
-import { stockFor, won } from '../entities/shops.js';
+import { stockFor, won, marketFor } from '../entities/shops.js';
 import { bizAlwaysOpen, clockLabel } from '../world/interiors.js';
 import { getWeaponIcon } from '../render/sprites.js';
 
@@ -127,7 +127,13 @@ export class ShopMenu {
     // L'orario sta qui perché è qui che si decide di spendere: sapere che fra
     // un'ora chiude cambia quanto ci si carica addosso adesso.
     ctx.fillStyle = 'rgba(238,242,248,0.42)';
-    ctx.fillText(hoursLabel(biz), x + 40 + ctx.measureText(label).width, y + 68);
+    const after = x + 40 + ctx.measureText(label).width;
+    ctx.fillText(hoursLabel(biz), after, y + 68);
+    // Il quartiere in cui stai comprando: senza dirlo, i prezzi che cambiano da un
+    // negozio all'altro sembrano un bug invece che un mercato.
+    const market = marketFor(game);
+    ctx.fillStyle = hexA(pal.accent, 0.75);
+    ctx.fillText(`· 시세 ${market.hangul}`, after + ctx.measureText(hoursLabel(biz)).width + 12, y + 68);
     ctx.textAlign = 'right';
     ctx.fillStyle = '#ffd23f';
     ctx.font = '700 22px ui-monospace, monospace';
@@ -146,6 +152,7 @@ export class ShopMenu {
     // Righe
     this.rows.length = 0;
     this.hover = -1;
+    let deviation = false;
     const m = game.input.mouse;
     let ry = y + 96;
     for (let i = 0; i < this.items.length; i++) {
@@ -189,7 +196,17 @@ export class ShopMenu {
       ctx.textAlign = 'right';
       ctx.fillStyle = sell ? '#4ad98a' : afford ? '#ffd23f' : '#e04a3a';
       ctx.font = '700 16px ui-monospace, monospace';
-      ctx.fillText(sell ? `+${won(-it.price)}` : won(it.price), rx + rw - 14, ry + 28);
+      ctx.fillText(sell ? `+${won(-it.price)}` : won(it.price), rx + rw - 14, ry + 24);
+      // Scostamento dal listino di Seoul. Su una riga di vendita il segno si legge
+      // al contrario — pagarti il 12% in più è una buona notizia — e il colore
+      // segue quello, non il segno.
+      const dev = Math.round(((it.mul || 1) - 1) * 100);
+      if (Math.abs(dev) >= 2) {
+        deviation = true;
+        ctx.font = '700 11px system-ui, sans-serif';
+        ctx.fillStyle = (sell ? dev > 0 : dev < 0) ? 'rgba(74,217,138,0.85)' : 'rgba(224,90,74,0.9)';
+        ctx.fillText(`${dev > 0 ? '+' : ''}${dev}% sul listino`, rx + rw - 14, ry + 38);
+      }
       ctx.globalAlpha = 1;
       ry += ROW;
     }
@@ -208,6 +225,11 @@ export class ShopMenu {
     ctx.fillStyle = 'rgba(235,240,250,0.4)';
     ctx.font = '500 12px system-ui, sans-serif';
     ctx.fillText('W / S — scegli · E — compra · ESC — esci', x + pw / 2, y + ph - 18);
+    if (deviation) {
+      ctx.fillStyle = 'rgba(235,240,250,0.32)';
+      ctx.font = '500 11px system-ui, sans-serif';
+      ctx.fillText(`prezzi di ${market.hangul}: rosso = ci rimetti, verde = ci guadagni`, x + pw / 2, y + ph - 56);
+    }
     ctx.restore();
   }
 }
