@@ -24,6 +24,18 @@
 //   il palazzo, non il negozio al piano terra: si entra se almeno un piano è aperto,
 //   perché la scala è in comune. Dentro, il locale resta com'era quando ci sei
 //   entrato — vedi `showFloor`.
+// - **I prezzi sono quelli del quartiere** (`MARKETS`). È l'unica ragione per cui
+//   vale la pena attraversare Seoul con dei contanti in tasca, e il pannello del
+//   listino la deve dire: un prezzo che cambia senza spiegarsi è un bug.
+// - **La gente di passaggio dipende dall'ora, il personale e i morti no**
+//   (`refreshCrowd`). L'interno si ricorda quello che è successo *e* cambia con
+//   l'orologio: sono due cose diverse e vivono in due liste diverse.
+// - **Chi ha visto chiama la polizia** (`raiseAlarm`), con qualche secondo di
+//   ritardo e senza che tu lo possa più fermare una volta che è uscito. Un commesso
+//   già steso non chiama: è la differenza fra una rapina e una sparatoria.
+// - **Al piano terra c'è una seconda uscita**, dove dietro l'edificio c'è posto per
+//   metterci i piedi (`backDoorSpot`). Senza, con la polizia sulla porta, entrare
+//   in un negozio sarebbe solo un modo più lento di farsi prendere.
 import { Rng } from '../core/rng.js';
 import { clamp, damp, dist, approachAngle, circleRectPush, pointInRect } from '../core/math.js';
 import { createPed } from './pedestrians.js';
