@@ -87,6 +87,10 @@ export const VEHICLE_TYPES = {
   // e il grip laterale bassissimo è quello che fa scarrocciare la poppa in virata.
   boat:    { len: 90, wid: 30, mass: 1.0, topSpeed: 400, accel: 165, grip: 0.34, hp: 130, cabin: [0.24, 0.6], label: 'motoscafo', marine: true },
   ferry:   { len: 154, wid: 54, mass: 3.4, topSpeed: 215, accel: 82, grip: 0.26, hp: 340, cabin: [0.34, 0.68], label: 'battello', marine: true },
+  // Motovedetta della polizia. Più lenta del motoscafo civile ma più robusta: in
+  // acqua non ci sono vicoli in cui infilarsi, e se ti raggiungesse in dieci
+  // secondi la fuga in barca smetterebbe di essere una fuga.
+  patrol:  { len: 104, wid: 34, mass: 1.4, topSpeed: 355, accel: 150, grip: 0.33, hp: 190, cabin: [0.24, 0.62], label: 'motovedetta', marine: true },
 };
 
 export const VEHICLE_COLORS = [
@@ -316,6 +320,43 @@ function drawPoliceExtras(g, w, h) {
   g.fillRect(w * 0.41, h * 0.52, w * 0.08, h * 0.26);
 }
 
+/**
+ * Motovedetta: stessa livrea bianca e blu delle volanti, perché è la livrea a dire
+ * "polizia" in una visuale dall'alto — lo scafo da solo si legge come un motoscafo
+ * qualunque. La banda blu corre lungo la murata, non attorno al tetto come in auto:
+ * su una barca il ponte è quasi tutto scafo.
+ */
+function drawPatrolExtras(g, w, h) {
+  g.fillStyle = '#1c3f8f';
+  g.beginPath();
+  g.moveTo(w * 0.1, h * 0.16);
+  g.lineTo(w * 0.7, h * 0.08);
+  g.lineTo(w * 0.7, h * 0.17);
+  g.lineTo(w * 0.1, h * 0.25);
+  g.closePath();
+  g.fill();
+  g.beginPath();
+  g.moveTo(w * 0.1, h * 0.84);
+  g.lineTo(w * 0.7, h * 0.92);
+  g.lineTo(w * 0.7, h * 0.83);
+  g.lineTo(w * 0.1, h * 0.75);
+  g.closePath();
+  g.fill();
+  // Sigla sul pozzetto: piccola, ma è quello che a schermo fermo distingue la
+  // motovedetta da un motoscafo bianco qualunque.
+  g.fillStyle = 'rgba(28,63,143,0.95)';
+  g.font = 'bold 8px sans-serif';
+  g.textAlign = 'center';
+  g.fillText('경비정', w * 0.28, h * 0.57);
+  // Faro lampeggiante sulla tuga (i colori vivi li aggiunge il renderer).
+  g.fillStyle = '#2a2d33';
+  roundRect(g, w * 0.46, h * 0.38, w * 0.07, h * 0.24, 2); g.fill();
+  g.fillStyle = '#7a1f22';
+  g.fillRect(w * 0.47, h * 0.4, w * 0.05, h * 0.09);
+  g.fillStyle = '#1b3a7a';
+  g.fillRect(w * 0.47, h * 0.51, w * 0.05, h * 0.09);
+}
+
 /** Trattore: ruote posteriori enormi, cabina arretrata, muso stretto col motore. */
 function drawTractor(g, w, h, color) {
   // Ruote posteriori enormi e sporgenti: da sopra sono la firma del trattore.
@@ -522,6 +563,7 @@ export function getVehicleSprite(kind, colorIndex = 0) {
   if (kind === 'plane') color = ['#dfe4ea', '#c8ccd2', '#9fb3c8'][colorIndex % 3];
   if (kind === 'boat') color = ['#e8ecf0', '#2f5f9e', '#c9d0d8'][colorIndex % 3];
   if (kind === 'ferry') color = ['#4a6a86', '#5c6660', '#8a7a5a'][colorIndex % 3];
+  if (kind === 'patrol') color = '#e8ecf2';
 
   const key = `veh:${kind}:${colorIndex}`;
   const pad = 4;
@@ -534,7 +576,10 @@ export function getVehicleSprite(kind, colorIndex = 0) {
     else if (kind === 'tractor') drawTractor(g, iw, ih, color);
     else if (kind === 'heli') drawHeli(g, iw, ih, color);
     else if (kind === 'plane') drawPlane(g, iw, ih, color);
-    else if (spec.marine) drawBoatHull(g, iw, ih, color, kind === 'ferry');
+    else if (spec.marine) {
+      drawBoatHull(g, iw, ih, color, kind === 'ferry');
+      if (kind === 'patrol') drawPatrolExtras(g, iw, ih);
+    }
     else if (kind === 'truck' || kind === 'van' || kind === 'swat') {
       drawBoxVehicle(g, iw, ih, color, spec, { livery: kind === 'swat' ? '#1c3f8f' : null });
       if (kind === 'swat') {
