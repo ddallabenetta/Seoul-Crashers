@@ -147,16 +147,49 @@ export class DayCycle {
   }
 
   update(dt) {
-    if (!this.paused) {
-      this.t += dt;
-      if (this.t >= DAY_SECONDS) { this.t -= DAY_SECONDS; this.day++; }
-      this.updateWeather(dt);
-      // L'asfalto si bagna in fretta e si asciuga piano: è quello che fa restare
-      // i riflessi (e la scarsa aderenza) per un po' dopo che ha smesso.
-      const target = this.rain > 0.05 ? 1 : 0;
-      this.wet += (target - this.wet) * (target > this.wet ? 0.7 : 0.1) * dt;
-      this.updateFlash(dt);
+    if (!this.paused) this.step(dt);
+    this.apply();
+  }
+
+  /**
+   * Un passo di orologio. Sta a parte perché lo fanno in due: il frame di gioco e
+   * il salto di `advance`, che deve muovere *le stesse* cose o dormire otto ore
+   * diventerebbe un teletrasporto dell'ora e basta.
+   */
+  step(dt) {
+    this.t += dt;
+    if (this.t >= DAY_SECONDS) { this.t -= DAY_SECONDS; this.day++; }
+    this.updateWeather(dt);
+    // L'asfalto si bagna in fretta e si asciuga piano: è quello che fa restare
+    // i riflessi (e la scarsa aderenza) per un po' dopo che ha smesso. Il limite
+    // serve al passo lungo di `advance`: con dt di cinque secondi la correzione
+    // supera il bersaglio, e `wet` finirebbe fuori da [0,1].
+    const target = this.rain > 0.05 ? 1 : 0;
+    this.wet = clamp(this.wet + (target - this.wet) * (target > this.wet ? 0.7 : 0.1) * dt, 0, 1);
+    this.updateFlash(dt);
+  }
+
+  /**
+   * Porta l'orologio avanti di `hours` ore di gioco: è il letto della safehouse e
+   * sarà l'attesa di un appuntamento. **Non è `hour = x`**: il meteo è una catena
+   * di Markov e va *fatta girare*, non spostata — svegliarsi dopo otto ore con lo
+   * stesso temporale che c'era andando a dormire vorrebbe dire che mentre dormivi
+   * il tempo non è passato. Anche il giorno avanza, e l'asfalto si asciuga.
+   *
+   * Il passo è di 5 s reali (5 minuti di orologio): la catena cambia stato su
+   * scale di ore, quindi otto ore costano 96 iterazioni e nessuna si vede.
+   */
+  advance(hours) {
+    const STEP = 5;
+    let left = Math.max(0, hours) * HOUR;
+    while (left > 0.001) {
+      this.step(Math.min(STEP, left));
+      // `wet` legge `rain`, che nasce in `apply`: senza ricalcolarlo a ogni passo
+      // il bagnato inseguirebbe la pioggia di otto ore prima.
+      this.apply();
+      left -= STEP;
     }
+    this.flash = 0;
     this.apply();
   }
 

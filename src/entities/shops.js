@@ -28,7 +28,7 @@ import { Rng } from '../core/rng.js';
 import { clamp, damp, dist, approachAngle, circleRectPush, pointInRect } from '../core/math.js';
 import { createPed } from './pedestrians.js';
 import { WEAPONS, shoot, hasLineOfSight } from './weapons.js';
-import { buildInterior, BUSINESSES, bizOpenAt, clockLabel } from '../world/interiors.js';
+import { buildInterior, BUSINESSES, bizOpenAt, clockLabel, crowdAt, rushAt } from '../world/interiors.js';
 import { HERO_OUTFITS, VEHICLE_COLORS, VEHICLE_TYPES } from '../render/sprites.js';
 
 const DOOR_REACH = 34;   // quanto ci si deve avvicinare alla porta dalla strada
@@ -101,6 +101,10 @@ function roundPrice(n) {
  * I mezzi che non ci sono (velivoli, barche) hanno un prezzo lo stesso: a un
  * 전당포 sul lungomare un motoscafo ci arriva davvero.
  */
+// Scorrimento lungo il muro di fondo nella ricerca dell'uscita di servizio, in px
+// dal centro: il palazzo attaccato dietro può lasciare una fessura più in là.
+const SIDE_SCAN = [0, -30, 30, -60, 60, -92, 92, -124, 124];
+
 const CAR_VALUE = {
   scooter: 18000, hatch: 42000, taxi: 48000, sedan: 55000, tractor: 60000,
   van: 70000, suv: 90000, bus: 95000, truck: 120000, sport: 210000,
@@ -278,6 +282,7 @@ export class ShopSystem {
     this.cache = new Map();   // interni già visitati, con le loro casse svuotate
     this.active = null;
     this.outside = null;      // dove si torna uscendo
+    this.backSpot = null;     // dove si sbuca dal retro, se là dietro c'è posto
     this.actions = [];        // suggerimenti contestuali per l'HUD
     this.fade = 0;            // nero fra una porta e l'altra
     this.garageT = 0;
@@ -316,33 +321,81 @@ export class ShopSystem {
   // --- ingresso e uscita ------------------------------------------------------
 
   /** Interno dell'edificio, costruito alla prima visita e poi ricordato. */
-  interiorOf(shop) {
+  interiorOf(shop, game) {
     let it = this.cache.get(shop.id);
     if (it) return it;
-    it = buildInterior(shop);
-    const rng = new Rng((shop.seed ^ 0xbeef) >>> 0);
+    // Il retro si decide qui, una volta sola: se dietro l'edificio non c'è un punto
+    // buono in cui sbucare, il varco non viene proprio aperto. Un buco nel muro che
+    // non porta da nessuna parte è peggio di un muro — ci si infila e ci si resta.
+    const spot = this.backDoorSpot(shop, game);
+    it = buildInterior(shop, !!spot);
+    it.backSpot = spot;
+    // L'rng resta attaccato all'interno: lo riusa la folla di passaggio, che nasce
+    // a ogni visita e non in generazione.
+    it.rng = new Rng((shop.seed ^ 0xbeef) >>> 0);
     for (const f of it.floors) {
       // `staff` è il ruolino del piano e non si tocca più: chi lavora qui è sempre
       // questo, anche mentre il locale è chiuso e in sala non c'è nessuno. Quello
-      // che cambia con l'orario è `people`, cioè chi è in sala adesso.
-      f.staff = f.npcs.map((d) => {
-        const p = createPed(d.kind, d.x, d.y, rng);
-        p.home = { x: d.x, y: d.y };
-        p.role = d.role;
-        p.state = 'post';
-        p.indoor = true;
-        // Chi tiene una cassa in un posto dove si beve o si vendono armi è armato:
-        // è quello che rende una rapina una scelta e non un pulsante.
-        if (d.role === 'keeper' && (f.biz.id === 'guns' || f.biz.id === 'bar' || f.biz.id === 'billiards')) {
-          p.armed = true;
-        }
-        return p;
-      });
+      // che cambia con l'orario è `crowd`, cioè chi è di passaggio adesso.
+      f.staff = f.npcs.map((d) => this.hirePed(d, it.rng, f, true));
       f.npcs = f.staff;
+      f.crowd = [];
+      // Quello che è successo qui e non deve tornare indietro: i clienti stesi a
+      // terra. Il personale morto resta in `staff`, i vivi di passaggio no.
+      f.kept = [];
       f.people = f.staff;
     }
     this.cache.set(shop.id, it);
     return it;
+  }
+
+  /** Un pedone da interno: al suo posto, senza marciapiedi da navigare. */
+  hirePed(d, rng, f, staff) {
+    const p = createPed(d.kind, d.x, d.y, rng);
+    p.home = { x: d.x, y: d.y };
+    p.role = d.role;
+    p.state = 'post';
+    p.indoor = true;
+    p.staff = staff;
+    // Chi tiene una cassa in un posto dove si beve o si vendono armi è armato:
+    // è quello che rende una rapina una scelta e non un pulsante.
+    if (staff && d.role === 'keeper' && (f.biz.id === 'guns' || f.biz.id === 'bar' || f.biz.id === 'billiards')) {
+      p.armed = true;
+    }
+    return p;
+  }
+
+  /**
+   * La sala all'ora in cui ci sei entrato. **La folla di passaggio si rifà a ogni
+   * visita, il personale e i morti no**: è la riga che tiene insieme le due cose
+   * che l'interno deve fare — cambiare con l'ora e ricordarsi cosa è successo. Se
+   * si ricalcolasse tutto da zero, la cassa svuotata tornerebbe piena di gente e
+   * il commesso steso si rialzerebbe; se non si ricalcolasse niente, un 술집 alle
+   * tre di notte avrebbe la stessa folla delle nove di sera.
+   *
+   * Un cliente ammazzato passa da `crowd` a `kept` e da lì non si muove più: la
+   * differenza fra qualcuno che se n'è andato e qualcuno che è rimasto a terra.
+   */
+  refreshCrowd(f, game) {
+    for (const p of f.crowd) if (p.dead && !f.kept.includes(p)) f.kept.push(p);
+    f.crowd = [];
+    if (f.openNow) {
+      const hour = game.dayCycle.hour;
+      const n = crowdAt(f.biz, hour);
+      // Fuori dall'ora di punta la gente non gira per la sala: sta al tavolo. È
+      // l'altra metà di "cosa fanno a quest'ora", e costa una riga.
+      const still = rushAt(f.biz.id, hour) < 0.5;
+      for (let i = 0; i < n && i < f.guests.length; i++) {
+        const p = this.hirePed(f.guests[i], this.active.rng, f, false);
+        if (still) p.role = 'sit';
+        f.crowd.push(p);
+      }
+    }
+    // Chiuso vuol dire vuoto: restano solo i morti, che non tornano a casa alla
+    // chiusura del turno.
+    const dead = f.staff.filter((p) => p.dead);
+    const live = f.openNow ? f.staff.filter((p) => !p.dead) : [];
+    f.people = [...dead, ...f.kept, ...live, ...f.crowd];
   }
 
   // --- orari ------------------------------------------------------------------
@@ -399,8 +452,9 @@ export class ShopSystem {
     }
     const pl = game.player;
     this.outside = { x: pl.x, y: pl.y, angle: pl.angle };
-    this.active = this.interiorOf(shop);
+    this.active = this.interiorOf(shop, game);
     this.active.cur = 0;
+    this.backSpot = this.active.backSpot;
     this.placeOnFloor(game, this.floor.entry);
     this.showFloor(game, this.floor);
     game.fx.clear();
@@ -424,10 +478,7 @@ export class ShopSystem {
    */
   showFloor(game, f) {
     f.openNow = this.isOpen(f.biz.id, game);
-    // Chiuso vuol dire vuoto: niente commessi, niente clienti, e la cassa la
-    // svuotano loro alla chiusura (vedi `updateInside`). Il ruolino resta in
-    // `staff` e torna al turno dopo.
-    f.people = f.openNow ? f.staff : [];
+    this.refreshCrowd(f, game);
     // I pedoni della città restano dove sono: dentro `game.peds` ci va la gente di
     // questo piano, così raggi, mischia e onde d'urto la trovano senza sapere che
     // sono in un interno (vedi `rayCast`, che interroga `game.pedGrid`).
@@ -440,21 +491,72 @@ export class ShopSystem {
   leave(game) {
     if (!this.active) return;
     const shop = this.active.shop;
+    this.stepOutside(game, shop.x + shop.nx * 16, shop.y + shop.ny * 16, Math.atan2(shop.ny, shop.nx));
+  }
+
+  /**
+   * Uscita di servizio. Sbuca **dietro** l'edificio, dal lato opposto alla
+   * facciata: se davanti alla porta c'è la polizia, il cortile dell'isolato è
+   * l'unica cosa che rende una scelta l'essere entrati.
+   */
+  leaveBack(game) {
+    const spot = this.backSpot;
+    if (!this.active || !spot) return;
+    this.stepOutside(game, spot.x, spot.y, spot.angle);
+    game.hud.toast('Uscita sul retro', 1.8);
+  }
+
+  stepOutside(game, x, y, angle) {
     const pl = game.player;
     this.forceExit(game);
-    pl.x = shop.x + shop.nx * 16;
-    pl.y = shop.y + shop.ny * 16;
+    pl.x = x;
+    pl.y = y;
     pl.vx = 0;
     pl.vy = 0;
-    pl.angle = Math.atan2(shop.ny, shop.nx);
+    pl.angle = angle;
     game.camera.snapTo(pl.x, pl.y);
     pl.district = game.city.districtAt(pl.x, pl.y);
+  }
+
+  /**
+   * Dove si sbuca uscendo dal retro, in coordinate **mondo**: dal lato opposto
+   * alla facciata, appena fuori dall'ingombro dell'edificio. Si calcola una volta
+   * all'ingresso e non a ogni frame.
+   *
+   * Torna `null` se là dietro non c'è posto — il palazzo accanto attaccato, il
+   * mare, il bordo mappa — e in quel caso **l'uscita non viene offerta**: una
+   * porta che scarica il giocatore dentro un muro è peggio di una porta che non
+   * c'è, perché il muro lo sputa fuori in un punto a caso.
+   */
+  backDoorSpot(shop, game) {
+    const b = shop.building;
+    if (!b) return null;
+    const cx = b.x + b.w / 2;
+    const cy = b.y + b.h / 2;
+    const horiz = Math.abs(shop.nx) > 0.5;
+    const half = horiz ? b.w / 2 : b.h / 2;
+    // Il muro di fondo è lungo: se in mezzo c'è attaccato il palazzo accanto, la
+    // fessura può esserci lo stesso venti passi più in là. Si scorre il retro
+    // dall'interno verso i bordi prima di rinunciare — senza questa scansione la
+    // porta di servizio esisterebbe in un negozio su quattro.
+    const span = (horiz ? b.h : b.w) / 2 - 12;
+    const angle = Math.atan2(-shop.ny, -shop.nx);
+    for (const out of [18, 30, 44, 60]) {
+      for (const side of SIDE_SCAN) {
+        const off = clamp(side, -span, span);
+        const x = horiz ? cx - shop.nx * (half + out) : cx + off;
+        const y = horiz ? cy + off : cy - shop.ny * (half + out);
+        if (freeSpot(x, y, game)) return { x, y, angle };
+      }
+    }
+    return null;
   }
 
   /** Chiude l'interno senza spostare nessuno: lo usa anche la morte in un negozio. */
   forceExit(game) {
     if (!this.active) return;
     this.active = null;
+    this.backSpot = null;
     game.peds = game.pedSystem.peds;
     game.pedGrid.rebuild(game.peds);
     game.fx.clear();
@@ -503,6 +605,7 @@ export class ShopSystem {
   update(dt, game) {
     this.fade = Math.max(0, this.fade - dt * 2.6);
     this.actions.length = 0;
+    this.updateAlarm(dt, game);
     if (this.active) { this.near = null; this.updateInside(dt, game); }
     else this.updateOutside(dt, game);
   }
@@ -573,7 +676,13 @@ export class ShopSystem {
     const pl = game.player;
     for (const p of f.people) this.updateNpc(p, dt, game);
     for (let i = f.people.length - 1; i >= 0; i--) {
-      if (f.people[i].gone) f.people.splice(i, 1);
+      const p = f.people[i];
+      if (!p.gone) continue;
+      // Chi è uscito dalla porta è uscito davvero: va tolto anche dal ruolino,
+      // altrimenti alla visita dopo il commesso scappato è di nuovo dietro al banco.
+      f.people.splice(i, 1);
+      drop(f.staff, p);
+      drop(f.crowd, p);
     }
 
     // Azioni contestuali: scala, porta, bancone, cassa.
@@ -585,6 +694,25 @@ export class ShopSystem {
       this.actions.push({ key: 'E', text: this.active.cur === 1 ? 'scendi al piano terra' : `scendi al ${ordinal(this.active.cur)} piano`, run: () => this.useStairs(-1, game) });
     } else if (f.idx === 0 && dist(pl.x, pl.y, f.entry.x, f.entry.y) < 34) {
       this.actions.push({ key: 'E', text: 'esci in strada', run: () => this.leave(game) });
+    } else if (f.idx === 0 && f.backExit && this.backSpot
+      && dist(pl.x, pl.y, f.backExit.x, f.backExit.y) < 32) {
+      this.actions.push({ key: 'E', text: 'esci sul retro', run: () => this.leaveBack(game) });
+    }
+
+    // Il futon di un 주택: l'unico modo di far passare il tempo senza aspettarlo
+    // davvero. Sta solo nelle case — in una corsia d'ospedale c'è lo stesso mobile,
+    // ma lì il tempo si compra al bancone.
+    if (f.biz.id === 'home') {
+      const bed = f.furni.find((o) => o.type === 'bed'
+        && dist(pl.x, pl.y, o.x + o.w / 2, o.y + o.h / 2) < 46);
+      if (bed) {
+        const to = sleepTarget(game.dayCycle.hour);
+        this.actions.push({
+          key: 'E',
+          text: `dormi fino alle ${clockLabel(to.at)} · ${to.wait.toFixed(0)}h`,
+          run: () => this.sleep(game),
+        });
+      }
     }
 
     // A locale chiuso il bancone è morto: niente listino e niente cassa. Senza,
@@ -605,6 +733,36 @@ export class ShopSystem {
         break;
       }
     }
+  }
+
+  /**
+   * Dormire. Porta l'orologio avanti (`dayCycle.advance`, che fa girare anche il
+   * meteo) e rimette in piedi il giocatore.
+   *
+   * **Non azzera il ricercato, e con tre stelle non si dorme affatto.** Il letto
+   * non può essere la via d'uscita da un assedio: se lo fosse, tutta la caccia
+   * finirebbe con «entro in casa e vado a nanna». Sotto le tre stelle un sonnellino
+   * si concede — le stelle le ritrovi tali e quali quando esci, perché il ricercato
+   * dentro un edificio è congelato, non spento.
+   */
+  sleep(game) {
+    const dc = game.dayCycle;
+    const pl = game.player;
+    if (game.wanted.level >= 3) {
+      game.hud.toast('Con le sirene là fuori non chiudi occhio', 2.6);
+      return;
+    }
+    const to = sleepTarget(dc.hour);
+    dc.advance(to.wait);
+    pl.heal(pl.maxHp);
+    // Nero pieno per mezzo secondo: uno stacco da porta (fade 1) non basta a dire
+    // che sono passate otto ore.
+    this.fade = 2.4;
+    pl.enterCooldown = 0.5;
+    game.hud.toast(`Hai dormito ${to.wait.toFixed(0)} ore · ${clockLabel(dc.hour)}`, 3);
+    // L'ora è un'altra: il piano va riletto come se ci si fosse appena arrivati —
+    // aperture, luci e gente di passaggio.
+    this.showFloor(game, this.floor);
   }
 
   /**
@@ -842,7 +1000,97 @@ export class ShopSystem {
       p.state = 'flee';
       p.panic = 4;
     }
+    if (source === game.player) this.raiseAlarm(f, game);
   }
+
+  // --- allarme silenzioso -------------------------------------------------------
+
+  /** Quanto manca alla telefonata, in [0,1]: lo disegna `interiorscene`. */
+  get alarmFrac() {
+    return clamp(this.alarmT / ALARM_DELAY, 0, 1);
+  }
+
+  /**
+   * Chi ha visto non ti ferma: esce e telefona, e la centrale lo sa qualche
+   * secondo dopo. È la differenza fra una rapina e una sparatoria — **un commesso
+   * già steso non chiama nessuno**, quindi svuotare una cassa senza testimoni resta
+   * possibile, ed è l'unico modo di farla franca.
+   *
+   * Chi è armato e ti sta sparando non telefona, ha altro da fare: rapinare un
+   * 총포상 costa un conflitto a fuoco e non una denuncia, rapinare un 편의점 il
+   * contrario. Il testimone preferito è il commesso — è quello che sa il numero.
+   */
+  raiseAlarm(f, game) {
+    if (this.alarmT > 0) return;
+    const witness = f.people.find((p) => !p.dead && !p.hostile && p.role === 'keeper')
+      || f.people.find((p) => !p.dead && !p.hostile);
+    if (!witness) return;
+    this.alarmT = ALARM_DELAY;
+    this.alarmCaller = witness;
+    witness.calling = true;
+    game.hud.toast('Un testimone ha il telefono in mano', 2.8);
+  }
+
+  /**
+   * Il conto alla rovescia gira **anche fuori**: uscire dalla porta non ferma una
+   * telefonata già partita, e il negozio alle spalle non è un rifugio. Si ferma in
+   * un modo solo, stendendo chi sta chiamando prima che esca — e se in sala c'è
+   * qualcun altro in piedi, tocca a lui.
+   */
+  updateAlarm(dt, game) {
+    if (this.alarmT <= 0) return;
+    const caller = this.alarmCaller;
+    if (caller && caller.dead && this.active) {
+      const other = this.floor.people.find((p) => !p.dead && !p.hostile && p !== caller);
+      if (!other) {
+        this.alarmT = 0;
+        this.alarmCaller = null;
+        game.hud.toast('Nessuno ha fatto in tempo a chiamare', 2.6);
+        return;
+      }
+      this.alarmCaller = other;
+      other.calling = true;
+    }
+    this.alarmT -= dt;
+    if (this.alarmT > 0) return;
+    this.alarmT = 0;
+    if (this.alarmCaller) this.alarmCaller.calling = false;
+    this.alarmCaller = null;
+    // Metà di una rapina: la denuncia da sola non vale quanto il colpo, ma sommata
+    // ai 22 della cassa porta la seconda stella. Farla franca vuol dire non
+    // lasciare nessuno in piedi, o non farsi trovare lì.
+    game.wanted.report('rob', game, { mul: 0.55 });
+    game.hud.toast('112 — «rapina in corso», e hanno il tuo indirizzo', 3.2);
+  }
+}
+
+/** Un punto in cui un pedone ci sta: niente solidi, niente acqua, niente bordo mappa. */
+function freeSpot(x, y, game) {
+  const city = game.city;
+  if (x < 60 || y < 60 || x > city.w - 60 || y > city.h - 60) return false;
+  if (city.isWater(x, y)) return false;
+  // 11 px è il raggio del giocatore (9) più due di margine: uscire di misura
+  // incastrati fra due muri è come non uscire.
+  for (const s of city.solidGrid.queryRect(x - 26, y - 26, 52, 52)) {
+    if (s.vehicleOnly) continue;   // sulle transenne si passa a piedi
+    if (circleRectPush(x, y, 11, s)) return false;
+  }
+  return true;
+}
+
+/**
+ * Fino a che ora si dorme: all'alba se ci si corica di sera o di notte, a stasera
+ * se è giorno. Due mete e non un menù di orari — la domanda vera che si fa chi va
+ * a letto in un gioco è una sola, «fammi arrivare all'altra metà della giornata».
+ */
+function sleepTarget(hour) {
+  const at = hour >= 17.5 || hour < 6 ? 6.5 : 20;
+  return { at, wait: (((at - hour) % 24) + 24) % 24 };
+}
+
+function drop(list, item) {
+  const i = list.indexOf(item);
+  if (i >= 0) list.splice(i, 1);
 }
 
 function padRect(r, m) {
