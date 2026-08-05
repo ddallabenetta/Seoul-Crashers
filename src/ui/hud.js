@@ -487,6 +487,19 @@ export class Hud {
       ctx.arc(0, 0, r + 12, -Math.PI / 2, -Math.PI / 2 + p.spin * 6.2832);
       ctx.stroke();
     }
+    // Calore delle canne, l'anello più esterno. Lampeggia da inceppato perché un
+    // rosso fisso qui si confonde con l'anello dello spin-up già pieno, che è a
+    // dodici pixel di distanza e vuol dire l'esatto contrario ("puoi sparare").
+    if (spec.spinUp && p.heat > 0.02) {
+      const blink = p.overheated ? 0.55 + 0.45 * Math.sin(game.time * 14) : 0.8;
+      ctx.strokeStyle = p.overheated
+        ? `rgba(255,70,50,${blink})`
+        : `rgba(255,${Math.round(206 - p.heat * 140)},60,${blink})`;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(0, 0, r + 17, -Math.PI / 2, -Math.PI / 2 + Math.min(1, p.heat) * 6.2832);
+      ctx.stroke();
+    }
     ctx.restore();
   }
 

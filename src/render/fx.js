@@ -183,8 +183,7 @@ export class Fx {
 
   /**
    * La pioggia lava il sangue, non le bruciature: una pozza rossa se ne va con
-   * l'acqua, un cerchio di catrame bruciato no. La chiama `projectiles.update`,
-   * che il meteo ce l'ha già in mano — `fx.update` riceve dal loop il solo dt.
+   * l'acqua, un cerchio di catrame bruciato no.
    */
   washRain(dt, rain) {
     if (rain <= 0.02) return;
@@ -197,7 +196,11 @@ export class Fx {
     }
   }
 
-  update(dt) {
+  // `game` serve solo al meteo: dentro un edificio non piove, e le coordinate di
+  // una pianta non hanno niente a che vedere con la strada. `drawDecals` invece
+  // resta a un argomento — la chiama anche `interiorscene`.
+  update(dt, game) {
+    if (game && !game.indoors) this.washRain(dt, game.dayCycle.rain);
     for (let i = this.decals.length - 1; i >= 0; i--) {
       const d = this.decals[i];
       if (d.maxLife < 900) {

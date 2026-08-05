@@ -232,6 +232,9 @@ class Game {
     v.dead = true;
     v.deadT = 24;      // lo streaming lo raccoglie al prossimo giro
     v.protect = false;
+    // Togliere il veicolo dalla lista non libera il suo stallo di sosta: senza
+    // questo, il posto resta occupato da un fantasma per il resto della partita.
+    if (v.spot) v.spot.taken = false;
     const i = this.vehicles.indexOf(v);
     if (i >= 0) this.vehicles.splice(i, 1);
   }
@@ -390,7 +393,7 @@ class Game {
     // tramezzi e fa danno a chi c'è. Quello che *non* può fare è sopravvivere alla
     // porta, e infatti `shops` svuota la lista a ogni passaggio (mine comprese).
     this.projectiles.update(dt, this);
-    this.fx.update(dt);
+    this.fx.update(dt, this);
     this.hud.update(dt);
 
     // Statistiche di guida. Entrare e uscire da una porta è un salto di coordinate,

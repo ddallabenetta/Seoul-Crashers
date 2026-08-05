@@ -258,10 +258,6 @@ export class ProjectileSystem {
     // Dentro un edificio non piove: una pozza in un 노래방 non la spegne il
     // temporale che c'è fuori.
     const rain = game.indoors ? 0 : game.dayCycle.rain;
-    // La pioggia lava anche il sangue. `fx.update` non vede il meteo (`main` la
-    // chiama col solo dt), quindi la sbiadita la comanda chi il meteo ce l'ha già
-    // in mano: qui.
-    if (!game.indoors) game.fx.washRain(dt, rain);
     // Con l'incendio propagato le pozze sono venti, non una: a 26 particelle al
     // secondo ciascuna si occupano da sole 346 dei 420 posti di `fx`, e la prima
     // esplosione butta fuori traccianti e sangue. Non è il frame rate (misurato:

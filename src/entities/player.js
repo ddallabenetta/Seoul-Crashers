@@ -375,8 +375,9 @@ export class Player {
     const reach = dist(ox, oy, this.aimX, this.aimY);
     game.projectiles.throwItem(game, this, spec, ox, oy, ang, reach);
     game.camera.addShake(spec.shake * 0.35);
-    // Una molotov che vola in mezzo alla strada la vede tutto l'isolato.
-    game.wanted?.report('gunshot', game);
+    // Una molotov che vola in mezzo alla strada la vede tutto l'isolato, e non la si
+    // scambia per una lite finita male: pesa il doppio di uno sparo.
+    game.wanted?.report('blast', game);
     game.alarm(ox, oy, 300, this);
   }
 
