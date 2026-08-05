@@ -22,6 +22,7 @@ import { clamp, rectsOverlap } from '../core/math.js';
 
 export const WALL = 12;      // spessore dei muri perimetrali
 const DOOR_W = 54;           // varco d'ingresso al piano terra
+export const BACK_W = 44;    // varco di servizio sul retro, sempre al piano terra
 const STAIR_W = 58;
 const STAIR_H = 78;
 
@@ -118,6 +119,46 @@ export function bizOpenAt(bizId, hour) {
   return z > a ? h >= a && h < z : h >= a || h < z;
 }
 
+/**
+ * Quanta gente di passaggio c'è dentro, ora per ora, in frazione di `biz.crowd`.
+ * È una tabella come le chiavi della luce (`daycycle.KEYS`) e per lo stesso
+ * motivo: un 술집 non si riempie seguendo una sinusoide, si riempie alle undici.
+ * Le fasce che scavalcano la mezzanotte si scrivono come gli orari (`[23, 2]`).
+ *
+ * Fuori dall'orario di apertura non serve: un locale chiuso è vuoto comunque.
+ */
+const RUSH = {
+  bar:       [[17, 20, 0.4], [20, 23, 1], [23, 2, 1.2], [2, 4, 0.35]],
+  bunsik:    [[8, 11, 0.4], [11, 14, 1.2], [14, 17, 0.5], [17, 21, 1], [21, 22, 0.5]],
+  conv:      [[0, 5, 0.25], [5, 8, 0.5], [8, 12, 0.8], [12, 14, 1.1], [14, 18, 0.8], [18, 23, 1.1], [23, 24, 0.5]],
+  pharma:    [[9, 12, 0.9], [12, 14, 0.6], [14, 20, 1]],
+  guns:      [[10, 14, 0.7], [14, 20, 0.9]],
+  pawn:      [[10, 14, 0.9], [14, 21, 0.7]],
+  clothes:   [[11, 15, 0.8], [15, 20, 1.1], [20, 22, 0.6]],
+  office:    [[9, 12, 1.1], [12, 14, 0.5], [14, 18, 1], [18, 19, 0.15]],
+  pcbang:    [[14, 18, 0.6], [18, 23, 1.1], [23, 3, 1.2], [3, 4, 0.4]],
+  noraebang: [[16, 20, 0.4], [20, 24, 1.1], [0, 3, 1.2], [3, 5, 0.4]],
+  billiards: [[15, 19, 0.6], [19, 24, 1.1], [0, 3, 0.7]],
+  // Un 주택 è pieno quando la gente è a casa, cioè quando tutto il resto è chiuso.
+  home:      [[0, 7, 1.2], [7, 9, 0.8], [9, 18, 0.2], [18, 22, 1], [22, 24, 1.2]],
+  clinic:    [[0, 8, 0.4], [8, 12, 1.2], [12, 18, 1], [18, 24, 0.6]],
+};
+
+export function rushAt(bizId, hour) {
+  const table = RUSH[bizId];
+  if (!table) return 0.8;
+  const h = ((hour % 24) + 24) % 24;
+  for (const [a, z, f] of table) {
+    if (z > a ? h >= a && h < z : h >= a || h < z) return f;
+  }
+  return 0.4;
+}
+
+/** Quanti clienti ci sono su questo piano a quest'ora. */
+export function crowdAt(biz, hour) {
+  return Math.round((biz.crowd || 0) * rushAt(biz.id, hour));
+}
+
 /** Sempre aperto: `[0, 24]`, l'unica fascia che non ha senso scrivere su un cartello. */
 export function bizAlwaysOpen(bizId) {
   const b = BUSINESSES[bizId];
@@ -171,19 +212,27 @@ export const DISTRICT_MIX = {
 // GENERAZIONE
 // ---------------------------------------------------------------------------
 
-/** Interno completo di un edificio: una pianta per piano, dal terra in su. */
-export function buildInterior(shop) {
+/**
+ * Interno completo di un edificio: una pianta per piano, dal terra in su.
+ * `back` dice se il piano terra ha l'uscita di servizio: lo decide chi conosce il
+ * mondo fuori (`shops.backDoorSpot`), perché dietro un edificio attaccato al
+ * palazzo accanto non c'è nessun posto in cui sbucare.
+ */
+export function buildInterior(shop, back = false) {
   const rng = new Rng(shop.seed);
   const w = clamp(Math.round(shop.w * 1.8), 300, 470);
   const h = clamp(Math.round(shop.h * 1.8), 260, 390);
-  const floors = shop.biz.map((id, i) => buildFloor(rng, BUSINESSES[id], i, shop.biz.length, w, h));
+  const floors = shop.biz.map((id, i) => buildFloor(rng, BUSINESSES[id], i, shop.biz.length, w, h, back));
   return { shop, floors, cur: 0, name: shop.name };
 }
 
-function buildFloor(rng, biz, idx, total, w, h) {
+function buildFloor(rng, biz, idx, total, w, h, back) {
   const f = {
     idx, biz, w, h,
-    walls: [], furni: [], npcs: [],
+    // `npcs` è il ruolino (chi lavora qui, sempre gli stessi), `guests` sono i
+    // posti in cui *può* esserci un cliente: quanti se ne occupano davvero lo
+    // decide l'ora, a ogni visita (vedi `crowdAt` e `shops.refreshCrowd`).
+    walls: [], furni: [], npcs: [], guests: [],
     stairUp: null, stairDown: null,
     entry: null, till: null, robbed: false,
     grid: null,
@@ -191,7 +240,20 @@ function buildFloor(rng, biz, idx, total, w, h) {
 
   // Muri: perimetro chiuso, con il varco della porta solo al piano terra.
   const gap = idx === 0 ? { a: w / 2 - DOOR_W / 2, b: w / 2 + DOOR_W / 2 } : null;
-  f.walls.push({ x: 0, y: 0, w, h: WALL });                 // fondo (retro)
+  // Porta di servizio sul retro, anche lei solo al piano terra: è il contrappeso
+  // all'assedio della porta principale — senza una seconda uscita un negozio è una
+  // trappola, con la porta sul retro è una scelta. Sta all'**estremo** del muro di
+  // fondo e non in mezzo: quello è il muro dell'arredo (frigoriferi, rastrelliere,
+  // cucina), e un varco al centro lo spezzerebbe in due tronconi troppo corti per
+  // starci qualcosa. `band` si accorcia di conseguenza, e le piante la rispettano
+  // da sole perché usano solo quella.
+  f.back = back && idx === 0 ? { x: WALL + 14, w: BACK_W } : null;
+  if (f.back) {
+    f.walls.push({ x: 0, y: 0, w: f.back.x, h: WALL });
+    f.walls.push({ x: f.back.x + f.back.w, y: 0, w: w - f.back.x - f.back.w, h: WALL });
+  } else {
+    f.walls.push({ x: 0, y: 0, w, h: WALL });               // fondo (retro)
+  }
   f.walls.push({ x: 0, y: 0, w: WALL, h });                 // sinistra
   f.walls.push({ x: w - WALL, y: 0, w: WALL, h });           // destra
   if (gap) {
@@ -211,12 +273,16 @@ function buildFloor(rng, biz, idx, total, w, h) {
     ? { x: w / 2, y: h - WALL - 28, angle: -Math.PI / 2 }
     : { x: WALL + STAIR_W / 2, y: WALL + STAIR_H + 22, angle: Math.PI / 2 };
 
-  // Zone da non ingombrare: scale, pianerottoli e il corridoio davanti alla porta.
+  // Dove si esce sul retro, visto da dentro.
+  f.backExit = f.back ? { x: f.back.x + f.back.w / 2, y: WALL + 26, angle: -Math.PI / 2 } : null;
+
+  // Zone da non ingombrare: scale, pianerottoli e i corridoi delle due porte.
   const keep = [];
   if (f.stairUp) keep.push(pad(f.stairUp, 16));
   if (f.stairDown) keep.push(pad(f.stairDown, 16));
   if (idx === 0) keep.push({ x: w / 2 - 36, y: h - WALL - 76, w: 72, h: 76 });
   else keep.push({ x: WALL, y: WALL, w: STAIR_W + 26, h: STAIR_H + 46 });
+  if (f.back) keep.push({ x: f.back.x - 10, y: WALL, w: f.back.w + 20, h: 62 });
   f.keep = keep;
 
   const area = { x: WALL + 6, y: WALL + 6, w: w - WALL * 2 - 12, h: h - WALL * 2 - 12 };
@@ -242,11 +308,12 @@ function pad(r, m) {
   return { x: r.x - m, y: r.y - m, w: r.w + m * 2, h: r.h + m * 2 };
 }
 
-/** Tratto di muro di fondo non occupato dai vani scala. */
+/** Tratto di muro di fondo non occupato dai vani scala né dalla porta sul retro. */
 function backBand(f, a) {
   let x0 = a.x;
   let x1 = a.x + a.w;
   if (f.stairDown) x0 = Math.max(x0, f.stairDown.x + f.stairDown.w + 16);
+  if (f.back) x0 = Math.max(x0, f.back.x + f.back.w + 14);
   if (f.stairUp) x1 = Math.min(x1, f.stairUp.x - 16);
   return { x: x0, w: Math.max(0, x1 - x0) };
 }
@@ -267,6 +334,11 @@ function npc(f, kind, x, y, role = 'idle') {
   f.npcs.push({ kind, x, y, role });
 }
 
+/** Un posto da cliente: esiste sempre, ma è occupato solo a certe ore. */
+function guest(f, kind, x, y, role = 'wander') {
+  f.guests.push({ kind, x, y, role });
+}
+
 /**
  * Cassa: sta *sopra* il bancone, quindi entra nell'elenco senza passare dal
  * controllo di sovrapposizione — è l'unico mobile che deve pestarne un altro.
@@ -276,17 +348,26 @@ function till(f, x, y, cash) {
   f.furni.push({ x: x - 9, y: y - 7, w: 18, h: 14, type: 'till', z: 30, solid: false });
 }
 
-/** Sparpaglia i clienti nello spazio ancora libero. */
-function crowd(rng, f, area, biz) {
+/**
+ * Sparpaglia i **posti** dei clienti nello spazio ancora libero. Se ne prepara
+ * qualcuno in più di quanti ne servano a regime: nell'ora di punta un locale è più
+ * pieno del suo `crowd`, e cercare un posto libero a runtime vorrebbe dire rifare
+ * il campionamento a ogni visita — questi invece sono sempre gli stessi, e la sala
+ * non si riarreda ogni volta che si apre la porta.
+ */
+function crowd(rng, f, area, biz, role = 'wander') {
   const kinds = ['civil', 'student', 'office', 'tourist'];
-  for (let i = 0; i < (biz.crowd || 0); i++) {
+  const n = biz.crowd || 0;
+  if (!n) return;
+  for (let i = 0; i < n + 2; i++) {
     for (let a = 0; a < 12; a++) {
       const x = area.x + rng.range(20, area.w - 20);
       const y = area.y + rng.range(20, area.h - 20);
       const box = { x: x - 11, y: y - 11, w: 22, h: 22 };
       if (f.keep.some((k) => rectsOverlap(box, k))) continue;
       if (f.furni.some((q) => q.solid && rectsOverlap(box, q))) continue;
-      npc(f, rng.pick(kinds), x, y, 'wander');
+      if (f.guests.some((g) => (g.x - x) ** 2 + (g.y - y) ** 2 < 40 * 40)) continue;
+      guest(f, rng.pick(kinds), x, y, role);
       break;
     }
   }
@@ -426,7 +507,9 @@ const LAYOUTS = {
           put(f, { x: inner.x, y: inner.y + inner.h - 20, w: Math.min(52, inner.w), h: 18, type: 'sofa', z: 20 });
           put(f, { x: inner.x + inner.w * 0.5 - 12, y: inner.y + 4, w: 24, h: 16, type: 'tv', z: 26, solid: false });
         }
-        if (rng.chance(0.45)) npc(f, rng.pick(['student', 'civil', 'office']), inner.x + inner.w * 0.5, inner.y + inner.h * 0.5, 'sit');
+        // Una stanzetta occupata è un posto da cliente come gli altri: alle tre di
+        // notte un 노래방 ne ha una sola accesa, alle undici tutte.
+        if (rng.chance(0.8)) guest(f, rng.pick(['student', 'civil', 'office']), inner.x + inner.w * 0.5, inner.y + inner.h * 0.5, 'sit');
       }
     }
     if (!home) {
