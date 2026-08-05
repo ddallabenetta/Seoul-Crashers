@@ -617,47 +617,49 @@ export class ShopSystem {
     if (!game.player.onFoot && game.player.vehicle) game.player.vehicle.hotwired = true;
     const shop = this.nearestDoor(game);
     this.near = shop;
-    if (!shop) return;
-    const biz = BUSINESSES[shop.biz[0]];
-    // Il primo piano aperto della colonna. Se non è il terra, il negozio della
-    // vetrina ha la saracinesca giù ma il portone resta aperto per quello di sopra:
-    // è come funziona un palazzo di Seoul, e il suggerimento lo deve dire.
-    const openIdx = shop.biz.findIndex((id) => this.isOpen(id, game));
-    let act;
-    if (openIdx < 0) {
-      const n = this.nextOpening(shop, game);
-      act = { key: 'E', text: `${biz.hangul} — chiuso · apre alle ${clockLabel(n.at)}`, run: () => this.knock(shop, game) };
-    } else if (openIdx === 0) {
-      act = {
-        key: 'E',
-        text: `entra in ${biz.hangul} · ${biz.label}${shop.biz.length > 1 ? ` (+${shop.biz.length - 1} piani)` : ''}`,
-        run: () => this.enter(shop, game),
-      };
-    } else {
-      const up = BUSINESSES[shop.biz[openIdx]];
-      act = {
-        key: 'E',
-        text: `entra — ${biz.hangul} è chiuso, ${up.hangul} aperto al ${ordinal(openIdx + 1)} piano`,
-        run: () => this.enter(shop, game),
-      };
+    if (shop) {
+      const biz = BUSINESSES[shop.biz[0]];
+      // Il primo piano aperto della colonna. Se non è il terra, il negozio della
+      // vetrina ha la saracinesca giù ma il portone resta aperto per quello di sopra:
+      // è come funziona un palazzo di Seoul, e il suggerimento lo deve dire.
+      const openIdx = shop.biz.findIndex((id) => this.isOpen(id, game));
+      let act;
+      if (openIdx < 0) {
+        const n = this.nextOpening(shop, game);
+        act = { key: 'E', text: `${biz.hangul} — chiuso · apre alle ${clockLabel(n.at)}`, run: () => this.knock(shop, game) };
+      } else if (openIdx === 0) {
+        act = {
+          key: 'E',
+          text: `entra in ${biz.hangul} · ${biz.label}${shop.biz.length > 1 ? ` (+${shop.biz.length - 1} piani)` : ''}`,
+          run: () => this.enter(shop, game),
+        };
+      } else {
+        const up = BUSINESSES[shop.biz[openIdx]];
+        act = {
+          key: 'E',
+          text: `entra — ${biz.hangul} è chiuso, ${up.hangul} aperto al ${ordinal(openIdx + 1)} piano`,
+          run: () => this.enter(shop, game),
+        };
+      }
+      this.actions.push(act);
     }
-    this.actions.push(act);
 
     // Ruba-e-rivendi. `F` è già il tasto della cassa: qui e al bancone fa la stessa
     // cosa — trasforma in contanti qualcosa che non è tuo. Con `E` si finirebbe per
-    // vendere il mezzo volendo entrare a comprare.
-    if (shop.biz[0] === 'pawn' && this.isOpen('pawn', game)) {
-      const { v, cop } = this.vehicleAtDoor(shop, game);
+    // vendere il mezzo volendo entrare a comprare, o per scendere dall'auto.
+    const desk = this.sellDeskNear(game, shop);
+    if (desk) {
+      const { v, cop } = this.vehicleAtDoor(desk, game);
       if (cop && !v) {
         this.actions.push({ key: 'F', text: '전당포 — una volante non la compra nessuno', run: () => {
           game.hud.toast('전당포 — «quella riportala dove l\'hai presa»', 2.4);
         } });
       } else if (v) {
-        const price = this.vehiclePrice(v, marketOf(shop.district));
+        const price = this.vehiclePrice(v, marketOf(desk.district));
         this.actions.push({
           key: 'F',
           text: `vendi ${VEHICLE_TYPES[v.kind].label} — ${won(price)}`,
-          run: () => this.sellVehicle(v, shop, game),
+          run: () => this.sellVehicle(v, desk, game),
         });
       }
     }
@@ -811,6 +813,27 @@ export class ShopSystem {
     // doppio di uno ammaccato: la forbice è 0.35-1, non 0-1.
     const cond = 0.35 + 0.65 * clamp(v.hp / (v.maxHp || 1), 0, 1);
     return roundPrice(base * cond * (v.flatTires ? 0.88 : 1) * market.cars);
+  }
+
+  /**
+   * Il 전당포 a cui si sta consegnando: quello sulla cui soglia sei, oppure quello
+   * davanti a cui hai accostato. Le due strade servono tutte e due — si arriva col
+   * mezzo e si vende dal finestrino, oppure si scende, si consegna e si entra a
+   * farsi pagare. Deve essere aperto: di notte la saracinesca è giù per tutti.
+   */
+  sellDeskNear(game, atDoor) {
+    if (!this.isOpen('pawn', game)) return null;
+    if (atDoor && atDoor.biz[0] === 'pawn') return atDoor;
+    const v = game.player.vehicle;
+    if (game.player.onFoot || !v || Math.abs(v.speed) > 24) return null;
+    let best = null;
+    let bestD = SELL_REACH;
+    for (const s of this.city.shops) {
+      if (s.biz[0] !== 'pawn') continue;
+      const d = dist(v.x, v.y, s.x, s.y);
+      if (d < bestD) { bestD = d; best = s; }
+    }
+    return best;
   }
 
   /** Il mezzo fermo più vicino alla porta, fra quelli che si possono vendere. */
@@ -1039,9 +1062,17 @@ export class ShopSystem {
    */
   updateAlarm(dt, game) {
     if (this.alarmT <= 0) return;
+    // Se ti hanno steso tu la denuncia non la prendi: la morte azzera il ricercato,
+    // e una telefonata in coda lo farebbe risorgere sul lettino dell'ospedale.
+    if (game.player.dying) {
+      this.alarmT = 0;
+      this.alarmCaller = null;
+      return;
+    }
     const caller = this.alarmCaller;
     if (caller && caller.dead && this.active) {
       const other = this.floor.people.find((p) => !p.dead && !p.hostile && p !== caller);
+      caller.calling = false;
       if (!other) {
         this.alarmT = 0;
         this.alarmCaller = null;
