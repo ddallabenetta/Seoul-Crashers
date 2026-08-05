@@ -1,0 +1,113 @@
+// Censimento del traffico: quanti urti, di che tipo, e quanta strada fanno davvero
+// le auto. È la misura con cui è stata fatta la messa a punto della guida AI
+// (HANDOFF §5.10): serve a rispondere con dei numeri a "il traffico si muove male",
+// che a occhio non si giudica.
+//
+//   node .claude/tools/probe.mjs --seconds 0 --quiet \
+//     --script .claude/tools/scenes/traffic-census.scene
+//
+// Due avvertenze che costano un pomeriggio se le si scopre da soli:
+//
+// 1. **Si misura su cinque zone, non su una.** Qualunque modifica alla guida
+//    sposta le traiettorie e quindi cambia lo scenario: su una scena sola un
+//    ingorgo locale nasce o non nasce, e il conteggio delle auto immobili salta
+//    da 0 a 10 senza che la legge di guida sia migliorata o peggiorata di niente.
+// 2. **Il confronto onesto è fianco a fianco**: `git worktree add /tmp/base origin/main`
+//    e la stessa scena sui due alberi. I valori assoluti dipendono dalla macchina.
+//
+// Il loop è a passo fisso, quindi due esecuzioni dello stesso codice danno lo
+// stesso identico risultato: una run per configurazione basta.
+// Estensione `.scene` e non `.js` perché è il corpo di una funzione async, non un
+// modulo: `node --check` (l'hook su Write/Edit) lo rifiuterebbe.
+const { VEHICLE_TYPES } = await import('/src/render/sprites.js');
+const { angleDiff } = await import('/src/core/math.js');
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const tally = (arr, f) => arr.reduce((a, e) => (a[f(e)] = (a[f(e)] || 0) + 1, a), {});
+
+// Lo spawn più un ospedale per distretto: marciapiedi in zone diverse, e il
+// giocatore fermo lì non finisce sotto un'auto.
+const spots = [
+  { x: game.player.x, y: game.player.y },
+  ...game.city.hospitals.slice(0, 4).map((h) => ({ x: h.x, y: h.y })),
+];
+
+const events = [];
+let recording = false;
+// `onVehicleImpact` scatta sopra i 60 px/s di avvicinamento, cioè su un urto che
+// fa danno. Chi c'è addosso lo si cerca nella griglia: se un altro mezzo è entro
+// la somma delle semilunghezze l'urto è fra veicoli, altrimenti è contro un solido.
+const base = game.onVehicleImpact.bind(game);
+game.onVehicleImpact = function (v, impact) {
+  base(v, impact);
+  if (!recording || v.driver !== 'ai') return;
+  const spec = VEHICLE_TYPES[v.kind];
+  let other = null, od = Infinity;
+  for (const o of game.vehicleGrid.queryCircle(v.x, v.y, spec.len + 60)) {
+    if (o === v) continue;
+    const d = Math.hypot(o.x - v.x, o.y - v.y);
+    if (d < (spec.len + VEHICLE_TYPES[o.kind].len) * 0.66 && d < od) { od = d; other = o; }
+  }
+  const cos = Math.cos(v.angle), sin = Math.sin(v.angle);
+  events.push({
+    vs: other ? other.kind : null, parked: other ? !!other.spot : false,
+    rel: other ? +Math.abs(angleDiff(v.angle, other.angle)).toFixed(2) : null,
+    fwd: other ? Math.round((other.x - v.x) * cos + (other.y - v.y) * sin) : null,
+  });
+};
+
+const perSpot = [];
+let obsTime = 0;
+for (const s of spots) {
+  game.player.x = s.x; game.player.y = s.y;
+  game.camera.snapTo(s.x, s.y);
+  await wait(16000);   // lo streaming rifà il traffico attorno alla nuova posizione
+  const track = new Map();
+  recording = true;
+  const t0 = game.time;
+  const sampler = setInterval(() => {
+    for (const v of game.vehicles) {
+      if (v.driver !== 'ai') continue;
+      const t = track.get(v);
+      if (!t) { track.set(v, { d: 0, x: v.x, y: v.y, n: 0 }); continue; }
+      const step = Math.hypot(v.x - t.x, v.y - t.y);
+      if (step < 200) t.d += step;   // un salto è un despawn, non strada percorsa
+      t.x = v.x; t.y = v.y; t.n++;
+    }
+  }, 250);
+  // Finestra lunga: con meno di mezzo minuto un'auto ferma a un rosso (7,7 s) e a
+  // quello dopo risulta "immobile" pur essendo perfettamente sana.
+  await wait(34000);
+  clearInterval(sampler);
+  recording = false;
+  const span = game.time - t0;
+  obsTime += span;
+  const followed = [...track.values()].filter((t) => t.n > span * 4 * 0.6);
+  const perMin = followed.map((t) => Math.round(t.d / (t.n * 0.25) * 60)).sort((a, b) => a - b);
+  perSpot.push({
+    zona: `${s.x | 0},${s.y | 0}`,
+    seguiti: followed.length,
+    mediana: perMin[perMin.length >> 1] || 0,
+    immobili: perMin.filter((d) => d < 400).length,
+  });
+}
+
+const cls = (e) => {
+  if (!e.vs) return 'solido';
+  if (e.parked) return 'in-sosta';
+  if (e.rel < 0.7) return e.fwd > 0 ? 'tamponamento' : 'tamponato';
+  if (e.rel > 2.4) return 'frontale';
+  return 'incrocio/laterale';
+};
+const med = perSpot.map((s) => s.mediana).sort((a, b) => a - b);
+return {
+  osservati: +obsTime.toFixed(0),
+  urtiAlMinuto: +(events.length / obsTime * 60).toFixed(1),
+  perTipo: tally(events, cls),
+  // px percorsi al minuto da un veicolo: è **la** misura del flusso.
+  flussoMediano: med[med.length >> 1],
+  flussoMin: med[0], flussoMax: med[med.length - 1],
+  immobiliTotali: perSpot.reduce((a, s) => a + s.immobili, 0),
+  seguitiTotali: perSpot.reduce((a, s) => a + s.seguiti, 0),
+  perZona: perSpot,
+  fps: Math.round(game.loop.fps),
+};

@@ -456,14 +456,19 @@ export class PoliceSystem {
     let target = ai.edge.arterial ? 330 : 260;
     if (Math.abs(heading) > 0.5) target = Math.min(target, 110);
 
-    // Chi è fermo davanti si evita, ma senza la prudenza del traffico civile.
+    // Chi è fermo davanti si evita, ma senza la prudenza del traffico civile: la
+    // distanza si misura **fra i paraurti** come nel traffico (§4 dell'HANDOFF),
+    // altrimenti per una volante lunga 82 px il freno arriva a contatto avvenuto.
     const cos = Math.cos(v.angle), sin = Math.sin(v.angle);
+    const spec = VEHICLE_TYPES[v.kind];
     const probe = 34 + Math.abs(v.speed) * 0.4;
-    for (const o of game.vehicleGrid.queryCircle(v.x + cos * probe * 0.6, v.y + sin * probe * 0.6, probe * 0.7)) {
+    const reach = spec.len * 0.5 + probe;
+    for (const o of game.vehicleGrid.queryCircle(v.x + cos * reach * 0.5, v.y + sin * reach * 0.5, reach * 0.5 + 40)) {
       if (o === v || o.driver === 'player') continue;
       const forward = (o.x - v.x) * cos + (o.y - v.y) * sin;
       const lateral = Math.abs(-(o.x - v.x) * sin + (o.y - v.y) * cos);
-      if (forward > 4 && forward < probe && lateral < 24) target = Math.min(target, 60);
+      const gap = forward - (spec.len + VEHICLE_TYPES[o.kind].len) * 0.5;
+      if (forward > 0 && gap < probe && lateral < 26) target = Math.min(target, 60);
     }
 
     const diff = target - v.speed;
