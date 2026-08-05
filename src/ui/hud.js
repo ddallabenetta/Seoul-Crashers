@@ -581,6 +581,19 @@ export class Hud {
       ctx.fillRect(m.x - 1, m.y - 3.2, 2, 6.4);
       ctx.fillRect(m.x - 3.2, m.y - 1, 6.4, 2);
     }
+    // Commissariati: da lì partono le volanti quando sei nei paraggi. Serve saperlo
+    // per la stessa ragione per cui serve sapere dov'è l'officina — per starne lontano.
+    for (const st of this.city.stations || []) {
+      const m = toMap(st.x, st.y);
+      if (m.x < x || m.x > x + MINIMAP || m.y < y || m.y > y + MINIMAP) continue;
+      ctx.fillStyle = '#2f5fbf';
+      ctx.fillRect(m.x - 4.5, m.y - 4.5, 9, 9);
+      ctx.strokeStyle = 'rgba(226,234,248,0.9)';
+      ctx.lineWidth = 1.2;
+      ctx.strokeRect(m.x - 4.5, m.y - 4.5, 9, 9);
+      ctx.fillStyle = 'rgba(226,234,248,0.95)';
+      ctx.fillRect(m.x - 3, m.y - 1, 6, 2);
+    }
     // Negozi con un servizio dentro (armeria, pegni, minimarket, farmacia, vestiti):
     // gli altri locali sono decine per isolato e riempirebbero la minimappa di puntini.
     for (const sh of this.city.shops || []) {

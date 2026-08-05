@@ -369,9 +369,11 @@ class Game {
     // un edificio, e il giocatore deve muoversi già nello spazio giusto.
     this.shops.update(dt, this);
     this.player.update(dt, this);
-    // Dentro un edificio la città si ferma del tutto — traffico, pedoni, polizia e
-    // ricercato. Non è un'ottimizzazione: è la risposta a "cosa succede fuori
-    // mentre compro", che è "niente", e vale anche per chi ti sta cercando.
+    // Dentro un edificio la città si ferma — traffico, pedoni, raccolte — e il
+    // ricercato **resta congelato**: se si raffreddasse, la porta diventerebbe il
+    // nascondiglio che §5.8 non vuole. La polizia è l'unica eccezione: continua a
+    // lavorare, ma sulla porta invece che sul giocatore (`police.siege`), perché
+    // uscire dopo un minuto e ritrovare la strada com'era è la scena che manca.
     if (!this.indoors) {
       // Il ricercato legge l'avvistamento calcolato dalla polizia, la polizia scrive
       // gas e sterzo delle volanti: la fisica di quei veicoli la integra `traffic`,
@@ -381,6 +383,8 @@ class Game {
       this.traffic.update(dt, this);
       this.pedSystem.update(dt, this);
       this.pickups.update(dt, this);
+    } else {
+      this.police.siege(dt, this);
     }
     // Gli esplosivi girano anche dentro: una granata in un 노래방 rimbalza sui
     // tramezzi e fa danno a chi c'è. Quello che *non* può fare è sopravvivere alla

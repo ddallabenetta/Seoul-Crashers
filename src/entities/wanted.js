@@ -28,6 +28,10 @@ const COOL_TIME = [0, 7, 11, 15, 20, 26];
 const CRIMES = {
   brawl: 1.5,    // pugni e mazzate
   gunshot: 3,    // sparare in strada
+  // Un esplosivo lanciato pesa il doppio di uno sparo: si sente in tutto l'isolato,
+  // e chi tira granate in strada non lo si scambia per una lite finita male. Resta
+  // sotto il furto d'auto perché il danno che fa lo paga già a parte (`wreck`, `kill`).
+  blast: 6,
   theft: 6,      // auto rubata sotto gli occhi di qualcuno
   copTheft: 12,  // ... o sotto quelli di una pattuglia
   copHit: 12,    // poliziotto ferito
@@ -87,8 +91,14 @@ export class WantedSystem {
     this.heat = Math.min(LEVEL_HEAT[MAX_WANTED] + 90, this.heat + amount);
     this.level = levelFor(this.heat);
     this.unseenT = 0;
-    this.lastX = game.player.x;
-    this.lastY = game.player.y;
+    // Dentro un negozio le coordinate del giocatore sono quelle della pianta
+    // (200-470 px), che in città cadono nell'angolo nord-ovest della mappa:
+    // registrarle come "ultima posizione nota" manderebbe a Gimpo tutta la
+    // polizia. Una cassa svuotata al terzo piano la denunciano comunque, e
+    // l'indirizzo che danno è quello della vetrina.
+    const door = game.indoors && game.shops.active ? game.shops.active.shop : null;
+    this.lastX = door ? door.x : game.player.x;
+    this.lastY = door ? door.y : game.player.y;
     if (this.level > before) {
       game.hud.toast(`수배 ${this.stars}`, 2.2);
       game.stats.maxWanted = Math.max(game.stats.maxWanted || 0, this.level);
