@@ -1,6 +1,10 @@
 // Effetti: tracce di gomma e macchie a terra (decals) + particelle sopra il mondo.
 const MAX_DECALS = 700;
 const MAX_PARTICLES = 420;
+// Quanto in fretta l'acqua porta via il sangue, in opacità al secondo sotto il
+// temporale: una pozza fresca (0.55-0.85) sparisce in 11-17 s, una pioggia
+// normale ci mette il doppio. Più veloce e il sangue evaporerebbe sotto gli occhi.
+const WASH_RATE = 0.05;
 
 export class Fx {
   constructor() {
@@ -175,6 +179,22 @@ export class Fx {
       });
     }
     this.addSmoke(x, y, 14, 2.2);
+  }
+
+  /**
+   * La pioggia lava il sangue, non le bruciature: una pozza rossa se ne va con
+   * l'acqua, un cerchio di catrame bruciato no. La chiama `projectiles.update`,
+   * che il meteo ce l'ha già in mano — `fx.update` riceve dal loop il solo dt.
+   */
+  washRain(dt, rain) {
+    if (rain <= 0.02) return;
+    const k = rain * WASH_RATE * dt;
+    for (let i = this.decals.length - 1; i >= 0; i--) {
+      const d = this.decals[i];
+      if (d.type !== 'blood') continue;
+      d.alpha -= k;
+      if (d.alpha <= 0.03) this.decals.splice(i, 1);
+    }
   }
 
   update(dt) {

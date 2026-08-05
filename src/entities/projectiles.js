@@ -16,6 +16,7 @@
 // un'auto in `main.onVehicleDestroyed`: raggio, caduta lineare col raggio, e i veicoli
 // presi dentro possono a loro volta saltare — le catene di esplosioni vengono gratis.
 import { circleRectPush, clamp, dist } from '../core/math.js';
+import { VEHICLE_TYPES } from '../render/sprites.js';
 
 const GRAV = 620;        // px/s² sulla quota
 const THROW_Z = 150;     // spinta verticale del lancio
@@ -30,12 +31,31 @@ const MAX_SPEED = 980;
 // e la differenza non si vede.
 const FIRE_TICK = 0.34;
 
+// --- propagazione ------------------------------------------------------------
+// Tetto duro sulle pozze accese insieme. Non è un'ottimizzazione: senza, una
+// molotov in un vicolo di macchine in sosta accende mezza Seoul in venti secondi.
+const MAX_FIRES = 22;
+// Ogni quanto una pozza prova a generarne una accanto.
+const SPREAD_EVERY = 0.9;
+// La figlia nasce **più debole e più corta** della madre: è questo, non il tetto,
+// che fa esaurire un incendio da solo. Col tetto soltanto il fuoco resterebbe
+// acceso al massimo consentito finché c'è asfalto.
+const SPREAD_LIFE = 0.62;
+const SPREAD_R = 0.86;
+// Sopra questa pioggia il fuoco non si propaga più: resiste e basta.
+const RAIN_STOP = 0.35;
+// Quanto la pioggia accorcia una pozza, al quadrato: una pioggerella la accorcia,
+// un temporale la spegne. `1 + rain² × 3.6` porta i 9,5 s della molotov a ~2 s
+// sotto il temporale e a ~4,5 s sotto la pioggia — nessun taglio secco.
+const RAIN_DOUSE = 3.6;
+
 export class ProjectileSystem {
   constructor() {
     this.items = [];   // granate e molotov in volo o che rotolano
     this.mines = [];
     this.fires = [];   // pozze di fuoco
     this._q = [];
+    this._q2 = [];     // la propagazione interroga mentre `_q` è ancora in mano al loop
   }
 
   clear() {
@@ -82,15 +102,28 @@ export class ProjectileSystem {
 
   addFire(game, x, y, spec, owner) {
     const f = spec.fire;
-    this.fires.push({
-      x, y, r: f.r, dps: f.dps, owner,
-      life: f.life, maxLife: f.life, tick: 0, seed: Math.random() * 100,
-    });
+    this.ignite(x, y, f.r, f.life, f.dps, owner, 0);
     // La bruciatura resta sull'asfalto anche dopo che il fuoco si è spento: è il
-    // segno che dice "qui è passata una molotov" mezz'ora dopo.
+    // segno che dice "qui è passata una molotov" mezz'ora dopo. Vale anche quando
+    // il tetto ha rifiutato la pozza: il vetro si è rotto lì comunque.
     game.fx.addScorch(x, y, f.r * 0.78);
     // Una pozza in fiamme svuota il marciapiede: è metà dell'effetto della molotov.
     game.alarm(x, y, 320, owner);
+  }
+
+  /** Una pozza nuova, se il tetto lo consente. `gen` è la generazione (0 = molotov). */
+  ignite(x, y, r, life, dps, owner, gen) {
+    if (this.fires.length >= MAX_FIRES) return null;
+    const f = {
+      x, y, r, dps, owner, gen,
+      life, maxLife: life, tick: 0,
+      // Sfasate fra loro, altrimenti tutte le pozze di un incendio provano a
+      // propagarsi nello stesso frame e il fuoco avanza a scatti.
+      spread: SPREAD_EVERY * (0.4 + Math.random()),
+      seed: Math.random() * 100,
+    };
+    this.fires.push(f);
+    return f;
   }
 
   update(dt, game) {
@@ -222,13 +255,35 @@ export class ProjectileSystem {
 
   updateFires(dt, game) {
     const pl = game.player;
+    // Dentro un edificio non piove: una pozza in un 노래방 non la spegne il
+    // temporale che c'è fuori.
+    const rain = game.indoors ? 0 : game.dayCycle.rain;
+    // La pioggia lava anche il sangue. `fx.update` non vede il meteo (`main` la
+    // chiama col solo dt), quindi la sbiadita la comanda chi il meteo ce l'ha già
+    // in mano: qui.
+    if (!game.indoors) game.fx.washRain(dt, rain);
+    // Con l'incendio propagato le pozze sono venti, non una: a 26 particelle al
+    // secondo ciascuna si occupano da sole 346 dei 420 posti di `fx`, e la prima
+    // esplosione butta fuori traccianti e sangue. Non è il frame rate (misurato:
+    // uguale), è il tetto condiviso. Sotto le dieci pozze non cambia niente.
+    const flame = 26 * Math.min(1, 10 / Math.max(1, this.fires.length));
     for (let i = this.fires.length - 1; i >= 0; i--) {
       const f = this.fires[i];
-      f.life -= dt;
+      f.life -= dt * (1 + rain * rain * RAIN_DOUSE);
       if (f.life <= 0) { this.fires.splice(i, 1); continue; }
 
+      f.spread -= dt;
+      if (f.spread <= 0) {
+        f.spread = SPREAD_EVERY;
+        this.trySpread(f, game, rain);
+      }
+
+      // Sotto l'acqua la pozza fuma: è il segno che si sta spegnendo, e senza
+      // sembrerebbe solo che il fuoco duri di meno per magia.
+      if (rain > RAIN_STOP && Math.random() < dt * 7) game.fx.addSmoke(f.x, f.y, 1, 1.1);
+
       // Fiamme: poche particelle per pozza, ma continue.
-      if (Math.random() < dt * 26) {
+      if (Math.random() < dt * flame) {
         const a = Math.random() * 6.283;
         const rr = Math.sqrt(Math.random()) * f.r * 0.85;
         game.fx.addParticle({
@@ -256,12 +311,64 @@ export class ProjectileSystem {
       for (const v of game.vehicleGrid.queryCircle(f.x, f.y, f.r + 30, this._q)) {
         if (v.dead || dist(v.x, v.y, f.x, f.y) > f.r + 24) continue;
         game.damageVehicle(v, bite * 0.85, v.x, v.y, f.owner);
+        // Un'auto che sta bruciando accende l'asfalto sotto di sé: è così che il
+        // fuoco attraversa una fila di macchine in sosta invece di fermarsi al
+        // primo paraurti. Solo quando la carrozzeria è mezza andata, o basterebbe
+        // sfiorare un furgone per raddoppiare l'incendio.
+        if (!v.dead && rain <= RAIN_STOP && v.hp < (VEHICLE_TYPES[v.kind].hp || 120) * 0.45
+          && Math.random() < 0.5 && this.canBurn(game, v.x, v.y, f.r * SPREAD_R)) {
+          this.ignite(v.x, v.y, f.r * SPREAD_R, f.maxLife * SPREAD_LIFE, f.dps * 0.85, f.owner, f.gen + 1);
+          game.fx.addScorch(v.x, v.y, f.r * 0.5);
+        }
       }
       const d = dist(pl.x, pl.y, f.x, f.y);
       if (pl.onFoot && !pl.dying && d < f.r) {
         game.damagePlayer(bite, (pl.x - f.x) / (d || 1), (pl.y - f.y) / (d || 1), f.owner);
       }
     }
+  }
+
+  /**
+   * Una pozza ne accende un'altra accanto. I freni sono tre e servono tutti e
+   * tre: il tetto sul totale, la figlia più debole della madre (il fuoco si
+   * esaurisce da solo, non solo quando sbatte contro il tetto) e la distanza
+   * minima fra due pozze — senza quest'ultima il fuoco si accatasta dov'è invece
+   * di camminare, e venti pozze sovrapposte sono una pozza sola che fa 20× danno.
+   */
+  trySpread(f, game, rain) {
+    if (rain > RAIN_STOP || this.fires.length >= MAX_FIRES) return;
+    // Una pozza al lumicino non attacca più niente.
+    if (f.life < f.maxLife * 0.4 || f.r < 24) return;
+    const life = f.maxLife * SPREAD_LIFE;
+    if (life < 1.8) return;
+    const r = f.r * SPREAD_R;
+    const a = Math.random() * 6.2832;
+    const x = f.x + Math.cos(a) * f.r * 0.95;
+    const y = f.y + Math.sin(a) * f.r * 0.95;
+    if (!this.canBurn(game, x, y, r)) return;
+    this.ignite(x, y, r, life, f.dps * 0.85, f.owner, f.gen + 1);
+    game.fx.addScorch(x, y, r * 0.7);
+    game.alarm(x, y, 240, f.owner);
+  }
+
+  /**
+   * Dove il fuoco può attaccare: non sull'acqua, non dentro un muro, non addosso
+   * a una pozza che c'è già. Vale identico dentro un edificio — `game.area()` è
+   * la pianta del piano, e un tramezzo ferma le fiamme come una facciata.
+   */
+  canBurn(game, x, y, r) {
+    const area = game.area();
+    if (x < area.x0 || x > area.x1 || y < area.y0 || y > area.y1) return false;
+    if (!game.indoors && game.city.isWater(x, y)) return false;
+    for (const s of area.grid.queryRect(x - 10, y - 10, 20, 20, this._q2)) {
+      if (s.vehicleOnly) continue;
+      if (circleRectPush(x, y, 6, s)) return false;
+    }
+    const min = (r * 0.72) ** 2;
+    for (const o of this.fires) {
+      if ((o.x - x) ** 2 + (o.y - y) ** 2 < min) return false;
+    }
+    return true;
   }
 }
 

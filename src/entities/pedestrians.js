@@ -12,6 +12,21 @@ const BASE_MAX = 62;
 const GUN_RANGE = 330;
 const FIST_RANGE = 34;
 
+// Sotto questa pioggia chi non ha l'ombrello smette di vagare e si infila sotto
+// una tettoia. Chi l'ombrello ce l'ha tira dritto: è per quello che se lo porta.
+const RAIN_SHELTER = 0.35;
+// Quanto lontano si va a cercare un portone. Più in là si arriva zuppi lo stesso
+// e si attraversa mezzo quartiere in mezzo al traffico.
+const SHELTER_REACH = 340;
+// Un portone è una sosta, non un parcheggio: scaduto il tempo si riprende la
+// strada. Senza questo tetto i marciapiedi si svuotano una volta sola e restano
+// vuoti per tutto il temporale — e i fermi occupano il tetto dello streaming al
+// posto di chi cammina.
+const SHELTER_MAX = 40;
+// Quanto si affretta il passo sotto l'acqua. Poco: un marciapiede al piccolo
+// trotto si legge come panico, non come pioggia.
+const RAIN_HURRY = 0.12;
+
 /** Tinte degli ombrelli. La trasparente è quella coreana per eccellenza. */
 export const UMBRELLAS = ['#1c2029', '#2f4f7a', '#8c2f3c', '#3f6b4a', '#d9dde4', '#b8b0d8'];
 
@@ -72,6 +87,16 @@ export function createPed(kind, x, y, rng) {
     // *è* un ombrello, e vederli comparire tutti insieme sopra le teste
     // tradirebbe che sono un effetto e non una cosa che la gente ha con sé.
     umbrella: rng.chance(0.62) ? rng.int(0, UMBRELLAS.length - 1) : -1,
+    // Chi, restando a mani nude sotto l'acqua, si infila sotto una tettoia invece
+    // di rassegnarsi. Come per l'ombrello si decide alla nascita, e per la stessa
+    // ragione: vedere tutti muoversi nello stesso istante tradirebbe l'effetto.
+    shy: rng.chance(0.75),
+    shelterCd: rng.range(0, 7),   // sfasa anche la prima corsa al riparo
+    shelterT: 0,
+    shelterX: 0, shelterY: 0, shelterA: 0,
+    // Soglia di pioggia sotto la quale *questo* pedone decide che è passata: chi
+    // esce prima e chi aspetta l'ultima goccia.
+    rainOut: rng.range(0.08, 0.3),
   };
 }
 
@@ -98,6 +123,7 @@ export class PedestrianSystem {
     this.peds = peds;
     this.tmp = {};
     this.spawnTimer = 0;
+    this._sq = [];   // scratch per la ricerca dei portoni
   }
 
   /**
@@ -281,6 +307,16 @@ export class PedestrianSystem {
       p.state = p.panic > 0 ? 'flee' : 'walk';
     }
 
+    // Il riparo è uno stato di riposo, non una gabbia: panico, ostilità e
+    // servizio riscrivono `state` da soli e portano fuori dal portone senza che
+    // qui serva un caso apposta.
+    const rain = game.dayCycle.rain;
+    if (p.shelterCd > 0) p.shelterCd -= dt;
+    if (rain > RAIN_SHELTER && p.shy && p.umbrella < 0 && p.shelterCd <= 0
+      && (p.state === 'walk' || p.state === 'idle')) {
+      this.seekShelter(p, game);
+    }
+
     let targetSpeed = p.baseSpeed;
     let tx = p.x, ty = p.y;
 
@@ -335,6 +371,29 @@ export class PedestrianSystem {
             p.angle = aim;
             meleeSwing(game, p, WEAPONS.fists, p.x, p.y, aim);
           }
+        }
+        break;
+      }
+      case 'shelter': {
+        p.shelterT -= dt;
+        // Smesso di piovere non si riparte tutti insieme: la fine della pioggia
+        // diventa un conto alla rovescia diverso per ognuno, e sotto la tettoia
+        // resta chi ci sta ancora bene.
+        if (rain < p.rainOut && p.shelterT > 6) p.shelterT = 1 + this.rng.range(0, 5);
+        if (p.shelterT <= 0) {
+          p.state = 'walk';
+          p.shelterCd = 4 + this.rng.range(0, 8);
+          break;
+        }
+        tx = p.shelterX;
+        ty = p.shelterY;
+        if (dist(p.x, p.y, tx, ty) < 9) {
+          targetSpeed = 0;
+          // Da fermi si guarda la strada, non il muro: è quello che rende
+          // leggibile dall'alto una fila di gente sotto una tettoia.
+          p.angle = approachAngle(p.angle, p.shelterA, 3 * dt);
+        } else {
+          targetSpeed = p.baseSpeed * 1.35;   // gli ultimi metri si fanno di corsa
         }
         break;
       }
@@ -433,6 +492,13 @@ export class PedestrianSystem {
       }
     }
 
+    // Sotto l'acqua si allunga il passo, ombrello o no: è il modo più economico
+    // di far vedere che piove su chi non si ripara. Chi scappa o è in servizio ha
+    // già una sua andatura e non c'entra niente con il tempo.
+    if (rain > 0.05 && (p.state === 'walk' || p.state === 'crossing' || p.state === 'shelter')) {
+      targetSpeed *= 1 + rain * RAIN_HURRY;
+    }
+
     // Steering verso il punto obiettivo
     const dx = tx - p.x;
     const dy = ty - p.y;
@@ -464,7 +530,11 @@ export class PedestrianSystem {
 
     // Non attraversano i muri. I solidi `vehicleOnly` (le scalinate) sì: sono
     // fatti apposta per lasciar passare chi va a piedi.
-    if (p.state === 'flee' || p.state === 'crossing' || p.state === 'hostile' || p.state === 'duty') {
+    // Chi è già arrivato sotto la tettoia è fermo contro un muro che ha già
+    // scavalcato: rifargli la query dei solidi a ogni frame, per venti persone,
+    // è il grosso di quello che costa la pioggia.
+    if (p.state === 'flee' || p.state === 'crossing' || p.state === 'hostile'
+      || p.state === 'duty' || (p.state === 'shelter' && targetSpeed > 0)) {
       const solids = this.city.solidGrid.queryRect(p.x - 24, p.y - 24, 48, 48);
       for (const s of solids) {
         if (s.vehicleOnly) continue;
@@ -474,6 +544,34 @@ export class PedestrianSystem {
         p.y += push.ny * push.depth;
       }
     }
+  }
+
+  /**
+   * Cerca il portone più vicino e ci si mette sotto. I portoni sono punti che
+   * esistono già (`b.shop`), quindi non serve un indice nuovo: bastano gli
+   * edifici attorno. La ricerca è dietro a `shelterCd` perché una query di
+   * 680×680 px per pedone per frame, sotto la pioggia, si paga.
+   */
+  seekShelter(p, game) {
+    p.shelterCd = 2 + this.rng.range(0, 3);
+    const R = SHELTER_REACH;
+    let best = null;
+    let bd = R * R;
+    for (const b of this.city.buildingGrid.queryRect(p.x - R, p.y - R, R * 2, R * 2, this._sq)) {
+      if (!b.shop) continue;
+      const d2 = (b.shop.x - p.x) ** 2 + (b.shop.y - p.y) ** 2;
+      if (d2 < bd) { bd = d2; best = b.shop; }
+    }
+    if (!best) return;
+    // Sotto la tettoia, non sullo zerbino: un filo più in fuori della soglia (o
+    // si finisce dentro il muro) e spostati di lato, o cinque persone allo stesso
+    // portone stanno tutte nello stesso pixel.
+    const off = ((p.id % 5) - 2) * 11;
+    p.shelterX = best.x + best.nx * 6 - best.ny * off;
+    p.shelterY = best.y + best.ny * 6 + best.nx * off;
+    p.shelterA = Math.atan2(best.ny, best.nx);
+    p.shelterT = SHELTER_MAX;
+    p.state = 'shelter';
   }
 
   /**
