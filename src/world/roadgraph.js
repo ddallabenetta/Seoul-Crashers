@@ -3,7 +3,11 @@
 // di una direzione (dx,dy) è (-dy, dx).
 import { SpatialGrid } from '../core/spatial.js';
 
+// Il giallo è un intervallo di sicurezza, non una leva di capacità: resta fisso e
+// il verde si prende quello che avanza, così la durata del ciclo è una manopola sola.
 export const SIGNAL_CYCLE = 15.5;
+const YELLOW = 1;
+const GREEN = (SIGNAL_CYCLE - YELLOW * 2) / 2;
 
 export function laneCount(edge) {
   return edge.arterial ? 2 : 1;
@@ -32,9 +36,9 @@ export function lanePoint(edge, dir, lane, s, out = {}) {
 /** Fase del semaforo: 'v' se il traffico verticale ha verde. */
 export function signalAxis(node, time) {
   const p = (time + node.tOffset) % SIGNAL_CYCLE;
-  if (p < 6.8) return 'v';
-  if (p < 7.8) return 'v-yellow';
-  if (p < 14.6) return 'h';
+  if (p < GREEN) return 'v';
+  if (p < GREEN + YELLOW) return 'v-yellow';
+  if (p < GREEN * 2 + YELLOW) return 'h';
   return 'h-yellow';
 }
 
