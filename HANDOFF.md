@@ -3,13 +3,15 @@
 Documento per riprendere il lavoro da una sessione pulita. Leggi anche `README.md`
 (descrizione del gioco e comandi) — qui c'è quello che serve a *sviluppare*.
 
-Ultimo aggiornamento: **Fase 3, seconda tappa — la mappa prende forma** (§5.9): mare, aeroporto,
-porto, campagna, velivoli e imbarcazioni, territori delle bande. Prima c'erano i negozi e gli
-interni (§5.8), la Fase 2 tappa C (arsenale pesante) e gli strumenti per gli agenti (`.claude/`, §9).
+Ultimo aggiornamento: **il traffico si muove bene** (§5.10) — la segnalazione aperta dell'utente
+(«si muove in modo strano, molti incidenti o ingorghi») è chiusa: **−83% di urti** a flusso
+sostanzialmente invariato. Prima c'era la mappa (§5.9: mare, aeroporto, porto, campagna, bande),
+i negozi e gli interni (§5.8), la Fase 2 tappa C (arsenale pesante) e gli strumenti (`.claude/`, §9).
 
-> ⚠️ **Aperto e da guardare per primo:** l'utente segnala che **il traffico si muove spesso in
-> modo strano, con molti incidenti e ingorghi.** Vedi §4bis: c'è quello che è stato misurato,
-> quello che sappiamo già essere fragile e da dove conviene ripartire.
+> 📌 **Da concordare con l'utente prima di scrivere codice:** la Fase 3 ha ancora due lavori
+> indipendenti, **missioni** e **ciclo giorno-notte**. Sono di taglia molto diversa e l'utente
+> vuole essere consultato sulle scelte di design (§7): chiedigli da quale partire. §6 ha
+> l'elenco completo di quello che resta indietro, in ordine di quanto si sente.
 
 ---
 
@@ -20,9 +22,9 @@ Canvas 2D puro, moduli ES nativi, **zero dipendenze, nessun build step**. Tutta 
 (sprite, facciate, terreno, mappa) è generata da codice a runtime: non esistono asset esterni.
 
 Stato: **Fase 1, Fase 1.5, Fase 2 (tutte e tre le tappe) e le prime due tappe della Fase 3
-completate e collaudate**. ~13.400 righe in 32 moduli. 60 fps con ~50 veicoli e ~93 pedoni
-attivi, e restano 60 anche sotto raffica continua di SMG. Dentro un edificio il costo è
-trascurabile: la città non gira.
+completate e collaudate**, più la revisione della guida AI del traffico (§5.10). ~13.500 righe
+in 32 moduli. 60 fps con ~44 veicoli e ~93 pedoni attivi, e restano 60 anche sotto raffica
+continua di SMG. Dentro un edificio il costo è trascurabile: la città non gira.
 
 **Il mondo è 5400×5400 e la città non lo riempie: ha una sagoma.** A ovest il mare, con
 l'aeroporto di Gimpo e il porto di Incheon sulla costa e la campagna in mezzo; a est, nord e
@@ -77,7 +79,7 @@ node .claude/tools/probe.mjs --seconds 5 --eval "game.city.stats" --shot /tmp/se
 `F3` in gioco mostra fps, entità, posizione. Da console del browser è esposto `window.game`:
 
 ```js
-// stato del traffico: se "move" crolla e "stop" sale, c'è una regressione negli ingorghi
+// stato del traffico, istantanea
 const ai = game.vehicles.filter(v => v.driver === 'ai');
 const sp = ai.map(v => Math.abs(v.speed)).sort((a, b) => a - b);
 ({ fps: game.loop.fps, n: ai.length,
@@ -86,29 +88,48 @@ const sp = ai.map(v => Math.abs(v.speed)).sort((a, b) => a - b);
    why: ai.filter(v => Math.abs(v.speed) < 8).reduce((a, v) => (a[v.ai.why] = (a[v.ai.why]||0)+1, a), {}) })
 ```
 
-`ai.why` vale `incrocio` / `coda` / `curva` / `libero`. **`libero` su un veicolo fermo
-significa che è bloccato fisicamente**: è il sintomo da inseguire.
+`ai.why` vale `incrocio` (aspetta il verde, il turno o che si liberi l'uscita) / `coda`
+(incolonnato) / `curva` / `sblocco` (sta forzando un incastro, §5.10) / `libero`. **`libero`
+su un veicolo fermo significa che è bloccato fisicamente**: è il sintomo da inseguire.
 
-Valori sani a regime: `fps 60`, `n ~49`, `move 32-43`, `stop < 12`, `med 58-100`, `libero ≤ 7`.
-(`med` oscilla parecchio: dipende da quanto traffico si trova in salita — e adesso anche da
-quanto se ne trova sulle provinciali di campagna, dove si viaggia molto più veloci.)
-
-**I numeri vanno confrontati con lo stesso ambiente, non con quelli scritti qui.** In un
-Chromium headless dentro un container questi valori scendono per conto loro: misurati fianco
-a fianco, `main` dà `fps 32-41 · stop 14-19 · move 23-36 · med 22-57 · libero 4-10` e questo
-ramo dà `fps 40-48 · stop 2-10 · move 32-43 · med 58-102 · libero 1-7`. Il modo onesto di
-giudicare una modifica è sempre quello: `git worktree add /tmp/base HEAD` e la stessa scena
-sui due alberi.
+> ⚠️ **Questa istantanea non è più un giudizio sul traffico.** Da quando le auto tengono una
+> distanza di sicurezza vera (§5.10) si fermano ai semafori e si incolonnano *per progetto*:
+> `stop 20-30` su 44 veicoli è normale, e prima del §5.10 era `stop 3-6` solo perché le auto
+> si attraversavano a vicenda. Quello che conta è **quanta strada fanno**, e per misurarlo c'è
+> `.claude/tools/scenes/traffic-census.scene` (§9): urti al minuto, tipo di urto e px percorsi
+> al minuto per veicolo, su cinque zone diverse.
+>
+> ```bash
+> node .claude/tools/probe.mjs --seconds 0 --quiet \
+>   --script .claude/tools/scenes/traffic-census.scene
+> ```
+>
+> Valori di riferimento (Chromium headless in container, 170 s su 5 zone), misurati fianco a
+> fianco con `git worktree add /tmp/base origin/main`:
+>
+> | | `main` prima del §5.10 | adesso |
+> | --- | --- | --- |
+> | urti al minuto | 235–266 | **36–40** |
+> | di cui tamponamenti (su 170 s) | 358–414 | 6–8 |
+> | flusso mediano (px/min per veicolo) | 4047–4245 | 3450–3811 |
+> | veicoli praticamente fermi | 0–5 su ~230 | 11–12 su ~190 |
+>
+> **I numeri assoluti dipendono dalla macchina: si confrontano solo fianco a fianco**, e sono
+> intervalli su due esecuzioni perché questa scena cambia zona a tempo di orologio, non di
+> simulazione: sotto carico diverso i teletrasporti cadono in istanti diversi. Gli ordini di
+> grandezza però sono stabili — una differenza del 10% non significa niente, una del 200% sì.
+> Attenzione anche a un'altra cosa: **qualunque** modifica alla guida sposta le traiettorie e
+> quindi cambia lo scenario, ed è per questo che si misura su cinque zone e non su una (su una
+> sola il conteggio dei veicoli fermi salta da 0 a 10 senza che la legge di guida sia cambiata
+> in meglio o in peggio — ci ho perso mezza sessione).
 
 **Aspetta almeno 90 s prima di dare un giudizio.** Il `prewarm` immette 72 auto anche in
-campo visivo e ne ammassa qualcuna sull'incrocio di partenza: se il giocatore resta fermo lì
-il grumo non viene mai despawnato (`hopeless` richiede `outsideView`) e ci mette ~1 minuto a
-sciogliersi da solo. Fino ad allora si legge `stop 16-21` e `libero 5-7` senza che ci sia
-niente di rotto.
+campo visivo: se il giocatore resta fermo lì il grumo non viene mai despawnato (`hopeless`
+richiede `outsideView`) e ci mette ~1 minuto a diradarsi.
 
-`med` è sceso da ~60 stabile a ~46-58 **per via della pendenza**, non per una regressione: è verificabile
-in due minuti spegnendola a caldo e riconfrontando (con la quota a zero si torna a `med 58`,
-`move 33`).
+`med` oscilla parecchio: dipende da quanto traffico si trova in salita — e da quanto se ne
+trova sulle provinciali di campagna, dove si viaggia molto più veloci. La pendenza da sola
+vale ~15 px/s di mediana, ed è verificabile spegnendola a caldo:
 
 ```js
 window._elev = game.city.elevationAt; game.city.elevationAt = () => 0; // A/B: pendenza off
@@ -295,6 +316,7 @@ src/ui/
 .claude/              strumenti per chi sviluppa (non fa parte del gioco), vedi §9
   tools/probe.mjs     avvia il gioco headless, esegue scene, misura, screenshot
   tools/sprite.mjs    guarda uno sprite generato ingrandito
+  tools/scenes/       scene pronte da dare a `probe.mjs --script`
   hooks/              controllo sintassi + briefing di sessione
   skills/             /seoul-verifica /seoul-arma /seoul-sprite /seoul-citta
 ```
@@ -505,6 +527,18 @@ volante è un veicolo di `game.vehicles` con `driver === 'cop'`: `police.driveCa
 girare prima di `traffic.update`**, ed è così in `main.update`. Corollario: le volanti hanno
 `protect = true`, altrimenti lo streaming del traffico se le porta via a metà inseguimento.
 
+**Il traffico ragiona in spazio libero, non in distanza.** Tutte le soglie di `driveAI` sono
+**fra le carrozzerie** (`gap = forward − (len + olen) / 2`), mai fra i centri: due berline che
+si toccano hanno i centri a 78 px, quindi una soglia "centro-centro" di 78 px vuol dire
+frenare a urto avvenuto. Da lì escono tre regole che vanno lette insieme:
+`senseAhead` restituisce un **tetto di velocità** (insegue la velocità di chi sta davanti,
+corretta dall'errore di distanza — ridurre invece la velocità desiderata genera onde di
+stop-and-go); `boxBlocked` dice se **oltre** l'incrocio c'è posto per tutta la carrozzeria, ed
+è la regola che impedisce di tappare la giunzione; la prenotazione d'asse dice **di chi è il
+turno**, e vale solo dove non c'è semaforo — dove c'è, il turno lo assegna già la lanterna e
+sommarci una prenotazione ferma chi ha il verde. Ognuna di queste, da sola, produce uno stallo:
+servono tutte e tre, più il limite di tempo che le sblocca (§5.10).
+
 **Inseguimento senza pathfinding.** A ogni nodo `police.chooseEdge` prende l'arco il cui
 estremo lontano è più vicino al bersaglio (greedy, dieci confronti). Su una maglia ortogonale
 arriva quasi sempre; quando sbaglia interviene lo stesso anti-incastro del traffico civile
@@ -587,47 +621,53 @@ codice spiega il perché nel punto giusto.
 | Atterrare costava un terzo della fusoliera | la discesa comandata arrivava a −286 px/s, ben oltre `HARD_LANDING` | effetto suolo in `updateAircraft`: sotto i 60 px con `climb < 0` la caduta si smorza |
 | **In una prova scriptata** il velivolo non si muove | `updateDriving` riscrive `throttle`/`steer`/`climb` dall'input a ogni frame | i comandi si danno con `game.input.down.add('KeyW')` |
 | **In una prova scriptata** il giocatore muore appena teletrasportato | è finito in acqua, e a piedi in acqua si annega | teletrasportarlo sul molo, poi `enterVehicle` |
+| Metà del traffico si tampona a gas costante, dicendosi `libero` | la distanza di sicurezza era misurata **fra i centri**: per una berlina lunga 78 px la frenata cominciava a paraurti già in contatto | `traffic.senseAhead`, `gap = forward − (len + olen) / 2` |
+| Una coda si ferma da sola senza niente davanti (onde di stop-and-go) | la velocità *desiderata* veniva moltiplicata per quanto spazio mancava: chi frena troppo fa frenare di più chi ha dietro, e l'onda risale la fila | `senseAhead` restituisce un **tetto** di velocità (`lead + (gap − want) × 2.6`), non un fattore |
+| Due mezzi fermi **dentro** l'incrocio, ognuno davanti all'altro | la prenotazione del nodo veniva liberata al cambio d'arco: lì il muso è sulla strada nuova ma la coda è ancora in mezzo, e l'asse perpendicolare parte addosso | `ai.clearing`, la prenotazione si libera a distanza dal nodo |
+| Auto ferme al **verde** | prenotazione d'asse *e* semaforo sullo stesso incrocio: due arbitri, e quello dell'asse rosso non aveva ancora liberato | la prenotazione vale solo dove `!endNode.signal` |
+| Nessuno entra più in nessun incrocio | "non entrare se non esci" senza filtro di corsia contava anche il traffico fermo in senso opposto, a 38 px di lato | `boxBlocked` proietta sulla direzione d'uscita e scarta chi è oltre 34 px di lato |
+| Ognuno cede il passo a chi gli sta cedendo il passo | su maglia fitta l'uscita di un incrocio è già la coda di quello dopo: la cortesia si propaga all'indietro e non si scioglie mai | `ai.boxT`: dopo 3,5 s si entra lo stesso |
+| Una coda ferma indietreggia e si tampona da sola | `throttle` negativo a velocità nulla **è retromarcia**, non freno | `if (v.speed > 3) throttle = −1; else { throttle = 0; handbrake = true }` |
+| La manovra di sblocco sbatte le auto contro i palazzi | si indietreggiava senza guardare cosa c'è dietro | `startRecovery` controlla veicoli **e** `solidGrid` dietro; se è chiuso forza il passaggio invece di indietreggiare |
+| Auto che nascono dentro un autobus | lo spazio libero preteso allo spawn era 88 px fissi, e un autobus è lungo 158 | `spawnTrafficNear`, `54 + len/2 + GAP_STOP` |
+| Le code crescono finché non si smaltiscono più | con una distanza di sicurezza vera, 54 auto nell'anello di streaming superano la capacità degli incroci semaforizzati | `MAX_TRAFFIC` 54 → 44 (misurato: a 48 il flusso cala del 23%, a 44 del 6%) |
+| **In una prova scriptata** il ricercato torna a 0 da solo | il giocatore fermo allo spawn viene investito, oppure a cinque stelle la SWAT lo ammazza in ~8 s: la morte azzera tutto | metterlo su un marciapiede (`city.hospitals[i]`) e campionare entro 7 s |
 
 Regola generale emersa: **prima di dare la colpa all'AI, verifica la geometria.** Quasi tutti
 gli "stalli dell'AI" erano problemi di ingombri, corsie o posizionamento.
 
 ---
 
-## 4bis. Aperto: il traffico si muove male
+## 4bis. Chiuso: il traffico si muoveva male
 
 **Segnalazione dell'utente:** *«il traffico si muove spesso in modo strano e fanno molti
-incidenti o ingorghi»*. È il primo problema da guardare, prima di aggiungere altro.
+incidenti o ingorghi»*. **Risolto in §5.10**, dove ci sono la diagnosi completa e le misure.
+Questa sezione resta come esempio di metodo, perché è il modo in cui va affrontato il
+prossimo problema di questo tipo.
 
-**Cosa è stato misurato** (100 s di gioco, `.claude/tools/probe.mjs`, stessa scena sui due
-alberi): questo ramo non peggiora nessuna metrica rispetto a `main` — anzi le migliora tutte,
-perché in campagna gli incroci sono molti meno. `main`: `stop 14-19 · move 23-36 · med 22-57 ·
-libero 4-10`. Questo ramo: `stop 2-10 · move 32-43 · med 58-102 · libero 1-7`. **Quindi la
-segnalazione non descrive una regressione di questa tappa: descrive un difetto che c'era già,
-e che si nota di più adesso che si vede più strada.** Non è stato risolto.
+**Il difetto non era nell'AI: era nella geometria** (che è la regola generale del §4). La
+distanza di sicurezza si misurava **fra i centri** dei due veicoli invece che fra le
+carrozzerie: per una berlina lunga 78 px la frenata cominciava quando i paraurti si stavano
+già toccando. Metà degli urti erano tamponamenti, e il 78% dei veicoli coinvolti si dichiarava
+`libero` un istante prima di tamponare — non stavano frenando perché non vedevano niente.
 
-**Quello che già sappiamo essere fragile**, in ordine di quanto è probabile che sia la causa:
+**Quello che ha funzionato, come metodo:**
 
-- **Il modello di guida non ha una vera nozione di "corsia occupata".** `driveAI` frena solo
-  per quello che ha *davanti al muso* (`probe` di 30 + velocità × 0.6, laterale < 24 px). Chi
-  arriva di lato o in diagonale — tipico in uscita da un incrocio o dopo una svolta — non viene
-  visto finché non è già addosso. È il candidato numero uno per gli incidenti.
-- **La prenotazione dell'incrocio è per asse, non per veicolo.** `endNode.claimAxis` lascia
-  passare *tutta* la fila di un asse e scade dopo 1.1 s: due auto che svoltano in senso opposto
-  dallo stesso asse si incrociano dentro l'incrocio senza che nessuno ceda.
-- **Il recupero dall'incastro è cieco.** Fermo 1.7 s → retromarcia 0.9 s con sterzo casuale
-  (`ai.recoverSteer = rng.chance(0.5) ? 1 : -1`). In una coda densa la manovra spesso peggiora
-  la situazione e innesca la carambola successiva.
-- **`reacquireLane` può cambiare senso di marcia.** Sceglie l'arco col punteggio migliore fra
-  distanza e allineamento del muso: dopo un urto che ha girato l'auto, il "senso compatibile"
-  può essere quello contrario, e per qualche secondo si guida contromano.
-- **Il traffico civile ignora i chiodi** e **non sa niente della quota**: erano già noti (§6).
-- **Non c'è nessuna nozione di priorità fra i mezzi.** Un autobus (158 px) e uno scooter
-  (44 px) trattano l'incrocio allo stesso modo, e il primo lo occupa per il doppio del tempo.
-
-**Da dove ripartire.** Prima misurare *dove* succede: `ai.why` dice solo perché uno è fermo,
-non chi ha tamponato chi. Serve un contatore di urti per posizione — `game.stats.crashes` esiste
-ma è solo del giocatore. Un `onVehicleImpact` che accumula `{x, y, impact}` per 60 s e poi si
-guarda sulla mappa dice in dieci minuti se il problema è diffuso o è di tre incroci.
+1. **Misurare prima di toccare.** Un censimento che classifica ogni urto (tamponamento,
+   laterale, frontale, contro un solido), dice quanto è lontano dall'incrocio più vicino e
+   cosa diceva di sé il veicolo (`ai.why`) nell'istante dell'urto. È
+   `.claude/tools/scenes/traffic-census.scene`, ed è rimasto nel repo.
+2. **Guardare l'ingorgo, non il codice.** Tre volte su tre la diagnosi è arrivata portando la
+   camera sul grumo di auto ferme più grosso e leggendo lo stato di *ogni* veicolo dentro —
+   `stopDist`, `claim` del nodo, `stallT`. Il difetto che ne è uscito (la prenotazione
+   dell'incrocio liberata mentre l'auto è ancora in mezzo alla giunzione) nel sorgente non si
+   vedeva: sembrava corretta.
+3. **Misurare il flusso, non quanti sono fermi.** «Quante auto sono ferme adesso» è una
+   fotografia che peggiora *proprio quando il traffico migliora*, perché le auto sane si
+   fermano ai semafori. La misura giusta è quanta strada percorre un veicolo al minuto.
+4. **Misurare su più zone.** Qualunque modifica alla guida sposta le traiettorie e cambia lo
+   scenario: su una scena sola si finisce per tarare su un ingorgo che nasce o non nasce per
+   caso. Su cinque zone il rumore si media.
 
 ---
 
@@ -909,13 +949,79 @@ Le scelte di design prese qui — cambiare costa poco, i punti sono tutti indica
   volo (il suo ne ha già uno, ma solo a cinque stelle) e non insegue in barca. È la prima cosa
   che si sentirà mancare.
 
+### 5.10 Il traffico si muove bene
+
+Chiude la segnalazione dell'utente (§4bis). Misurato su 170 s in cinque zone diverse, due
+esecuzioni per albero, fianco a fianco con `main`:
+
+| | `main` | adesso |
+| --- | --- | --- |
+| urti al minuto | 235–266 | **36–40** (−85%) |
+| di cui tamponamenti (su 170 s) | 358–414 | **6–8** (−98%) |
+| di cui laterali all'incrocio | 149–155 | 42–45 |
+| di cui frontali | 79–83 | 4–7 |
+| di cui contro un solido | 51–67 | 39–52 |
+| flusso mediano, px/min per veicolo | 4047–4245 | 3450–3811 (−13%) |
+| veicoli praticamente fermi | 0–5 su ~230 | 11–12 su ~190 |
+
+**Quello che resta indietro, detto chiaro:** il flusso mediano è ~13% sotto `main` e c'è un 6%
+di veicoli che in mezzo minuto non si muove, contro l'1% di prima. Non sono ingorghi eterni —
+guardati a schermo sono code al semaforo che si smaltiscono — ma è il prezzo che si paga per
+avere auto che si cedono il passo invece di attraversarsi. Se qualcuno vuole ridurlo, le due
+leve misurate sono il ciclo del semaforo e il sorpasso (§6), non la distanza di sicurezza.
+
+**La causa era una sola riga di geometria.** La distanza di sicurezza si misurava fra i centri
+dei due veicoli, non fra le carrozzerie: una berlina è lunga 78 px, quindi la frenata
+cominciava a paraurti in contatto. Il 78% dei veicoli si dichiarava `libero` nell'istante in
+cui tamponava. Corretto questo, i tamponamenti sono spariti (110 → 4 sulla prima misura) — e
+sono emersi tutti i difetti che il caos precedente nascondeva, perché le auto hanno cominciato
+a fare **code vere** invece di attraversarsi a vicenda. Sono in §4, uno per riga; qui c'è il
+perché delle scelte, che è quello che serve per cambiarle:
+
+- **Una legge di inseguimento invece di un fattore di frenata.** Si punta alla velocità di chi
+  sta davanti, corretta dall'errore di distanza (`lead + (gap − want) × 2.6`). Moltiplicare la
+  velocità desiderata per quanto spazio manca — quello che si faceva prima — è instabile: chi
+  frena troppo fa frenare di più chi ha dietro, e la coda si ferma da sola senza che davanti ci
+  sia niente. È la differenza fra una coda che scorre e una che pulsa.
+- **Tre regole all'incrocio, e servono tutte.** «C'è posto di là?» (`boxBlocked`), «è il mio
+  turno?» (prenotazione d'asse, **solo dove non c'è semaforo**), e un limite di tempo che le
+  sblocca entrambe. Senza la prima l'incrocio si tappa; senza la terza si arriva a uno stallo
+  di cortesia in cui ognuno cede il passo a chi gli sta cedendo il passo — e su una maglia
+  fitta, dove l'uscita di un incrocio è già la coda di quello dopo, succede subito.
+- **Il traffico è sceso da 54 a 44 veicoli.** Non è una resa: con una distanza di sicurezza
+  vera, 54 auto nell'anello di streaming chiedono agli incroci semaforizzati più di quello che
+  riescono a smaltire in un ciclo, e le code crescono finché non si smaltiscono più. Misurato:
+  a 48 il flusso mediano cala del 23%, a 44 del 6%. Il limite di capacità sta lì in mezzo. Se
+  si vuole più densità, la leva vera è il ciclo del semaforo (`SIGNAL_CYCLE`, 15,5 s), non
+  `MAX_TRAFFIC`.
+- **La manovra di sblocco guarda dove va.** Prima indietreggiava con sterzo casuale: in coda
+  innescava la carambola successiva, contro un palazzo rompeva la macchina e restava incastrata
+  lo stesso. Ora controlla veicoli e solidi dietro; se è chiuso forza il passaggio
+  nell'incrocio invece di indietreggiare, e alla terza volta indietreggia comunque ma piano —
+  una spinta gentile a chi sta dietro costa un urto leggero, restare incastrati costa quella
+  strada per il resto della partita.
+- **La polizia ha preso solo la correzione geometrica** (`police.followRoads`): le volanti
+  frenano per chi hanno davvero davanti, ma restano senza la prudenza del traffico civile, che
+  è metà del carattere di un inseguimento. Verificato che a cinque stelle arrivino agenti,
+  volanti, posti di blocco ed elicottero, e che `wanted.reset()` li smonti tutti.
+
+**Provato e scartato: il sorpasso.** Un'arteria ha due corsie per senso e nessuno le usa, così
+dietro al primo furgone lento resta incolonnata mezza città. Implementato (cambio corsia con
+scivolamento su `laneOffset` frazionario, tre punti di controllo sulla corsia di fianco) e
+**misurato peggiore**: flusso mediano da 3311 a 2191 px/min e da 1 a 9 veicoli fermi. Le auto
+si spostano tutte nella corsia libera, si ritrovano affiancate all'incrocio dove le due corsie
+si riuniscono, e il guadagno sul rettilineo si perde tutto lì. Se qualcuno ci riprova, il pezzo
+che manca è la scelta della corsia **in funzione della svolta successiva**: senza quella, il
+sorpasso è un debito che si paga all'incrocio dopo.
+
 ---
 
 ## 6. Backlog successivo (già concordato con l'utente)
 
-**Fase 3 — contenuti.** È in corso: negozi e interni sono fatti (§5.8), restano missioni e
-ciclo giorno-notte, che sono due lavori indipendenti e di taglia molto diversa. **Conviene
-farsi dire dall'utente da quale dei due partire.**
+**Fase 3 — contenuti.** È in corso: negozi e interni (§5.8) e la mappa (§5.9) sono fatti, e la
+segnalazione sul traffico è chiusa (§5.10). Restano **missioni** e **ciclo giorno-notte**, due
+lavori indipendenti e di taglia molto diversa. **Conviene farsi dire dall'utente da quale dei
+due partire** — è la prima cosa da chiedere in apertura di sessione.
 
 **Cose rimaste indietro dai negozi**, in ordine di quanto si sentono:
 - **La polizia non ti aspetta fuori.** Entrare con quattro stelle e uscire dopo un minuto ti
@@ -951,8 +1057,18 @@ farsi dire dall'utente da quale dei due partire.**
   senza ridisegnare la città) darebbe blip sulla mappa e un punto di partenza più credibile.
 - **Traffico civile e chiodi**: le strisce le controlla solo il mezzo del giocatore.
 
+**Cose rimaste indietro dal traffico** (§5.10), in ordine di quanto si sentono:
+- **Nessuno sorpassa.** Sull'arteria le due corsie per senso restano inutilizzate e dietro al
+  primo furgone lento si incolonna tutto. Un tentativo è già stato fatto e misurato peggiore:
+  §5.10 dice cosa manca (scegliere la corsia in base alla svolta successiva).
+- **Il ciclo del semaforo non è mai stato tarato con code vere.** `SIGNAL_CYCLE` vale 15,5 s
+  dai tempi in cui nessuno si fermava. È la leva giusta se si vuole rialzare `MAX_TRAFFIC`.
+- **Il traffico civile ignora ancora i chiodi** e **non sa niente della quota**: un'auto in
+  salita rallenta per fisica ma non se lo aspetta, e alza il gas dopo.
+- **Non c'è priorità fra i mezzi.** Un autobus (158 px) e uno scooter (44 px) trattano
+  l'incrocio allo stesso modo, e il primo lo occupa per il doppio del tempo.
+
 **Cose rimaste indietro dalla mappa nuova**, in ordine di quanto si sentono:
-- **Il traffico si muove male.** È la segnalazione dell'utente ed è il primo lavoro: §4bis.
 - **In volo e in barca la polizia non ti prende.** A cinque stelle l'elicottero c'è, ma sotto
   non esiste nessuna unità che segua un velivolo o una barca: si scappa banalmente. Un
   elicottero d'inseguimento anticipato a tre stelle e una motovedetta al porto sarebbero due
@@ -1020,8 +1136,15 @@ ora che c'è del denaro e un arsenale comprato, il salvataggio serve davvero.
 | Direzione/lunghezza ombre | `camera.SUN` | 0.5 / 0.66, scala 0.42 |
 | Larghezza carreggiate | `citygen.genLines` | boulevard 144, strada 76 |
 | Corsie | `roadgraph.laneOffset` | 18/54 (boulevard), 19 (strada) |
-| Traffico attivo | `traffic.MAX_TRAFFIC` | 54 (× densità distretto) |
+| Traffico attivo | `traffic.MAX_TRAFFIC` | 44 (× densità distretto) — vedi §5.10 |
 | Auto in sosta | `traffic.MAX_PARKED` | 24 |
+| Spazio libero da fermi | `traffic.GAP_STOP` | 13 px fra i paraurti |
+| Distanza voluta / reattività | `traffic.senseAhead` | `13 + v × 0.16` px · guadagno 2.6 |
+| Spazio preteso oltre l'incrocio | `traffic.boxBlocked` | mezza giunzione + tutta la carrozzeria + 13 |
+| Cortesia massima all'incrocio | `traffic.driveAI` `ai.boxT` | 3,5 s, poi si entra lo stesso |
+| Prenotazione dell'incrocio | `driveAI` (solo nodi senza semaforo) | scade dopo 0,6 s senza rinnovo |
+| Fermo troppo a lungo → manovra | `driveAI` `ai.stallT` | 9 s (il rosso più lungo dura 7,7 s) |
+| Ciclo del semaforo | `roadgraph.SIGNAL_CYCLE` | 15,5 s (verde 6,8 per asse) |
 | Pedoni | `pedestrians.BASE_MAX` | 62 (× densità distretto) |
 | Pendenza minima per una scalinata | `citygen.STAIR_GRADE` | 0.018 (→ 8 scalinate su 14 vicoli passanti) |
 | Danno / cadenza delle armi | `weapons.WEAPONS` | pugni 15·0.34 · mazza 46·0.52 · katana 92·0.4 · pistola 27·0.22 · pompa 13×8·0.84 · SMG 15·0.075 · fucile 24·0.105 · sniper 145·1.35 · minigun 12·0.045 |
@@ -1098,8 +1221,20 @@ node .claude/tools/probe.mjs --seconds 3 --script /tmp/scena.js --shot /tmp/scen
 (armi addosso, cinque stelle, un lancio) e si aspetta il risultato — il loop continua a
 girare mentre lo script attende. Dentro c'è `game`, e si può `await import('/src/...')`.
 
-Le tre trappole delle prove scriptate (mira dal cursore, camera smorzata, griglie ricostruite
-ogni frame) sono in §4, in fondo: leggerle prima di dare la colpa al codice.
+Le trappole delle prove scriptate (mira dal cursore, camera smorzata, griglie ricostruite ogni
+frame, il giocatore fermo che muore) sono in §4, in fondo: leggerle prima di dare la colpa al
+codice.
+
+### `tools/scenes/` — scene pronte
+
+Una scena è il **corpo di una funzione async**, non un modulo: dentro c'è `game`, si può fare
+`await import('/src/…')` e si termina con `return` di quello che si vuole leggere. Per questo
+l'estensione è `.scene` e non `.js` — l'hook su Write/Edit passa `node --check` su ogni `.js`,
+e un `return` a livello di file lo farebbe fallire.
+
+| Scena | Cosa misura |
+| --- | --- |
+| `traffic-census.scene` | urti al minuto e loro tipo, flusso in px/min per veicolo, su cinque zone. È la misura con cui è stato tarato §5.10 — e l'unica onesta per giudicare una modifica alla guida AI |
 
 ### `tools/sprite.mjs` — guardare uno sprite ingrandito
 
