@@ -75,6 +75,19 @@ export class MapView {
     }
     ctx.drawImage(this.texture, 0, 0, MAP_SIZE, MAP_SIZE, dx, dy, drawSize, drawSize);
 
+    // Velo notturno sulla carta, più leggero che sulla minimappa: una mappa
+    // aperta va letta, e qui non c'è la scena attorno a dare il contesto
+    // dell'ora. Va prima dei blip, che devono restare pieni.
+    const L = game.dayCycle && game.dayCycle.light;
+    if (L && L.k > 0.02) {
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.globalAlpha = L.k * 0.55;
+      ctx.fillStyle = `rgb(${L.amb[0] | 0},${L.amb[1] | 0},${L.amb[2] | 0})`;
+      ctx.fillRect(x, y, size, size);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+    }
+
     const toScreen = (wx, wy) => ({
       x: dx + (wx / city.w) * drawSize,
       y: dy + (wy / city.h) * drawSize,

@@ -7,6 +7,8 @@ import { won } from '../entities/shops.js';
 
 const MINIMAP = 196;
 const MINIMAP_WORLD = 1000; // porzione di mondo inquadrata
+const CLOCK_W = 224;
+const CLOCK_H = 48;
 
 export class Hud {
   constructor(city, mapTexture) {
@@ -58,6 +60,7 @@ export class Hud {
     this.drawVitals(ctx, game, 22, 22);
     this.drawMoney(ctx, game, 22, 88);
     if (game.wanted) this.drawWanted(ctx, game, 22, 124);
+    this.drawClock(ctx, game, w - CLOCK_W - 22, 22);
     this.drawDistrictToast(ctx, game, w, h);
     this.drawVenueToast(ctx, game, w, h);
     this.drawHints(ctx, game, w, h);
@@ -132,6 +135,42 @@ export class Hud {
     ctx.font = '700 15px ui-monospace, monospace';
     ctx.fillStyle = '#ffd23f';
     ctx.fillText(won(p.money), x + 10, y + 18);
+    ctx.restore();
+  }
+
+  /**
+   * Orologio, fase e meteo. Va in alto a destra perché è l'unico angolo libero:
+   * a sinistra c'è la colonna vitale, in basso tachimetro, barra armi e
+   * suggerimenti.
+   */
+  drawClock(ctx, game, x, y) {
+    const dc = game.dayCycle;
+    if (!dc) return;
+    ctx.save();
+    ctx.fillStyle = 'rgba(10,12,15,0.72)';
+    roundPath(ctx, x, y, CLOCK_W, CLOCK_H, 10);
+    ctx.fill();
+
+    drawWeatherIcon(ctx, dc, x + 27, y + CLOCK_H / 2, 8, game.time);
+
+    ctx.textAlign = 'left';
+    ctx.font = '700 18px system-ui, "Apple SD Gothic Neo", sans-serif';
+    ctx.fillStyle = '#eef1f6';
+    ctx.fillText(dc.clock, x + 50, y + 24);
+
+    ctx.font = '600 11px system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(230,235,245,0.62)';
+    // 'giorno' da solo si confonde col contatore dei giorni, a due centimetri.
+    const ph = dc.phase;
+    const phase = ph === 'giorno' ? 'Pieno giorno' : ph[0].toUpperCase() + ph.slice(1);
+    ctx.fillText(`${phase} · ${dc.weather.label}`, x + 50, y + 39);
+
+    if (dc.day > 1) {
+      ctx.textAlign = 'right';
+      ctx.font = '700 9px ui-monospace, monospace';
+      ctx.fillStyle = 'rgba(255,214,80,0.8)';
+      ctx.fillText(`GIORNO ${dc.day}`, x + CLOCK_W - 12, y + 23);
+    }
     ctx.restore();
   }
 
@@ -468,6 +507,18 @@ export class Hud {
     ctx.fillStyle = '#12151a';
     ctx.fillRect(x, y, MINIMAP, MINIMAP);
     ctx.drawImage(this.mapTexture, sx, sy, src, src, x, y, MINIMAP, MINIMAP);
+    // Tinta della luce sopra il solo ritaglio della mappa: di notte la minimappa
+    // deve leggersi come notte, ma blip e cornice restano fuori dalla tinta o
+    // sparirebbero proprio quando servono.
+    const L = game.dayCycle && game.dayCycle.light;
+    if (L && L.k > 0.02) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.globalAlpha = L.k;
+      ctx.fillStyle = `rgb(${L.amb[0] | 0},${L.amb[1] | 0},${L.amb[2] | 0})`;
+      ctx.fillRect(x, y, MINIMAP, MINIMAP);
+      ctx.restore();
+    }
 
     const toMap = (wx, wy) => ({
       x: x + MINIMAP / 2 + ((wx - p.x) * MINIMAP) / MINIMAP_WORLD,
@@ -824,11 +875,108 @@ export class Hud {
     ctx.font = '500 12px ui-monospace, monospace';
     ctx.textAlign = 'left';
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(w - 296, 14, 282, lines.length * 16 + 12);
+    const top = 22 + CLOCK_H + 10; // sotto l'orologio, che sta nello stesso angolo
+    ctx.fillRect(w - 296, top, 282, lines.length * 16 + 12);
     ctx.fillStyle = '#8ff0c0';
-    lines.forEach((l, i) => ctx.fillText(l, w - 286, 32 + i * 16));
+    lines.forEach((l, i) => ctx.fillText(l, w - 286, top + 18 + i * 16));
     ctx.restore();
   }
+}
+
+/**
+ * Icona del meteo disegnata a mano in un quadrato di 2r: `weather.icon` è un
+ * emoji, e il rendering degli emoji cambia da macchina a macchina. La forma
+ * viene dai valori continui (`rain`, `cloudiness`) e non dall'id, così l'icona
+ * dice quello che sta davvero venendo giù anche a metà transizione.
+ */
+function drawWeatherIcon(ctx, dc, cx, cy, r, time) {
+  const rain = dc.rain;
+  const cloud = dc.cloudiness;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.lineCap = 'round';
+
+  if (cloud < 0.25 && rain < 0.05) {
+    if (dc.isNight) moonGlyph(ctx, r);
+    else sunGlyph(ctx, r, time);
+    ctx.restore();
+    return;
+  }
+
+  const storm = rain > 0.7 && cloud > 0.7;
+  ctx.translate(0, rain > 0.05 ? -r * 0.22 : 0); // spazio sotto per le gocce
+  cloudGlyph(ctx, r, cloud > 0.55);
+
+  if (rain > 0.05) {
+    const n = storm ? 2 : rain > 0.55 ? 4 : 3;
+    ctx.strokeStyle = `rgba(120,190,255,${0.5 + 0.45 * clamp(rain, 0, 1)})`;
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      // Fase per goccia, modulo 1: cadono davvero senza tenere stato.
+      const t = (time * (1.3 + rain) + i * 0.41) % 1;
+      // Col temporale le gocce stanno larghe, il centro serve al fulmine.
+      const gx = storm ? (i === 0 ? -0.6 : 0.6) * r : -r * 0.5 + (i * r) / (n - 1);
+      const gy = r * 0.5 + t * r * 0.55;
+      ctx.moveTo(gx + r * 0.09, gy);
+      ctx.lineTo(gx - r * 0.09, gy + r * 0.3);
+    }
+    ctx.stroke();
+  }
+
+  if (storm) {
+    ctx.fillStyle = dc.flash > 0.05 ? '#fff6c8' : '#ffd23f';
+    ctx.beginPath();
+    ctx.moveTo(r * 0.2, r * 0.42);
+    ctx.lineTo(-r * 0.24, r * 0.92);
+    ctx.lineTo(r * 0.01, r * 0.92);
+    ctx.lineTo(-r * 0.14, r * 1.3);
+    ctx.lineTo(r * 0.3, r * 0.76);
+    ctx.lineTo(r * 0.05, r * 0.76);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function sunGlyph(ctx, r, time) {
+  ctx.fillStyle = '#ffd23f';
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.44, 0, 6.2832);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,210,63,0.9)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const a = time * 0.2 + (i * Math.PI) / 4;
+    const c = Math.cos(a);
+    const s = Math.sin(a);
+    ctx.moveTo(c * r * 0.66, s * r * 0.66);
+    ctx.lineTo(c * r, s * r);
+  }
+  ctx.stroke();
+}
+
+function moonGlyph(ctx, r) {
+  // Falce come differenza di due dischi tracciata in un path solo: con
+  // 'destination-out' si bucherebbe anche il pannello che sta sotto.
+  ctx.fillStyle = '#e6ecfa';
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.78, 1.2, -1.2);
+  ctx.arc(r * 0.43, 0, r * 0.74, -1.77, 1.77, true);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function cloudGlyph(ctx, r, dark) {
+  const puff = (px, py, pr) => { ctx.moveTo(px + pr, py); ctx.arc(px, py, pr, 0, 6.2832); };
+  ctx.fillStyle = dark ? '#98a2b4' : '#d8dee9';
+  ctx.beginPath();
+  puff(-r * 0.44, -r * 0.02, r * 0.4);
+  puff(r * 0.02, -r * 0.34, r * 0.5);
+  puff(r * 0.52, r * 0.02, r * 0.36);
+  ctx.rect(-r * 0.44, -r * 0.02, r * 0.96, r * 0.4);
+  ctx.fill();
 }
 
 /** Stella a cinque punte centrata in (cx,cy). */

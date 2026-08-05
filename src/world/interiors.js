@@ -31,74 +31,105 @@ const STAIR_H = 78;
  * Seoul sta di sopra proprio perché l'affitto costa meno.
  * `shop` è la voce del listino in `entities/shops.js`; senza, è un posto da
  * esplorare e basta — ma la cassa da svuotare ce l'hanno quasi tutti.
+ *
+ * `open: [apre, chiude]` è l'orario in ore di gioco. Se la chiusura è **minore**
+ * dell'apertura la fascia scavalca la mezzanotte: `[17, 4]` apre alle cinque del
+ * pomeriggio e tira fino alle quattro. `[0, 24]` non chiude mai — e sono tre casi
+ * scelti, non una scorciatoia: il 편의점 a Seoul è davvero aperto ventiquattr'ore,
+ * il 병원 è anche il punto di risveglio dopo la morte (chiuderlo chiude la
+ * partita) e il 주택 è casa di qualcuno, non un esercizio con una saracinesca.
  */
 export const BUSINESSES = {
   guns: {
     id: 'guns', hangul: '총포상', label: 'armeria', where: 'ground', layout: 'counter',
-    shop: 'guns', keeper: 'gangster', crowd: 0, blip: '#ff6b5a',
+    shop: 'guns', keeper: 'gangster', crowd: 0, blip: '#ff6b5a', open: [10, 20],
     pal: { floor: '#39332b', wall: '#4b4238', trim: '#6d5a42', accent: '#ffd23f' },
   },
   pawn: {
     id: 'pawn', hangul: '전당포', label: 'banco dei pegni', where: 'ground', layout: 'counter',
-    shop: 'pawn', keeper: 'civil', crowd: 1, blip: '#c9a24a',
+    shop: 'pawn', keeper: 'civil', crowd: 1, blip: '#c9a24a', open: [10, 21],
     pal: { floor: '#3b352f', wall: '#4e453a', trim: '#7a6440', accent: '#c9a24a' },
   },
   clothes: {
     id: 'clothes', hangul: '옷가게', label: 'negozio di vestiti', where: 'ground', layout: 'counter',
-    shop: 'clothes', keeper: 'student', crowd: 2, blip: '#b48cff',
+    shop: 'clothes', keeper: 'student', crowd: 2, blip: '#b48cff', open: [11, 22],
     pal: { floor: '#46414a', wall: '#5a5360', trim: '#8f7fa0', accent: '#b48cff' },
   },
   conv: {
     id: 'conv', hangul: '편의점', label: 'minimarket', where: 'ground', layout: 'market',
-    shop: 'conv', keeper: 'student', crowd: 2, blip: '#4ad98a',
+    shop: 'conv', keeper: 'student', crowd: 2, blip: '#4ad98a', open: [0, 24],
     pal: { floor: '#4a4a4e', wall: '#5c5c62', trim: '#7f8189', accent: '#4ad98a' },
   },
   pharma: {
     id: 'pharma', hangul: '약국', label: 'farmacia', where: 'ground', layout: 'market',
-    shop: 'pharma', keeper: 'office', crowd: 1, blip: '#e8595e',
+    shop: 'pharma', keeper: 'office', crowd: 1, blip: '#e8595e', open: [9, 20],
     pal: { floor: '#4e5054', wall: '#62656b', trim: '#8b9099', accent: '#e8595e' },
   },
   bunsik: {
     id: 'bunsik', hangul: '분식', label: 'tavola calda', where: 'any', layout: 'eatery',
-    shop: 'food', keeper: 'civil', crowd: 3,
+    // Apre presto, e non è pignoleria: la partita comincia alle 8:24 e il 분식 è
+    // l'unico posto dove si mangia, cioè l'unico modo di curarsi che si può pagare.
+    shop: 'food', keeper: 'civil', crowd: 3, open: [8, 22],
     pal: { floor: '#4b3f36', wall: '#5d4c3e', trim: '#8a6a4a', accent: '#ffa229' },
   },
   bar: {
     id: 'bar', hangul: '술집', label: 'bar', where: 'any', layout: 'eatery',
-    shop: 'food', keeper: 'gangster', crowd: 4,
+    shop: 'food', keeper: 'gangster', crowd: 4, open: [17, 4],
     pal: { floor: '#33292c', wall: '#43353a', trim: '#6b4a52', accent: '#ff5fa2' },
   },
   pcbang: {
     id: 'pcbang', hangul: '피시방', label: 'internet café', where: 'upper', layout: 'desks',
-    keeper: 'student', crowd: 5,
+    keeper: 'student', crowd: 5, open: [14, 4],
     pal: { floor: '#2b2f38', wall: '#373d48', trim: '#4c5566', accent: '#38d6ff' },
   },
   office: {
     id: 'office', hangul: '사무실', label: 'ufficio', where: 'upper', layout: 'desks',
-    keeper: 'office', crowd: 3,
+    keeper: 'office', crowd: 3, open: [9, 19],
     pal: { floor: '#4c4e52', wall: '#5e6167', trim: '#7c818a', accent: '#8fb6e8' },
   },
   noraebang: {
     id: 'noraebang', hangul: '노래방', label: 'karaoke', where: 'upper', layout: 'rooms',
-    keeper: 'civil', crowd: 3,
+    keeper: 'civil', crowd: 3, open: [16, 5],
     pal: { floor: '#2e2733', wall: '#3d3244', trim: '#5d4a6b', accent: '#ff5fa2' },
   },
   home: {
     id: 'home', hangul: '주택', label: 'appartamenti', where: 'upper', layout: 'rooms',
-    crowd: 2,
+    crowd: 2, open: [0, 24],
     pal: { floor: '#4a4238', wall: '#5a5044', trim: '#7d6d55', accent: '#ffcf4a' },
   },
   billiards: {
     id: 'billiards', hangul: '당구장', label: 'sala biliardo', where: 'upper', layout: 'hall',
-    keeper: 'gangster', crowd: 4,
+    keeper: 'gangster', crowd: 4, open: [15, 3],
     pal: { floor: '#39413c', wall: '#47514a', trim: '#5e6b62', accent: '#41e0a3' },
   },
   clinic: {
     id: 'clinic', hangul: '병원', label: 'ospedale', where: 'ground', layout: 'hall',
-    shop: 'clinic', keeper: 'office', crowd: 2, blip: '#eef2f8',
+    shop: 'clinic', keeper: 'office', crowd: 2, blip: '#eef2f8', open: [0, 24],
     pal: { floor: '#5a5f66', wall: '#6c727a', trim: '#8f959e', accent: '#e8595e' },
   },
 };
+
+/** Un tipo di attività è aperto a quell'ora? Fascia chiusa a sinistra, aperta a destra. */
+export function bizOpenAt(bizId, hour) {
+  const b = BUSINESSES[bizId];
+  if (!b || !b.open) return true;
+  const [a, z] = b.open;
+  const h = ((hour % 24) + 24) % 24;
+  return z > a ? h >= a && h < z : h >= a || h < z;
+}
+
+/** Sempre aperto: `[0, 24]`, l'unica fascia che non ha senso scrivere su un cartello. */
+export function bizAlwaysOpen(bizId) {
+  const b = BUSINESSES[bizId];
+  return !b || !b.open || (b.open[0] === 0 && b.open[1] === 24);
+}
+
+/** Ora da cartello: `9.5` → `09:30`. */
+export function clockLabel(h) {
+  const t = ((h % 24) + 24) % 24;
+  const hh = Math.floor(t);
+  return `${String(hh).padStart(2, '0')}:${String(Math.round((t - hh) * 60)).padStart(2, '0')}`;
+}
 
 /**
  * Che cosa apre, e dove. Le ripetizioni sono i pesi: a Itaewon si beve, a Gangnam
