@@ -21,6 +21,7 @@ import { ProjectileSystem } from './entities/projectiles.js';
 import { WantedSystem } from './entities/wanted.js';
 import { PoliceSystem } from './entities/police.js';
 import { ShopSystem, won } from './entities/shops.js';
+import { usedSlots } from './core/save.js';
 import { InteriorScene } from './render/interiorscene.js';
 import { Hud } from './ui/hud.js';
 import { MapView } from './ui/mapview.js';
@@ -64,6 +65,7 @@ class Game {
       pedsHit: 0,
       kills: 0,
       deaths: 0,
+      busted: 0,
       copsKilled: 0,
       maxWanted: 0,
       choppers: 0,
@@ -151,6 +153,9 @@ class Game {
     this.hud.toast('E per rubare un\'auto · M per la mappa', 5);
     this.hud.toast('Mouse per mirare e sparare · 1-6 per l\'arma', 6.5);
     this.hud.toast('E sulla porta di un negozio per entrare · F svuota la cassa', 8);
+    // Il gioco parte in strada, senza schermata iniziale: se non lo si dice qui,
+    // una partita salvata resta invisibile finché non si apre il menu per caso.
+    if (usedSlots() > 0) this.hud.toast('Hai una partita salvata · ESC → Salvataggi', 9.5);
 
     await onProgress('Pronti.', 1);
     this.loop = new Loop((dt) => this.update(dt), () => this.render());
@@ -376,6 +381,49 @@ class Game {
     pl.money -= bill;
     this.hud.toast(`Ospedale di ${best.name}: ti hanno ricucito, l'arsenale no`, 4);
     if (bill > 0) this.hud.toast(`Conto della clinica: ${won(bill)}`, 4);
+  }
+
+  /**
+   * Arrestato. È la seconda sconfitta del gioco, e deve **costare in modo
+   * diverso** dalla prima o tanto varrebbe morire: l'ospedale si prende un
+   * quarto dei contanti e ti rimette in piedi subito, la cella si prende meno
+   * denaro (un quinto, la cauzione) ma **sei ore**. Perdere una notte di Seoul
+   * è un prezzo che il gioco sa già far sentire — cambia la luce, cambia il
+   * tempo, chiudono i locali — e non ne serviva uno nuovo.
+   *
+   * L'arsenale è confiscato come in corsia: `revive` fa già esattamente questo.
+   */
+  bustPlayer() {
+    const pl = this.player;
+    if (this.indoors) this.shops.forceExit(this);
+    // In campagna e all'aeroporto non ci sono commissariati: lì ti portano
+    // all'ospedale del distretto, che è l'unico edificio pubblico che c'è.
+    const places = this.city.stations.length ? this.city.stations : this.city.hospitals;
+    let best = places[0];
+    let bestD = Infinity;
+    for (const s of places) {
+      const d = dist(s.x, s.y, pl.x, pl.y);
+      if (d < bestD) { bestD = d; best = s; }
+    }
+    const bail = Math.round(pl.money * 0.2);
+    pl.revive(best.x, best.y);
+    pl.money -= bail;
+    pl.angle = Math.PI / 2;
+    this.stats.busted = (this.stats.busted || 0) + 1;
+    this.wanted.reset();
+    this.police.standDown(this, true);
+    this.camera.snapTo(pl.x, pl.y);
+    this.fx.clear();
+    this.projectiles.clear();
+    // Sei ore di cella: l'orologio va *fatto girare*, non spostato, o il meteo
+    // all'uscita sarebbe quello di quando sei entrato (§5.11).
+    this.dayCycle.advance(6);
+    pl.district = this.city.districtAt(pl.x, pl.y);
+    this.hud.showDistrict(pl.district);
+    this.audio.playerDown();
+    this.hud.toast(`Arrestato — commissariato di ${best.name}`, 4);
+    this.hud.toast('Sei ore dentro, e l\'arsenale se lo tengono', 4);
+    if (bail > 0) this.hud.toast(`Cauzione: ${won(bail)}`, 4);
   }
 
   // --- ciclo ----------------------------------------------------------------

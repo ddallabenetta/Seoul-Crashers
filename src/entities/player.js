@@ -1,13 +1,21 @@
 // Jae-min Seo: a piedi o al volante. Un solo stato commuta tutto il controllo.
 import { circleRectPush, clamp, approachAngle, damp, dist } from '../core/math.js';
 import { VEHICLE_TYPES } from '../render/sprites.js';
-import { vehicleDoorPoint, updateVehicle } from './vehicle.js';
+import { vehicleDoorPoint, updateVehicle, collisionCircles, airborne } from './vehicle.js';
 import { WEAPONS, WEAPON_ORDER, WEAPON_SLOTS, shoot, meleeSwing, assistAim } from './weapons.js';
 
 const WALK = 74;
 const SPRINT = 126;
 const RADIUS = 9;
 const ENTER_RANGE = 78;
+// Investimento: sotto questa velocità di avvicinamento la lamiera spinge e basta
+// (è il paraurti che ti sposta al semaforo), sopra fa male. 70 px/s sono 21 km/h,
+// e il danno cresce fino a stendere: a 120 km/h (400 px/s) sono 99 punti.
+const RUNOVER_SPEED = 70;
+const RUNOVER_DMG = 0.3;
+// Un urto ogni mezzo secondo: senza, un'auto che ti trascina contro un muro
+// applicherebbe il danno sessanta volte al secondo.
+const RUNOVER_GAP = 0.5;
 // Tempo a terra prima di risvegliarsi all'ospedale.
 const DEATH_TIME = 2.8;
 // Un tasto per fila della barra armi: ripremendolo si scorre la fila.
@@ -67,6 +75,7 @@ export class Player {
     this.hurtT = 0;
     this.dying = false;
     this.deathT = 0;
+    this.carHitT = 0;
     // Tappa C: rotazione delle canne della minigun, mirino del fucile di precisione,
     // e il lampo della barra armi quando si cambia arma.
     this.spin = 0;
@@ -234,7 +243,7 @@ export class Player {
     this.angle = approachAngle(this.angle, this.aimAngle, 18 * dt);
     this.animT += mv.len > 0.05 ? this.speed * dt * 0.16 : dt * 1.2;
 
-    this.resolveCollisions(game);
+    this.resolveCollisions(game, dt);
 
     // Il mare e il Han sono un confine vero, non uno sfondo: a piedi si annega.
     // Il controllo va saltato dentro un edificio — le coordinate di una pianta
@@ -466,7 +475,11 @@ export class Player {
     game.camera.addShake(spec.shake * 0.6);
   }
 
-  resolveCollisions(game) {
+  resolveCollisions(game, dt = 0) {
+    // Le lamiere per prime e i muri dopo: se l'ordine fosse rovesciato, un'auto
+    // che ti stringe contro una vetrina ti spingerebbe *dentro* la vetrina, che
+    // è l'unico dei due modi di restare incastrato che si vede a schermo.
+    this.resolveVehicleCollisions(game, dt);
     // `game.area()` è la città o la pianta del piano in cui si è entrati: muri e
     // limiti hanno la stessa forma, quindi qui non serve sapere dove siamo.
     const area = game.area();
@@ -485,6 +498,72 @@ export class Player {
     }
     this.x = clamp(this.x, area.x0, area.x1);
     this.y = clamp(this.y, area.y0, area.y1);
+  }
+
+  /**
+   * La carrozzeria è solida anche a piedi. Senza, il giocatore attraversava le
+   * auto: in una visuale dall'alto, dove il tetto è disegnato più in alto del
+   * marciapiede, sembrava camminarci sopra. La sagoma è la stessa terna di cerchi
+   * con cui i veicoli si urtano fra loro (`collisionCircles`) e non l'ingombro
+   * rettangolare: di quello, una berlina in diagonale sporgerebbe con gli angoli.
+   *
+   * Da fermo spinge, in corsa investe: sono la stessa collisione letta due volte,
+   * perché una lamiera che ti sposta e basta a 100 km/h è peggio di una che ti
+   * attraversa — dice che l'urto non conta.
+   */
+  resolveVehicleCollisions(game, dt) {
+    this.carHitT = Math.max(0, this.carHitT - dt);
+    // Dentro un negozio `vehicleGrid` è vuota per costruzione: la guardia serve
+    // solo al primo frame, prima che `main` l'abbia costruita.
+    if (game.indoors || !game.vehicleGrid) return;
+    for (const v of game.vehicleGrid.queryCircle(this.x, this.y, 150)) {
+      // Un velivolo in volo passa sopra la testa: la griglia è piatta e non sa
+      // niente di quota (§4).
+      if (v === this.vehicle || airborne(v)) continue;
+      const spec = VEHICLE_TYPES[v.kind];
+      const reach = spec.len * 0.5 + spec.wid * 0.46 + RADIUS;
+      if ((v.x - this.x) ** 2 + (v.y - this.y) ** 2 > reach * reach) continue;
+
+      // Solo il cerchio più compenetrato viene risolto: sommare i tre spara via
+      // il giocatore, ed è la stessa ragione per cui lo fa la fisica dei veicoli.
+      let best = null;
+      for (const c of collisionCircles(v, spec)) {
+        const dx = this.x - c.x;
+        const dy = this.y - c.y;
+        const minD = c.r + RADIUS;
+        const d2 = dx * dx + dy * dy;
+        if (d2 > minD * minD) continue;
+        const d = Math.sqrt(d2);
+        // Piedi esattamente sull'asse del veicolo (un mezzo che ti compare
+        // addosso): la normale sarebbe di lunghezza zero e la spinta non
+        // esisterebbe. Da sotto un'auto si esce di fianco, è il lato corto.
+        const nx = d > 0.01 ? dx / d : -Math.sin(v.angle);
+        const ny = d > 0.01 ? dy / d : Math.cos(v.angle);
+        const overlap = minD - d;
+        if (!best || overlap > best.overlap) best = { overlap, nx, ny };
+      }
+      if (!best) continue;
+
+      this.x += best.nx * best.overlap;
+      this.y += best.ny * best.overlap;
+      // Conta solo quanto **la lamiera** avanza verso di te, non la velocità
+      // relativa: altrimenti sprintare addosso a un'auto in sosta farebbe male,
+      // e in una città piena di macchine parcheggiate ci si sbatte di continuo.
+      const impact = v.vx * best.nx + v.vy * best.ny;
+      if (impact <= 0) continue;
+      // Sbalzato comunque: è l'unica cosa che dice «ti ha preso» quando il colpo
+      // è troppo lento per fare danno.
+      this.vx += best.nx * Math.min(impact, 240) * 0.5;
+      this.vy += best.ny * Math.min(impact, 240) * 0.5;
+      if (impact < RUNOVER_SPEED || this.carHitT > 0) continue;
+      this.carHitT = RUNOVER_GAP;
+      game.fx.addDust(this.x, this.y, v.vx, v.vy, 3);
+      game.audio?.impact(this.x, this.y, impact);
+      game.camera.addShake(Math.min(12, impact / 26));
+      // Il sangue schizza nel verso in cui il colpo ti butta, come per l'onda
+      // d'urto di un'esplosione: `best.n` va dalla lamiera a te.
+      this.damage((impact - RUNOVER_SPEED) * RUNOVER_DMG, best.nx, best.ny, game);
+    }
   }
 
   findNearbyVehicle(game) {

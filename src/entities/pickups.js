@@ -95,6 +95,18 @@ export class PickupSystem {
     return this.add(kind, x, y);
   }
 
+  /**
+   * Tutto di nuovo per terra. Le raccolte non entrano nel salvataggio — che
+   * ricompaiano da sole è già il loro comportamento normale — ma caricare una
+   * partita non deve lasciare vuoti i cortili svuotati in quella precedente.
+   */
+  reset() {
+    for (const it of this.items) {
+      it.taken = false;
+      it.t = 0;
+    }
+  }
+
   add(kind, x, y) {
     const item = { spec: PICKUP_KINDS[kind], x, y, taken: false, t: 0 };
     this.items.push(item);

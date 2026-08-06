@@ -78,6 +78,20 @@ const MARINE_LEVEL = 3;
 // (misurato) — che è esattamente la condanna senza uscita che si voleva evitare.
 const NADE_MIN = 200;
 const NADE_MAX = 430;
+
+// Arresto. La divisa ammanetta invece di sparare in due situazioni sole: il
+// giocatore è **a mani vuote o con una mazza** — sparare a chi non ha una bocca
+// da fuoco non è quello che fa una pattuglia — oppure è quasi a terra, e allora
+// il fermo è la strada corta. In tutti gli altri casi si spara come prima.
+//
+// Sopra le tre stelle non arresta più nessuno: a quel punto in strada ci sono
+// speronamenti, chiodi e SWAT, e fermarsi ad ammanettare sarebbe un passo
+// indietro nell'escalation. È anche l'unico modo di rendere l'arresto una scelta
+// del giocatore: mettere via la pistola con una stella è una resa, con cinque no.
+const BUST_R = 46;
+const BUST_TIME = 1.4;
+const BUST_HP = 25;
+const ARREST_LEVEL = 3;
 const NADE_CD = 9;
 const NADE_GAP = 5;
 
@@ -114,6 +128,11 @@ export class PoliceSystem {
     this.nadeCd = 0;
     this.siegeDoor = null;
     this.siegeEdge = null;
+    // Arresto in corso: `arresting` è la condizione del frame (la legge anche
+    // `copBehavior`), `bustT` il cronometro con cui l'agente ti tiene fermo.
+    this.arresting = false;
+    this.bustT = 0;
+    this._bustCd = 0;
     this._spikeI = 0;
     this._boarded = [];
     this.tmp = {};
@@ -158,7 +177,54 @@ export class PoliceSystem {
     this.updateMarine(dt, game, tier);
     this.updateChopper(dt, game, tier);
     this.updateSpikes(dt, game);
+    this.updateArrest(dt, game);
     this.spotted = this.computeSpotted(game);
+  }
+
+  /**
+   * Arresto. Non è un'unità nuova né uno stato nuovo: è la stessa divisa che, in
+   * due situazioni sole, smette di sparare e chiude la distanza. Il cronometro
+   * sta qui e non sull'agente perché la condizione è del giocatore — che si
+   * arrenda o no non dipende da *quale* pattuglia gli è addosso.
+   *
+   * Si spezza in quattro modi, e sono tutti azioni: allontanarsi, salire in
+   * macchina, tirare fuori una bocca da fuoco, stendere l'agente. È quello che
+   * rende il fermo una scelta e non un incidente.
+   */
+  updateArrest(dt, game) {
+    const pl = game.player;
+    const w = game.wanted;
+    this._bustCd = Math.max(0, this._bustCd - dt);
+    this.arresting = w.level > 0 && w.level <= ARREST_LEVEL && pl.onFoot && !pl.dying
+      && !game.indoors && (WEAPONS[pl.weapon].melee || pl.hp <= BUST_HP);
+    if (!this.arresting) {
+      this.bustT = 0;
+      return;
+    }
+    const near = this.cops.some(
+      (p) => !p.dead && p.kind === 'cop' && dist(p.x, p.y, pl.x, pl.y) < BUST_R
+    );
+    if (!near) {
+      // Si perde il contatto più in fretta di quanto lo si guadagni: due passi
+      // indietro devono bastare a togliersi dalle mani di un agente.
+      this.bustT = Math.max(0, this.bustT - dt * 2);
+      return;
+    }
+    if (this.bustT === 0 && this._bustCd === 0) {
+      this._bustCd = 6;
+      game.hud.toast('«Fermo! Mani in alto»', 2);
+      game.audio?.ui('deny');
+    }
+    this.bustT += dt;
+    if (this.bustT >= BUST_TIME) {
+      this.bustT = 0;
+      game.bustPlayer();
+    }
+  }
+
+  /** Quanto manca alle manette, in [0,1]. La disegna l'HUD. */
+  get bustProgress() {
+    return this.arresting ? Math.min(1, this.bustT / BUST_TIME) : 0;
   }
 
   /** Unità perse per strada: morti, despawnate dallo streaming, o troppo lontane. */
@@ -362,6 +428,8 @@ export class PoliceSystem {
 
   /** Cessato allarme: le unità in vista se ne vanno da sole, le altre spariscono. */
   standDown(game, hard = false) {
+    this.arresting = false;
+    this.bustT = 0;
     for (const b of this.blocks) this.removeBlock(b, game);
     this.blocks.length = 0;
     this.spikes.length = 0;
@@ -601,6 +669,12 @@ export class PoliceSystem {
     const los = d < SEE_FOOT * this.visionScale(game) && hasLineOfSight(game, p.x, p.y, pl.x, pl.y);
 
     if (los) {
+      // Fermo invece che fuoco: chiude la distanza e basta. Vale solo per la
+      // divisa — la SWAT non ammanetta nessuno (vedi `updateArrest`).
+      if (this.arresting && p.kind === 'cop') {
+        p.angle = Math.atan2(pl.y - p.y, pl.x - p.x);
+        return { x: pl.x, y: pl.y, speed: p.baseSpeed * (d > 90 ? 1.9 : 1.15) };
+      }
       const aim = Math.atan2(pl.y - p.y, pl.x - p.x);
       // Granata della SWAT: è la risposta di livello 5 a un giocatore che si è
       // imboscato dietro un riparo e non si muove più. Vuole distanza (sotto i

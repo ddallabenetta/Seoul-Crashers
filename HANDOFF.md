@@ -3,18 +3,17 @@
 Documento per riprendere il lavoro da una sessione pulita. Leggi anche `README.md`
 (descrizione del gioco e comandi) — qui c'è quello che serve a *sviluppare*.
 
-Ultimo aggiornamento: **Seoul fa rumore** (§5.13) e **la radio in macchina** (§5.14) — audio
-procedurale WebAudio, la voce che era in cima al §6 da quattro fasi, più le stazioni coreane
-in streaming, che sono l'unica cosa del gioco che parla con la rete. Nessun file sonoro: spari, motori, sirene, pioggia, tuoni,
-urla e interfaccia nascono da oscillatori e rumore generato al boot, come la grafica nasce da
-path su canvas. Prima c'erano il giro di arretrati (§5.12), il ciclo giorno-notte (§5.11), il
-traffico (§5.10), la mappa (§5.9), i negozi (§5.8) e la Fase 2 tappa C.
+Ultimo aggiornamento: **la partita si salva** (§5.15), **la polizia ti arresta** (§5.16) e
+**la lamiera è solida anche a piedi** (§5.17) — le due voci che erano in cima al §6 più la
+segnalazione dell'utente sul giocatore che camminava sopra le auto. Prima c'erano l'audio
+procedurale (§5.13) e la radio (§5.14), il giro di arretrati (§5.12), il ciclo giorno-notte
+(§5.11), il traffico (§5.10), la mappa (§5.9), i negozi (§5.8) e la Fase 2 tappa C.
 
 > 📌 **Da concordare con l'utente prima di scrivere codice:** della Fase 3 restano le
 > **missioni**, che sono il lavoro grosso e pieno di scelte di design (quante, come si
-> attivano, cutscene a fumetti, fallimento e ripetizione), e adesso anche la **musica** —
-> l'audio c'è (§5.13), ma quanti pezzi, di che genere e quando partono sono scelte di regia,
-> non un sintetizzatore. L'utente vuole essere consultato invece di trovarsele fatte (§7):
+> attivano, cutscene a fumetti, fallimento e ripetizione), e la **musica** — l'audio c'è
+> (§5.13), ma quanti pezzi, di che genere e quando partono sono scelte di regia, non un
+> sintetizzatore. L'utente vuole essere consultato invece di trovarsele fatte (§7):
 > **chiediglielo in apertura di sessione.** Adesso il §6 è corto: gli arretrati grossi sono
 > stati pagati, e quello che resta è quasi tutto materia della storia o roba che si nota poco.
 
@@ -28,7 +27,8 @@ Canvas 2D puro, moduli ES nativi, **zero dipendenze, nessun build step**. Tutta 
 
 Stato: **Fase 1, Fase 1.5, Fase 2 (tutte e tre le tappe) e le prime tre tappe della Fase 3
 completate e collaudate**, più la revisione della guida AI del traffico (§5.10), il giro di
-arretrati del §5.12 e l'audio procedurale del §5.13. ~18.900 righe in 34 moduli. 60 fps con ~44 veicoli e ~93 pedoni attivi, e restano 60 anche sotto raffica
+arretrati del §5.12, l'audio procedurale del §5.13 e il salvataggio del §5.15. ~20.100 righe in
+35 moduli. 60 fps con ~44 veicoli e ~93 pedoni attivi, e restano 60 anche sotto raffica
 continua di SMG. Dentro un edificio il costo è trascurabile: la città non gira. Il ciclo
 giorno-notte costa **1,5 ms di JS per frame nel caso peggiore** (notte con temporale) — ma i
 veli a schermo intero non sono misurabili onestamente in headless, vedi l'avvertenza in §5.11.
@@ -50,6 +50,12 @@ una scelta — e `F4` è il muto.
 stazione, `Shift+R` spegne, e nei 편의점 aperti la si sente bassa di sottofondo. È **l'unica
 cosa del gioco che parla con la rete**, non lo fa finché non premi `R`, e quando la rete non
 c'è il gioco si comporta esattamente come prima.
+
+**La partita si salva, e la polizia adesso ti prende vivo.** Tre slot in `localStorage` dal
+menu di pausa (§5.15): dentro c'è solo quello che Seoul non sa rifare da sola, cioè 0,7 kB —
+la città nasce da una seed fissa e il traffico è streaming. E la divisa, se hai i pugni al
+posto della pistola o sei quasi a terra, ti ammanetta invece di spararti (§5.16): sei ore di
+cella, la cauzione, e l'arsenale se lo tengono.
 
 **Il mondo è 5400×5400 e la città non lo riempie: ha una sagoma.** A ovest il mare, con
 l'aeroporto di Gimpo e il porto di Incheon sulla costa e la campagna in mezzo; a est, nord e
@@ -263,6 +269,29 @@ const dp = (o) => Math.round(Math.hypot(o.x - game.player.x, o.y - game.player.y
    motovedette: game.police.boats.length })
 ```
 
+Per il salvataggio (§5.15) e l'arresto (§5.16):
+
+```js
+// cosa c'è nei tre slot, senza caricarli
+const S = await import('/src/core/save.js');
+[0, 1, 2].map((i) => { const d = S.readSlot(i); return d && S.describe(d, game); })
+// scrivi, ricarica, cancella (nel gioco: ESC → Salvataggi)
+S.writeSlot(0, game);   S.apply(game, S.readSlot(0));   S.clearSlot(0);
+// quanto pesa davvero, e cosa c'è dentro
+JSON.stringify(S.snapshot(game)).length / 1024
+// arresto: la condizione del frame e il cronometro delle manette
+({ ammanettabile: game.police.arresting, barra: +game.police.bustProgress.toFixed(2),
+   celle: game.stats.busted })
+// prova a freddo: due stelle, pugni in mano, e un agente addosso
+game.player.setWeapon('fists'); game.wanted.add(30, game);
+// ... aspetta che arrivi una pattuglia, poi ...
+game.police.cops[0] && Object.assign(game.police.cops[0], { x: game.player.x + 30, y: game.player.y });
+```
+
+`arresting` falso con una pattuglia addosso ha tre spiegazioni e sono tutte volute: hai una
+bocca da fuoco in pugno, sei sopra le tre stelle, o l'agente è della SWAT. **Il cronometro sta
+sul sistema e non sull'agente**: la condizione è del giocatore, non di chi gli è addosso.
+
 Per l'ora, la luce e il meteo (fase 3, terza tappa):
 
 ```js
@@ -387,6 +416,7 @@ src/core/
   input.js            tastiera/mouse, stato continuo + fronti (wasPressed)
   audio.js            sintetizzatore WebAudio: colpi secchi + letti continui, mix, muto
   radio.js            stazioni coreane in streaming (`<audio>`, fuori dal grafo audio)
+  save.js             salvataggio su localStorage: 3 slot, fotografia e ripristino
   math.js             angoli, damp, circleRectPush, pointSegment, KMH, PX_PER_M
   rng.js              mulberry32 deterministico (stessa seed = stessa Seoul)
   spatial.js          SpatialGrid (statica) e DynamicGrid (ricostruita ogni frame)
@@ -885,6 +915,8 @@ codice spiega il perché nel punto giusto.
 | Una stazione «rotta» che nell'app dell'emittente funziona | è HLS (`.m3u8`) o una playlist (`.pls`): `<audio>` non le sa leggere, e senza librerie non c'è modo | `radio.usable`, filtro sull'estensione e sul codec |
 | **In una prova scriptata** l'audio non suona mai | senza gesto dell'utente il contesto resta sospeso, e sospeso vuol dire orologio fermo | `probe.mjs` passa `--autoplay-policy=no-user-gesture-required`; la scena chiama `game.audio.unlock()` |
 | **In una prova scriptata** il ricercato torna a 0 da solo | il giocatore fermo allo spawn viene investito, oppure a cinque stelle la SWAT lo ammazza in ~8 s: la morte azzera tutto | metterlo su un marciapiede (`city.hospitals[i]`) e campionare entro 7 s |
+| Il giocatore attraversa le auto e ci cammina sopra | `player.resolveCollisions` interrogava solo `area.grid` (edifici, props, limiti): i veicoli non ci sono mai stati, e in una visuale dall'alto il tetto è disegnato più in alto del marciapiede | `player.resolveVehicleCollisions`, sui tre cerchi di `collisionCircles` — **prima** dei muri, o un'auto ti spinge dentro una vetrina |
+| Espulso da un'auto con spinta di lunghezza zero | il giocatore esattamente sull'asse del veicolo: la normale è `(0,0)` e la spinta non esiste | `resolveVehicleCollisions`, ripiego sulla perpendicolare al muso (da sotto un'auto si esce di fianco) |
 
 Regola generale emersa: **prima di dare la colpa all'AI, verifica la geometria.** Quasi tutti
 gli "stalli dell'AI" erano problemi di ingombri, corsie o posizionamento.
@@ -1728,31 +1760,151 @@ il browser logga da sé `net::ERR_...` per ogni richiesta bloccata, e il probe c
 `console.error`. Non è un errore JS. Le scene che non riguardano la radio non la accendono,
 quindi il problema non si presenta mai per caso.
 
+### 5.15 Il salvataggio: tre slot, 0,7 kB
+
+Era la prima voce del §6: con del denaro in tasca, un arsenale comprato, un orologio che
+avanza e degli interni che si ricordano, chiudere la pagina buttava via tutto.
+
+**Il salvataggio è piccolo perché la città è deterministica.** Strade, edifici, vetrine,
+officine e territori nascono da `new Rng(20260730)` e sono identici a ogni avvio: non hanno
+bisogno di stare in un file. Traffico e pedoni sono streaming puro attorno al giocatore, e si
+rifanno da soli. Resta **solo quello che il giocatore ha cambiato** — sé stesso, il mezzo che
+stava guidando, l'orologio col suo meteo, il ricercato, le statistiche e le poche cose che gli
+interni ricordano. Misurato: **0,7 kB per slot**, e il conto non cresce con la mappa.
+
+Le scelte, tutte in `src/core/save.js`:
+
+- **Tre slot manuali dal menu di pausa, nessun autosave.** Salvare in tre punti a scelta è una
+  decisione del giocatore; un autosave che scatta da solo mentre hai quattro stelle addosso è
+  una trappola. Sovrascrivere e cancellare vogliono **due Invio**.
+- **Salvando dentro un negozio si registra la vetrina, non la pianta.** Le coordinate di un
+  interno sono numeri da 200-470 px che in città cadono tutti nell'angolo nord-ovest della
+  mappa: è la stessa trappola di `wanted.add` (§4). Si ricarica in strada, davanti alla porta.
+- **Il mezzo si salva come descrizione** (tipo, colore, HP, gomme) e alla ricarica ne nasce uno
+  nuovo sotto il giocatore, con `protect` scritto a mano perché non ci passa `onEnterVehicle`.
+  Salvare la lista dei veicoli vorrebbe dire salvare mezza città per riavere l'auto in cui eri
+  seduto.
+- **Il ricercato si conserva.** Chi salva in mezzo a un inseguimento lo ritrova: è coerente con
+  una porta che non è mai stata un nascondiglio (§5.8).
+- **Gli interni restano pigri.** Il salvataggio ricorda per ogni indirizzo la cassa svuotata e
+  il personale steso; `shops.interiorOf` applica il ricordo **alla prima visita dopo il
+  caricamento** (`shops.pending`), invece di ricostruire 369 piante che nessuno guarderà. I
+  clienti ammazzati restano fuori: la folla di passaggio nasce dall'ora che è, quindi un indice
+  su quella lista non vorrebbe dire niente al caricamento.
+- **Uno slot con una seed diversa viene rifiutato.** Una modifica alla generazione sposta tutto
+  quello che c'è a valle, e il giocatore rinascerebbe dentro un muro. **Se tocchi `citygen`,
+  i salvataggi vecchi devono smettere di caricarsi** — è quello che fa il controllo su `SEED`.
+- **Il caricamento svuota il mondo prima di spostare il giocatore e lo ripopola dopo.** Al
+  contrario ci si porterebbe dietro il traffico del punto di partenza. Costa **2,7 ms** e non
+  lascia strascichi: 36 fps prima, 37 sei secondi dopo.
+
+Quello che *non* è nel file, e va bene così: raccolte a terra (ricompaiono da sole, e
+`pickups.reset()` le rimette tutte in campo al caricamento), stato del traffico, posizione dei
+pedoni, mix audio e stazione radio (che hanno già una chiave `localStorage` loro).
+
+### 5.16 Arresto: la divisa ammanetta invece di sparare
+
+Seconda voce del §6, rimandata dalla tappa B con una ragione scritta in §5.5 — il busted
+raddoppia i flussi di fine partita. Qui il flusso in più è **uno solo**, e riusa quello che
+c'era già: `player.revive` confisca l'arsenale come in corsia, `daycycle.advance` fa passare le
+ore come il letto della safehouse, i commissariati esistono dal §5.12.
+
+**Quando si viene ammanettati.** La divisa smette di sparare e chiude la distanza in due
+situazioni sole: hai in pugno **i pugni o una mazza** — sparare a chi non ha una bocca da fuoco
+non è quello che fa una pattuglia — oppure sei **quasi a terra** (HP ≤ 25), e allora il fermo è
+la strada corta. Sopra le **tre stelle** non arresta più nessuno, e la SWAT non arresta mai: a
+quel punto in strada ci sono speronamenti, chiodi ed elicottero, e fermarsi ad ammanettare
+sarebbe un passo indietro nell'escalation. È anche quello che rende il fermo **una scelta del
+giocatore** invece di un incidente: mettere via la pistola con una stella è una resa, con
+cinque non serve a niente.
+
+**Il cronometro sta sul sistema, non sull'agente** (`police.bustT`): la condizione è del
+giocatore, e che si arrenda o no non dipende da quale pattuglia gli è addosso. 1,4 s con un
+agente entro 46 px, e si spezza in quattro modi che sono tutti azioni — allontanarsi, salire in
+macchina, tirare fuori una bocca da fuoco, stendere l'agente. Il contatto si perde al doppio
+della velocità con cui si guadagna: due passi indietro devono bastare.
+
+**Cosa costa, e perché non è la morte.** Deve costare in modo *diverso*, o tanto varrebbe
+morire: l'ospedale si prende un quarto dei contanti e ti rimette in piedi subito, la cella si
+prende **un quinto** (la cauzione) ma **sei ore**. Perdere una notte di Seoul è un prezzo che il
+gioco sa già far sentire — cambia la luce, cambia il tempo, chiudono i locali — e non ne
+serviva uno nuovo. L'orologio va **fatto girare** con `advance`, non spostato, o il meteo
+all'uscita sarebbe quello di quando sei entrato (§4). Ci si sveglia davanti al commissariato più
+vicino, che è finalmente qualcosa che i commissariati *fanno*; dove non ce ne sono (campagna,
+aeroporto) ti portano all'ospedale del distretto.
+
+L'HUD mostra la barra che si riempie e cosa fare per spezzarla: un secondo e mezzo senza niente
+a schermo sarebbe un fermo che arriva dal nulla. Sta **sotto il centro** e non nel terzo alto,
+che è già occupato da cartello del distretto e messaggi.
+
+### 5.17 La lamiera è solida anche a piedi
+
+**Segnalazione dell'utente:** *«il giocatore si compenetra con le auto e può camminarci
+sopra»*. `player.resolveCollisions` interrogava solo `area.grid` — edifici, props solidi e
+limiti: i veicoli non ci sono mai stati, in nessuna fase. In una visuale dall'alto, dove il
+tetto di un'auto è disegnato più in alto del marciapiede, il risultato non era «lo attraverso»
+ma «ci cammino sopra», che è peggio.
+
+- **La sagoma sono i tre cerchi di `collisionCircles`** (ora esportata da `vehicle.js`), gli
+  stessi con cui i veicoli si urtano fra loro. L'ingombro rettangolare no: di quello, una
+  berlina in diagonale sporgerebbe con gli angoli.
+- **Si risolve solo il cerchio più compenetrato.** Sommare i tre spara via il giocatore, ed è
+  la stessa ragione per cui lo fa la fisica dei veicoli (§4).
+- **Le lamiere prima dei muri.** Nell'ordine inverso, un'auto che ti stringe contro una vetrina
+  ti spingerebbe *dentro* la vetrina, che è l'unico dei due modi di restare incastrato che si
+  vede a schermo.
+- **Da fermo spinge, in corsa investe**: la stessa collisione letta due volte. Il danno guarda
+  **solo quanto la lamiera avanza verso di te**, non la velocità relativa — altrimenti
+  sprintare addosso a un'auto in sosta farebbe male, e in una città di macchine parcheggiate ci
+  si sbatte di continuo. Sotto i 70 px/s (21 km/h) spinge e basta; sopra fa `(v − 70) × 0.3` di
+  danno, al massimo uno ogni mezzo secondo perché un'auto che ti trascina contro un muro non
+  applichi il danno sessanta volte al secondo.
+
+Misurato headless: dal centro di una berlina si viene espulsi a 24 px (il minimo geometrico),
+un furgone a 90 km/h toglie 58 HP, sprintare contro una lamiera ferma ne toglie 0 e ci si ferma
+a 52 px dal centro. Fermi su un marciapiede per 45 s in mezzo al traffico: **nessun danno
+spurio**.
+
+> I **pedoni** invece attraversano ancora le auto in sosta, ed è voluto per adesso: un pedone
+> che si incastra contro una macchina parcheggiata mentre attraversa resterebbe lì per sempre,
+> e il rimedio (aggirare l'ostacolo) è lavoro di steering, non di collisione. Sta nel §6.
+
 ---
 
 ## 6. Backlog successivo (già concordato con l'utente)
 
 **Fase 3 — contenuti.** Negozi e interni (§5.8), la mappa (§5.9), il ciclo giorno-notte
-(§5.11) e il giro di arretrati (§5.12) sono fatti; la segnalazione sul traffico è chiusa
-(§5.10). **Restano le missioni**, che sono il lavoro grosso: impianto (attivazione sulla mappa,
+(§5.11), il giro di arretrati (§5.12), il salvataggio (§5.15) e l'arresto (§5.16) sono fatti;
+la segnalazione sul traffico è chiusa (§5.10) e quella sulle auto attraversabili pure (§5.17).
+**Restano le missioni**, che sono il lavoro grosso: impianto (attivazione sulla mappa,
 obiettivi, fallimento e ripetizione), cutscene a pannelli a fumetto, e i contenuti. **Le scelte
 di design vanno concordate con l'utente prima di scrivere codice** — è la prima cosa da chiedere
 in apertura di sessione.
 
 Quello che segue è quanto resta indietro, in ordine di quanto si sente. È molto più corto di
-prima: il §5.12 ha pagato diciannove voci di questo elenco e il §5.13 ha chiuso l'audio.
+prima: il §5.12 ha pagato diciannove voci di questo elenco, il §5.13 ha chiuso l'audio e il
+§5.15-5.16 le due voci che stavano in cima.
 
 **Le cose che si sentono di più, oggi:**
-- **Niente salvataggio.** Con del denaro in tasca, un arsenale comprato, un orologio che avanza
-  e degli interni che si ricordano, chiudere la pagina butta via tutto. localStorage con 3 slot:
-  la città è deterministica dalla seed, quindi si salvano solo giocatore, ricercato, orologio,
-  statistiche e le poche cose che `shops.cache` ricorda davvero (casse svuotate, morti).
-- **Arresto (busted).** La polizia spara e basta, non ti carica in volante. Adesso che assedia
-  la porta è anche più strano che non lo faccia. Vedi §5.5 per le ragioni per cui era stato
-  rimandato: raddoppia i flussi di fine partita (celle, cauzione, arsenale confiscato).
 - **Niente musica *del gioco*.** La radio c'è (§5.14) e porta musica vera, ma è musica di
   qualcun altro: manca un tema, e mancano i pezzi che accompagnano una missione o una fuga.
   È materia di regia e va concordata.
+- **I pedoni attraversano le auto in sosta.** Il giocatore no, dal §5.17. Per loro non basta
+  la stessa spinta: uno che si incastra contro una macchina parcheggiata mentre attraversa la
+  strada resta lì per sempre, e serve aggirarla — che è lavoro di steering. È la cosa più
+  visibile che resta a schermo.
+- **Non ti caricano in volante.** L'arresto c'è (§5.16), ma è uno stacco: manette, nero,
+  commissariato. Vedere l'agente che ti ammanetta e la volante che parte vorrebbe
+  un'animazione e un pezzo di regia della camera.
+
+**Rimasto indietro dal salvataggio** (§5.15):
+- **Nessun autosave**, per scelta (vedi §5.15), ma un salvataggio automatico *al letto della
+  safehouse* sarebbe coerente: lì il tempo passa già, ed è il posto in cui in un GTA si salva.
+- **Non c'è una schermata iniziale**: il gioco parte in strada e un salvataggio esistente si
+  annuncia con un toast. Con le missioni servirà un menu d'avvio vero, e quello è il posto
+  giusto per «continua».
+- **La folla degli interni non si ricorda i clienti stesi**: il personale sì, chi era di
+  passaggio no (§5.15).
 
 **Rimasto indietro dalla radio** (§5.14):
 - **Le tre grandi coreane non ci sono**: KBS, MBC e SBS trasmettono in HLS con un token, e
@@ -1801,12 +1953,18 @@ prima: il §5.12 ha pagato diciannove voci di questo elenco e il §5.13 ha chius
   attraverso il prezzo dell'officina. Un banco dei pegni per distretto in `citygen.placeShops`,
   come `placeGarages` fa con le officine, e il mercato si vedrebbe tutto.
 
-**Rimasto indietro dalla polizia** (§5.5, §5.12):
+**Rimasto indietro dalla polizia** (§5.5, §5.12, §5.16):
+- **Dalla cella non si esce a piedi con qualcosa da fare**: niente cauzione da pagare in
+  anticipo, niente scelta fra restare dentro e uscire subito, e i commissariati restano volumi
+  chiusi anche adesso che ci si rinasce davanti.
+- **La divisa ammanetta anche chi ha una mazza in mano** e la sta usando: `WEAPONS[].melee` non
+  distingue fra tenere una mazza e menare.
 - **Durante l'assedio non si posano blocchi né chiodi**: uscendo non si trova mai una transenna
   davanti alla porta. `manageObstacles` ragiona su un vettore velocità, e una porta non ce l'ha.
 - **Durante l'assedio gli agenti attraversano i muri** (nessuna collisione, per scelta di costo):
   per un frame se ne può vedere uno dentro una vetrina prima che lo steering lo rimetta a posto.
-- **Non si entra nei commissariati**: non esiste un `biz` `police` in `interiors.js`.
+- **Non si entra nei commissariati**: non esiste un `biz` `police` in `interiors.js` — e
+  adesso che l'arresto ti ci sveglia davanti, si nota di più.
 - **Le motovedette non speronano e non fanno posti di blocco d'acqua**; non c'è un'unità aerea
   d'attacco oltre all'elicottero.
 - **La granata è solo della SWAT e solo a cinque stelle**: niente lanci dal finestrino.
@@ -1841,9 +1999,11 @@ prima: il §5.12 ha pagato diciannove voci di questo elenco e il §5.13 ha chius
 12 missioni in 3 atti con cutscene a **pannelli a fumetto** (gli interni sono anche il posto
 dove ambientarne metà: un incontro in un 노래방 non ha bisogno di niente di nuovo, un
 appuntamento può avere un'ora, e adesso una banda ha anche un motivo per parlarti); attività
-secondarie (taxi, consegne, salti); salvataggio su localStorage, che è in cima all'elenco qui
-sopra. **L'audio procedurale, che stava in questa riga da quattro fasi, è fatto** (§5.13):
-resta la musica, che è una scelta di regia e non un sintetizzatore.
+secondarie (taxi, consegne, salti). **L'audio procedurale, che stava in questa riga da quattro
+fasi, è fatto** (§5.13), e con lui il salvataggio (§5.15): resta la musica, che è una scelta di
+regia e non un sintetizzatore. Le missioni avranno bisogno di due cose che adesso ci sono e
+prima no — un posto in cui riprendere una partita interrotta, e una sconfitta che non sia solo
+la morte.
 
 ## 7. Vincoli e convenzioni
 
@@ -2012,6 +2172,14 @@ resta la musica, che è una scelta di regia e non un sintetizzatore.
 | Volume | `audio.mix.radio` · `radio.contextGain` | 0.8 di fabbrica · pieno in auto, ×0.26 nel negozio, ×0.4 in pausa |
 | Locali con la radio | `interiors.BUSINESSES[].radio` | 편의점 · 약국 · 옷가게 · 분식 · 술집 · 당구장 |
 | Stazioni proprie | `localStorage` `seoul.radio.stations` | `[{name, url}]`, hanno la precedenza sull'elenco scaricato |
+| **— salvataggio, arresto, lamiera (§5.15-5.17) —** | | |
+| Slot di salvataggio · chiave | `save.SLOTS` · `localStorage` `seoul.save.N` | 3 · versione 1, seed 20260730 (una seed diversa viene rifiutata) |
+| Peso di uno slot · costo di un caricamento | misurato | 0,7 kB · 2,7 ms (fps invariati) |
+| Ripopolamento dopo un caricamento | `save.apply` | `prewarm(40, 18)` veicoli e 40 pedoni |
+| Fermo: raggio, tempo, decadenza | `police.BUST_R` / `BUST_TIME` | 46 px · 1,4 s · si perde al doppio della velocità |
+| Chi arresta e quando | `police.ARREST_LEVEL` / `BUST_HP` · `updateArrest` | fino a 3 stelle, solo `kind: 'cop'`, con arma da mischia in pugno **oppure** HP ≤ 25 |
+| Costo della cella | `main.bustPlayer` | 20% dei contanti (cauzione) · 6 ore di orologio · arsenale confiscato |
+| Investimento a piedi: soglia, danno, cadenza | `player.RUNOVER_SPEED` / `RUNOVER_DMG` / `RUNOVER_GAP` | 70 px/s (21 km/h) · `(v − 70) × 0.3` · un urto ogni 0,5 s |
 
 ---
 

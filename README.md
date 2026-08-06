@@ -28,7 +28,7 @@ Poi apri <http://localhost:8123>.
 | **click destro** | mirino del fucile di precisione (allarga il campo) |
 | `1` … `6` | barra armi: una fila per tasto, ripremi per scorrere la fila (rotella = tutto l'arsenale) |
 | `M` | mappa a tutto schermo (rotella = zoom, trascina = sposta) |
-| `ESC` | menu di pausa (mappa, audio, comandi, statistiche) |
+| `ESC` | menu di pausa (mappa, **salvataggi**, audio, comandi, statistiche) |
 | `F3` | pannello tecnico (fps, entità, posizione) |
 | `F4` | audio muto |
 | `R` | radio: accendi · stazione successiva |
@@ -38,6 +38,20 @@ Armi e munizioni si raccolgono a terra, nei cortili e nei vicoli, oppure si **co
 (vedi sotto). A zero salute ci si risveglia davanti all'ospedale del distretto più vicino —
 con la salute piena, senza più un'arma, senza più nessuno alle costole e con un quarto dei
 contanti in meno: la clinica presenta il conto.
+
+Le auto sono solide anche quando sei a piedi: non ci si passa attraverso e non ci si cammina
+sopra. Una che ti arriva addosso a velocità ti stende, una ferma ti sposta e basta.
+
+## Salvataggi
+
+`ESC` → **Salvataggi**: tre slot nel browser, con `W`/`S` per lo slot, `A`/`D` per l'azione
+(salva · carica · cancella) e `Invio` per confermare — due volte, se stai per sovrascrivere o
+cancellare. Ogni slot dice dove eri, che ora era e quanto avevi in tasca.
+
+Dentro c'è solo quello che Seoul non sa rifare da sola: la città nasce sempre uguale da una
+seed, quindi si salvano tu, il mezzo che stavi guidando, l'orologio col suo tempo, le stelle,
+le statistiche e le casse che avevi già svuotato. Sono meno di mille byte a slot, e restano nel
+browser: se svuoti i dati del sito, se ne vanno con loro.
 
 ## L'arsenale
 
@@ -113,6 +127,13 @@ alza il livello di **수배** (ricercato), da una a cinque stelle:
 
 In volo o in barca non ci si libera così facilmente: l'elicottero arriva già a tre stelle, e
 dal porto partono le motovedette.
+
+**Ti possono anche prendere vivo.** Fino a tre stelle, se ti trovano addosso con i pugni o una
+mazza al posto della pistola — o quasi a terra — la divisa smette di sparare e viene ad
+ammanettarti: hai un secondo e mezzo per scappare, saltare in macchina o tirare fuori qualcosa
+di più serio. Se ti prendono sono sei ore di cella, la cauzione (un quinto dei contanti) e
+l'arsenale che si tengono loro; ti risvegli davanti al commissariato più vicino, con la città
+che nel frattempo è andata avanti. Da quattro stelle in su non ammanetta più nessuno.
 
 Le stelle scendono **solo se nessuno ti vede**: basta un poliziotto con la linea di vista
 libera, o il cono del riflettore addosso, e il cronometro della fuga riparte da zero. Un
@@ -299,5 +320,10 @@ registratore di cassa. Quattro volumi nel menu di pausa, `F4` per il silenzio.
 chiavi API: `R` accende e cambia stazione, `Shift+R` spegne, il nome scorre sopra il
 tachimetro e nei locali che ce l'hanno la si sente bassa. Volume suo nel mixer.
 
-**Fase 3, il resto — da fare.** Le 12 missioni con cutscene a fumetti, le attività secondarie,
-la musica del gioco e il salvataggio su localStorage.
+**Fase 3, salvataggio e arresto — completata.** Tre slot su `localStorage` dal menu di pausa,
+con dentro solo quello che la seed non sa rifare (meno di mille byte a slot). E una sconfitta
+che non è la morte: la polizia ti ammanetta invece di spararti quando non hai una pistola in
+pugno o sei quasi a terra, e la cella costa sei ore di orologio, la cauzione e l'arsenale.
+
+**Fase 3, il resto — da fare.** Le 12 missioni con cutscene a fumetti, le attività secondarie
+e la musica del gioco.
