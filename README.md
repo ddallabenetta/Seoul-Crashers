@@ -28,8 +28,9 @@ Poi apri <http://localhost:8123>.
 | **click destro** | mirino del fucile di precisione (allarga il campo) |
 | `1` … `6` | barra armi: una fila per tasto, ripremi per scorrere la fila (rotella = tutto l'arsenale) |
 | `M` | mappa a tutto schermo (rotella = zoom, trascina = sposta) |
-| `ESC` | menu di pausa (mappa, comandi, statistiche) |
+| `ESC` | menu di pausa (mappa, audio, comandi, statistiche) |
 | `F3` | pannello tecnico (fps, entità, posizione) |
+| `F4` | audio muto |
 
 Armi e munizioni si raccolgono a terra, nei cortili e nei vicoli, oppure si **comprano**
 (vedi sotto). A zero salute ci si risveglia davanti all'ospedale del distretto più vicino —
@@ -161,7 +162,7 @@ di guardia. Passarci disarmati si può; entrarci con un ferro in pugno, no.
 ```
 index.html
 src/
-  core/      loop a passo fisso, input, RNG deterministico, griglie spaziali
+  core/      loop a passo fisso, input, audio sintetizzato, RNG deterministico, griglie
   world/     generazione città, grafo stradale, distretti, texture mappa
   render/    camera 2.5D, sprite vettoriali, facciate, terreno a tile, effetti
   entities/  giocatore, fisica veicoli, traffico, pedoni, polizia, negozi
@@ -218,6 +219,15 @@ Alcune scelte tecniche che spiegano il risultato a schermo:
   confronti, nessun grafo di ricerca — e quando resta incastrata manovra in retromarcia come
   il traffico civile. I posti di blocco sono volanti ferme di traverso più transenne che
   fermano le ruote e lasciano passare piedi e proiettili: la stessa cosa delle scalinate.
+- **Audio senza file audio.** Nessun campione, nessun `.mp3`: spari, motori, sirene, pioggia,
+  tuoni e menu nascono da oscillatori e da due buffer di rumore generati all'avvio, come la
+  grafica nasce da path su canvas. È il vincolo del progetto, ma si ripaga: il timbro di
+  un'arma sono cinque numeri accanto al suo danno, il motore cambia giro con la marcia e
+  cilindrata con la massa del mezzo, la sirena scivola di tono quando la volante ti supera, e
+  la pioggia dentro un negozio è la stessa pioggia con il filtro spostato — quello che si
+  sente è il muro. L'ascoltatore non è il personaggio ma **la camera**, così col mirino del
+  fucile di precisione si sente quello che si vede. L'audio parte al primo clic (lo impongono
+  i browser); i volumi stanno nel menu di pausa, `F4` è il muto.
 
 ## Stato
 
@@ -268,5 +278,12 @@ si propaga, la minigun si surriscalda. Prezzi per quartiere, mezzi rubati da riv
 che cambiano con l'ora, un futon per dormire fino all'alba, l'allarme silenzioso dopo una
 rapina, la porta sul retro. E le bande commerciano: quattro banchi, uno per mestiere.
 
+**Fase 3, l'audio — completata.** Seoul fa rumore, e non c'è un solo file sonoro: undici armi
+con timbro proprio, esplosioni e vetri rotti, il motore del mezzo che guidi, sirene che
+scivolano di tono passandoti accanto, il rotore dell'elicottero, la pioggia — ovattata se sei
+al riparo — il tuono che arriva dopo il lampo, il fondo della città che cala quando esci dal
+centro, la risacca sulla costa, gli incendi, i passi, le urla, il campanello del 편의점 e il
+registratore di cassa. Quattro volumi nel menu di pausa, `F4` per il silenzio.
+
 **Fase 3, il resto — da fare.** Le 12 missioni con cutscene a fumetti, le attività secondarie,
-l'audio procedurale e il salvataggio su localStorage.
+la musica e il salvataggio su localStorage.

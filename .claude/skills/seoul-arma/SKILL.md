@@ -5,7 +5,8 @@ description: Aggiungere o bilanciare un'arma di Seoul Crashers (mischia, bocca d
 
 # Aggiungere un'arma
 
-Un'arma non è una riga in una tabella: è **sette punti** che devono combaciare. Saltarne uno
+Un'arma non è una riga in una tabella: è **sette punti** che devono combaciare (più
+l'ottavo, il suono, che è facoltativo). Saltarne uno
 dà i sintomi classici — l'arma non compare mai a terra, il personaggio la impugna invisibile,
 il tasto non la seleziona, la barra mostra una casella vuota.
 
@@ -39,6 +40,10 @@ il tasto non la seleziona, la barra mostra una casella vuota.
    `spawnCar` e `spawnFootCop`. Ricorda che la cadenza degli agenti è
    `spec.rate * (auto ? 6 : 2.6)`: un'arma automatica in mano a un poliziotto non spara
    come in mano al giocatore.
+
+8. **Suono** (`src/core/audio.js` → `GUN_TONE`), **facoltativo**: senza una riga l'arma
+   suona lo stesso (il timbro si ricava da danno e cadenza), con una riga ha un carattere
+   suo. Vedi `/seoul-suono`.
 
 Le armi da lancio passano da `src/entities/projectiles.js` senza modifiche: `throwItem` per
 quelle che volano, `place` per quelle che si posano, `explode` per l'onda d'urto (che è già

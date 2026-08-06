@@ -114,7 +114,16 @@ async function main() {
   const problems = [];
   try {
     await waitForServer(port);
-    browser = await chromium.launch({ args: ['--no-sandbox', '--disable-dev-shm-usage'] });
+    // `--autoplay-policy` è quello che rende misurabile l'audio: senza, il contesto
+    // resta sospeso (serve un gesto dell'utente) e `game.audio` non suona mai in
+    // headless. `--mute-audio` tiene il grafo acceso ma non manda niente alla
+    // scheda audio, che in un container non c'è.
+    browser = await chromium.launch({
+      args: [
+        '--no-sandbox', '--disable-dev-shm-usage',
+        '--autoplay-policy=no-user-gesture-required', '--mute-audio',
+      ],
+    });
     const page = await browser.newPage({ viewport: { width: vw, height: vh }, deviceScaleFactor: opts.zoom || 1 });
 
     page.on('pageerror', (err) => problems.push(`pageerror: ${err.message}`));

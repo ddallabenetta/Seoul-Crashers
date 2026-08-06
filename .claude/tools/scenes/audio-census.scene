@@ -1,0 +1,108 @@
+// Censimento dell'audio: livelli veri, non "sembra alto".
+//
+// Un analizzatore attaccato al master misura **valore efficace (rms)** e **picco**
+// di ogni scenario, e per i colpi singoli il picco di ciascuno. È il modo di
+// bilanciare il mix senza una cassa — ed è così che sono stati trovati i numeri
+// del §5.13 dell'HANDOFF: alla prima passata l'ambiente aveva lo stesso rms di
+// un colpo di pistola, cosa che nel sorgente non si vede.
+//
+//   node .claude/tools/probe.mjs --seconds 2 --quiet \
+//     --script .claude/tools/scenes/audio-census.scene
+//
+// Riferimenti sani (Chromium headless in container, mix di fabbrica):
+//   ambiente rms ~0.015 · temporale ~0.045 · motore ~0.045 · caccia ~0.055
+//   picco di un colpo 0.30-0.60 · esplosione 0.60-0.75 · voci vive ≤ 24
+// I picchi ballano del 20% fra due esecuzioni (la coda del suono prima non è
+// sempre finita): quello che deve restare stabile è il **rapporto**.
+// Il rapporto che conta è **ambiente contro colpo**: se l'ambiente supera un
+// quarto del picco di una pistola, il fondo sta mangiando il gioco.
+const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
+const A = game.audio;
+A.unlock();
+await wait(1.5);
+if (!A.ready) return { errore: 'contesto audio non partito: probe.mjs passa --autoplay-policy?' };
+
+const ctx = A.ctx;
+const an = ctx.createAnalyser();
+an.fftSize = 2048;
+A.master.connect(an);
+const buf = new Float32Array(an.fftSize);
+
+/** rms e picco su una finestra di tempo reale. */
+const meas = async (secs) => {
+  let sum = 0;
+  let n = 0;
+  let peak = 0;
+  const t0 = performance.now();
+  while (performance.now() - t0 < secs * 1000) {
+    an.getFloatTimeDomainData(buf);
+    for (let i = 0; i < buf.length; i++) {
+      sum += buf[i] * buf[i];
+      if (Math.abs(buf[i]) > peak) peak = Math.abs(buf[i]);
+    }
+    n += buf.length;
+    await new Promise((r) => setTimeout(r, 12));
+  }
+  return { rms: +Math.sqrt(sum / n).toFixed(4), picco: +peak.toFixed(3) };
+};
+
+const W = (await import('/src/entities/weapons.js')).WEAPONS;
+const pl = game.player;
+const out = { colpi: {}, scene: {} };
+
+// 1. Fondo: la città e basta.
+out.scene.ambiente = await meas(1.2);
+
+// 2. Ogni bocca da fuoco, una alla volta, al centro camera.
+for (const id of ['pistol', 'shotgun', 'smg', 'rifle', 'sniper', 'minigun']) {
+  const r = await (async () => {
+    A.shot(W[id], game.camera.cx, game.camera.cy, true);
+    return meas(0.6);
+  })();
+  out.colpi[id] = r.picco;
+}
+out.colpi.granata = (await (async () => { A.explosion(game.camera.cx, game.camera.cy, 1); return meas(1.3); })()).picco;
+out.colpi.urto = (await (async () => { A.impact(game.camera.cx, game.camera.cy, 260); return meas(0.6); })()).picco;
+out.colpi.urlo = (await (async () => { A.scream(game.camera.cx, game.camera.cy); return meas(0.8); })()).picco;
+
+// 3. Temporale.
+game.dayCycle.setWeather('storm');
+await wait(1.5);
+out.scene.temporale = await meas(1.2);
+game.dayCycle.setWeather('clear');
+await wait(1.5);
+
+// 4. Al volante, gas a tavoletta.
+const v = game.vehicles.find((q) => !q.dead && q.driver !== 'player' && !q.moored);
+if (v) {
+  pl.x = v.x + 22;
+  pl.y = v.y + 22;
+  game.camera.snapTo(pl.x, pl.y);
+  await wait(0.3);
+  pl.enterVehicle(v, game);
+  game.input.down.add('KeyW');
+  await wait(3);
+  out.scene.motore = await meas(1.2);
+  game.input.down.delete('KeyW');
+  pl.exitVehicle(game, true);
+}
+
+// 5. Caccia a cinque stelle: sirene, elicottero, piombo. Il giocatore va tenuto
+//    vivo a mano, o la SWAT lo stende e il ricercato si azzera (HANDOFF §4).
+for (const id of Object.keys(W)) pl.giveWeapon(id, 400);
+pl.setWeapon('smg');
+pl.hp = 1e6;
+game.wanted.add(200, game);
+for (let i = 0; i < 9; i++) { await wait(1); pl.hp = 1e6; }
+game.input.mouse.down = true;
+out.scene.caccia = await meas(1.5);
+game.input.mouse.down = false;
+out.letti = A.stats.letti;
+out.voci = A.stats.voci;
+
+// 6. Costo in JS del passo audio, misurato a parte dal frame.
+const t0 = performance.now();
+for (let i = 0; i < 600; i++) A.update(1 / 60, game);
+out.ms_per_frame = +((performance.now() - t0) / 600).toFixed(3);
+out.fps = game.loop.fps;
+return out;

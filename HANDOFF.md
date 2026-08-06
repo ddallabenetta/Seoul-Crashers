@@ -3,18 +3,19 @@
 Documento per riprendere il lavoro da una sessione pulita. Leggi anche `README.md`
 (descrizione del gioco e comandi) — qui c'è quello che serve a *sviluppare*.
 
-Ultimo aggiornamento: **giro di arretrati** (§5.12) — diciannove punti che il §6 si portava
-dietro da quattro fasi, chiusi in un colpo: la polizia assedia la porta di un negozio, i
-pedoni si riparano dalla pioggia, il fuoco si propaga, le bande commerciano, i prezzi cambiano
-da quartiere a quartiere, si dorme per far passare la notte. Prima c'erano il ciclo
-giorno-notte (§5.11), il traffico (§5.10), la mappa (§5.9), i negozi (§5.8) e la Fase 2 tappa C.
+Ultimo aggiornamento: **Seoul fa rumore** (§5.13) — audio procedurale WebAudio, la voce che
+era in cima al §6 da quattro fasi. Nessun file sonoro: spari, motori, sirene, pioggia, tuoni,
+urla e interfaccia nascono da oscillatori e rumore generato al boot, come la grafica nasce da
+path su canvas. Prima c'erano il giro di arretrati (§5.12), il ciclo giorno-notte (§5.11), il
+traffico (§5.10), la mappa (§5.9), i negozi (§5.8) e la Fase 2 tappa C.
 
 > 📌 **Da concordare con l'utente prima di scrivere codice:** della Fase 3 restano le
 > **missioni**, che sono il lavoro grosso e pieno di scelte di design (quante, come si
-> attivano, cutscene a fumetti, fallimento e ripetizione). L'utente vuole essere consultato
-> invece di trovarsele fatte (§7): **chiediglielo in apertura di sessione.** Adesso il §6 è
-> corto: gli arretrati grossi sono stati pagati, e quello che resta è quasi tutto materia
-> della storia o roba che si nota poco.
+> attivano, cutscene a fumetti, fallimento e ripetizione), e adesso anche la **musica** —
+> l'audio c'è (§5.13), ma quanti pezzi, di che genere e quando partono sono scelte di regia,
+> non un sintetizzatore. L'utente vuole essere consultato invece di trovarsele fatte (§7):
+> **chiediglielo in apertura di sessione.** Adesso il §6 è corto: gli arretrati grossi sono
+> stati pagati, e quello che resta è quasi tutto materia della storia o roba che si nota poco.
 
 ---
 
@@ -25,8 +26,8 @@ Canvas 2D puro, moduli ES nativi, **zero dipendenze, nessun build step**. Tutta 
 (sprite, facciate, terreno, mappa) è generata da codice a runtime: non esistono asset esterni.
 
 Stato: **Fase 1, Fase 1.5, Fase 2 (tutte e tre le tappe) e le prime tre tappe della Fase 3
-completate e collaudate**, più la revisione della guida AI del traffico (§5.10) e il giro di
-arretrati del §5.12. ~17.600 righe in 33 moduli. 60 fps con ~44 veicoli e ~93 pedoni attivi, e restano 60 anche sotto raffica
+completate e collaudate**, più la revisione della guida AI del traffico (§5.10), il giro di
+arretrati del §5.12 e l'audio procedurale del §5.13. ~18.900 righe in 34 moduli. 60 fps con ~44 veicoli e ~93 pedoni attivi, e restano 60 anche sotto raffica
 continua di SMG. Dentro un edificio il costo è trascurabile: la città non gira. Il ciclo
 giorno-notte costa **1,5 ms di JS per frame nel caso peggiore** (notte con temporale) — ma i
 veli a schermo intero non sono misurabili onestamente in headless, vedi l'avvertenza in §5.11.
@@ -35,6 +36,14 @@ veli a schermo intero non sono misurabili onestamente in headless, vedi l'avvert
 un negozio), la luce cambia con l'ora, il cielo passa da sereno a temporale e viceversa, e i
 locali hanno un orario di apertura. Non è una decorazione: di notte la polizia vede meno lontano,
 sotto l'acqua si frena peggio, e alle tre del mattino l'unica insegna accesa è quella del 편의점.
+
+**Seoul si sente, e nemmeno un byte di audio è un file.** Spari, motori, sirene, rotori,
+pioggia, tuoni, urla, casse che si aprono e menu che scorrono nascono da oscillatori e da
+due buffer di rumore generati al boot (§5.13). Vale lo stesso vincolo della grafica, con lo
+stesso vantaggio: il timbro di un'arma è cinque numeri in tabella, il motore cambia giro con
+la marcia e la pioggia si sente ovattata dentro un negozio senza che esista un secondo suono
+di pioggia. L'audio parte **al primo clic o tasto premuto** — è una regola dei browser, non
+una scelta — e `F4` è il muto.
 
 **Il mondo è 5400×5400 e la città non lo riempie: ha una sagoma.** A ovest il mare, con
 l'aeroporto di Gimpo e il porto di Incheon sulla costa e la campagna in mezzo; a est, nord e
@@ -266,6 +275,28 @@ game.shops.isOpen('guns', game)          // un tipo di attività
 game.shops.nextOpening(s, game)          // { biz, at, wait } del piano che riapre prima
 ```
 
+Per l'audio (§5.13):
+
+```js
+// stato del sintetizzatore: contesto, voci brevi vive (tetto 24), letti continui
+game.audio.stats
+// se `stato` non è "running" non sta suonando niente: nel browser serve un clic,
+// in una prova scriptata si chiama unlock() a mano
+game.audio.unlock();
+// mix: master / sfx / ambient / ui, in [0,1]. Restano in localStorage.
+game.audio.setVolume('master', 0.4);   game.audio.toggleMute();
+// provare un suono a freddo, al centro camera
+(async () => { const W = await import('/src/entities/weapons.js');
+  game.audio.shot(W.WEAPONS.shotgun, game.camera.cx, game.camera.cy, true); })()
+```
+
+`letti` sono i suoni continui con il loro guadagno attuale: `citta pioggia vento mare
+motore traffico sirena rotore fuoco gomme canne`. **Sono la diagnosi giusta**: se guidando
+`motore` è 0, il letto non è agganciato al veicolo del giocatore; se `sirena` resta a 0 con
+tre volanti addosso, `police.cars` non ha `siren`. Per i livelli veri (rms e picco) c'è
+`.claude/tools/scenes/audio-census.scene` (§9), che è l'unico modo onesto di bilanciare
+senza una cassa.
+
 `dc.light.lamps` (0..1) è la manopola da cui scende tutto quello che si accende: fari,
 lampioni, insegne, finestre. `isNight` è solo `lamps > 0.5`. Per un giro completo delle 24 ore
 in forma di tabella, senza guardare ventiquattro screenshot, c'è
@@ -332,6 +363,7 @@ src/main.js           classe Game: boot, loop, callback del mondo, statistiche
 src/core/
   loop.js             passo fisso 1/60 con accumulatore, render libero
   input.js            tastiera/mouse, stato continuo + fronti (wasPressed)
+  audio.js            sintetizzatore WebAudio: colpi secchi + letti continui, mix, muto
   math.js             angoli, damp, circleRectPush, pointSegment, KMH, PX_PER_M
   rng.js              mulberry32 deterministico (stessa seed = stessa Seoul)
   spatial.js          SpatialGrid (statica) e DynamicGrid (ricostruita ogni frame)
@@ -372,7 +404,7 @@ src/entities/
 src/ui/
   hud.js              minimappa, tachimetro, barra armi, cartello distretto, toast, debug
   mapview.js          mappa a tutto schermo (pannello riusato dal menu)
-  menu.js             menu di pausa
+  menu.js             menu di pausa, con il pannello dei volumi (tab `audio`)
   shopmenu.js         pannello del listino (compra/vendi)
 
 .claude/              strumenti per chi sviluppa (non fa parte del gioco), vedi §9
@@ -380,7 +412,7 @@ src/ui/
   tools/sprite.mjs    guarda uno sprite generato ingrandito
   tools/scenes/       scene pronte da dare a `probe.mjs --script`
   hooks/              controllo sintassi + briefing di sessione
-  skills/             /seoul-verifica /seoul-arma /seoul-sprite /seoul-citta
+  skills/             /seoul-verifica /seoul-arma /seoul-sprite /seoul-citta /seoul-suono
 ```
 
 ---
@@ -698,6 +730,28 @@ proiettata (c'è un caso apposta in `weapons.rayCast`, ed è l'unico bersaglio c
 camera), e la sua raffica **non passa dal raycast** — un raggio radente sul piano si pianterebbe
 nel primo palazzo. Tira a stima attorno al bersaglio, e chi resta dentro i 13 px incassa.
 
+**L'audio ha due famiglie, e confonderle è il primo errore.** Un **colpo secco** (`shot`,
+`explosion`, `ui`) costruisce due o tre nodi, li programma sull'orologio del contesto e
+muore; un **letto continuo** (motore, sirena, pioggia, città) è acceso per sempre e quello
+che cambia è il guadagno, scritto ogni frame. Un suono che dipende da uno *stato* e dura più
+di mezzo secondo va fatto letto: riaccendere un oscillatore sessanta volte al secondo costa e
+fa click. I colpi hanno un tetto (`MAX_VOICES` 24) perché una raffica di minigun dentro un
+incendio, con la folla che urla, ne chiederebbe centinaia — e a saltare sarebbe il frame rate.
+
+**L'ascoltatore è la camera, non il giocatore.** Col mirino del fucile di precisione la camera
+scivola verso il cursore, e in quel momento quello che si sente deve essere quello che si
+vede. Distanza → volume (oltre 1500 px il suono non viene nemmeno costruito), scarto
+orizzontale → panning. Dentro un edificio funziona identico senza una riga di casi speciali,
+perché le coordinate della pianta e quelle della camera sono le stesse: cambia solo il taglio
+dei filtri, che è il muro. Corollario che è già costato un suono muto: **un suono generato
+prima di uno `snapTo`** (una porta, un teletrasporto) risulta a mezza Seoul di distanza e
+viene scartato — va chiamato dopo, come fa `shops.stepOutside`.
+
+**Un contesto audio sospeso non è innocuo.** Finché l'utente non tocca qualcosa il browser lo
+tiene fermo, e un contesto fermo ha l'orologio fermo: tutto quello che ci si programma dentro
+resta in coda e si accumula. Per questo `audio.ready` guarda `ctx.state === 'running'` e non
+"l'ho costruito", e finché è falso ogni chiamata di `audio.js` non fa niente.
+
 ---
 
 ## 4. Trappole già pagate — non reintrodurle
@@ -793,6 +847,9 @@ codice spiega il perché nel punto giusto.
 | **In una prova scriptata** «tengo premuto il mouse» non spara | `mouse.down = true` a mano non alza `mouse.pressed`, e le semiautomatiche guardano il fronte | si prova con un'arma `auto` (SMG, minigun) |
 | **In una prova scriptata** il contatto di una banda non c'è | le guardie nascono a scaglioni e a più di 300 px dal giocatore: due secondi non bastano | avvicinarsi da **fuori** dal recinto e aspettarne sette |
 | **In una prova scriptata** `player.attack(game)` esplode | la firma è `attack(game, spec)`: senza spec si legge `.melee` di `undefined` | `attack(game, WEAPONS[id])` |
+| L'ambiente copre gli spari | il rumore rosa è ~3× più forte del bianco a parità di guadagno, e i letti erano tarati a occhio: misurato, l'ambiente aveva **lo stesso rms di un colpo di pistola** | buffer rosa normalizzato in `audio.makeNoise`, guadagni dei letti scesi di 3×, e `audio-census.scene` per non rifarlo a occhio |
+| Una porta che si chiude non si sente | il suono nasceva **prima** di `camera.snapTo`, con l'ascoltatore ancora dentro la stanza: risultava a 2000 px e veniva scartato | `shops.stepOutside`, chiamata in coda alla funzione |
+| **In una prova scriptata** l'audio non suona mai | senza gesto dell'utente il contesto resta sospeso, e sospeso vuol dire orologio fermo | `probe.mjs` passa `--autoplay-policy=no-user-gesture-required`; la scena chiama `game.audio.unlock()` |
 | **In una prova scriptata** il ricercato torna a 0 da solo | il giocatore fermo allo spawn viene investito, oppure a cinque stelle la SWAT lo ammazza in ~8 s: la morte azzera tutto | metterlo su un marciapiede (`city.hospitals[i]`) e campionare entro 7 s |
 
 Regola generale emersa: **prima di dare la colpa all'AI, verifica la geometria.** Quasi tutti
@@ -1466,7 +1523,7 @@ differenza del 10% non significa niente». **Il valore resta 15,5.** Quello che 
 **il rumore di questa scena a configurazione ferma vale ~7%**: chi misura la prossima modifica
 alla guida sa sotto quale soglia non deve credersi.
 
-**Cuciture.** Cinque pezzi stavano a cavallo di file diversi**Cuciture.** Cinque pezzi stavano a cavallo di file diversi e sono stati collegati a parte:
+**Cuciture.** Cinque pezzi stavano a cavallo di file diversi e sono stati collegati a parte:
 l'anello del calore nel mirino; il peso proprio di un esplosivo nel ricercato (`blast` 6, cioè
 il doppio di uno sparo — due granate in strada fanno una stella); `fx.update(dt, game)`, che
 riporta la sbiadita del sangue dentro `Fx` invece di farla chiamare a `projectiles` solo per
@@ -1477,6 +1534,97 @@ commissariato.
 da 22 pozze), `update` in strada da 1,0 a 0,9-1,0 ms mediani, `update` dentro un negozio
 invariato a 0,2 ms. `city.stats` **identico** (`buildings 418, props 1299, blocks 122, nodes 196,
 edges 279, doglegs 4, stairs 3`): niente di tutto questo ha spostato una `rng` in generazione.
+
+### 5.13 Seoul fa rumore — audio procedurale
+
+Era la prima voce del §6 da quattro fasi: *«`game.audio` è ancora `null` e i quattro punti di
+chiamata esistenti girano a vuoto»*. Adesso c'è `src/core/audio.js` (~1100 righe) e i punti
+di chiamata sono sessantuno, sparsi in dodici file. **Nessun asset**: come la grafica nasce da
+path su canvas, il suono nasce da oscillatori, filtri e due buffer di rumore generati al boot.
+
+**Perché sintetizzare invece di registrare** non è solo il vincolo del §7. Un suono
+sintetizzato è *parametrico*, e in un gioco dove tutto il resto lo è già questo si paga da
+solo: il timbro di un'arma sono cinque numeri nella stessa tabella in cui c'è il danno; il
+motore cambia giro con la marcia e cilindrata con la massa del mezzo (un autobus non gira come
+una sportiva, e non è un secondo file); la sirena scivola di tono quando la volante ti supera,
+perché il Doppler è una moltiplicazione; la pioggia dentro un negozio è **la stessa** pioggia
+con il filtro spostato, cioè è il muro che si sente, non un campione «pioggia ovattata».
+
+**Due famiglie.** È la distinzione che regge tutto il file, e sta anche in §3:
+
+- **colpi secchi** — `shot`, `explosion`, `impact`, `melee`, `scream`, `ui`… Costruiscono due
+  o tre nodi, li programmano sull'orologio del contesto, finiscono in `_live` e `update` li
+  stacca quando hanno smesso. Tetto di **24 voci** insieme: una raffica di minigun dentro un
+  incendio con la folla che urla ne chiederebbe centinaia.
+- **letti continui** — `city rain wind sea engine traffic siren rotor fire skid spin`. Accesi
+  una volta e mai spenti: ogni frame si scrive il guadagno (smorzato in JS, non con rampe
+  programmate, che riempirebbero la coda di automazione senza suonare meglio).
+
+**Un solo ascoltatore, ed è la camera.** Distanza → volume, scarto orizzontale → panning,
+oltre 1500 px il suono non viene proprio costruito. Vale identico dentro un edificio: le
+coordinate della pianta sono quelle della camera, e non c'è un solo caso speciale per gli
+interni in tutto il file (§3).
+
+**Un letto per famiglia, non per entità.** Il traffico attorno è **un** letto che somma la
+velocità dei veicoli vicini, non quaranta motori; le sirene sono **una** voce agganciata alla
+volante più vicina, con il guadagno che cresce col numero delle altre. Quaranta oscillatori
+per quaranta auto sarebbero costati tutto il budget per una differenza che nessuno sente.
+
+**I punti di chiamata sono negli imbuti**, non nei chiamanti: `weapons.shoot` copre ogni
+bocca da fuoco del gioco (giocatore, polizia, teppisti, drive-by) con una riga sola;
+`projectiles.explode` ogni onda d'urto; `main.onVehicleImpact` ogni urto di lamiera, dal
+tamponamento del traffico allo schianto del giocatore. I passi non hanno nemmeno un punto di
+chiamata: `audio.updateWalk` li conta in **pixel percorsi** dal giocatore, che è l'unico modo
+di non farli sfasare con la corsa.
+
+**Cosa suona, in ordine di quanto si sente:** le undici armi (timbro per arma, con schiocco,
+corpo e coda che rimbalza fra i palazzi), esplosioni e molotov (che si *spacca*: vetro prima
+della vampata), il motore del mezzo che guidi, le sirene, gli urti, il rotore dell'elicottero,
+la pioggia e il tuono che arriva **dopo** il lampo con il ritardo del suono, il fondo urbano
+che scende con `urbanAt` e sale col traffico dell'ora, la risacca vicino alla costa, gli
+incendi che scoppiettano, le gomme, le canne della minigun che prendono giro, i passi (diversi
+sull'asfalto bagnato e sulle piastrelle di un negozio), le urla, il campanello della porta,
+il registratore di cassa, la stella che sale.
+
+**Il mixer** è nel menu di pausa (voce **Audio**): quattro volumi — generale, effetti,
+ambiente, interfaccia — che restano in `localStorage` sotto `seoul.audio`. `F4` è il muto.
+L'interfaccia ha un bus suo che **non passa dal compressore** e non viene abbassato in pausa:
+un clic di menu non deve schiacciare l'esplosione che c'è sotto, e in pausa dev'essere l'unica
+cosa che si sente. Il resto dei letti in pausa si abbassa al 22% invece di spegnersi: uno
+stacco netto suona come un guasto.
+
+**Misurare invece di ascoltare.** Nessuno ha una cassa in headless, e il primo mix «a
+occhio» era sbagliato di tre volte: `.claude/tools/scenes/audio-census.scene` attacca un
+analizzatore al master e riporta rms e picco. La misura che ha trovato il difetto:
+
+| | prima (a occhio) | adesso |
+| --- | --- | --- |
+| ambiente urbano, rms | 0,083 | **0,015** |
+| temporale, rms | 0,168 | 0,045 |
+| al volante, rms | 0,108 | 0,046 |
+| colpo di pistola, picco | 0,44 | 0,44 |
+
+L'ambiente aveva **lo stesso valore efficace di un colpo di pistola** e il temporale copriva
+le esplosioni. Due cause: i guadagni tarati senza sentirli, e il rumore rosa che a parità di
+guadagno è ~3× più forte del bianco (il filtro a un polo toglie energia, e la compensazione
+era esagerata). Nel sorgente non si vedeva niente. **Il rapporto da tenere d'occhio è
+ambiente contro colpo**: sotto un quarto del picco di una pistola.
+
+**Costo.** Il passo audio in JS è **0,04 ms per frame** — tre centesimi del budget, e non è
+lì che si spende: il grafo gira sul suo thread. Fianco a fianco con `main` sullo scenario
+peggiore (cinque stelle, minigun, 20-24 voci vive) la mediana degli fps passa da 33-35 a
+31-32, cioè dentro il rumore del container; nel caso normale (si guida in città) le due
+misure si sono invertite fra due esecuzioni, che è il modo in cui il rumore dice «qui non c'è
+niente da leggere». Il tetto delle voci regge: 20 su 24 in un minuto di esplosioni e incendi
+continui, e lo tocca solo la caccia a cinque stelle con l'automatica in mano — che è
+esattamente il momento per cui esiste.
+
+**Rimasto fuori, e perché.** Niente musica (è un'altra cosa: vuole scelte di regia, non un
+sintetizzatore); niente riverbero per interno/esterno (un `ConvolverNode` vuole una risposta
+all'impulso, cioè un asset, oppure una da generare — è la cosa più grossa che manca e si
+sentirebbe); niente voci vere per i pedoni (le urla sono stilizzate apposta: una formante con
+vibrato, tenuta piano perché di più suonerebbe finta invece che stilizzata); niente radio in
+macchina, che è la prima cosa che il giocatore cercherà e vuole musica.
 
 ---
 
@@ -1490,14 +1638,9 @@ di design vanno concordate con l'utente prima di scrivere codice** — è la pri
 in apertura di sessione.
 
 Quello che segue è quanto resta indietro, in ordine di quanto si sente. È molto più corto di
-prima: il §5.12 ha pagato diciannove voci di questo elenco.
+prima: il §5.12 ha pagato diciannove voci di questo elenco e il §5.13 ha chiuso l'audio.
 
 **Le cose che si sentono di più, oggi:**
-- **Niente audio.** `game.audio` è ancora `null` e i quattro punti di chiamata esistenti
-  (`honk`, `doorClose`) girano a vuoto con l'optional chaining. Un sintetizzatore WebAudio
-  procedurale — spari, motore, sirene, pioggia, l'insegna che ronza — è la cosa che manca di
-  più adesso che a schermo succede tutto. Non è difficile, è **diffuso**: i punti di chiamata
-  vanno messi in quasi tutti i file.
 - **Niente salvataggio.** Con del denaro in tasca, un arsenale comprato, un orologio che avanza
   e degli interni che si ricordano, chiudere la pagina butta via tutto. localStorage con 3 slot:
   la città è deterministica dalla seed, quindi si salvano solo giocatore, ricercato, orologio,
@@ -1505,6 +1648,21 @@ prima: il §5.12 ha pagato diciannove voci di questo elenco.
 - **Arresto (busted).** La polizia spara e basta, non ti carica in volante. Adesso che assedia
   la porta è anche più strano che non lo faccia. Vedi §5.5 per le ragioni per cui era stato
   rimandato: raddoppia i flussi di fine partita (celle, cauzione, arsenale confiscato).
+- **Niente musica e niente radio in macchina.** L'audio c'è (§5.13), la musica è un'altra
+  cosa: vuole scelte di regia — quanti pezzi, di che genere, quando parte, se si accende con
+  la chiave — ed è la prima che il giocatore cercherà girando la manopola. Da concordare.
+
+**Rimasto indietro dall'audio** (§5.13):
+- **Niente riverbero**: un vicolo, un 노래방 e il piazzale dell'aeroporto suonano nello stesso
+  spazio. È la cosa che manca di più. Un `ConvolverNode` vuole una risposta all'impulso, cioè
+  un asset — o una generata a runtime (rumore che decade, è fattibile in venti righe).
+- **Le armi dei nemici suonano come le tue**, solo un po' più piano: manca la coda lontana che
+  distingue «ti stanno sparando addosso» da «si spara da qualche parte».
+- **L'insegna non ronza e il 편의점 non ha la sua musichetta**: il fondo urbano è un letto solo
+  e non sa niente di cosa c'è attorno. Un letto per prop acceso costerebbe poco (le insegne
+  vicine sono già indicizzate) e caratterizzerebbe i quartieri di notte.
+- **Le urla sono una formante sola**: uomini, donne e vecchi urlano con lo stesso timbro, solo
+  con l'altezza spostata a caso.
 
 **Rimasto indietro dal ciclo giorno-notte** (§5.11):
 - **Il traffico non sa che piove**: frena alle stesse distanze e sul bagnato scoda in curva
@@ -1570,8 +1728,9 @@ prima: il §5.12 ha pagato diciannove voci di questo elenco.
 12 missioni in 3 atti con cutscene a **pannelli a fumetto** (gli interni sono anche il posto
 dove ambientarne metà: un incontro in un 노래방 non ha bisogno di niente di nuovo, un
 appuntamento può avere un'ora, e adesso una banda ha anche un motivo per parlarti); attività
-secondarie (taxi, consegne, salti); audio procedurale WebAudio e salvataggio localStorage, che
-sono in cima all'elenco qui sopra.
+secondarie (taxi, consegne, salti); salvataggio su localStorage, che è in cima all'elenco qui
+sopra. **L'audio procedurale, che stava in questa riga da quattro fasi, è fatto** (§5.13):
+resta la musica, che è una scelta di regia e non un sintetizzatore.
 
 ## 7. Vincoli e convenzioni
 
@@ -1722,6 +1881,16 @@ sono in cima all'elenco qui sopra.
 | Luce dalla porta di un interno | `interiorscene.drawDoorLight` | profondità `34 + 78 × (1 − lamps)` px |
 | Raccolte in campagna e sui moli | `pickups.RURAL_TABLE` / `PIER_TABLE` / `placeRural` | 32% dei campi · 85% dei moli del porto, 30% degli scali sul Han (43 raccolte in tutto) |
 | Limite pixel canvas | `main.MAX_PIXELS` | 2.9 M (scala il DPR) |
+| **— audio (§5.13) —** | | |
+| Portata dell'ascolto · panorama stereo | `audio.HEAR` / `PAN_W` | 1500 px (oltre non si costruisce) · 760 px di scarto = tutto da un lato |
+| Tetto delle voci brevi | `audio.MAX_VOICES` | 24 (mai superate 20 in un minuto di esplosioni) |
+| Volumi di fabbrica | `audio.DEFAULT_MIX` · `localStorage` `seoul.audio` | master 0.7 · effetti 1 · ambiente 0.8 · interfaccia 0.75 |
+| Timbro delle armi | `audio.GUN_TONE` · `gunTone(spec)` | 6 righe a mano; le altre armi lo ricavano da danno e cadenza |
+| Fondo urbano · pioggia · vento · mare | `audio.updateBeds` | `0.014 + urbanAt × 0.042` · `rain × 0.085` (0.028 dentro) · `0.008 + wind × 0.038` · 0.05 sulla battigia |
+| Motore | `audio.updateVehicles` | base `64/√massa`, 3,4 marce finte, `0.028 + rpm × 0.036` |
+| Sirena · rotore | `audio.updatePolice` | `0.022 + 0.04 × vicinanza`, ×1.6 max col numero · 0.06 (polizia) / 0.09 (il tuo) |
+| Attenuazione in pausa | `audio.updateBeds` (`duck`) | 22% sui letti, interfaccia a volume pieno |
+| Passo del giocatore | `audio.updateWalk` | uno ogni 34 px percorsi, sopra 18 px/s |
 
 ---
 
@@ -1748,6 +1917,10 @@ node .claude/tools/probe.mjs --seconds 3 --script /tmp/scena.js --shot /tmp/scen
 (armi addosso, cinque stelle, un lancio) e si aspetta il risultato — il loop continua a
 girare mentre lo script attende. Dentro c'è `game`, e si può `await import('/src/...')`.
 
+Chromium parte con `--autoplay-policy=no-user-gesture-required` e `--mute-audio`: l'audio è
+**misurabile anche headless** (basta `game.audio.unlock()` in testa alla scena) ma non viene
+mandato a una scheda audio, che in un container non c'è.
+
 Le trappole delle prove scriptate (mira dal cursore, camera smorzata, griglie ricostruite ogni
 frame, il giocatore fermo che muore) sono in §4, in fondo: leggerle prima di dare la colpa al
 codice.
@@ -1763,6 +1936,7 @@ e un `return` a livello di file lo farebbe fallire.
 | --- | --- |
 | `traffic-census.scene` | urti al minuto e loro tipo, flusso in px/min per veicolo, su cinque zone. È la misura con cui è stato tarato §5.10 — e l'unica onesta per giudicare una modifica alla guida AI **o al ciclo del semaforo** (`roadgraph.SIGNAL_CYCLE`, che dalla §5.12 è una manopola sola: il giallo è fisso e il verde si prende quello che avanza) |
 | `daylight-sweep.scene` | la luce ora per ora su tutto il giro, più quattro campioni col temporale. Serve a vedere in una tabella quello che altrimenti vuole ventiquattro screenshot: tinta, velo caldo, lampioni, ombre, popolamento |
+| `audio-census.scene` | **livelli veri dell'audio**: un analizzatore sul master dà rms e picco di ogni scenario (ambiente, temporale, motore, caccia) e il picco di ogni arma, più voci vive e costo in ms. È l'unico modo di bilanciare senza una cassa, ed è quello che ha trovato l'ambiente tarato tre volte troppo alto (§5.13) |
 
 ⚠️ **Una misura alla volta.** La scena cambia zona a tempo di *orologio*, non di simulazione:
 due censimenti che girano insieme sulla stessa macchina si rubano la CPU e i teletrasporti
@@ -1797,7 +1971,7 @@ davvero. È la procedura con cui il protagonista è stato rifatto tre volte, aut
 
 ### Skill
 
-Quattro, invocabili anche a mano con `/nome`:
+Cinque, invocabili anche a mano con `/nome`:
 
 | Skill | Quando |
 | --- | --- |
@@ -1805,3 +1979,4 @@ Quattro, invocabili anche a mano con `/nome`:
 | `/seoul-arma` | aggiungere o bilanciare un'arma: i sette punti che devono combaciare |
 | `/seoul-sprite` | disegnare o correggere uno sprite generato |
 | `/seoul-citta` | toccare la generazione senza rompere il determinismo o il traffico |
+| `/seoul-suono` | aggiungere o bilanciare un suono: colpo secco o letto continuo, e come si misura |
