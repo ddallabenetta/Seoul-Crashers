@@ -133,7 +133,8 @@ Cosa guardare, e cosa significa se è sbagliato:
   la porta, e una mina rimasta armata vive in coordinate che fuori cadono in un angolo della
   mappa.
 
-I valori attesi completi stanno in HANDOFF.md §1 e §8. Confrontali sempre **prima e dopo**
+I valori attesi completi stanno in `docs/verifica.md` (§1) e `docs/parametri.md` (§8).
+Confrontali sempre **prima e dopo**
 la modifica: in headless gli fps assoluti sono più bassi che su una macchina vera (48-54
 invece di 60), quindi vale il delta, non il numero.
 
