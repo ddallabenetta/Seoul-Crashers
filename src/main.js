@@ -2,6 +2,8 @@
 import { Loop } from './core/loop.js';
 import { Input } from './core/input.js';
 import { Rng } from './core/rng.js';
+import { AudioSystem } from './core/audio.js';
+import { Radio } from './core/radio.js';
 import { DynamicGrid } from './core/spatial.js';
 import { KMH, clamp, dist } from './core/math.js';
 import { generateCity } from './world/citygen.js';
@@ -50,7 +52,10 @@ class Game {
     this.peds = [];
     this.markers = [];
     this.fx = new Fx();
-    this.audio = null; // sintetizzatore WebAudio: arriva nella fase 3
+    this.audio = new AudioSystem();
+    // La radio è l'unica cosa del gioco che parla con la rete, e non lo fa
+    // finché il giocatore non la accende (§5.14).
+    this.radio = new Radio(this.audio);
     this.stats = {
       distance: 0,
       topSpeed: 0,
@@ -69,6 +74,27 @@ class Game {
     };
     this._skidT = 0;
     window.addEventListener('resize', () => this.resize());
+    this.armAudio();
+  }
+
+  /**
+   * L'audio non può partire prima che l'utente tocchi qualcosa: è una regola dei
+   * browser, non una scelta. Il contesto si crea al primo tasto o al primo click e
+   * fino a lì `AudioSystem` non fa niente. La scheda nascosta va sospesa a mano:
+   * il loop si ferma con `requestAnimationFrame`, i letti continui no.
+   */
+  armAudio() {
+    const start = () => {
+      this.audio.unlock();
+      if (!this.audio.ready) return;
+      window.removeEventListener('pointerdown', start);
+      window.removeEventListener('keydown', start);
+    };
+    window.addEventListener('pointerdown', start);
+    window.addEventListener('keydown', start);
+    document.addEventListener('visibilitychange', () => {
+      this.audio.setActive(!document.hidden);
+    });
   }
 
   resize() {
@@ -180,6 +206,9 @@ class Game {
 
   onVehicleImpact(v, impact) {
     const isPlayer = v.driver === 'player';
+    // Sotto i 30 px/s è lo strisciare di un paraurti in coda: farlo suonare
+    // riempirebbe la strada di lamiere a ogni semaforo.
+    if (impact > 30) this.audio.impact(v.x, v.y, impact);
     if (impact > 90) {
       this.fx.addSparks(v.x, v.y, -v.vx, -v.vy, Math.min(14, impact / 22));
       if (isPlayer) {
@@ -192,6 +221,7 @@ class Game {
 
   onVehicleDestroyed(v) {
     this.fx.addExplosion(v.x, v.y);
+    this.audio.explosion(v.x, v.y, 1.15);
     if (dist(v.x, v.y, this.player.x, this.player.y) < 900) {
       this.camera.addShake(18);
     }
@@ -224,6 +254,7 @@ class Game {
    */
   onVehicleSunk(v) {
     this.fx.addSplash(v.x, v.y, 22, 1.6);
+    this.audio.splash(v.x, v.y, 1.6);
     if (v.driver === 'player') {
       this.player.exitVehicle(this, true);
       this.hud.toast('Sei finito in acqua', 2.4);
@@ -251,15 +282,39 @@ class Game {
       }
     }
     this.fx.addBlood(p.x, p.y, clamp(speed / 220, 0.5, 1.6));
+    this.audio.bodyFall(p.x, p.y);
+    // Investito, non colpito: il grido è quello di chi ha visto la macchina
+    // arrivare. Chi muore di piombo cade e basta.
+    if (v && Math.random() < 0.6) this.audio.scream(p.x, p.y, 1.1);
     if (v) {
       this.fx.addDust(p.x, p.y, v.vx, v.vy, 3);
       if (v.driver === 'player') this.camera.addShake(6);
     }
   }
 
+  /**
+   * Manopola della radio. Sta qui e non in `player` perché si usa in due posti —
+   * al volante e dentro un locale — e in nessuno dei due è un'azione del
+   * personaggio. Premerla dove non si sentirebbe niente lo dice, invece di
+   * aprire uno stream muto.
+   */
+  updateRadioKeys() {
+    if (!this.input.wasPressed('KeyR') || this.paused) return;
+    const shift = this.input.anyDown('ShiftLeft', 'ShiftRight');
+    const inCar = !this.player.onFoot && this.player.vehicle;
+    const inShop = this.indoors && this.shops.floor?.openNow && this.shops.floor?.biz.radio;
+    if (!inCar && !inShop) {
+      this.hud.toast('La radio è in macchina (o in un locale che ce l\'ha)', 1.8);
+      return;
+    }
+    if (shift) this.radio.off(this);
+    else this.radio.next(this);
+  }
+
   onPlayerDeath() {
     this.stats.deaths++;
     this.camera.addShake(16);
+    this.audio.playerDown();
   }
 
   // --- combattimento ---------------------------------------------------------
@@ -328,19 +383,31 @@ class Game {
     const input = this.input;
 
     if (input.wasPressed('Escape')) {
+      // `backOut` è il pannello audio del menu: ESC lì dentro torna alle voci
+      // invece di chiudere tutto.
       if (this.shopMenu.open) this.shopMenu.close(this);
-      else if (this.mapView.open) this.mapView.open = false;
-      else this.menu.toggle();
+      else if (this.mapView.open) { this.mapView.open = false; this.audio.ui('close'); }
+      else if (!this.menu.backOut()) { this.menu.toggle(); this.audio.ui(this.menu.open ? 'open' : 'close'); }
+      else this.audio.ui('close');
     }
     // La mappa della città non serve dentro un negozio: le coordinate sono quelle
     // della pianta, e il puntino finirebbe in un angolo di Seoul a caso.
     if (input.wasPressed('KeyM') && !this.shopMenu.open && !this.indoors) {
       if (this.menu.open) this.menu.open = false;
       this.mapView.toggle();
+      this.audio.ui(this.mapView.open ? 'open' : 'close');
     }
     if (input.wasPressed('F3')) this.debug = !this.debug;
+    if (input.wasPressed('F4')) {
+      this.hud.toast(this.audio.toggleMute() ? 'Audio: muto' : 'Audio: acceso', 1.6);
+    }
 
     this.paused = this.menu.open || this.mapView.open || this.shopMenu.open;
+    this.updateRadioKeys();
+    // L'audio gira anche in pausa: i letti si abbassano invece di spegnersi (uno
+    // stacco netto suona come un guasto) e i suoni dei menu restano a volume pieno.
+    this.audio.update(dt, this);
+    this.radio.update(dt, this);
     const cursor = this.paused ? 'default' : 'none';
     if (this.canvas.style.cursor !== cursor) this.canvas.style.cursor = cursor;
 

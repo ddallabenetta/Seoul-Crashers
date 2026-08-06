@@ -101,6 +101,7 @@ export class WantedSystem {
     this.lastY = door ? door.y : game.player.y;
     if (this.level > before) {
       game.hud.toast(`수배 ${this.stars}`, 2.2);
+      game.audio?.star(true);
       game.stats.maxWanted = Math.max(game.stats.maxWanted || 0, this.level);
     }
   }
@@ -134,6 +135,7 @@ export class WantedSystem {
     this.level = Math.max(0, this.level - 1);
     this.heat = LEVEL_HEAT[this.level];
     this.unseenT = 0;
+    game.audio?.star(false);
     if (this.level === 0) game.hud.toast('Li hai seminati', 2.4);
   }
 

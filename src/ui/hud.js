@@ -55,7 +55,10 @@ export class Hud {
 
     if (game.indoors) this.drawFloorPlan(ctx, game, 22, h - MINIMAP - 22);
     else this.drawMinimap(ctx, game, 22, h - MINIMAP - 22);
-    if (!game.player.onFoot) this.drawSpeedo(ctx, game, w - 132, h - 112);
+    if (!game.player.onFoot) {
+      this.drawSpeedo(ctx, game, w - 132, h - 112);
+      this.drawRadio(ctx, game, w - 18, h - 154);
+    }
     this.drawWeaponBar(ctx, game, w, h);
     this.drawVitals(ctx, game, 22, 22);
     this.drawMoney(ctx, game, 22, 88);
@@ -796,6 +799,45 @@ export class Hud {
       ctx.fillStyle = 'rgba(230,235,245,0.45)';
       ctx.fillText('QUOTA', cx, cy - 32);
     }
+    ctx.restore();
+  }
+
+  /**
+   * Autoradio: sta sopra il tachimetro, allineata al suo bordo destro. Si vede
+   * anche da spenta — è l'unico posto in cui il tasto `R` si racconta da solo,
+   * e una radio che non si sa di avere è una radio che nessuno accende.
+   */
+  drawRadio(ctx, game, right, y) {
+    const r = game.radio;
+    if (!r) return;
+    const on = r.on;
+    const text = on ? r.label : 'R  —  radio';
+    ctx.save();
+    ctx.font = '600 12px system-ui, "Apple SD Gothic Neo", sans-serif';
+    const tw = Math.min(230, ctx.measureText(text).width);
+    const pad = on ? 34 : 14;
+    const bw = tw + pad + 14;
+    const x = right - bw;
+    ctx.fillStyle = on ? 'rgba(12,14,18,0.74)' : 'rgba(12,14,18,0.44)';
+    roundPath(ctx, x, y, bw, 26, 8);
+    ctx.fill();
+    ctx.strokeStyle = on ? 'rgba(56,214,255,0.34)' : 'rgba(255,255,255,0.1)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    if (on) {
+      // Tre tacche di segnale invece di una scritta: dicono "sta agganciando"
+      // senza rubare spazio al nome della stazione.
+      const lit = r.state === 'acceso' ? 3 : (Math.floor(game.time * 4) % 3) + 1;
+      for (let i = 0; i < 3; i++) {
+        ctx.fillStyle = i < lit ? '#38d6ff' : 'rgba(120,140,160,0.35)';
+        ctx.fillRect(x + 12 + i * 5, y + 17 - i * 4, 3, 4 + i * 4);
+      }
+    }
+    ctx.textAlign = 'left';
+    ctx.fillStyle = on ? '#eef1f6' : 'rgba(235,240,250,0.6)';
+    // `maxWidth` invece di tagliare a mano: i nomi coreani sono corti in glifi e
+    // larghi in pixel, e una troncatura per caratteri sbaglia sempre.
+    ctx.fillText(text, x + pad, y + 17, tw);
     ctx.restore();
   }
 

@@ -132,6 +132,23 @@ I valori attesi completi stanno in HANDOFF.md §1 e §8. Confrontali sempre **pr
 la modifica: in headless gli fps assoluti sono più bassi che su una macchina vera (48-54
 invece di 60), quindi vale il delta, non il numero.
 
+## Verificare l'audio
+
+`probe.mjs` avvia Chromium con `--autoplay-policy=no-user-gesture-required`, quindi l'audio
+**si può misurare anche headless**: basta `game.audio.unlock()` all'inizio della scena (nel
+gioco vero lo fa il primo clic). Non si ascolta, si misura — un analizzatore attaccato al
+master dà valore efficace e picco:
+
+```bash
+node .claude/tools/probe.mjs --seconds 2 --quiet \
+  --script .claude/tools/scenes/audio-census.scene
+```
+
+`game.audio.stats` è l'istantanea da console: stato del contesto, voci vive (tetto 24) e
+guadagno di ogni letto continuo. Se `stato` non è `running`, non è partito niente e ogni
+altra misura è zero per un motivo che non c'entra con la modifica. Dettagli e soglie in
+`/seoul-suono`.
+
 ## Regola
 
 Non dire che una modifica funziona se non l'hai vista funzionare. Uno screenshot o una misura
