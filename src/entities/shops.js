@@ -36,9 +36,12 @@
 // - **Al piano terra c'è una seconda uscita**, dove dietro l'edificio c'è posto per
 //   metterci i piedi (`backDoorSpot`). Senza, con la polizia sulla porta, entrare
 //   in un negozio sarebbe solo un modo più lento di farsi prendere.
+// - **Anche le bande hanno un banco** (`gangMarket`, `gangStock`, `updateTurf`).
+//   Non è un negozio in più: è lo stesso listino con un mercato piegato dal
+//   mestiere della banda, in un posto dove si entra solo a mani vuote.
 import { Rng } from '../core/rng.js';
 import { clamp, damp, dist, approachAngle, circleRectPush, pointInRect } from '../core/math.js';
-import { createPed } from './pedestrians.js';
+import { createPed, canDeal } from './pedestrians.js';
 import { WEAPONS, shoot, hasLineOfSight } from './weapons.js';
 import { buildInterior, BUSINESSES, bizOpenAt, clockLabel, crowdAt, rushAt } from '../world/interiors.js';
 import { HERO_OUTFITS, VEHICLE_COLORS, VEHICLE_TYPES } from '../render/sprites.js';
@@ -53,6 +56,7 @@ const OUTFIT_PRICE = 40000;
 // accostare — un'auto ferma al cordolo ha il centro a mezza corsia dalla porta.
 const SELL_REACH = 108;
 const ALARM_DELAY = 17;  // secondi fra il testimone che vede e la centrale che sa
+const DEAL_REACH = 54;   // quanto ci si avvicina al 거래책 di un territorio
 
 /** ₩ con i punti delle migliaia: un prezzo a sei cifre senza va solo letto male. */
 export function won(n) {
@@ -100,6 +104,49 @@ export function marketFor(game) {
   return marketOf(shop ? shop.district : game.player.district && game.player.district.id);
 }
 
+// --- il mercato delle bande ---------------------------------------------------
+//
+// Una banda non ha un listino suo: ha **il mercato del suo quartiere piegato dal
+// suo mestiere**, e solo per quello. È la ragione per cui esistono i territori
+// come posti di scambio — i 전당포 stanno in quattro distretti su sette, i
+// territori no — e il motivo per cui conviene attraversare Seoul con la merce.
+//
+// I numeri non sono liberi: messi insieme al listino dei negozi devono restare
+// **una catena in perdita**, o comprare in un posto e rivendere in un altro
+// diventa una zecca. Il conto, in frazioni del listino di `WEAPONS`:
+//
+//   arma nuova più economica possibile = 백호파 0.88 × 인천항 0.68 = 0.598
+//   usato più economico possibile      = 전당포 0.72 × 이태원 0.92 = 0.662
+//   quanto ricompra al massimo il ricettatore                      = 0.56 ← `FENCE_CAP`
+//
+// `FENCE_CAP` sta sotto tutte e due, quindi qualunque giro chiude in perdita di
+// almeno il 6%. Quello che il ricettatore paga davvero è la roba **che non hai
+// comprato**: un fucile di precisione raccolto in un cortile vale ₩347.000 da lui
+// e ₩297.500 al banco dei pegni di 이태원.
+const GANG_GUNS = 0.88;    // 백호파: sotto il 총포상 dello stesso quartiere
+const GANG_AMMO = 0.88;
+const SMUGGLE = 1.18;      // 흑사파: quello che nei negozi non c'è si paga
+const CHOP = 1.42;         // 철마파: quanto più del 전당포 vale un mezzo rubato
+const FENCE_BONUS = 0.14;  // 황소파: quanti punti sopra la ricompra del quartiere
+const FENCE_CAP = 0.56;
+
+/**
+ * Il mercato con cui tratta una banda. È il mercato del distretto con una sola
+ * voce spostata — quella del suo mestiere — così il pannello del listino continua
+ * a disegnare lo scostamento dal listino di Seoul senza sapere niente di bande.
+ */
+export function gangMarket(gangId, m) {
+  switch (gangId) {
+    case 'baekho': return { ...m, guns: m.guns * GANG_GUNS, ammo: m.ammo * GANG_AMMO };
+    // Il contrabbandiere vende cure ed esplosivi: per lui `goods` è il prezzo di
+    // tutto, armi comprese, perché quello che tratta non ha un listino ufficiale.
+    case 'heuksa': return { ...m, guns: m.goods * SMUGGLE, goods: m.goods * SMUGGLE };
+    case 'cheolma': return { ...m, cars: m.cars * CHOP };
+    case 'hwangso': return { ...m, pawn: Math.min(m.pawn + FENCE_BONUS, FENCE_CAP) };
+    default: return m;
+  }
+}
+
 /** Un prezzo di mercato resta un prezzo da cartello: niente ₩2.763. */
 function roundPrice(n) {
   const step = n < 20000 ? 100 : 500;
@@ -141,8 +188,10 @@ function weaponItem(id, m, used = 1) {
     price: roundPrice(base * m.guns),
     detail: (game) => {
       if (s.infinite) return 'non finisce mai';
-      if (game.player.owned.has(id)) return `ce l'hai già: ricarica ${s.pickup * 2} colpi`;
-      return `${s.pickup * 2} colpi inclusi`;
+      // Gli esplosivi si contano a pezzi: «10 colpi di molotov» non lo dice nessuno.
+      const unit = s.thrown ? 'pezzi' : 'colpi';
+      if (game.player.owned.has(id)) return `ce l'hai già: altri ${s.pickup * 2} ${unit}`;
+      return `${s.pickup * 2} ${unit} inclusi`;
     },
     buy(game) {
       game.player.giveWeapon(id, s.pickup ? s.pickup * 2 : 0);
@@ -284,6 +333,81 @@ export function stockFor(bizId, game) {
     default:
       return [];
   }
+}
+
+/**
+ * Il banco di una banda. Tre mestieri su quattro passano da qui — il quarto
+ * (철마파) compra mezzi e non ha un listino da leggere, si tratta col mezzo
+ * davanti e il tasto `F`, come al 전당포.
+ *
+ * Le armi comprate da una banda **finiscono in borsa, non in mano**: chi entra in
+ * un territorio con un ferro in pugno diventa un bersaglio (`pedestrians.watchTurfs`),
+ * e senza questa riga comprare una pistola dai 백호파 vorrebbe dire farsi sparare
+ * dai 백호파 mezzo secondo dopo averli pagati.
+ */
+export function gangStock(turf, game) {
+  const m = gangMarket(turf.gang, marketOf(turf.district));
+  switch (turf.gang) {
+    case 'baekho': {
+      // Sono la fonte, quindi hanno anche quello che un 총포상 non tiene in
+      // vetrina: il fucile di precisione, la minigun e le loro munizioni, che
+      // altrimenti in tutta Seoul non si comprano da nessuna parte.
+      const list = [
+        weaponItem('pistol', m), weaponItem('shotgun', m), weaponItem('smg', m),
+        weaponItem('rifle', m), weaponItem('sniper', m), weaponItem('minigun', m),
+        ammoItem('sniper', m), ammoItem('minigun', m),
+      ];
+      for (const it of list) bagged(it);
+      return list;
+    }
+    case 'heuksa': {
+      const list = [
+        weaponItem('molotov', m), weaponItem('grenade', m), weaponItem('mine', m),
+        healItem('pain', 'antidolorifici', '진통제', 12000, 45, m),
+        healItem('kit', 'kit di pronto soccorso', '구급상자', 26000, 100, m),
+      ];
+      for (const it of list) bagged(it);
+      return list;
+    }
+    case 'hwangso': {
+      const pct = Math.round(m.pawn * 100);
+      const list = [];
+      for (const id of game.player.owned) {
+        const s = WEAPONS[id];
+        if (!s || s.infinite || !s.price) continue;
+        list.push({
+          key: `s:${id}`,
+          label: `vendi ${s.label}`,
+          hangul: '팝니다',
+          base: -Math.round(s.price * MARKET_BASE.pawn),
+          mul: m.pawn / MARKET_BASE.pawn,
+          price: -roundPrice(s.price * m.pawn),
+          detail: () => `${pct}% e nessuna domanda`,
+          buy(game) {
+            game.player.owned.delete(id);
+            game.player.ammo[id] = 0;
+            if (game.player.weapon === id) game.player.setWeapon('fists');
+            return `${s.label} venduta`;
+          },
+        });
+      }
+      return list;
+    }
+    default:
+      return [];
+  }
+}
+
+/** Comprata da una banda: te la mettono in borsa, non in mano. Vedi `gangStock`. */
+function bagged(item) {
+  const buy = item.buy;
+  item.buy = (game) => {
+    const held = game.player.weapon;
+    const msg = buy(game);
+    if (msg !== null && game.player.weapon !== held) game.player.setWeapon(held);
+    return msg;
+  };
+  return item;
 }
 
 // --- sistema ------------------------------------------------------------------
@@ -676,6 +800,8 @@ export class ShopSystem {
       }
     }
 
+    this.updateTurf(game);
+
     for (const a of this.actions) {
       if (game.input.wasPressed(`Key${a.key}`) && game.player.enterCooldown <= 0) {
         game.player.enterCooldown = 0.35;
@@ -868,9 +994,14 @@ export class ShopSystem {
    * relitto: se restasse in `game.vehicles` continuerebbe a girare la sua AI in
    * mezzo alla strada dopo essere stato pagato. E lo stallo va liberato, o quel
    * posto auto resta occupato da un fantasma per il resto della partita.
+   *
+   * `place` è la vetrina del 전당포 **oppure** un territorio: hanno tutti e due un
+   * `district` e un'insegna, che è tutto quello che serve qui. Con `gang` il prezzo
+   * passa dal mercato della banda (la chop shop paga di più, vedi `gangMarket`).
    */
-  sellVehicle(v, shop, game) {
-    const price = this.vehiclePrice(v, marketOf(shop.district));
+  sellVehicle(v, place, game, gang = null) {
+    const m = marketOf(place.district);
+    const price = this.vehiclePrice(v, gang ? gangMarket(gang, m) : m);
     game.player.money += price;
     this.sold++;
     game.stats.soldCars = (game.stats.soldCars || 0) + 1;
@@ -882,7 +1013,82 @@ export class ShopSystem {
     const i = game.vehicles.indexOf(v);
     if (i >= 0) game.vehicles.splice(i, 1);
     game.fx.addSmoke(v.x, v.y, 4, 1.3);
-    game.hud.toast(`전당포 — ${won(price)} per ${VEHICLE_TYPES[v.kind].label}, e non l'hai mai vista`, 3.2);
+    const sign = gang ? place.hangul : '전당포';
+    game.hud.toast(`${sign} — ${won(price)} per ${VEHICLE_TYPES[v.kind].label}, e non l'hai mai vista`, 3.2);
+  }
+
+  // --- il banco delle bande -----------------------------------------------------
+
+  /**
+   * Il 거래책 di un territorio, se c'è. Uno degli uomini di guardia lo è
+   * (`pedestrians.spawnTurf`), e si riconosce a vista dal segno che porta addosso
+   * (`render/scene.js`). Non è invulnerabile: steso lui il territorio smette di
+   * commerciare finché non ne compare un altro.
+   *
+   * Il controllo su `state` non è una ridondanza: un uomo che è stato provocato e
+   * poi si è calmato torna a fare il passante (`updatePed`, case `hostile`), e
+   * senza questa riga si finirebbe per trattare con un tizio che cammina in
+   * mezzo alla strada tre isolati più in là.
+   */
+  dealerOf(turf) {
+    return canDeal(turf, turf.dealer) ? turf.dealer : null;
+  }
+
+
+  /**
+   * Trattare con una banda. **Solo a mani vuote e senza stelle**: è la stessa
+   * soglia con cui `pedestrians.watchTurfs` decide se prendersela con te, e da
+   * qui in poi quella regola non è più solo un modo di farsi sparare — è l'unica
+   * porta d'ingresso a un mercato che i negozi non hanno.
+   *
+   * I 철마파 fanno eccezione e comprano mezzi: lì si arriva **guidando**, e il
+   * tasto è `F` come al banco dei pegni. Un pannello che elenca l'auto che hai
+   * parcheggiato dietro sarebbe una lista di un elemento solo, e `E` sul 거래책
+   * ruberebbe il tasto a chi vuole solo risalire in macchina.
+   */
+  updateTurf(game) {
+    const pl = game.player;
+    if (pl.dying) return;
+    const reach = pl.onFoot ? DEAL_REACH : SELL_REACH;
+    let turf = null;
+    let dealer = null;
+    let best = reach;
+    for (const t of this.city.turfs || []) {
+      const d = this.dealerOf(t);
+      if (!d) continue;
+      const dd = dist(pl.x, pl.y, d.x, d.y);
+      if (dd < best) { best = dd; turf = t; dealer = d; }
+    }
+    if (!turf) return;
+
+    if (turf.gang === 'cheolma') {
+      const { v, cop } = this.vehicleAtDoor(dealer, game);
+      if (v) {
+        const price = this.vehiclePrice(v, gangMarket('cheolma', marketOf(turf.district)));
+        this.actions.push({
+          key: 'F',
+          text: `${turf.hangul} — vendi ${VEHICLE_TYPES[v.kind].label} · ${won(price)}`,
+          run: () => this.sellVehicle(v, turf, game, 'cheolma'),
+        });
+      } else {
+        this.actions.push({
+          key: 'F',
+          text: `${turf.hangul} — comprano mezzi, non chiacchiere`,
+          run: () => game.hud.toast(`${turf.hangul} — «portala qui davanti e ferma»${cop ? ', ma non una volante' : ''}`, 2.6),
+        });
+      }
+      return;
+    }
+
+    if (!pl.onFoot || pl.weapon !== 'fists' || game.wanted.level > 0) return;
+    // Come per la porta di un negozio: il giocatore deve saperlo *prima* di
+    // premere `E`, o si ritrova in macchina invece che davanti al listino.
+    this.near = turf;
+    this.actions.push({
+      key: 'E',
+      text: `${turf.hangul} — ${turf.trade}`,
+      run: () => game.shopMenu.showStock(gangCounter(turf), () => gangStock(turf, game), game),
+    });
   }
 
   /** Officina: ci si guida dentro, si paga, si esce puliti. */
@@ -1105,6 +1311,25 @@ export class ShopSystem {
     game.wanted.report('rob', game, { mul: 0.55 });
     game.hud.toast('112 — «rapina in corso», e hanno il tuo indirizzo', 3.2);
   }
+}
+
+/**
+ * L'intestazione del pannello quando il banco è un territorio. Il pannello non sa
+ * niente di bande: sa disegnare un'insegna, un mestiere, un colore e un orario.
+ * Qui l'insegna è il nome della banda, il colore è il suo (lo stesso del tag a
+ * terra e del blip sulla mappa) e l'orario è che non ce n'è.
+ */
+function gangCounter(turf) {
+  return {
+    hangul: turf.hangul,
+    label: turf.trade,
+    accent: turf.color,
+    // Dove sta il banco, al posto dell'orario: una banda non chiude, e di 백호파
+    // ce n'è più di un cortile. Quale dei due sei riuscito a raggiungere conta
+    // più di un cartello con gli orari che non ci sono.
+    hours: `· ${turf.place.toUpperCase()}`,
+    market: marketOf(turf.district),
+  };
 }
 
 /** Un punto in cui un pedone ci sta: niente solidi, niente acqua, niente bordo mappa. */

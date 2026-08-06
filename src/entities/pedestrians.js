@@ -75,6 +75,7 @@ export function createPed(kind, x, y, rng) {
     hostile: false,
     armed,
     turf: null,       // territorio presidiato: lo guida lo stato `guard`
+    dealer: false,    // 거래책: l'uomo con cui si tratta (vedi `spawnTurf`)
     cop: false,       // in servizio: lo stato lo guida `police.copBehavior`
     copWeapon: null,
     gone: false,      // despawnato dallo streaming (vedi `stream`)
@@ -98,6 +99,47 @@ export function createPed(kind, x, y, rng) {
     // esce prima e chi aspetta l'ultima goccia.
     rainOut: rng.range(0.08, 0.3),
   };
+}
+
+/**
+ * Chi può fare il 거래책 di un territorio. Il criterio è **dov'è**, non come si
+ * sente: chiedere `state === 'guard'` sembrava più sicuro e chiudeva il banco al
+ * primo spavento — un'auto che accosta, un tamponamento a due isolati, un allarme
+ * — cioè quasi sempre. Fuori dal recinto invece non si tratta davvero: uno che sta
+ * scappando per strada non è il contatto di nessuno.
+ */
+export function canDeal(t, d) {
+  return !!d && !d.dead && !d.gone && !d.hostile && d.turf === t
+    && d.x > t.x - 80 && d.x < t.x + t.w + 80
+    && d.y > t.y - 80 && d.y < t.y + t.h + 80;
+}
+
+function dealerLost(t) {
+  return !canDeal(t, t.dealer);
+}
+
+/**
+ * Il contatto va rimpiazzato, ma non subito se lo hai steso tu. Senza rimpiazzo un
+ * territorio resta senza banco per il resto della partita appena lo streaming si
+ * porta via il 거래책 — e succede da solo, standogli lontano un minuto. Con un
+ * rimpiazzo istantaneo, invece, sparargli non costerebbe niente.
+ */
+const DEALER_WAIT = 18;
+
+function refreshDealer(t, peds, dt) {
+  if (!dealerLost(t)) { t.dealerT = 0; return; }
+  // Steso: si aspetta. Sparito dallo streaming: subentra il primo che c'è.
+  const killed = t.dealer && t.dealer.dead;
+  t.dealerT = (t.dealerT || 0) + dt;
+  if (killed && t.dealerT < DEALER_WAIT) return;
+  for (const p of peds) {
+    if (!canDeal(t, p)) continue;
+    if (t.dealer) t.dealer.dealer = false;
+    t.dealer = p;
+    p.dealer = true;
+    t.dealerT = 0;
+    return;
+  }
 }
 
 /** Punto centrale del marciapiede per lato/t di un isolato. */
@@ -132,15 +174,19 @@ export class PedestrianSystem {
    * banda che ti lascia passeggiare in mezzo ai suoi affari non è una banda.
    * Passarci disarmati e in fretta si può: è l'unica via per andare a trattare.
    */
-  watchTurfs(game) {
+  watchTurfs(game, dt = 0) {
     const pl = game.player;
+    for (const t of this.city.turfs || []) refreshDealer(t, this.peds, dt);
     if (pl.dying) return;
     const provoking = pl.weapon !== 'fists' || (game.wanted && game.wanted.level > 0);
     for (const t of this.city.turfs || []) {
       const inside = pl.x > t.x - 40 && pl.x < t.x + t.w + 40 && pl.y > t.y - 40 && pl.y < t.y + t.h + 40;
       if (inside && !t.warned) {
         t.warned = true;
-        game.hud.toast(`${t.hangul} — ${t.place}`, 3);
+        // Il mestiere della banda si legge entrando: è l'unico posto in cui il
+        // giocatore può scoprire che qui si commercia, e perché adesso non può.
+        game.hud.toast(`${t.hangul} · ${t.trade} — ${t.place}`, 3);
+        if (provoking) game.hud.toast('Con questa addosso non trattano', 2.8);
       } else if (!inside && t.warned && dist(pl.x, pl.y, t.cx, t.cy) > 700) {
         t.warned = false;
       }
@@ -155,7 +201,7 @@ export class PedestrianSystem {
 
   update(dt, game) {
     this.stream(dt, game);
-    this.watchTurfs(game);
+    this.watchTurfs(game, dt);
     for (const p of this.peds) this.updatePed(p, dt, game);
   }
 
@@ -217,6 +263,10 @@ export class PedestrianSystem {
       ped.gang = t.gang;
       ped.armed = rng.chance(0.7); // in casa propria sono armati quasi tutti
       ped.state = 'guard';
+      // Chi fa il 거래책 lo decide `refreshDealer` al prossimo frame, e lo decide
+      // da solo: due punti che scrivono lo stesso flag lasciavano in giro un
+      // secondo uomo marchiato come contatto, e il giocatore andava a parlare con
+      // quello sbagliato.
       this.peds.push(ped);
       return ped;
     }
@@ -305,6 +355,17 @@ export class PedestrianSystem {
     if (p.panic > 0 && !p.hostile) {
       p.panic -= dt;
       p.state = p.panic > 0 ? 'flee' : 'walk';
+    }
+
+    // Una guardia che ha finito di correre o di sparare torna al recinto. Senza,
+    // qualunque spavento la promuove a passante per sempre: e siccome dai 철마파
+    // ci si arriva **guidando**, e un'auto che accosta fa scappare chi ha intorno,
+    // il 거래책 spariva proprio nel momento in cui serviva.
+    // Non basta guardare se è ancora dentro il recinto: fuggendo a 2,1× per due
+    // secondi ne esce di trecento pixel, e da `walk` non ci tornerebbe mai più.
+    // È lo stato `guard` a riportarcelo, camminando.
+    if (p.turf && !p.hostile && p.panic <= 0 && (p.state === 'walk' || p.state === 'idle')) {
+      p.state = 'guard';
     }
 
     // Il riparo è uno stato di riposo, non una gabbia: panico, ostilità e
@@ -406,6 +467,16 @@ export class PedestrianSystem {
         if (p.idleT > 0) {
           p.idleT -= dt;
           targetSpeed = 0;
+          break;
+        }
+        // Il 거래책 non fa il giro del recinto: sta dove tratta. Un contatto che
+        // ciondola trasforma i 54 px del banco in un inseguimento con `E` in mano,
+        // ed è anche il modo in cui si capisce chi comanda in un cortile.
+        if (p.dealer) {
+          if (!p.postX) { p.postX = p.x; p.postY = p.y; }
+          tx = p.postX;
+          ty = p.postY;
+          targetSpeed = dist(p.x, p.y, tx, ty) > 8 ? p.baseSpeed * 0.5 : 0;
           break;
         }
         targetSpeed = p.baseSpeed * 0.55;

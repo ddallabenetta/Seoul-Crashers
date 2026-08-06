@@ -890,6 +890,8 @@ export class Scene {
       ctx.beginPath();
       ctx.arc(p.x, p.y, 13, 0, 6.2832);
       ctx.stroke();
+    } else if (p.dealer && !p.dead && p.turf) {
+      this.drawDealerMark(ctx, p, cam, game);
     }
     ctx.save();
     ctx.translate(p.x + ox * 0.7, p.y + oy * 0.7);
@@ -914,6 +916,50 @@ export class Scene {
       const uf = 34 / PROJ;
       this.drawUmbrella(ctx, p, (p.x - cam.cx) * uf, (p.y - cam.cy) * uf, rain);
     }
+  }
+
+  /**
+   * Il 거래책 di una banda. Due segni, e servono tutti e due: **l'anello a terra**
+   * nel colore della banda dice di chi è (lo stesso colore del tag dipinto sotto
+   * i piedi e del blip sulla mappa), **il rombo sospeso** dice che con lui si
+   * parla. Da solo l'anello si perderebbe fra fusti, casse e vernice del tag, che
+   * in un territorio sono esattamente quello che ci sta attorno.
+   *
+   * Il rombo si stacca in proiezione come l'ombrello, più un rialzo fisso: senza
+   * quello, un contatto inquadrato al centro camera avrebbe il segno esattamente
+   * sopra la propria testa, cioè invisibile.
+   */
+  drawDealerMark(ctx, p, cam, game) {
+    const col = p.turf.color;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 15, 0, 6.2832);
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = col;
+    ctx.fill();
+    ctx.globalAlpha = 0.8;
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    const zf = 52 / PROJ;
+    ctx.globalAlpha = 1;
+    ctx.translate(
+      p.x + (p.x - cam.cx) * zf,
+      p.y + (p.y - cam.cy) * zf - 22 + Math.sin(game.time * 2.6 + p.id) * 2.2
+    );
+    ctx.beginPath();
+    ctx.moveTo(0, -7);
+    ctx.lineTo(5.4, 0);
+    ctx.lineTo(0, 7);
+    ctx.lineTo(-5.4, 0);
+    ctx.closePath();
+    ctx.fillStyle = col;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(8,9,12,0.85)';
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+    ctx.restore();
   }
 
   drawUmbrella(ctx, p, ox, oy, rain) {
