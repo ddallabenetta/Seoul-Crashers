@@ -193,11 +193,13 @@ export class PickupSystem {
       if (pl.hp >= pl.maxHp) return false;
       pl.heal(s.heal);
       game.hud.toast(`${s.label} +${s.heal}`, 1.4);
+      game.audio?.pickup('heal');
       return true;
     }
     if (s.weapon) {
       pl.giveWeapon(s.weapon, s.ammo || 0);
       game.hud.toast(s.ammo ? `${s.label} · ${s.ammo} colpi` : s.label, 1.6);
+      game.audio?.pickup('weapon');
       return true;
     }
     // Cassa di munizioni: rifornisce l'arma in mano, o la prima che ne ha bisogno.
@@ -209,6 +211,7 @@ export class PickupSystem {
       if (!spec || spec.infinite || spec.thrown) continue;
       if (pl.giveAmmo(id, Math.round(spec.maxAmmo * 0.28))) {
         game.hud.toast(`munizioni ${spec.label}`, 1.4);
+        game.audio?.pickup('ammo');
         return true;
       }
     }

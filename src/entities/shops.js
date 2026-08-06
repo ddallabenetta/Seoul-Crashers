@@ -565,6 +565,7 @@ export class ShopSystem {
   knock(shop, game) {
     const n = this.nextOpening(shop, game);
     game.hud.toast(`${n.biz.hangul} — apre alle ${clockLabel(n.at)}`, 2.4);
+    game.audio?.doorClose(game.player.x, game.player.y);
   }
 
   /** Negozio la cui porta è a portata, se il giocatore è a piedi. */
@@ -593,6 +594,9 @@ export class ShopSystem {
     this.backSpot = this.active.backSpot;
     this.placeOnFloor(game, this.floor.entry);
     this.showFloor(game, this.floor);
+    // Il campanello della porta: a Seoul entrare in un 편의점 suona, ed è anche il
+    // segnale che lo stacco è finito e adesso si è dentro.
+    game.audio?.bell();
     game.fx.clear();
     game.projectiles.clear();
     game.player.enterCooldown = 0.4;
@@ -652,6 +656,10 @@ export class ShopSystem {
     pl.angle = angle;
     game.camera.snapTo(pl.x, pl.y);
     pl.district = game.city.districtAt(pl.x, pl.y);
+    // Dopo lo `snapTo`: l'ascoltatore è la camera, e un istante prima era ancora
+    // dentro la stanza — la porta che si chiude risulterebbe a mezza Seoul di
+    // distanza e verrebbe scartata.
+    game.audio?.doorClose(pl.x, pl.y);
   }
 
   /**
@@ -719,6 +727,7 @@ export class ShopSystem {
       : (f.stairUp ? { x: f.stairUp.x + f.stairUp.w / 2, y: f.stairUp.y + f.stairUp.h + 20, angle: Math.PI / 2 } : f.entry);
     this.placeOnFloor(game, land);
     this.showFloor(game, f);
+    game.audio?.ui(dir > 0 ? 'open' : 'close');
     game.fx.clear();
     game.projectiles.clear();
     game.player.enterCooldown = 0.4;
@@ -890,11 +899,13 @@ export class ShopSystem {
     const pl = game.player;
     if (game.wanted.level >= 3) {
       game.hud.toast('Con le sirene là fuori non chiudi occhio', 2.6);
+      game.audio?.ui('deny');
       return;
     }
     const to = sleepTarget(dc.hour);
     dc.advance(to.wait);
     pl.heal(pl.maxHp);
+    game.audio?.ui('open');
     // Nero pieno per mezzo secondo: uno stacco da porta (fade 1) non basta a dire
     // che sono passate otto ore.
     this.fade = 2.4;
@@ -917,10 +928,12 @@ export class ShopSystem {
     const armed = !WEAPONS[pl.weapon].melee;
     if (keeper && !armed) {
       game.hud.toast('Il commesso non si muove: serve qualcosa di più convincente', 2.4);
+      game.audio?.ui('deny');
       return;
     }
     f.robbed = true;
     pl.money += f.till.cash;
+    game.audio?.cash(true);
     this.robbed++;
     game.stats.robberies = (game.stats.robberies || 0) + 1;
     game.hud.toast(`Cassa svuotata: ${won(f.till.cash)}`, 2.6);

@@ -293,6 +293,9 @@ export function shoot(game, owner, spec, ox, oy, ang, opts = {}) {
   const ignoreVehicle = opts.ignoreVehicle || null;
 
   game.fx.addMuzzle(ox, oy, ang);
+  // Qui passa *tutto* quello che spara — giocatore, polizia, teppisti — quindi un
+  // punto solo basta a dare un suono a ogni bocca da fuoco del gioco.
+  game.audio?.shot(spec, ox, oy, fromPlayer);
   for (let i = 0; i < (spec.pellets || 1); i++) {
     const a = ang + gauss() * spec.spread * spreadMul;
     const dx = Math.cos(a);
@@ -368,11 +371,13 @@ export function meleeSwing(game, owner, spec, ox, oy, ang) {
     if (d < spec.range + PLAYER_HIT_R
       && Math.abs(angleDiff(ang, Math.atan2(pl.y - oy, pl.x - ox))) <= spec.arc / 2) {
       game.damagePlayer(spec.damage, cos, sin, owner);
+      game.audio?.melee(spec, ox, oy, true);
       return true;
     }
   }
   if (target) {
     game.damagePed(target, spec.damage, cos, sin, owner, spec.knock);
+    game.audio?.melee(spec, ox, oy, true);
     return true;
   }
 
@@ -387,8 +392,12 @@ export function meleeSwing(game, owner, spec, ox, oy, ang) {
       if (Math.abs(angleDiff(ang, Math.atan2(_circ[i + 1] - oy, _circ[i] - ox))) > spec.arc / 2) continue;
       game.damageVehicle(v, spec.damage * 0.5, ox + cos * spec.range, oy + sin * spec.range, owner);
       v.awake = true;
+      game.audio?.melee(spec, ox, oy, true);
       return true;
     }
   }
+  // Colpo a vuoto: resta il fendente, che è comunque quello che dice al giocatore
+  // che l'arma ha risposto al click.
+  game.audio?.melee(spec, ox, oy, false);
   return false;
 }

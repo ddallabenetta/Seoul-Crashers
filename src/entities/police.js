@@ -615,6 +615,7 @@ export class PoliceSystem {
           p.x + Math.cos(aim) * 14, p.y + Math.sin(aim) * 14, aim, d
         );
         game.hud.toast('Granata in arrivo', 1.6);
+        game.audio?.throwItem(p.x, p.y);
         return { x: p.x, y: p.y, speed: 0 };
       }
       if (d < COP_FIRE_RANGE && p.fireT <= 0) {
@@ -1308,6 +1309,7 @@ export class PoliceSystem {
     game.fx.addExplosion(c.x + (c.x - cam.cx) * (c.z / PROJ), c.y + (c.y - cam.cy) * (c.z / PROJ));
     game.fx.addExplosion(c.x, c.y);
     game.camera.addShake(22);
+    game.audio?.explosion(c.x, c.y, 1.3);
     game.hud.toast('Elicottero abbattuto', 3);
     game.stats.choppers = (game.stats.choppers || 0) + 1;
     this.chopper = null;

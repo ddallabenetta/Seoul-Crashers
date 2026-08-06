@@ -661,6 +661,7 @@ export class PedestrianSystem {
       return;
     }
     p.bleedT = 0.4;
+    game.audio?.hurt(p.x, p.y, false);
     if (p.cop) {
       // Un agente ferito non scappa e non cambia stato: resta in servizio, e la
       // centrale se lo segna.
@@ -697,6 +698,9 @@ export class PedestrianSystem {
   alarm(x, y, r, game, source) {
     const r2 = r * r;
     const near2 = (r * 0.55) ** 2;
+    // Un grido solo per allarme: la folla che urla tutta insieme diventa rumore
+    // bianco, e il tetto delle voci lo taglierebbe comunque a caso.
+    let voiced = Math.random() > 0.55;
     for (const p of this.peds) {
       if (p.dead || p.hostile || p.cop) continue;
       const d2 = (p.x - x) ** 2 + (p.y - y) ** 2;
@@ -710,6 +714,10 @@ export class PedestrianSystem {
       p.fleeFromX = x;
       p.fleeFromY = y;
       p.state = 'flee';
+      if (!voiced) {
+        voiced = true;
+        game.audio?.scream(p.x, p.y);
+      }
     }
   }
 

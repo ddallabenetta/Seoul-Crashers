@@ -52,6 +52,7 @@ export class ShopMenu {
     this.note = '';
     this.cooldown = 0.25;
     this.open = this.items.length > 0;
+    game.audio?.ui(this.open ? 'open' : 'deny');
     if (!this.open) game.hud.toast(`${counter.hangul} — oggi non hanno niente per te`, 2.4);
   }
 
@@ -60,6 +61,7 @@ export class ShopMenu {
     this.counter = null;
     this.restock = null;
     game.player.enterCooldown = 0.3;
+    game.audio?.ui('close');
   }
 
   update(dt, game) {
@@ -74,9 +76,11 @@ export class ShopMenu {
       return;
     }
     const n = this.items.length;
+    const was = this.index;
     if (input.wasPressed('KeyW') || input.wasPressed('ArrowUp')) this.index = (this.index - 1 + n) % n;
     if (input.wasPressed('KeyS') || input.wasPressed('ArrowDown')) this.index = (this.index + 1) % n;
     if (input.mouse.wheel) this.index = clamp(this.index + input.mouse.wheel, 0, n - 1);
+    if (this.index !== was) game.audio?.ui('move');
     if (this.hover >= 0 && input.mouse.pressed) this.index = this.hover;
     if (input.wasPressed('KeyE') || input.wasPressed('Enter') || input.wasPressed('Space')
       || (this.hover >= 0 && input.mouse.pressed)) {
@@ -90,20 +94,24 @@ export class ShopMenu {
     const pl = game.player;
     if (it.need && !it.need(game)) {
       this.say('Prima serve l\'arma', false);
+      game.audio?.ui('deny');
       return;
     }
     if (it.price > 0 && pl.money < it.price) {
       this.say(`Ti mancano ${won(it.price - pl.money)}`, false);
+      game.audio?.ui('deny');
       return;
     }
     const msg = it.buy(game);
     if (msg === null) {
       this.say('Non ti serve', false);
+      game.audio?.ui('deny');
       return;
     }
     pl.money -= it.price;
     if (it.price > 0) game.shops.spent += it.price;
     this.say(msg, true);
+    game.audio?.cash(it.price >= 0);
     // Il banco dei pegni compra, e il ricettatore di 황소파 pure: dopo una vendita
     // la lista è un'altra. Finita la merce, il banco chiude da solo.
     this.items = this.restock();

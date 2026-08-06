@@ -219,6 +219,9 @@ export class ProjectileSystem {
       this.addFire(game, it.x, it.y, it.spec, it.owner);
       game.fx.addExplosion(it.x, it.y);
       game.camera.addShake(4);
+      // La molotov non esplode: si spacca. Il vetro prima della vampata è tutta
+      // la differenza fra le due, e a schermo non si vede.
+      game.audio?.firebomb(it.x, it.y);
     } else {
       explode(game, it.x, it.y, it.spec, it.owner);
     }
@@ -380,6 +383,7 @@ export function explode(game, x, y, spec, source = null) {
   game.fx.addExplosion(x, y);
   game.fx.addScorch(x, y, r * 0.6);
   game.fx.addSmoke(x, y, 10, 2.6);
+  game.audio?.explosion(x, y, clamp(r / 155, 0.5, 1.3));
   const pd = dist(x, y, pl.x, pl.y);
   if (pd < 1100) game.camera.addShake(clamp(24 * (1 - pd / 1100), 3, 24));
 

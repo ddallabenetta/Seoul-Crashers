@@ -144,6 +144,7 @@ export class Player {
       this.overheated = true;
       game.hud.toast('Canne surriscaldate — lascia raffreddare', 1.8);
       game.fx.addSmoke(this.x, this.y, 7, 1.2);
+      game.audio?.dryFire(this.x, this.y);
     } else if (this.overheated) {
       if (Math.random() < dt * 6) game.fx.addSmoke(this.x, this.y, 1, 0.9);
       if (this.heat <= HEAT_OK) this.overheated = false;
@@ -162,15 +163,20 @@ export class Player {
       const row = WEAPON_SLOTS[i].filter((id) => this.owned.has(id));
       if (!row.length) {
         game.hud.toast(`${WEAPONS[WEAPON_SLOTS[i][0]].label}: non ce l'hai`, 1.3);
+        game.audio?.ui('deny');
         continue;
       }
       // Se l'arma in mano non è di questa fila, indexOf dà -1 e si parte dalla prima.
       this.setWeapon(row[(row.indexOf(this.weapon) + 1) % row.length]);
+      // Lo scatto della barra sta qui e non in `setWeapon`: è il suono del *tasto*,
+      // e una raccolta a terra che cambia l'arma in mano non deve produrlo.
+      game.audio?.weaponSwitch();
     }
     if (input.mouse.wheel) {
       const list = WEAPON_ORDER.filter((id) => this.owned.has(id));
       const i = list.indexOf(this.weapon);
       this.setWeapon(list[(i + (input.mouse.wheel > 0 ? 1 : list.length - 1)) % list.length]);
+      game.audio?.weaponSwitch();
     }
   }
 
@@ -320,6 +326,7 @@ export class Player {
     if (this.shots <= 0) {
       this.fireCd = 0.3;
       game.hud.toast(`${spec.label}: caricatore vuoto`, 1.2);
+      game.audio?.dryFire(this.x, this.y);
       return;
     }
     this.fireCd = spec.rate;
@@ -351,6 +358,7 @@ export class Player {
     if (this.shots <= 0) {
       this.fireCd = 0.35;
       game.hud.toast(`${spec.label}: finite`, 1.2);
+      game.audio?.dryFire(this.x, this.y);
       return;
     }
     this.fireCd = spec.rate;
@@ -366,6 +374,7 @@ export class Player {
       const by = (vehicle ? vehicle.y : this.y) - sin * back;
       game.projectiles.place(game, this, spec, bx, by);
       game.hud.toast('mina posata — si arma quando ti allontani', 1.8);
+      game.audio?.beep(bx, by);
       return;
     }
 
@@ -374,6 +383,7 @@ export class Player {
     const oy = (vehicle ? vehicle.y : this.y) + Math.sin(ang) * (vehicle ? 30 : 16);
     const reach = dist(ox, oy, this.aimX, this.aimY);
     game.projectiles.throwItem(game, this, spec, ox, oy, ang, reach);
+    game.audio?.throwItem(ox, oy);
     game.camera.addShake(spec.shake * 0.35);
     // Una molotov che vola in mezzo alla strada la vede tutto l'isolato, e non la si
     // scambia per una lite finita male: pesa il doppio di uno sparo.
@@ -441,6 +451,7 @@ export class Player {
     if (this.shots <= 0) {
       this.fireCd = 0.4;
       game.hud.toast(`${spec.label}: caricatore vuoto`, 1.2);
+      game.audio?.dryFire(v.x, v.y);
       return;
     }
     this.fireCd = spec.rate * 1.5;
@@ -510,7 +521,7 @@ export class Player {
     this.vehicle = v;
     this.onFoot = false;
     this.enterCooldown = 0.35;
-    game.audio?.doorClose();
+    game.audio?.doorClose(v.x, v.y);
     game.onEnterVehicle?.(v);
   }
 
@@ -566,7 +577,7 @@ export class Player {
     this.vehicle = null;
     this.onFoot = true;
     this.enterCooldown = 0.35;
-    game.audio?.doorClose();
+    game.audio?.doorClose(this.x, this.y);
     game.onExitVehicle?.(v);
   }
 
@@ -576,6 +587,7 @@ export class Player {
     this.hp -= dmg;
     this.hurtT = 0.4;
     game.camera.addShake(Math.min(9, dmg * 0.35));
+    game.audio?.hurt(this.x, this.y, true);
     if (this.onFoot) game.fx.addBloodSpray(this.x, this.y, dx, dy, clamp(dmg / 34, 0.4, 1.3));
     if (this.hp <= 0) this.die(game);
   }

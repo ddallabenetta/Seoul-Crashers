@@ -16,6 +16,15 @@ const CONTROLS = [
   ['M', 'mappa a tutto schermo'],
   ['ESC', 'pausa'],
   ['F3', 'informazioni tecniche'],
+  ['F4', 'audio muto'],
+];
+
+// Righe del pannello audio: la chiave è il bus in `AudioSystem.mix`.
+const MIXER = [
+  ['master', 'Generale'],
+  ['sfx', 'Effetti'],
+  ['ambient', 'Ambiente'],
+  ['ui', 'Interfaccia'],
 ];
 
 export class PauseMenu {
@@ -27,21 +36,40 @@ export class PauseMenu {
     this.items = [
       { id: 'resume', label: 'Riprendi', hint: 'Torna in strada' },
       { id: 'map', label: 'Mappa', hint: 'Vista completa di Seoul' },
+      { id: 'audio', label: 'Audio', hint: 'Volumi · F4 per il muto' },
       { id: 'controls', label: 'Comandi', hint: 'Tastiera e mouse' },
       { id: 'stats', label: 'Statistiche', hint: 'La tua corsa finora' },
     ];
     this.hover = -1;
+    // Il pannello audio è l'unico che si *usa* invece di leggersi: quando è
+    // attivo i tasti di navigazione passano a lui, e ESC torna alle voci.
+    this.focus = 'items';
+    this.mixIndex = 0;
+    this.bars = [];
   }
 
   toggle() {
     this.open = !this.open;
     this.index = 0;
     this.tab = 'map';
+    this.focus = 'items';
+  }
+
+  /** ESC dentro il pannello audio torna alle voci invece di chiudere il menu. */
+  backOut() {
+    if (!this.open || this.focus !== 'audio') return false;
+    this.focus = 'items';
+    return true;
   }
 
   update(dt, game) {
     if (!this.open) return;
+    if (this.focus === 'audio') {
+      this.updateMixer(game);
+      return;
+    }
     const input = game.input;
+    const was = this.index;
     if (input.wasPressed('KeyW') || input.wasPressed('ArrowUp')) {
       this.index = (this.index - 1 + this.items.length) % this.items.length;
     }
@@ -49,13 +77,52 @@ export class PauseMenu {
       this.index = (this.index + 1) % this.items.length;
     }
     if (this.hover >= 0 && input.mouse.pressed) this.index = this.hover;
+    if (this.index !== was) game.audio?.ui('move');
     if (input.wasPressed('Space') || input.wasPressed('Enter') || (this.hover >= 0 && input.mouse.pressed)) {
       this.activate(game);
     }
   }
 
+  /** W/S scelgono la riga, A/D spostano il volume, Invio accende e spegne tutto. */
+  updateMixer(game) {
+    const input = game.input;
+    const audio = game.audio;
+    const was = this.mixIndex;
+    if (input.wasPressed('KeyW') || input.wasPressed('ArrowUp')) {
+      this.mixIndex = (this.mixIndex - 1 + MIXER.length) % MIXER.length;
+    }
+    if (input.wasPressed('KeyS') || input.wasPressed('ArrowDown')) {
+      this.mixIndex = (this.mixIndex + 1) % MIXER.length;
+    }
+    if (this.mixIndex !== was) audio?.ui('move');
+    const step = (input.wasPressed('KeyD') || input.wasPressed('ArrowRight') ? 1 : 0)
+      - (input.wasPressed('KeyA') || input.wasPressed('ArrowLeft') ? 1 : 0);
+    const bus = MIXER[this.mixIndex][0];
+    if (step && audio) {
+      audio.setVolume(bus, audio.mix[bus] + step * 0.1);
+      audio.preview(bus);
+    }
+    if (input.wasPressed('Space') || input.wasPressed('Enter')) {
+      audio?.toggleMute();
+      audio?.ui('ok');
+    }
+    // Trascinamento col mouse: la barra si prende dove la si clicca.
+    if (input.mouse.down && audio) {
+      const mx = input.mouse.x;
+      const my = input.mouse.y;
+      for (let i = 0; i < this.bars.length; i++) {
+        const b = this.bars[i];
+        if (mx < b.x - 6 || mx > b.x + b.w + 6 || my < b.y - 10 || my > b.y + b.h + 10) continue;
+        this.mixIndex = i;
+        audio.setVolume(MIXER[i][0], (mx - b.x) / b.w);
+        if (input.mouse.pressed) audio.preview(MIXER[i][0]);
+      }
+    }
+  }
+
   activate(game) {
     const item = this.items[this.index];
+    game.audio?.ui(item.id === 'resume' ? 'close' : 'ok');
     switch (item.id) {
       case 'resume':
         this.open = false;
@@ -63,6 +130,10 @@ export class PauseMenu {
       case 'map':
         this.open = false;
         this.mapView.open = true;
+        break;
+      case 'audio':
+        this.tab = 'audio';
+        this.focus = 'audio';
         break;
       case 'controls':
         this.tab = 'controls';
@@ -123,7 +194,9 @@ export class PauseMenu {
 
     ctx.fillStyle = 'rgba(235,240,250,0.32)';
     ctx.font = '500 12px system-ui, sans-serif';
-    ctx.fillText('W/S per navigare · Invio per confermare · ESC per riprendere', 60, h - 42);
+    ctx.fillText(this.focus === 'audio'
+      ? 'W/S per la riga · A/D per il volume · Invio per il muto · ESC per tornare'
+      : 'W/S per navigare · Invio per confermare · ESC per riprendere', 60, h - 42);
 
     // Pannello di destra
     const size = Math.min(h - 140, w * 0.44);
@@ -131,6 +204,7 @@ export class PauseMenu {
     const py = (h - size) / 2;
     if (this.tab === 'controls') this.drawControls(ctx, px, py, size);
     else if (this.tab === 'stats') this.drawStats(ctx, game, px, py, size);
+    else if (this.tab === 'audio') this.drawAudio(ctx, game, px, py, size);
     else this.mapView.drawPanel(ctx, game, px, py, size, { zoom: 1 });
 
     ctx.restore();
@@ -159,6 +233,57 @@ export class PauseMenu {
       ctx.fillText(desc, x + 150, ly);
       ly += 26;
     }
+  }
+
+  drawAudio(ctx, game, x, y, size) {
+    ctx.fillStyle = 'rgba(10,12,16,0.92)';
+    roundPath(ctx, x, y, size, size, 10);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(235,240,250,0.18)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#f2f5fa';
+    ctx.font = '700 20px system-ui, sans-serif';
+    ctx.fillText('Audio', x + 28, y + 44);
+
+    const audio = game.audio;
+    const muted = audio ? audio.muted : true;
+    ctx.font = '600 12px system-ui, sans-serif';
+    ctx.fillStyle = muted ? '#ff5fa2' : 'rgba(90,220,150,0.9)';
+    ctx.fillText(muted ? 'MUTO' : 'ACCESO', x + size - 96, y + 44);
+
+    this.bars.length = 0;
+    const bw = size - 90;
+    MIXER.forEach(([bus, label], i) => {
+      const ly = y + 92 + i * 58;
+      const sel = i === this.mixIndex && this.focus === 'audio';
+      const v = audio ? audio.mix[bus] : 0;
+      ctx.fillStyle = sel ? '#ffffff' : 'rgba(235,240,250,0.55)';
+      ctx.font = `${sel ? '700' : '600'} 12px system-ui, sans-serif`;
+      ctx.fillText(label.toUpperCase(), x + 28, ly);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = 'rgba(235,240,250,0.45)';
+      ctx.fillText(`${Math.round(v * 100)}%`, x + 28 + bw, ly);
+      ctx.textAlign = 'left';
+      const by = ly + 10;
+      this.bars.push({ x: x + 28, y: by, w: bw, h: 8 });
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      roundPath(ctx, x + 28, by, bw, 8, 4);
+      ctx.fill();
+      ctx.fillStyle = muted ? 'rgba(235,240,250,0.28)' : (sel ? '#ff5fa2' : 'rgba(56,214,255,0.8)');
+      roundPath(ctx, x + 28, by, Math.max(4, bw * v), 8, 4);
+      ctx.fill();
+    });
+
+    // Il browser non lascia partire l'audio finché non si tocca qualcosa: senza
+    // dirlo, un giocatore che apre il menu per primo pensa che sia rotto.
+    ctx.fillStyle = 'rgba(235,240,250,0.4)';
+    ctx.font = '500 12px system-ui, sans-serif';
+    const info = !audio || !audio.ready
+      ? 'Il browser accende l\'audio al primo clic o tasto premuto.'
+      : 'Tutto quello che senti è sintetizzato: non ci sono file audio.';
+    ctx.fillText(info, x + 28, y + 92 + MIXER.length * 58 + 12);
   }
 
   drawStats(ctx, game, x, y, size) {
