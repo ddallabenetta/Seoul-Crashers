@@ -1151,8 +1151,8 @@ perché delle scelte, che è quello che serve per cambiarle:
   vera, 54 auto nell'anello di streaming chiedono agli incroci semaforizzati più di quello che
   riescono a smaltire in un ciclo, e le code crescono finché non si smaltiscono più. Misurato:
   a 48 il flusso mediano cala del 23%, a 44 del 6%. Il limite di capacità sta lì in mezzo. Se
-  si vuole più densità, la leva vera è il ciclo del semaforo (`SIGNAL_CYCLE`, 15,5 s), non
-  `MAX_TRAFFIC`.
+  si vuole più densità, la leva vera è il ciclo del semaforo, non `MAX_TRAFFIC`. §5.12 l'ha poi
+  misurata: accorciarlo non dà niente, allungarlo fa danni.
 - **La manovra di sblocco guarda dove va.** Prima indietreggiava con sterzo casuale: in coda
   innescava la carambola successiva, contro un palazzo rompeva la macchina e restava incastrata
   lo stesso. Ora controlla veicoli e solidi dietro; se è chiuso forza il passaggio
@@ -1437,7 +1437,33 @@ restare un posto in cui si va apposta. Le raccolte passano da 36 a **43**, e ade
 che il punto non sia murato — così si è scoperto che **la molotov garantita davanti alla
 safehouse era dentro un solido da tre fasi di sviluppo**, e non l'aveva mai raccolta nessuno.
 
-**Cuciture.** Cinque pezzi stavano a cavallo di file diversi e sono stati collegati a parte:
+**Il ciclo del semaforo, finalmente misurato — e lasciato dov'era.** `SIGNAL_CYCLE` valeva
+15,5 s «dai tempi in cui nessuno si fermava» (§6, vecchia edizione), e non era mai stato
+provato con le code vere che il §5.10 ha introdotto. C'era anche un difetto silenzioso: le
+fasi erano tre numeri scritti a mano che con `SIGNAL_CYCLE` non c'entravano niente, quindi
+cambiarlo **non cambiava il verde**. Adesso è una manopola sola — il giallo è un intervallo di
+sicurezza e resta fisso a 1 s, il verde si prende quello che avanza — e si può misurare per
+davvero con `traffic-census.scene` (170 s su cinque zone, un albero per configurazione, in fila):
+
+| ciclo | urti al minuto | flusso mediano (px/min) | veicoli praticamente fermi |
+| --- | --- | --- | --- |
+| 12 s | 36,0 | 4323 | 4 su 172 |
+| 12 s, **seconda esecuzione** | 33,5 | 4035 | 8 su 184 |
+| 15,5 s (quello di prima) | 38,5 | 3926 | 8 su 183 |
+| 19 s | 34,2 | 3084 (**−21%**) | 23 su 179 |
+
+**Il ciclo lungo è fuori discussione**: un quinto del flusso in meno e tre volte i fermi, perché
+con 8,5 s di verde per asse la coda formata sul rosso non si smaltisce in un ciclo solo. Ma
+**fra 12 e 15,5 non c'è differenza**, e la riga che lo dimostra è la seconda: due esecuzioni
+della *stessa* configurazione si scostano del 7% sul flusso e del doppio sui fermi, cioè più
+di quanto separi 12 da 15,5. La prima misura da sola (+10% e metà dei fermi) sembrava un
+risultato; è rumore, ed è esattamente il caso contro cui §5.10 mette in guardia — «una
+differenza del 10% non significa niente». **Il valore resta 15,5.** Quello che si porta a casa
+è che adesso la manopola funziona, che il verso lungo è già stato provato e non conviene, e che
+**il rumore di questa scena a configurazione ferma vale ~7%**: chi misura la prossima modifica
+alla guida sa sotto quale soglia non deve credersi.
+
+**Cuciture.** Cinque pezzi stavano a cavallo di file diversi**Cuciture.** Cinque pezzi stavano a cavallo di file diversi e sono stati collegati a parte:
 l'anello del calore nel mirino; il peso proprio di un esplosivo nel ricercato (`blast` 6, cioè
 il doppio di uno sparo — due granate in strada fanno una stella); `fx.update(dt, game)`, che
 riporta la sbiadita del sangue dentro `Fx` invece di farla chiamare a `projectiles` solo per
@@ -1514,9 +1540,14 @@ prima: il §5.12 ha pagato diciannove voci di questo elenco.
 **Rimasto indietro dal traffico** (§5.10):
 - **Nessuno sorpassa.** Sull'arteria le due corsie per senso restano inutilizzate. Un tentativo
   è già stato fatto e misurato peggiore: manca la scelta della corsia in base alla svolta
-  successiva.
+  successiva. **È l'ultimo debito grosso del traffico**, adesso che il ciclo del semaforo è
+  stato misurato (§5.12).
 - **Il traffico non sa niente della quota**: un'auto in salita rallenta per fisica ma non se lo
   aspetta, e alza il gas dopo.
+- **`MAX_TRAFFIC` resta a 44, e adesso si sa che il semaforo non lo sblocca.** §5.10 lo aveva
+  sceso da 54 indicando il ciclo del semaforo come la leva per rialzarlo; §5.12 l'ha misurata e
+  la leva non c'è (accorciare non dà niente, allungare fa danni). Chi vuole più densità deve
+  cercare la capacità da un'altra parte — il sorpasso, o la priorità fra i mezzi.
 - **Non c'è priorità fra i mezzi**: un autobus (158 px) e uno scooter (44 px) trattano l'incrocio
   allo stesso modo, e il primo lo occupa per il doppio del tempo.
 
@@ -1593,7 +1624,7 @@ sono in cima all'elenco qui sopra.
 | Cortesia massima all'incrocio | `traffic.driveAI` `ai.boxT` | 3,5 s, poi si entra lo stesso |
 | Prenotazione dell'incrocio | `driveAI` (solo nodi senza semaforo) | scade dopo 0,6 s senza rinnovo |
 | Fermo troppo a lungo → manovra | `driveAI` `ai.stallT` | 9 s (il rosso più lungo dura 7,7 s) |
-| Ciclo del semaforo | `roadgraph.SIGNAL_CYCLE` | 15,5 s (verde 6,8 per asse) |
+| Ciclo del semaforo | `roadgraph.SIGNAL_CYCLE` / `YELLOW` | 15,5 s (verde 6,75 per asse, giallo 1) — misurato in §5.12: 19 s è peggio, 12 s è indistinguibile |
 | Pedoni | `pedestrians.BASE_MAX` | 62 (× densità distretto) |
 | Pendenza minima per una scalinata | `citygen.STAIR_GRADE` | 0.018 (→ 8 scalinate su 14 vicoli passanti) |
 | Danno / cadenza delle armi | `weapons.WEAPONS` | pugni 15·0.34 · mazza 46·0.52 · katana 92·0.4 · pistola 27·0.22 · pompa 13×8·0.84 · SMG 15·0.075 · fucile 24·0.105 · sniper 145·1.35 · minigun 12·0.045 |
