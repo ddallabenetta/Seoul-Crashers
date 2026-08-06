@@ -93,6 +93,33 @@ Per ascoltare a orecchio serve un browser vero: `python3 -m http.server 8123` e 
 sulla pagina (l'audio parte al primo gesto). `F4` è il muto, il pannello **Audio** del menu
 di pausa ha i quattro volumi.
 
+## La radio è un'altra cosa
+
+`src/core/radio.js` **non passa dal grafo di `audio.js`** ed è l'unica parte del gioco che
+parla con la rete. Se la richiesta riguarda stazioni, streaming o il volume della radio, le
+regole sono queste:
+
+- **Un `<audio>`, non un nodo WebAudio.** Un `MediaElementAudioSourceNode` con una sorgente
+  di un'altra origine senza CORS diventa *muto*, ed è la norma per gli Icecast delle
+  emittenti. Il volume si fa con `el.volume` = `mix.master × mix.radio × contesto`.
+- **`<audio>` non legge HLS né playlist**: `.m3u8`, `.pls`, `.m3u` vanno filtrati (`usable`),
+  o sembrano stazioni rotte. È il motivo per cui KBS/MBC/SBS non ci sono.
+- **Le stazioni si scoprono, non si scrivono**: radio-browser.info, nessuna chiave, tre
+  mirror. Una lista hardcoded marcisce. Per fissarne una: `localStorage` →
+  `seoul.radio.stations` = `[{name, url}]`.
+- **Niente può dipendere dalla rete.** Nessuna richiesta prima che il giocatore prema `R`,
+  nessuno stream aperto se nessuno lo sente, stazione muta marchiata e saltata dopo 11 s.
+- **Provala senza rete** iniettando una stazione finta invece di cercarne una vera:
+
+```js
+// un WAV generato al volo dentro un blob: suona come una stazione, senza uscire dal browser
+game.radio.stations = [{ name: 'Prova FM', url: URL.createObjectURL(new Blob([wav], { type: 'audio/wav' })) }];
+game.radio.discovered = true;
+```
+
+⚠️ Con la radio accesa e la rete chiusa **`probe.mjs` esce 1**: sono i `net::ERR_...` che
+logga il browser, non errori del gioco (HANDOFF §5.14).
+
 ## Un'arma nuova
 
 `GUN_TONE` in `audio.js` è una riga per arma: `f` (centro dello schiocco), `dec` (quanto

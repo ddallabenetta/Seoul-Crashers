@@ -31,6 +31,8 @@ Poi apri <http://localhost:8123>.
 | `ESC` | menu di pausa (mappa, audio, comandi, statistiche) |
 | `F3` | pannello tecnico (fps, entità, posizione) |
 | `F4` | audio muto |
+| `R` | radio: accendi · stazione successiva |
+| `Shift + R` | radio: spegni |
 
 Armi e munizioni si raccolgono a terra, nei cortili e nei vicoli, oppure si **comprano**
 (vedi sotto). A zero salute ci si risveglia davanti all'ospedale del distretto più vicino —
@@ -229,6 +231,14 @@ Alcune scelte tecniche che spiegano il risultato a schermo:
   fucile di precisione si sente quello che si vede. L'audio parte al primo clic (lo impongono
   i browser); i volumi stanno nel menu di pausa, `F4` è il muto.
 
+- **La radio è vera.** In macchina `R` accende l'autoradio e ci trovi **stazioni coreane in
+  streaming**, prese da una directory pubblica che non chiede nessuna chiave; nei 편의점
+  aperti la stessa stazione si sente bassa di sottofondo. È l'unica cosa del gioco che parla
+  con la rete, non lo fa finché non premi `R`, e se la rete non c'è tutto il resto funziona
+  identico — al massimo una stazione non risponde e si passa alla successiva. Le tre grandi
+  (KBS, MBC, SBS) trasmettono in HLS con un token e restano fuori; la tua stazione preferita
+  la puoi fissare tu, in `localStorage` sotto `seoul.radio.stations`.
+
 ## Stato
 
 **Fase 1 — completata.** Città esplorabile, guida, traffico, pedoni, camera 2.5D, minimappa
@@ -285,5 +295,9 @@ al riparo — il tuono che arriva dopo il lampo, il fondo della città che cala 
 centro, la risacca sulla costa, gli incendi, i passi, le urla, il campanello del 편의점 e il
 registratore di cassa. Quattro volumi nel menu di pausa, `F4` per il silenzio.
 
+**Fase 3, la radio — completata.** Autoradio con stazioni coreane vere, in streaming e senza
+chiavi API: `R` accende e cambia stazione, `Shift+R` spegne, il nome scorre sopra il
+tachimetro e nei locali che ce l'hanno la si sente bassa. Volume suo nel mixer.
+
 **Fase 3, il resto — da fare.** Le 12 missioni con cutscene a fumetti, le attività secondarie,
-la musica e il salvataggio su localStorage.
+la musica del gioco e il salvataggio su localStorage.

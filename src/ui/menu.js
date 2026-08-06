@@ -17,6 +17,8 @@ const CONTROLS = [
   ['ESC', 'pausa'],
   ['F3', 'informazioni tecniche'],
   ['F4', 'audio muto'],
+  ['R', 'radio: accendi · stazione dopo'],
+  ['Shift + R', 'radio: spegni'],
 ];
 
 // Righe del pannello audio: la chiave è il bus in `AudioSystem.mix`.
@@ -25,6 +27,7 @@ const MIXER = [
   ['sfx', 'Effetti'],
   ['ambient', 'Ambiente'],
   ['ui', 'Interfaccia'],
+  ['radio', 'Radio'],
 ];
 
 export class PauseMenu {
@@ -100,7 +103,9 @@ export class PauseMenu {
     const bus = MIXER[this.mixIndex][0];
     if (step && audio) {
       audio.setVolume(bus, audio.mix[bus] + step * 0.1);
-      audio.preview(bus);
+      // La radio non ha bisogno di un campione: o sta già suonando, o non c'è
+      // niente da provare.
+      if (bus !== 'radio') audio.preview(bus);
     }
     if (input.wasPressed('Space') || input.wasPressed('Enter')) {
       audio?.toggleMute();
@@ -115,7 +120,7 @@ export class PauseMenu {
         if (mx < b.x - 6 || mx > b.x + b.w + 6 || my < b.y - 10 || my > b.y + b.h + 10) continue;
         this.mixIndex = i;
         audio.setVolume(MIXER[i][0], (mx - b.x) / b.w);
-        if (input.mouse.pressed) audio.preview(MIXER[i][0]);
+        if (input.mouse.pressed && MIXER[i][0] !== 'radio') audio.preview(MIXER[i][0]);
       }
     }
   }
@@ -282,7 +287,7 @@ export class PauseMenu {
     ctx.font = '500 12px system-ui, sans-serif';
     const info = !audio || !audio.ready
       ? 'Il browser accende l\'audio al primo clic o tasto premuto.'
-      : 'Tutto quello che senti è sintetizzato: non ci sono file audio.';
+      : 'Tutto sintetizzato, nessun file audio. La radio no: è in streaming (R in macchina).';
     ctx.fillText(info, x + 28, y + 92 + MIXER.length * 58 + 12);
   }
 

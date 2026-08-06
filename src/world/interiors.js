@@ -39,6 +39,10 @@ const STAIR_H = 78;
  * scelti, non una scorciatoia: il 편의점 a Seoul è davvero aperto ventiquattr'ore,
  * il 병원 è anche il punto di risveglio dopo la morte (chiuderlo chiude la
  * partita) e il 주택 è casa di qualcuno, non un esercizio con una saracinesca.
+ *
+ * `radio: true` = qui dentro c'è una radio accesa (§5.14): il 편의점, la tavola
+ * calda, il bar, la sala biliardo. Non l'ufficio e non il 노래방, che la sua
+ * musica ce l'ha già, e non il 병원.
  */
 export const BUSINESSES = {
   guns: {
@@ -53,29 +57,29 @@ export const BUSINESSES = {
   },
   clothes: {
     id: 'clothes', hangul: '옷가게', label: 'negozio di vestiti', where: 'ground', layout: 'counter',
-    shop: 'clothes', keeper: 'student', crowd: 2, blip: '#b48cff', open: [11, 22],
+    shop: 'clothes', keeper: 'student', crowd: 2, blip: '#b48cff', open: [11, 22], radio: true,
     pal: { floor: '#46414a', wall: '#5a5360', trim: '#8f7fa0', accent: '#b48cff' },
   },
   conv: {
     id: 'conv', hangul: '편의점', label: 'minimarket', where: 'ground', layout: 'market',
-    shop: 'conv', keeper: 'student', crowd: 2, blip: '#4ad98a', open: [0, 24],
+    shop: 'conv', keeper: 'student', crowd: 2, blip: '#4ad98a', open: [0, 24], radio: true,
     pal: { floor: '#4a4a4e', wall: '#5c5c62', trim: '#7f8189', accent: '#4ad98a' },
   },
   pharma: {
     id: 'pharma', hangul: '약국', label: 'farmacia', where: 'ground', layout: 'market',
-    shop: 'pharma', keeper: 'office', crowd: 1, blip: '#e8595e', open: [9, 20],
+    shop: 'pharma', keeper: 'office', crowd: 1, blip: '#e8595e', open: [9, 20], radio: true,
     pal: { floor: '#4e5054', wall: '#62656b', trim: '#8b9099', accent: '#e8595e' },
   },
   bunsik: {
     id: 'bunsik', hangul: '분식', label: 'tavola calda', where: 'any', layout: 'eatery',
     // Apre presto, e non è pignoleria: la partita comincia alle 8:24 e il 분식 è
     // l'unico posto dove si mangia, cioè l'unico modo di curarsi che si può pagare.
-    shop: 'food', keeper: 'civil', crowd: 3, open: [8, 22],
+    shop: 'food', keeper: 'civil', crowd: 3, open: [8, 22], radio: true,
     pal: { floor: '#4b3f36', wall: '#5d4c3e', trim: '#8a6a4a', accent: '#ffa229' },
   },
   bar: {
     id: 'bar', hangul: '술집', label: 'bar', where: 'any', layout: 'eatery',
-    shop: 'food', keeper: 'gangster', crowd: 4, open: [17, 4],
+    shop: 'food', keeper: 'gangster', crowd: 4, open: [17, 4], radio: true,
     pal: { floor: '#33292c', wall: '#43353a', trim: '#6b4a52', accent: '#ff5fa2' },
   },
   pcbang: {
@@ -100,7 +104,7 @@ export const BUSINESSES = {
   },
   billiards: {
     id: 'billiards', hangul: '당구장', label: 'sala biliardo', where: 'upper', layout: 'hall',
-    keeper: 'gangster', crowd: 4, open: [15, 3],
+    keeper: 'gangster', crowd: 4, open: [15, 3], radio: true,
     pal: { floor: '#39413c', wall: '#47514a', trim: '#5e6b62', accent: '#41e0a3' },
   },
   clinic: {

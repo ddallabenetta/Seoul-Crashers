@@ -49,7 +49,7 @@ const GUN_TONE = {
 };
 
 /** Volumi di partenza. Si spostano dal menu e restano in localStorage. */
-const DEFAULT_MIX = { master: 0.7, sfx: 1, ambient: 0.8, ui: 0.75 };
+const DEFAULT_MIX = { master: 0.7, sfx: 1, ambient: 0.8, ui: 0.75, radio: 0.8 };
 const MIX_KEY = 'seoul.audio';
 
 export class AudioSystem {
@@ -218,6 +218,8 @@ export class AudioSystem {
       else if (bus === 'sfx') this.sfx.gain.value = this.mix.sfx;
       else if (bus === 'ambient') this.amb.gain.value = this.mix.ambient;
       else if (bus === 'ui') this.uiBus.gain.value = this.mix.ui;
+      // `radio` non ha un nodo: lo stream sta in un `<audio>` fuori dal grafo
+      // (vedi `core/radio.js`), e legge questo numero da solo.
     }
     this.save();
   }

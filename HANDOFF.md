@@ -3,8 +3,9 @@
 Documento per riprendere il lavoro da una sessione pulita. Leggi anche `README.md`
 (descrizione del gioco e comandi) — qui c'è quello che serve a *sviluppare*.
 
-Ultimo aggiornamento: **Seoul fa rumore** (§5.13) — audio procedurale WebAudio, la voce che
-era in cima al §6 da quattro fasi. Nessun file sonoro: spari, motori, sirene, pioggia, tuoni,
+Ultimo aggiornamento: **Seoul fa rumore** (§5.13) e **la radio in macchina** (§5.14) — audio
+procedurale WebAudio, la voce che era in cima al §6 da quattro fasi, più le stazioni coreane
+in streaming, che sono l'unica cosa del gioco che parla con la rete. Nessun file sonoro: spari, motori, sirene, pioggia, tuoni,
 urla e interfaccia nascono da oscillatori e rumore generato al boot, come la grafica nasce da
 path su canvas. Prima c'erano il giro di arretrati (§5.12), il ciclo giorno-notte (§5.11), il
 traffico (§5.10), la mappa (§5.9), i negozi (§5.8) e la Fase 2 tappa C.
@@ -44,6 +45,11 @@ stesso vantaggio: il timbro di un'arma è cinque numeri in tabella, il motore ca
 la marcia e la pioggia si sente ovattata dentro un negozio senza che esista un secondo suono
 di pioggia. L'audio parte **al primo clic o tasto premuto** — è una regola dei browser, non
 una scelta — e `F4` è il muto.
+
+**E in macchina c'è la radio, con stazioni coreane vere** (§5.14): `R` accende e cambia
+stazione, `Shift+R` spegne, e nei 편의점 aperti la si sente bassa di sottofondo. È **l'unica
+cosa del gioco che parla con la rete**, non lo fa finché non premi `R`, e quando la rete non
+c'è il gioco si comporta esattamente come prima.
 
 **Il mondo è 5400×5400 e la città non lo riempie: ha una sagoma.** A ovest il mare, con
 l'aeroporto di Gimpo e il porto di Incheon sulla costa e la campagna in mezzo; a est, nord e
@@ -290,6 +296,22 @@ game.audio.setVolume('master', 0.4);   game.audio.toggleMute();
   game.audio.shot(W.WEAPONS.shotgun, game.camera.cx, game.camera.cy, true); })()
 ```
 
+Per la radio (§5.14):
+
+```js
+// che sta facendo: off | cerco | sintonizzo | acceso, e quante stazioni ha trovato
+game.radio.stats
+// accendere, cambiare, spegnere da console (nel gioco: R e Shift+R)
+game.radio.next(game);   game.radio.off(game);
+// fissare una stazione propria: sopravvive alla directory e vince su di lei
+localStorage.setItem('seoul.radio.stations', JSON.stringify([{ name: 'la mia', url: 'https://…' }]))
+```
+
+`stato: cerco` che non cambia mai vuol dire che la directory non risponde (rete, o mirror
+giù); `rotte` che cresce vuol dire che le stazioni ci sono ma non mandano audio — quasi
+sempre perché sono HLS travestite. **La radio non entra nel grafo di `audio.js`**: il suo
+volume è `mix.master × mix.radio` scritto su un `<audio>`, vedi §5.14.
+
 `letti` sono i suoni continui con il loro guadagno attuale: `citta pioggia vento mare
 motore traffico sirena rotore fuoco gomme canne`. **Sono la diagnosi giusta**: se guidando
 `motore` è 0, il letto non è agganciato al veicolo del giocatore; se `sirena` resta a 0 con
@@ -364,6 +386,7 @@ src/core/
   loop.js             passo fisso 1/60 con accumulatore, render libero
   input.js            tastiera/mouse, stato continuo + fronti (wasPressed)
   audio.js            sintetizzatore WebAudio: colpi secchi + letti continui, mix, muto
+  radio.js            stazioni coreane in streaming (`<audio>`, fuori dal grafo audio)
   math.js             angoli, damp, circleRectPush, pointSegment, KMH, PX_PER_M
   rng.js              mulberry32 deterministico (stessa seed = stessa Seoul)
   spatial.js          SpatialGrid (statica) e DynamicGrid (ricostruita ogni frame)
@@ -747,6 +770,14 @@ dei filtri, che è il muro. Corollario che è già costato un suono muto: **un s
 prima di uno `snapTo`** (una porta, un teletrasporto) risulta a mezza Seoul di distanza e
 viene scartato — va chiamato dopo, come fa `shops.stepOutside`.
 
+**La radio è l'unica dipendenza di rete, e va trattata come tale.** Tutto il resto del gioco
+è deterministico e offline; `radio.js` no. Da qui tre vincoli che valgono per chiunque la
+tocchi: non deve **mai** stare sul percorso del boot o di un frame (è tutta asincrona e
+tollerante ai fallimenti), non deve **mai** aprire una connessione che nessuno ascolta (si
+carica solo in auto o in un locale che ce l'ha) e non deve **mai** fidarsi di un URL (una
+stazione che non risponde entro 11 s viene marchiata e saltata). Se un giorno servisse un
+secondo pezzo che va in rete, la stessa disciplina o niente.
+
 **Un contesto audio sospeso non è innocuo.** Finché l'utente non tocca qualcosa il browser lo
 tiene fermo, e un contesto fermo ha l'orologio fermo: tutto quello che ci si programma dentro
 resta in coda e si accumula. Per questo `audio.ready` guarda `ctx.state === 'running'` e non
@@ -849,6 +880,9 @@ codice spiega il perché nel punto giusto.
 | **In una prova scriptata** `player.attack(game)` esplode | la firma è `attack(game, spec)`: senza spec si legge `.melee` di `undefined` | `attack(game, WEAPONS[id])` |
 | L'ambiente copre gli spari | il rumore rosa è ~3× più forte del bianco a parità di guadagno, e i letti erano tarati a occhio: misurato, l'ambiente aveva **lo stesso rms di un colpo di pistola** | buffer rosa normalizzato in `audio.makeNoise`, guadagni dei letti scesi di 3×, e `audio-census.scene` per non rifarlo a occhio |
 | Una porta che si chiude non si sente | il suono nasceva **prima** di `camera.snapTo`, con l'ascoltatore ancora dentro la stanza: risultava a 2000 px e veniva scartato | `shops.stepOutside`, chiamata in coda alla funzione |
+| Spegnendo la radio si riaccendeva sulla stazione dopo | staccare la sorgente da un `<audio>` (`removeAttribute('src')` + `load()`) fa scattare un `error`, e il gestore lo leggeva come «stazione muta, passo alla prossima» | `radio.fail`, uscita immediata se la radio è spenta |
+| La radio suona in un `MediaElementAudioSourceNode`… muta | una sorgente di un'altra origine senza CORS **tainta** il nodo: il grafo gira, l'audio no. È la norma per gli Icecast delle emittenti | la radio **non** passa da WebAudio: `<audio>` e `el.volume` (§5.14) |
+| Una stazione «rotta» che nell'app dell'emittente funziona | è HLS (`.m3u8`) o una playlist (`.pls`): `<audio>` non le sa leggere, e senza librerie non c'è modo | `radio.usable`, filtro sull'estensione e sul codec |
 | **In una prova scriptata** l'audio non suona mai | senza gesto dell'utente il contesto resta sospeso, e sospeso vuol dire orologio fermo | `probe.mjs` passa `--autoplay-policy=no-user-gesture-required`; la scena chiama `game.audio.unlock()` |
 | **In una prova scriptata** il ricercato torna a 0 da solo | il giocatore fermo allo spawn viene investito, oppure a cinque stelle la SWAT lo ammazza in ~8 s: la morte azzera tutto | metterlo su un marciapiede (`city.hospitals[i]`) e campionare entro 7 s |
 
@@ -1626,6 +1660,74 @@ sentirebbe); niente voci vere per i pedoni (le urla sono stilizzate apposta: una
 vibrato, tenuta piano perché di più suonerebbe finta invece che stilizzata); niente radio in
 macchina, che è la prima cosa che il giocatore cercherà e vuole musica.
 
+### 5.14 La radio: l'unica cosa che parla con la rete
+
+Richiesta dell'utente subito dopo il §5.13: **stazioni coreane vere**, senza chiavi API, con
+i tasti in macchina per cambiare o spegnere, e la radio accesa anche nei negozi a volume
+basso. È in `src/core/radio.js`, e la regola che governa tutto il file è una sola:
+
+> **Il gioco si comporta identico quando la rete non c'è.** Niente qui può bloccare il boot,
+> costare un frame o rompere qualcosa: al massimo una stazione non risponde e si passa alla
+> successiva. E finché il giocatore non preme `R`, **il gioco non manda un pacchetto a
+> nessuno** — la scoperta delle stazioni parte all'accensione, non al boot.
+
+**Tre scelte tecniche, e ognuna esclude un'alternativa che sembrava più ovvia.**
+
+1. **Non passa da WebAudio.** Sarebbe stato comodo mandare la radio nel mixer del §5.13 e
+   avere ducking e compressore gratis. Ma un `MediaElementAudioSourceNode` con una sorgente
+   di un'altra origine **senza intestazioni CORS diventa muto** — ed è la norma per gli
+   Icecast delle emittenti. Un `<audio>` e basta suona sempre; il volume si fa con
+   `el.volume`, che per un fondo musicale è tutto quello che serve.
+2. **Nessun elenco di stazioni scritto a mano.** Gli URL delle emittenti cambiano, e una
+   lista hardcoded è una lista che marcisce. Le stazioni si chiedono a **radio-browser.info**
+   (aperto, gratuito, **nessuna chiave**, tre mirror provati in fila con timeout di 6 s),
+   filtrate su `countrycode=KR` e ordinate per voti. Chi vuole fissare la propria la mette in
+   `localStorage` sotto `seoul.radio.stations` (`[{name, url}]`): quelle vincono e non
+   spariscono se la directory cambia idea.
+3. **Solo MP3/AAC diretti.** `<audio>` non sa leggere una playlist (`.pls`, `.m3u`) né HLS
+   (`.m3u8`), e librerie non ce ne sono. **Questo taglia fuori KBS, MBC e SBS**, che
+   trasmettono in HLS con un token dell'app: restano le stazioni indipendenti dell'elenco.
+   È un limite vero, ed è meglio saperlo qui che scoprirlo credendo a un bug.
+
+**Comandi.** `R` accende e passa alla stazione dopo, `Shift+R` spegne. Premuti dove la radio
+non si sentirebbe (a piedi in mezzo alla strada) lo dicono con un toast invece di aprire uno
+stream muto. In macchina l'HUD mostra una targhetta sopra il tachimetro — nome della stazione
+e tre tacche di segnale che lampeggiano finché non si aggancia — e **si vede anche da
+spenta**, perché una radio che non si sa di avere non la accende nessuno.
+
+**Dentro i negozi** suona a `0.26` del volume, e solo nei locali che ce l'hanno davvero
+(`radio: true` in `interiors.BUSINESSES`: 편의점, 약국, 옷가게, 분식, 술집, 당구장 — non
+l'ufficio, non l'ospedale, e non il 노래방, che la musica ce l'ha già). **È la stessa
+stazione dell'autoradio**: una seconda connessione per un fondo appena percettibile non vale
+il traffico dati.
+
+**Dettagli che sembrano piccoli e non lo sono:**
+
+- **`TUNE_SETTLE` (0,45 s).** Scorrendo la manopola si passano cinque stazioni in due
+  secondi: senza la pausa si aprirebbero cinque connessioni per ascoltarne una.
+- **`STALL_LIMIT` (11 s).** Una stazione che non manda un byte suonabile viene marchiata
+  `broken` e saltata. Marchiata, non tolta: al giro dopo può essere tornata, ma scorrendo non
+  ci si inciampa più.
+- **La radio si carica solo quando qualcuno la sente.** Fuori dall'auto e fuori da un locale
+  con la radio, l'elemento va in pausa: niente stream che scorre per nessuno.
+- **`fail()` esce subito se la radio è spenta.** Staccare la sorgente da un `<audio>` fa
+  scattare un `error` da solo — senza quella riga, spegnere la radio la **riaccendeva** sulla
+  stazione successiva.
+
+**Cosa è stato verificato, e cosa no.** L'egress di quella sessione consentiva solo GitHub
+(`example.com` → 403 dal proxy), quindi **gli stream veri non sono mai stati ascoltati da
+qui**. Il resto sì, e con una stazione finta — un WAV generato al volo e servito da un
+`blob:` — il percorso completo è stato provato: accensione solo dove si sente, cambio
+stazione, volume 0,56 in auto contro 0,15 dentro un 편의점 aperto, pausa scendendo dall'auto,
+pausa col muto generale (`F4`), spegnimento con `Shift+R` che resta spento. Il ramo «la rete
+non c'è» è quello che in questo container succede per davvero: tre mirror falliti, toast, e
+radio che resta spenta senza rompere niente.
+
+⚠️ **In headless, con la radio accesa, `probe.mjs` esce 1** anche quando il gioco sta bene:
+il browser logga da sé `net::ERR_...` per ogni richiesta bloccata, e il probe conta i
+`console.error`. Non è un errore JS. Le scene che non riguardano la radio non la accendono,
+quindi il problema non si presenta mai per caso.
+
 ---
 
 ## 6. Backlog successivo (già concordato con l'utente)
@@ -1648,9 +1750,20 @@ prima: il §5.12 ha pagato diciannove voci di questo elenco e il §5.13 ha chius
 - **Arresto (busted).** La polizia spara e basta, non ti carica in volante. Adesso che assedia
   la porta è anche più strano che non lo faccia. Vedi §5.5 per le ragioni per cui era stato
   rimandato: raddoppia i flussi di fine partita (celle, cauzione, arsenale confiscato).
-- **Niente musica e niente radio in macchina.** L'audio c'è (§5.13), la musica è un'altra
-  cosa: vuole scelte di regia — quanti pezzi, di che genere, quando parte, se si accende con
-  la chiave — ed è la prima che il giocatore cercherà girando la manopola. Da concordare.
+- **Niente musica *del gioco*.** La radio c'è (§5.14) e porta musica vera, ma è musica di
+  qualcun altro: manca un tema, e mancano i pezzi che accompagnano una missione o una fuga.
+  È materia di regia e va concordata.
+
+**Rimasto indietro dalla radio** (§5.14):
+- **Le tre grandi coreane non ci sono**: KBS, MBC e SBS trasmettono in HLS con un token, e
+  `<audio>` non legge HLS. L'unica strada senza librerie sarebbe un demuxer TS→fMP4 scritto a
+  mano sopra MSE: è tanto lavoro per tre stazioni, ma sono *le* tre stazioni.
+- **Niente memoria di cosa suonava**: la stazione si ricorda (localStorage), il punto no —
+  ovvio per una diretta, ma vuol dire che ogni salita in auto ricomincia dal buffering.
+- **Non si vede il titolo del brano**: gli Icecast lo mandano nei metadati (`Icy-MetaData`),
+  che da un `<audio>` non si leggono. Vorrebbe dire scaricare lo stream a mano.
+- **La radio non reagisce a niente**: non si abbassa quando arriva la polizia, non gracchia
+  in galleria, non si spegne quando l'auto prende fuoco.
 
 **Rimasto indietro dall'audio** (§5.13):
 - **Niente riverbero**: un vicolo, un 노래방 e il piazzale dell'aeroporto suonano nello stesso
@@ -1891,6 +2004,14 @@ resta la musica, che è una scelta di regia e non un sintetizzatore.
 | Sirena · rotore | `audio.updatePolice` | `0.022 + 0.04 × vicinanza`, ×1.6 max col numero · 0.06 (polizia) / 0.09 (il tuo) |
 | Attenuazione in pausa | `audio.updateBeds` (`duck`) | 22% sui letti, interfaccia a volume pieno |
 | Passo del giocatore | `audio.updateWalk` | uno ogni 34 px percorsi, sopra 18 px/s |
+| **— radio (§5.14) —** | | |
+| Directory delle stazioni | `radio.DIRECTORY` · `QUERY` | 3 mirror di radio-browser.info, `countrycode=KR`, per voti, timeout 6 s |
+| Stazioni tenute | `radio.MAX_STATIONS` | 14 (su 80 chieste, dopo il filtro su codec e playlist) |
+| Attesa prima di agganciare | `radio.TUNE_SETTLE` | 0,45 s (scorrere la manopola non apre cinque connessioni) |
+| Stazione muta | `radio.STALL_LIMIT` | 11 s senza dati suonabili → marchiata `broken` e saltata |
+| Volume | `audio.mix.radio` · `radio.contextGain` | 0.8 di fabbrica · pieno in auto, ×0.26 nel negozio, ×0.4 in pausa |
+| Locali con la radio | `interiors.BUSINESSES[].radio` | 편의점 · 약국 · 옷가게 · 분식 · 술집 · 당구장 |
+| Stazioni proprie | `localStorage` `seoul.radio.stations` | `[{name, url}]`, hanno la precedenza sull'elenco scaricato |
 
 ---
 
@@ -1920,6 +2041,12 @@ girare mentre lo script attende. Dentro c'è `game`, e si può `await import('/s
 Chromium parte con `--autoplay-policy=no-user-gesture-required` e `--mute-audio`: l'audio è
 **misurabile anche headless** (basta `game.audio.unlock()` in testa alla scena) ma non viene
 mandato a una scheda audio, che in un container non c'è.
+
+⚠️ **Una scena che accende la radio fa uscire `probe.mjs` con codice 1** se la rete è chiusa:
+il browser logga da sé un `net::ERR_...` per ogni richiesta bloccata e il probe conta i
+`console.error`. Non è un errore JS e non è un difetto del gioco (§5.14). Per provare la
+radio senza rete si inietta una stazione finta — un WAV generato al volo dentro un `blob:` —
+in `game.radio.stations`, che è esattamente come è stata verificata.
 
 Le trappole delle prove scriptate (mira dal cursore, camera smorzata, griglie ricostruite ogni
 frame, il giocatore fermo che muore) sono in §4, in fondo: leggerle prima di dare la colpa al

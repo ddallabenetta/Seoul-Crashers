@@ -3,6 +3,7 @@ import { Loop } from './core/loop.js';
 import { Input } from './core/input.js';
 import { Rng } from './core/rng.js';
 import { AudioSystem } from './core/audio.js';
+import { Radio } from './core/radio.js';
 import { DynamicGrid } from './core/spatial.js';
 import { KMH, clamp, dist } from './core/math.js';
 import { generateCity } from './world/citygen.js';
@@ -52,6 +53,9 @@ class Game {
     this.markers = [];
     this.fx = new Fx();
     this.audio = new AudioSystem();
+    // La radio è l'unica cosa del gioco che parla con la rete, e non lo fa
+    // finché il giocatore non la accende (§5.14).
+    this.radio = new Radio(this.audio);
     this.stats = {
       distance: 0,
       topSpeed: 0,
@@ -288,6 +292,25 @@ class Game {
     }
   }
 
+  /**
+   * Manopola della radio. Sta qui e non in `player` perché si usa in due posti —
+   * al volante e dentro un locale — e in nessuno dei due è un'azione del
+   * personaggio. Premerla dove non si sentirebbe niente lo dice, invece di
+   * aprire uno stream muto.
+   */
+  updateRadioKeys() {
+    if (!this.input.wasPressed('KeyR') || this.paused) return;
+    const shift = this.input.anyDown('ShiftLeft', 'ShiftRight');
+    const inCar = !this.player.onFoot && this.player.vehicle;
+    const inShop = this.indoors && this.shops.floor?.openNow && this.shops.floor?.biz.radio;
+    if (!inCar && !inShop) {
+      this.hud.toast('La radio è in macchina (o in un locale che ce l\'ha)', 1.8);
+      return;
+    }
+    if (shift) this.radio.off(this);
+    else this.radio.next(this);
+  }
+
   onPlayerDeath() {
     this.stats.deaths++;
     this.camera.addShake(16);
@@ -380,9 +403,11 @@ class Game {
     }
 
     this.paused = this.menu.open || this.mapView.open || this.shopMenu.open;
+    this.updateRadioKeys();
     // L'audio gira anche in pausa: i letti si abbassano invece di spegnersi (uno
     // stacco netto suona come un guasto) e i suoni dei menu restano a volume pieno.
     this.audio.update(dt, this);
+    this.radio.update(dt, this);
     const cursor = this.paused ? 'default' : 'none';
     if (this.canvas.style.cursor !== cursor) this.canvas.style.cursor = cursor;
 
