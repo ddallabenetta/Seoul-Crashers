@@ -21,6 +21,7 @@ import { ProjectileSystem } from './entities/projectiles.js';
 import { WantedSystem } from './entities/wanted.js';
 import { PoliceSystem } from './entities/police.js';
 import { ShopSystem, won } from './entities/shops.js';
+import { usedSlots } from './core/save.js';
 import { InteriorScene } from './render/interiorscene.js';
 import { Hud } from './ui/hud.js';
 import { MapView } from './ui/mapview.js';
@@ -151,6 +152,9 @@ class Game {
     this.hud.toast('E per rubare un\'auto · M per la mappa', 5);
     this.hud.toast('Mouse per mirare e sparare · 1-6 per l\'arma', 6.5);
     this.hud.toast('E sulla porta di un negozio per entrare · F svuota la cassa', 8);
+    // Il gioco parte in strada, senza schermata iniziale: se non lo si dice qui,
+    // una partita salvata resta invisibile finché non si apre il menu per caso.
+    if (usedSlots() > 0) this.hud.toast('Hai una partita salvata · ESC → Salvataggi', 9.5);
 
     await onProgress('Pronti.', 1);
     this.loop = new Loop((dt) => this.update(dt), () => this.render());

@@ -416,6 +416,7 @@ export class ShopSystem {
   constructor(city) {
     this.city = city;
     this.cache = new Map();   // interni già visitati, con le loro casse svuotate
+    this.pending = null;      // quello che un salvataggio ricorda e la cache non ha ancora
     this.active = null;
     this.outside = null;      // dove si torna uscendo
     this.backSpot = null;     // dove si sbuca dal retro, se là dietro c'è posto
@@ -481,8 +482,61 @@ export class ShopSystem {
       f.kept = [];
       f.people = f.staff;
     }
+    // Quello che un salvataggio ricordava di questo indirizzo si applica adesso,
+    // alla prima visita dopo il caricamento: gli interni nascono pigri (139
+    // vetrine × fino a 4 piani sarebbero 369 piante costruite per niente) e
+    // ricostruirli tutti a mano al caricamento butterebbe via quel vantaggio.
+    const rec = this.pending && this.pending.get(shop.id);
+    if (rec) {
+      this.pending.delete(shop.id);
+      for (const i of rec.robbed || []) if (it.floors[i]) it.floors[i].robbed = true;
+      for (const [fi, si] of rec.dead || []) {
+        const p = it.floors[fi] && it.floors[fi].staff[si];
+        if (p) { p.dead = true; p.deadT = 40; }
+      }
+    }
     this.cache.set(shop.id, it);
     return it;
+  }
+
+  /**
+   * Cosa di un interno non deve tornare indietro fra una partita e l'altra: la
+   * cassa svuotata e il personale steso. **Non la pianta** — quella la
+   * ricostruisce `buildInterior` dalla seed del negozio, identica a prima, e
+   * scriverla in un salvataggio vorrebbe dire scrivere mezza città.
+   *
+   * I clienti ammazzati (`f.kept`) restano fuori: la folla di passaggio nasce a
+   * ogni visita dall'ora che è, quindi un indice su quella lista non
+   * significherebbe niente al caricamento.
+   */
+  snapshot() {
+    const out = {};
+    const record = (it) => {
+      const robbed = [];
+      const dead = [];
+      it.floors.forEach((f, i) => {
+        if (f.robbed) robbed.push(i);
+        f.staff.forEach((p, k) => { if (p.dead) dead.push([i, k]); });
+      });
+      return robbed.length || dead.length ? { robbed, dead } : null;
+    };
+    for (const [id, it] of this.cache) {
+      const rec = record(it);
+      if (rec) out[id] = rec;
+    }
+    // Un negozio caricato da un salvataggio e non ancora rivisitato è ancora in
+    // `pending`, non in `cache`: senza questa riga risalvare subito dopo aver
+    // caricato dimenticherebbe tutto quello che non si è passato a rivedere.
+    if (this.pending) for (const [id, rec] of this.pending) if (!(id in out)) out[id] = rec;
+    return out;
+  }
+
+  restore(data) {
+    // Le piante già in cache sono quelle della partita che si sta abbandonando:
+    // vanno buttate, o la cassa svuotata di *prima* si sovrapporrebbe a quella
+    // del salvataggio.
+    this.cache.clear();
+    this.pending = new Map(Object.entries(data || {}));
   }
 
   /** Un pedone da interno: al suo posto, senza marciapiedi da navigare. */
