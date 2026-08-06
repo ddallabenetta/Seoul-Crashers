@@ -70,6 +70,7 @@ export class Hud {
     this.drawMessages(ctx, w, h);
     if (game.debug) this.drawDebug(ctx, game, w, h);
     this.drawDamage(ctx, game, w, h);
+    this.drawArrest(ctx, game, w, h);
     this.drawCrosshair(ctx, game);
     this.drawFade(ctx, game, w, h);
 
@@ -391,6 +392,37 @@ export class Hud {
   }
 
   /** Botte prese: vignettatura rossa. Diventa fissa quando la salute è agli sgoccioli. */
+  /**
+   * Le manette che si stanno chiudendo. Un secondo e mezzo senza niente a schermo
+   * sarebbe un fermo che arriva dal nulla: qui si vede quanto manca, e quindi si
+   * capisce che scappare (o rimettere mano alla pistola) serve a qualcosa.
+   */
+  drawArrest(ctx, game, w, h) {
+    const t = game.police ? game.police.bustProgress : 0;
+    if (t <= 0) return;
+    const bw = 232;
+    const x = (w - bw) / 2;
+    // Sotto il centro e sopra la barra armi: il terzo alto dello schermo è già
+    // occupato dal cartello del distretto e dai messaggi, e il fermo ci finiva
+    // sotto proprio nel momento in cui c'è più roba a schermo.
+    const y = h * 0.6;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '900 19px system-ui, "Apple SD Gothic Neo", sans-serif';
+    ctx.fillText('체포 · FERMO!', w / 2, y - 12);
+    ctx.fillStyle = 'rgba(10,12,15,0.72)';
+    roundPath(ctx, x, y, bw, 9, 4);
+    ctx.fill();
+    ctx.fillStyle = '#56b8ff';
+    roundPath(ctx, x, y, Math.max(5, bw * t), 9, 4);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(235,240,250,0.7)';
+    ctx.font = '600 12px system-ui, sans-serif';
+    ctx.fillText('scappa, sali in macchina o tira fuori la pistola', w / 2, y + 28);
+    ctx.restore();
+  }
+
   drawDamage(ctx, game, w, h) {
     const p = game.player;
     const low = clamp(1 - p.hp / (p.maxHp * 0.3), 0, 1);

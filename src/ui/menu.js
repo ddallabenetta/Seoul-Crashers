@@ -546,6 +546,7 @@ export class PauseMenu {
       ['Incidenti', String(s.crashes)],
       ['Cadaveri lasciati', String(s.kills)],
       ['Volte all\'ospedale', String(s.deaths)],
+      ['Volte in cella', String(s.busted || 0)],
       ['Quartieri visitati', `${s.districts.size} / 5`],
       ['Divise stese', String(s.copsKilled || 0)],
       ['Ricercato massimo', '★'.repeat(s.maxWanted || 0) || '—'],
