@@ -82,9 +82,12 @@ Valori sani (Chromium headless in container, mix di fabbrica):
 | ambiente urbano | ~0.015 | ~0.06 |
 | temporale | ~0.045 | ~0.3 |
 | al volante | ~0.045 | ~0.15 |
-| caccia a 5 stelle | ~0.055 | ~0.33 |
+| caccia a 5 stelle | ~0.068 | ~0.5 |
 | colpo singolo | — | 0.30 (SMG) → 0.60 (fucile di precisione) |
 | esplosione | — | 0.60-0.75 |
+
+La caccia comprende la **musica** (§5.19): senza era ~0.055. Se tocchi il pezzo
+dell'inseguimento, il censimento da guardare è l'altro (vedi sotto).
 
 **Il rapporto che conta è ambiente contro colpo.** Alla prima passata l'ambiente aveva lo
 stesso rms di un colpo di pistola: nel sorgente non si vedeva, nel censimento sì.
@@ -92,6 +95,39 @@ stesso rms di un colpo di pistola: nel sorgente non si vedeva, nel censimento s�
 Per ascoltare a orecchio serve un browser vero: `python3 -m http.server 8123` e un clic
 sulla pagina (l'audio parte al primo gesto). `F4` è il muto, il pannello **Audio** del menu
 di pausa ha i quattro volumi.
+
+## La musica è una terza famiglia
+
+`src/core/music.js`. Non è un colpo secco e non è un letto: è uno **scheduler in anticipo**
+che ogni frame programma sull'orologio del contesto le note dei prossimi 0,25 s. Se la
+richiesta riguarda la musica, quasi sempre si tocca **una funzione sola**:
+
+| Vuoi… | Tocchi |
+| --- | --- |
+| far partire un pezzo in un momento nuovo (una missione, un locale) | `music.direct` — è l'unico punto che sa qualcosa del gioco |
+| cambiare come suona un pezzo | `stepMenu` / `stepChase`: `i` è il passo (una croma), `t` è **quando** suonerà |
+| aggiungere un pezzo | una voce in `BPM`, una in `LEVEL`, una progressione in `PROG`, un `stepX` e una riga in `step()` |
+| uno stacco (vittoria, sconfitta, stacco di scena) | `music.sting`, e mandalo su `this.stings` — il bus del pezzo può essere a zero |
+
+Regole che non si negoziano, perché sono la ragione per cui la musica non dà fastidio:
+
+- **In strada non suona niente**, e la **radio vince sempre** (§5.19). Prima di aggiungere un
+  pezzo che suona spesso, chiediti cosa copre: Seoul ha già un fondo suo.
+- **Non suonare a `dt`**: un frame lungo diventa una nota in ritardo. Si programma su
+  `ctx.currentTime + …`, sempre.
+- **Il cambio di pezzo passa dal silenzio** (dissolvenza ~1,9 s): non si taglia a metà battuta.
+- **Ogni nodo si stacca da solo** (`onended`): venti gain al secondo lasciati attaccati fanno
+  crescere il grafo per tutta la partita.
+
+```bash
+node .claude/tools/probe.mjs --menu --seconds 1 --quiet \
+  --script .claude/tools/scenes/music-census.scene
+```
+
+Dà rms e picco del tema e della caccia ai due gradini di stelle, **e verifica la regia**: che
+il pezzo taccia in strada e con la radio accesa. Riferimenti: tema ~0.045, caccia 3 stelle
+~0.034, in strada ~0.015 (che è il fondo urbano, cioè musica zero). Serve `--menu`, o il
+tema non parte.
 
 ## La radio è un'altra cosa
 
