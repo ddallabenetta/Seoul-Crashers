@@ -128,6 +128,9 @@ su un veicolo fermo significa che è bloccato fisicamente**: è il sintomo da in
 > intervalli su due esecuzioni perché questa scena cambia zona a tempo di orologio, non di
 > simulazione: sotto carico diverso i teletrasporti cadono in istanti diversi. Gli ordini di
 > grandezza però sono stabili — una differenza del 10% non significa niente, una del 200% sì.
+> **Misurato apposta in §5.12: due esecuzioni della stessa identica configurazione si scostano
+> del ~7% sul flusso e del doppio sui veicoli fermi.** È la soglia sotto cui non c'è niente da
+> leggere, ed è già bastata una volta a far sembrare un risultato quello che era rumore.
 > Attenzione anche a un'altra cosa: **qualunque** modifica alla guida sposta le traiettorie e
 > quindi cambia lo scenario, ed è per questo che si misura su cinque zone e non su una (su una
 > sola il conteggio dei veicoli fermi salta da 0 a 10 senza che la legge di guida sia cambiata
