@@ -3,17 +3,18 @@
 Documento per riprendere il lavoro da una sessione pulita. Leggi anche `README.md`
 (descrizione del gioco e comandi) — qui c'è quello che serve a *sviluppare*.
 
-Ultimo aggiornamento: **ciclo giorno-notte, meteo e orari** (§5.11) — Seoul ha un orologio
-(24 minuti reali = 24 ore), quattro condizioni di tempo con la pioggia che si sente al volante,
-e i negozi che aprono e chiudono. Prima c'era il traffico (§5.10), la mappa (§5.9: mare,
-aeroporto, porto, campagna, bande), i negozi e gli interni (§5.8) e la Fase 2 tappa C.
+Ultimo aggiornamento: **giro di arretrati** (§5.12) — diciannove punti che il §6 si portava
+dietro da quattro fasi, chiusi in un colpo: la polizia assedia la porta di un negozio, i
+pedoni si riparano dalla pioggia, il fuoco si propaga, le bande commerciano, i prezzi cambiano
+da quartiere a quartiere, si dorme per far passare la notte. Prima c'erano il ciclo
+giorno-notte (§5.11), il traffico (§5.10), la mappa (§5.9), i negozi (§5.8) e la Fase 2 tappa C.
 
 > 📌 **Da concordare con l'utente prima di scrivere codice:** della Fase 3 restano le
 > **missioni**, che sono il lavoro grosso e pieno di scelte di design (quante, come si
 > attivano, cutscene a fumetti, fallimento e ripetizione). L'utente vuole essere consultato
-> invece di trovarsele fatte (§7): **chiediglielo in apertura di sessione.** §6 ha l'elenco
-> completo di quello che resta indietro, in ordine di quanto si sente — e adesso in cima c'è
-> il ciclo giorno-notte, che ha appena aperto una lista tutta sua.
+> invece di trovarsele fatte (§7): **chiediglielo in apertura di sessione.** Adesso il §6 è
+> corto: gli arretrati grossi sono stati pagati, e quello che resta è quasi tutto materia
+> della storia o roba che si nota poco.
 
 ---
 
@@ -24,8 +25,8 @@ Canvas 2D puro, moduli ES nativi, **zero dipendenze, nessun build step**. Tutta 
 (sprite, facciate, terreno, mappa) è generata da codice a runtime: non esistono asset esterni.
 
 Stato: **Fase 1, Fase 1.5, Fase 2 (tutte e tre le tappe) e le prime tre tappe della Fase 3
-completate e collaudate**, più la revisione della guida AI del traffico (§5.10). ~14.500 righe
-in 33 moduli. 60 fps con ~44 veicoli e ~93 pedoni attivi, e restano 60 anche sotto raffica
+completate e collaudate**, più la revisione della guida AI del traffico (§5.10) e il giro di
+arretrati del §5.12. ~17.600 righe in 33 moduli. 60 fps con ~44 veicoli e ~93 pedoni attivi, e restano 60 anche sotto raffica
 continua di SMG. Dentro un edificio il costo è trascurabile: la città non gira. Il ciclo
 giorno-notte costa **1,5 ms di JS per frame nel caso peggiore** (notte con temporale) — ma i
 veli a schermo intero non sono misurabili onestamente in headless, vedi l'avvertenza in §5.11.
@@ -42,8 +43,8 @@ si annega e le auto affondano. Sei territori di bande occupano cortili, piazzali
 
 La Fase 2 era divisa in tre tappe, concordate con l'utente: **A** combattimento base,
 **B** polizia e ricercato a 5 livelli, **C** armi pesanti ed esplosivi. **Sono tutte fatte.**
-La Fase 3 (contenuti) è cominciata da **negozi e interni** (§5.8), che era una delle tre
-partenze possibili; restano missioni e ciclo giorno-notte, §6.
+La Fase 3 (contenuti) è cominciata da **negozi e interni** (§5.8), poi la mappa (§5.9) e il
+ciclo giorno-notte (§5.11); il §5.12 ha chiuso gli arretrati. **Restano le missioni**, §6.
 
 ### Avvio
 
@@ -127,6 +128,9 @@ su un veicolo fermo significa che è bloccato fisicamente**: è il sintomo da in
 > intervalli su due esecuzioni perché questa scena cambia zona a tempo di orologio, non di
 > simulazione: sotto carico diverso i teletrasporti cadono in istanti diversi. Gli ordini di
 > grandezza però sono stabili — una differenza del 10% non significa niente, una del 200% sì.
+> **Misurato apposta in §5.12: due esecuzioni della stessa identica configurazione si scostano
+> del ~7% sul flusso e del doppio sui veicoli fermi.** È la soglia sotto cui non c'è niente da
+> leggere, ed è già bastata una volta a far sembrare un risultato quello che era rumore.
 > Attenzione anche a un'altra cosa: **qualunque** modifica alla guida sposta le traiettorie e
 > quindi cambia lo scenario, ed è per questo che si misura su cinque zone e non su una (su una
 > sola il conteggio dei veicoli fermi salta da 0 a 10 senza che la legge di guida sia cambiata
@@ -156,7 +160,8 @@ game.city.stats // { buildings, props, blocks, nodes, edges, doglegs, stairs }
 
 Valori attesi con la seed attuale: `buildings 418`, `props 1299`, `blocks 122`, `nodes 196`,
 `edges 279`, `doglegs 4`, `stairs 3`, `rural 5`, `piers 10`, `shops 113`, `venues 324`,
-`garages 7`, `turfs 6`, e 36 raccolte a terra (`game.pickups.items.length`).
+`garages 7`, `turfs 6`, e 43 raccolte a terra (`game.pickups.items.length`) — erano 36 finché
+non si è aggiunta la campagna e non si è cominciato a scartare i punti murati (§5.12).
 I primi nove devono restare **identici** finché non si tocca l'ordine di consumo dell'rng in
 generazione: se cambiano, hai spostato una `rng.*` e la città non è più quella collaudata.
 `shops`/`venues`/`garages` e `turfs` nascono da rng **separati** (`placeShops`, `placeGarages`,
@@ -216,8 +221,32 @@ Per negozi e interni (fase 3):
 ```
 
 `game.indoors` è la domanda giusta da fare quasi sempre: se è vero, traffico, pedoni,
-polizia, ricercato e raccolte **non stanno girando**, e `game.area()` restituisce la pianta
-del piano invece della città. **L'unica eccezione è l'orologio**, che gira comunque (§5.11).
+ricercato e raccolte **non stanno girando**, e `game.area()` restituisce la pianta del piano
+invece della città. **Le eccezioni sono due**: l'orologio, che gira comunque (§5.11), e la
+polizia, che dalla §5.12 assedia la porta invece di sparire — ma con una versione ridotta di
+sé (`police.siege`), non facendo ripartire la città.
+
+Per le bande, il mercato e l'assedio (§5.12):
+
+```js
+// il banco di una banda: chi è il contatto, e cosa vende oggi
+const t = game.city.turfs[0];
+const S = await import('/src/entities/shops.js');
+({ banda: `${t.hangul} ${t.trade}`, contatto: !!game.shops.dealerOf(t),
+   merce: game.shops.dealerOf(t) ? S.gangStock(t, game).map((i) => `${i.label} ${i.price}`) : [] })
+// si tratta solo a mani vuote e senza stelle: con la mazza in pugno il banco sparisce
+game.shops.actions.map((a) => `${a.key}: ${a.text}`)
+// quanto costa la stessa cosa nei sette quartieri
+S.MARKETS && Object.entries(S.MARKETS).map(([k, m]) => [k, m.guns, m.pawn])
+// assedio: entra con quattro stelle e guarda chi trovi all'uscita
+game.wanted.add(100, game); game.shops.enter(game.city.shops[0], game);
+// ... qualche secondo ...
+game.shops.leave(game);
+const dp = (o) => Math.round(Math.hypot(o.x - game.player.x, o.y - game.player.y));
+({ agenti: game.police.cops.map(dp).sort((a, b) => a - b),
+   volanti: game.police.cars.map(dp).sort((a, b) => a - b),
+   motovedette: game.police.boats.length })
+```
 
 Per l'ora, la luce e il meteo (fase 3, terza tappa):
 
@@ -626,6 +655,43 @@ avere un muro d'acqua che compare in due secondi sopra una città col sole. La t
 25 s e `blend` va **da `weather` (0) a `next` (1)**: sbagliarne il verso fa una transizione che
 va a ritroso e finisce con uno scatto, ed è un bug che nel sorgente si legge come corretto.
 
+**L'assedio non fa ripartire la città.** Dalla §5.12 la polizia continua a lavorare mentre sei
+dentro un negozio, ma non perché `main` abbia tolto il ramo `if (!this.indoors)`: gira
+`police.siege`, che è un'altra cosa. Dentro un edificio `game.peds` è **scambiato** con la
+gente del piano e `traffic.update` non gira, quindi né gli agenti (che sono pedoni) né le
+volanti (la cui fisica la integra il traffico) avrebbero chi li muove: li muove l'assedio, con
+uno steering punto-e-velocità senza collisioni e senza griglie. Il giocatore non sta guardando,
+e all'uscita `snapToRoad` rimette le volanti in carreggiata. **Il ricercato invece resta
+congelato**: se si raffreddasse dentro, la porta diventerebbe il nascondiglio che §5.8 aveva
+deciso di non farne.
+
+**Un solo punto di riferimento, `police.focus(game)`.** `prune`, `spawnCar`, `spawnFootCop` e
+`updateChopper` leggevano tutti `player.x/y`, e dentro un edificio quelle coordinate sono
+quelle della pianta (200-470 px), che in città cadono nell'angolo nord-ovest della mappa.
+Ognuno che se ne dimentica manda un'unità a Gimpo: un punto solo da cui passare è l'unica
+difesa possibile contro quella trappola.
+
+**Un contatto è un posto, non uno stato.** Il 거래책 di una banda si riconosce con `canDeal`,
+che guarda **dov'è** — vivo, non ostile, dentro il suo recinto — e non `state === 'guard'`.
+Lo stato sembra più sicuro e chiude il banco al primo spavento: un'auto che accosta, un
+tamponamento a due isolati, un allarme lontano. E siccome dai 철마파 ci si arriva **guidando**,
+la versione con lo stato si rompeva esattamente nel caso per cui esisteva.
+
+**Il fuoco si esaurisce da solo, il tetto è solo una rete.** Ogni pozza può generarne un'altra,
+ma la figlia nasce più corta e più debole della madre (`× 0.62` di vita) e sotto 1,8 s smette
+di generare: sono quelle frazioni a spegnere un incendio, non `MAX_FIRES`. Col solo tetto il
+fuoco resterebbe acceso al massimo consentito finché c'è asfalto. Serve anche una distanza
+minima fra due pozze, o il fuoco si accatasta dov'è invece di camminare — e venti pozze
+sovrapposte sono una pozza sola che fa 20× danno.
+
+**Il prezzo di una cosa dipende da dove la compri.** `shops.MARKETS` è una tabella scritta a
+mano, sette distretti × quattro categorie più la percentuale di ricompra: un moltiplicatore
+casuale sulla seed sarebbe indistinguibile da un prezzo sbagliato, questi si spiegano guardando
+il quartiere. I numeri non sono liberi: messi in fila con lo sconto delle bande devono tenere
+la catena **in perdita**, o comprare in un posto e rivendere in un altro diventa una zecca.
+Quello che il mercato paga davvero è la roba che non hai comprato — raccolte a terra, armi dei
+morti, auto rubate.
+
 **L'elicottero vive nella proiezione.** Vola a `z = 210`, quindi a schermo sta dove lo mette
 la parallasse, non sopra la sua verticale. Due conseguenze: si colpisce alla posizione
 proiettata (c'è un caso apposta in `weapons.rayCast`, ed è l'unico bersaglio che dipende dalla
@@ -702,6 +768,31 @@ codice spiega il perché nel punto giusto.
 | La gente al tavolo di un 분식 apre l'ombrello | `drawPed` è lo stesso codice dentro e fuori, e leggeva `rain` senza guardare dove si trova | guardia `game.indoors` in `drawPed` |
 | L'orologio dell'HUD è un emoji che cambia da macchina a macchina | `weather.icon` usato come glifo | icone del meteo disegnate con path (`hud.drawWeatherIcon`), come tutto il resto della grafica |
 | L'asfalto resta bagnato per minuti dopo aver forzato `clear` in una prova | `setWeather` saltava alla nuova condizione ma lasciava `wet` a asciugarsi da solo (0.0016/frame) | `setWeather` porta `wet` a 0 o 1 insieme al resto |
+| Assediando la porta la polizia sparisce dopo un secondo | `prune` misura la distanza da `player.x/y`, che dentro un edificio è la pianta: tutto risulta oltre 2200 px | `police.focus`, da cui passano `prune`, gli spawn e l'elicottero |
+| Un agente di rinforzo compare fra gli scaffali del 편의점 | `addCop` faceva `game.peds.push`, e dentro `game.peds` è la gente del piano | `police.addCop`: `game.indoors ? game.pedSystem.peds : game.peds` |
+| Svuotata una cassa al terzo piano, le pattuglie corrono nell'angolo nord-ovest della mappa | `wanted.add` registrava le coordinate della pianta come ultima posizione nota | `wanted.add`: se si è dentro si registra `shops.active.shop` |
+| Le volanti escono dall'assedio a razzo e sbandano | durante l'assedio si scrive `x/y` a mano, ma `speed`/`vx`/`vy` restano quelli di prima e `traffic.update` li riprende alla lettera | `police.siegeCar` azzera velocità e comandi, `endSiege` chiama `snapToRoad` |
+| Un pedone su due viene saltato nel frame in cui un agente risale in macchina | `boardCop` è chiamata da dentro il `for…of this.peds` di `pedSystem.update` | `police._boarded`: la rimozione si rimanda al `prune` del frame dopo |
+| Il ricercato si raffredda con la motovedetta a cinquanta metri di poppa | `computeSpotted` guardava solo `cops` e `cars` | `police.computeSpotted`, terzo giro su `this.boats` |
+| La SWAT non tira quasi mai la granata | la distanza di ingaggio (120-240 px) sta quasi tutta sotto la soglia minima del lancio (200) | `police.copBehavior`, banda 190-320 px per la SWAT |
+| A cinque stelle arriva una granata ogni 2,5 s | «una sola in volo» non è un tetto di cadenza: con sei uomini della SWAT la miccia da 2,2 s diventa il periodo | `police.NADE_GAP`, 5 s di pausa per la squadra dopo ogni scoppio |
+| Una motovedetta si pianta contro un molo e non riparte | in acqua non passa nessuno a spostarla, e non c'è grafo da cui riagganciarsi | `police.driveBoat`, anti-incastro in retromarcia come per le volanti |
+| La pioggia non lava niente per quanto si aspetti | `Fx` non vede il meteo: `main` chiamava `fx.update(dt)` e basta | `fx.update(dt, game)`; `drawDecals` invece resta a un argomento, la usa anche `interiorscene` |
+| Un incendio grosso fa sparire traccianti e sangue a metà volo | 22 pozze × 26 particelle/s riempiono da sole 346 dei 420 posti di `fx` | strozzatura `26 × min(1, 10 / fires.length)` in `updateFires` |
+| Il fuoco si accatasta dov'è invece di camminare | senza distanza minima le figlie nascono dentro la madre | `projectiles.canBurn`, distanza minima `0.72 × r` |
+| I pedoni al riparo costano più della pioggia stessa | venti fermi contro un muro rifacevano la query dei solidi a ogni frame | `updatePed`, il push anti-muro vale per `shelter` solo con `targetSpeed > 0` |
+| Un posto auto resta occupato per sempre da un'auto venduta o affondata | togliere un veicolo da `game.vehicles` non libera il suo stallo | `shops.sellVehicle` e `main.onVehicleSunk`: `if (v.spot) v.spot.taken = false` |
+| Il commesso scappato è di nuovo dietro al banco alla visita dopo | `f.people` non è più lo stesso array di `f.staff`: lo splice toglieva solo dalla copia | `shops.updateInside`, `drop(f.staff, p)` e `drop(f.crowd, p)` |
+| Un buco nel muro di fondo che non porta da nessuna parte | il varco veniva aperto prima di sapere se dietro l'edificio c'è posto per un piede | `buildInterior(shop, back)`, `back` deciso da `shops.backDoorSpot` una volta sola |
+| Il meteo dopo otto ore di sonno è quello di otto ore prima | `hour = x` sposta l'orologio ma non fa girare la catena di Markov | `daycycle.advance`, passi di 5 s con `apply()` dentro il ciclo |
+| Una stella arriva dal nulla dopo essere rinato in ospedale | l'allarme silenzioso continuava a scorrere durante la morte, e la morte azzera il ricercato | `shops.updateAlarm`, uscita su `game.player.dying` |
+| Il 거래책 sparisce proprio quando ti serve | un'auto che accosta fa scappare chi ha intorno, e una guardia spaventata restava `walk` per sempre | `updatePed` rimette in `guard` chi ha `turf`; `canDeal` guarda il recinto, non lo stato |
+| Due uomini marchiati come contatto nello stesso cortile | il flag lo scrivevano sia `spawnTurf` sia il rimpiazzo, e il giocatore parlava con quello sbagliato | solo `refreshDealer` lo assegna, e spegne il precedente |
+| Una raccolta a terra dentro un muro | nessuno controllava il punto: la molotov garantita davanti alla safehouse era murata da tre fasi | `pickups.freeSpot` e `addNear` |
+| **In una prova scriptata** un incendio ammazza il giocatore fermo | il fuoco propagato cammina di ~60 px per generazione e torna addosso a chi l'ha appiccato | `pl.hp = 1e6` per lo scatto, o appiccare a più di 300 px |
+| **In una prova scriptata** «tengo premuto il mouse» non spara | `mouse.down = true` a mano non alza `mouse.pressed`, e le semiautomatiche guardano il fronte | si prova con un'arma `auto` (SMG, minigun) |
+| **In una prova scriptata** il contatto di una banda non c'è | le guardie nascono a scaglioni e a più di 300 px dal giocatore: due secondi non bastano | avvicinarsi da **fuori** dal recinto e aspettarne sette |
+| **In una prova scriptata** `player.attack(game)` esplode | la firma è `attack(game, spec)`: senza spec si legge `.melee` di `undefined` | `attack(game, WEAPONS[id])` |
 | **In una prova scriptata** il ricercato torna a 0 da solo | il giocatore fermo allo spawn viene investito, oppure a cinque stelle la SWAT lo ammazza in ~8 s: la morte azzera tutto | metterlo su un marciapiede (`city.hospitals[i]`) e campionare entro 7 s |
 
 Regola generale emersa: **prima di dare la colpa all'AI, verifica la geometria.** Quasi tutti
@@ -1063,8 +1154,8 @@ perché delle scelte, che è quello che serve per cambiarle:
   vera, 54 auto nell'anello di streaming chiedono agli incroci semaforizzati più di quello che
   riescono a smaltire in un ciclo, e le code crescono finché non si smaltiscono più. Misurato:
   a 48 il flusso mediano cala del 23%, a 44 del 6%. Il limite di capacità sta lì in mezzo. Se
-  si vuole più densità, la leva vera è il ciclo del semaforo (`SIGNAL_CYCLE`, 15,5 s), non
-  `MAX_TRAFFIC`.
+  si vuole più densità, la leva vera è il ciclo del semaforo, non `MAX_TRAFFIC`. §5.12 l'ha poi
+  misurata: accorciarlo non dà niente, allungarlo fa danni.
 - **La manovra di sblocco guarda dove va.** Prima indietreggiava con sterzo casuale: in coda
   innescava la carambola successiva, contro un palazzo rompeva la macchina e restava incastrata
   lo stesso. Ora controlla veicoli e solidi dietro; se è chiuso forza il passaggio
@@ -1202,103 +1293,285 @@ accumulo a terra (cioè toccare i tile, cioè la cache), la seconda in una visua
 toglie solo informazione. Niente stagioni. Gli orari non cambiano il *contenuto* di un locale:
 un 술집 alle nove di sera ha la stessa gente di uno alle due di notte.
 
+### 5.12 Il giro di arretrati
+
+Non una tappa nuova: **diciannove punti che il §6 si portava dietro da quattro fasi**, presi
+in blocco perché messi insieme cambiano il gioco più di una funzione nuova. Sono arrivati da
+tre lavorazioni parallele su file disgiunti più le cuciture fra l'una e l'altra; qui c'è il
+perché delle scelte, che è quello che serve per cambiarle.
+
+**La polizia ti aspetta fuori.** Era il primo punto della lista dei negozi, ed è la cosa che
+si sente di più. Entrare con quattro stelle e uscire dopo un minuto ridava la strada esattamente
+com'era. Adesso, mentre sei dentro, `police.siege` porta le unità **sulla porta** (§3): esci e
+trovi gli agenti a 70-250 px e le volanti in corsia davanti. Tre scelte reggono il pezzo: il
+ricercato resta **congelato** (la porta non diventa un nascondiglio); l'assedio muove le unità
+da sé senza far ripartire streaming, griglie e collisioni; i rinforzi arrivano più lenti che in
+strada (1,4 s contro 0,9), perché da dentro non si vede niente e riempire la strada mentre
+compri è una punizione per aver aperto un menu. **Misurato: `update` dentro un negozio resta
+0,2 ms mediani, identico a prima.** Il contrappeso è la porta sul retro, che è arrivata nello
+stesso giro (sotto): senza, l'assedio sarebbe una trappola invece che una scelta.
+
+**Chi sbarca risale.** Dopo `deployCrew` la volante restava ferma per sempre. Ora, se ti
+allontani in auto oltre 750 px o se il contatto è perso da 5 s, gli agenti vivi **camminano**
+fino alla macchina e risalgono (misurato: 2,1 s dal richiamo alla ripartenza). Camminano e non
+spariscono sul posto perché quella è tutta la scena che si vede di questa meccanica. Se non
+risale nessuno la volante **non riparte**: una volante vuota che ti sperona è una trappola già
+pagata (§4).
+
+**Commissariati.** `city.stations`, quattro, calcolati come `city.hospitals` e senza consumare
+rng, sul marciapiede a **sud** mentre l'ospedale sta a nord (sullo stesso isolato restano due
+posti diversi, e due blip a due passi sulla minimappa sono un blip solo). Targa blu dipinta a
+terra, blip su minimappa e mappa piena, e le volanti nuove partono di lì quando il commissariato
+è entro 1600 px: è quello che rende credibile da dove arriva la polizia.
+
+**In volo e in barca non si scappa più banalmente.** L'elicottero arriva **a tre stelle** invece
+che a cinque quando il giocatore guida un velivolo o una barca (con 6 s di memoria, o sparirebbe
+ogni volta che uno scafo tocca riva), e da tre stelle partono fino a **due motovedette** (경비정)
+dal molo più vicino. Non speronano: tengono 170-300 px e sparano, perché uno scafo che ti affonda
+in mezzo al Han è una morte senza appello e da una barca non si sbarca al largo.
+
+**La SWAT tira le granate**, e le due misure che l'hanno tarata hanno cambiato il progetto due
+volte. «Una sola granata in volo» **non è** un tetto di cadenza: la miccia dura 2,2 s, e con sei
+uomini in strada diventa il periodo — ne partiva una ogni 2,5 s. E con la vecchia distanza di
+ingaggio (120-240 px) la SWAT era quasi sempre **troppo vicina** per lanciare, visto che il
+raggio dello scoppio è 155 px. Ora la SWAT tiene 190-320 px e la cadenza reale è 7,2-7,8 s.
+Effetto collaterale misurato: un giocatore **fermo allo scoperto** a cinque stelle muore in
+10-16 s invece di 8-15 (chi tiene più distanza sbaglia più colpi), mentre chi si è imboscato
+dietro un riparo adesso lo si stana. Era lo scopo.
+
+**Il traffico civile buca sui chiodi.** Sei veicoli per frame a rotazione, solo entro 700 px dal
+giocatore, e testando **tre punti** lungo la carrozzeria invece del solo centro: a campionamento
+rotante una striscia larga 22 px la si attraversa in 0,09 s e il centro la salterebbe una volta
+su due. Misurato: 2 auto bucate in 40 s su 4 strisce. Occasionale, non continuo.
+
+**I pedoni si riparano dalla pioggia.** Sopra `rain 0.35`, chi **non ha l'ombrello** ed è `shy`
+(75%) si infila sotto il portone più vicino entro 340 px e ci resta al massimo 40 s; chi
+l'ombrello ce l'ha tira dritto, che è il motivo per cui se lo porta. Tutti affrettano il passo
+(×1,12: di più si legge come panico, non come pioggia). Il rientro ha una soglia **per pedone**
+più un ritardo casuale, per la stessa ragione degli ombrelli (§5.11): vederli ripartire tutti
+insieme tradirebbe l'effetto. Il tetto dei 40 s non è pigrizia — i fermi contano nel tetto dello
+streaming, e senza rotazione il marciapiede si svuota una volta sola e resta vuoto per tutto il
+temporale. Misurato: 20 al riparo su 90 pedoni sotto il temporale, 0 dopo 11 s di sereno.
+
+**La pioggia bagna anche quello che c'era già.** Spegne le pozze della molotov —
+`life × (1 + rain² × 3,6)`, al quadrato perché una pioggerella deve accorciare e un temporale
+spegnere: 9,7 s sereno · 4,6 s pioggia · **2,1 s temporale**, e la pozza fuma mentre muore.
+Lava il sangue (~14 s col temporale) ma **non le bruciature**: un cerchio di catrame bruciato
+non se ne va con l'acqua. E a piedi si slitta: spazio d'arresto da 3,8 a 6,2 px (+63%). Era
+stato provato a +89% e a schermo il passo laterale cominciava a pattinare — che è metà del
+combattimento a piedi in questa visuale. **Dentro un edificio `rain` vale 0**: il temporale di
+fuori non spegne una pozza in un 노래방.
+
+**Il fuoco si propaga** (§3 per il meccanismo). Una molotov: picco 12-13 pozze, terza
+generazione, tutto spento da solo in 10,5 s. Quattro molotov insieme: tetto tenuto a 22, fps
+32-39, e `projectiles.count` torna a 0. **Un'auto sotto il 45% della lamiera accende l'asfalto
+sotto di sé**, ed è quello che fa attraversare al fuoco una fila di macchine in sosta invece di
+fermarsi al primo paraurti. Non attacca sull'acqua, dentro un solido né sotto `rain > 0.35`.
+
+**La minigun si surriscalda.** 5,8 s dal grilletto all'inceppamento (100 colpi sui 600), 4,4 s
+per ripartire: un nastro intero passa da 27 a ~53 s e vuole sei inceppamenti. Il calore sale
+**a colpi** e non a secondi di grilletto, così la taratura resta «la raffica utile» qualunque
+cadenza abbia un'arma futura, e finire le munizioni interrompe anche il surriscaldamento. Vale
+solo per le armi con `spinUp`: la SMG non si inceppa. Da inceppata le canne **rallentano**, e
+l'anello del calore nel mirino lampeggia — un rosso fisso lì si confonderebbe con l'anello dello
+spin-up pieno, che a dodici pixel di distanza vuol dire l'esatto contrario.
+
+**Il mercato ha un prezzo per quartiere** (§3). La pompa costa 98.500 al porto e 188.500 a
+강남; le munizioni costano di più in campagna, dove non c'è concorrenza. Il listino lo dice
+(`시세 강남` accanto all'insegna e lo scostamento su ogni riga), perché un prezzo che cambia
+senza dirlo è un bug agli occhi di chi gioca. **Il giro compra-e-rivendi migliore rende ~700₩
+per la traversata di Seoul**, contro i 20-90k di una cassa: esiste sulla carta e non è una zecca.
+
+**Si rivendono i mezzi rubati.** `F` davanti a un 전당포 con un veicolo fermo entro 108 px —
+nove metri, cioè la carreggiata davanti alla vetrina, perché un'auto accostata ha il centro a
+mezza corsia dalla porta. Si vende **solo quello che hai guidato tu** (`v.hotwired`): senza, si
+rivenderebbe l'auto in sosta di uno sconosciuto senza toccarla. Prezzo per tipo × stato
+(`0,35 + 0,65 × hp/maxHp`: un rottame vale i pezzi) × gomme × mercato. Una volante viene
+rifiutata **con una risposta**, non col silenzio: è la prima cosa che prova chiunque.
+
+**Gli interni cambiano con l'ora.** Tre liste invece di una — `f.staff` (il ruolino,
+permanente), `f.crowd` (la folla di passaggio, rifatta a ogni arrivo su un piano), `f.kept` (i
+clienti morti, permanenti); `f.people` è la loro somma e resta quello che leggono `game.peds`,
+mischia, raggi e onde d'urto. Ricalcolare tutto rimetterebbe in piedi il commesso steso, non
+ricalcolare niente era il difetto. Un 술집 ha 5 persone alle 22 e 2 alle 3, un 사무실 è deserto
+alle 18:30, un 편의점 ha un cliente solo di notte. Il velo della luce dentro continua a non
+esserci (§3): quello che cambia è **la luce che entra dalla porta**, un fascio bianco a
+mezzogiorno e un fondo d'arancione da lampione di notte.
+
+**Si dorme per far passare il tempo.** Su un futon di un 주택: «dormi fino alle 06:30 · 8h»,
+dissolvenza, orologio e giorno avanti, salute piena. `daycycle.advance` **fa girare** la catena
+di Markov a passi di 5 s (96 iterazioni per otto ore) invece di teletrasportare l'ora:
+svegliarsi con lo stesso temporale che c'era andando a letto vorrebbe dire che mentre dormivi
+il tempo non è passato. Due mete e non un menù di orari — all'alba o a stasera — perché la
+domanda di chi va a letto in un gioco è una sola. **Dormire non azzera il ricercato**, e sopra
+le tre stelle non si dorme affatto («con le sirene là fuori non chiudi occhio»): il letto non
+deve essere la risposta all'assedio.
+
+**L'allarme silenzioso.** Una rapina con testimoni vivi fa partire un timer di 17 s; alla
+scadenza la centrale sa, e l'heat sale ancora fino alla seconda stella. Il chiamante ha un
+anello rosso che si svuota e una cornetta sopra la testa. **Un commesso già steso non chiama
+nessuno**, e chi è armato e ti sta sparando nemmeno: rapinare un 총포상 costa un conflitto a
+fuoco, rapinare un 편의점 una denuncia. Rapinare senza testimoni resta possibile ed è l'unico
+modo di farla franca.
+
+**La porta sul retro.** Al piano terra, un varco di 44 px nel muro di fondo che esce dietro
+l'edificio. Sta **all'estremo** del muro e non in mezzo, perché quello è il muro dell'arredo e
+un varco al centro lo spezzerebbe in due tronconi corti (§4, la trappola dei vani scala). Il
+punto d'uscita si decide una volta sola e dev'essere libero, non in acqua, non sul bordo mappa:
+**se non c'è posto il varco non viene proprio aperto**, perché un buco nel muro che non porta da
+nessuna parte è peggio di un muro. **42 negozi su 113 (37%) ce l'hanno**; gli altri 71 hanno un
+palazzo attaccato dietro — misurato, è sempre quello il motivo, mai l'acqua o il bordo.
+
+**Le bande commerciano** (§3 per `canDeal`). Un 거래책 per territorio, riconoscibile a vista da
+un anello nel colore della banda e da un rombo sospeso; si tratta **solo a mani vuote e senza
+stelle**, che è la stessa soglia con cui `watchTurfs` decide se prendersela con te. Da qui in
+poi quella regola non è più solo un modo di farsi sparare: è l'unica porta d'ingresso a un
+mercato che i negozi non hanno. Quattro mestieri, quattro cose diverse — 백호파 vende armi
+sotto mercato (e anche sniper e minigun, che in vetrina non ci sono), 흑사파 esplosivi e cure,
+철마파 **compra** i mezzi pagando più del 전당포, 황소파 ricompra le armi al 56%. Le armi
+comprate da una banda finiscono **in borsa, non in mano**: senza quella riga, comprare una
+pistola dai 백호파 vorrebbe dire farsi sparare dai 백호파 mezzo secondo dopo averli pagati.
+Il contatto non è invulnerabile: stenderlo costa 18 s prima che un altro prenda il suo posto.
+
+**In campagna c'è qualcosa da raccogliere.** Le capezzagne dei campi e le teste dei moli, con
+tabelle diverse da quelle urbane (una pompa da caccia in un fienile si spiega, una minigun no)
+e una densità **un ordine di grandezza più bassa**: la campagna è vuota per progetto e deve
+restare un posto in cui si va apposta. Le raccolte passano da 36 a **43**, e adesso si controlla
+che il punto non sia murato — così si è scoperto che **la molotov garantita davanti alla
+safehouse era dentro un solido da tre fasi di sviluppo**, e non l'aveva mai raccolta nessuno.
+
+**Il ciclo del semaforo, finalmente misurato — e lasciato dov'era.** `SIGNAL_CYCLE` valeva
+15,5 s «dai tempi in cui nessuno si fermava» (§6, vecchia edizione), e non era mai stato
+provato con le code vere che il §5.10 ha introdotto. C'era anche un difetto silenzioso: le
+fasi erano tre numeri scritti a mano che con `SIGNAL_CYCLE` non c'entravano niente, quindi
+cambiarlo **non cambiava il verde**. Adesso è una manopola sola — il giallo è un intervallo di
+sicurezza e resta fisso a 1 s, il verde si prende quello che avanza — e si può misurare per
+davvero con `traffic-census.scene` (170 s su cinque zone, un albero per configurazione, in fila):
+
+| ciclo | urti al minuto | flusso mediano (px/min) | veicoli praticamente fermi |
+| --- | --- | --- | --- |
+| 12 s | 36,0 | 4323 | 4 su 172 |
+| 12 s, **seconda esecuzione** | 33,5 | 4035 | 8 su 184 |
+| 15,5 s (quello di prima) | 38,5 | 3926 | 8 su 183 |
+| 19 s | 34,2 | 3084 (**−21%**) | 23 su 179 |
+
+**Il ciclo lungo è fuori discussione**: un quinto del flusso in meno e tre volte i fermi, perché
+con 8,5 s di verde per asse la coda formata sul rosso non si smaltisce in un ciclo solo. Ma
+**fra 12 e 15,5 non c'è differenza**, e la riga che lo dimostra è la seconda: due esecuzioni
+della *stessa* configurazione si scostano del 7% sul flusso e del doppio sui fermi, cioè più
+di quanto separi 12 da 15,5. La prima misura da sola (+10% e metà dei fermi) sembrava un
+risultato; è rumore, ed è esattamente il caso contro cui §5.10 mette in guardia — «una
+differenza del 10% non significa niente». **Il valore resta 15,5.** Quello che si porta a casa
+è che adesso la manopola funziona, che il verso lungo è già stato provato e non conviene, e che
+**il rumore di questa scena a configurazione ferma vale ~7%**: chi misura la prossima modifica
+alla guida sa sotto quale soglia non deve credersi.
+
+**Cuciture.** Cinque pezzi stavano a cavallo di file diversi**Cuciture.** Cinque pezzi stavano a cavallo di file diversi e sono stati collegati a parte:
+l'anello del calore nel mirino; il peso proprio di un esplosivo nel ricercato (`blast` 6, cioè
+il doppio di uno sparo — due granate in strada fanno una stella); `fx.update(dt, game)`, che
+riporta la sbiadita del sangue dentro `Fx` invece di farla chiamare a `projectiles` solo per
+via della firma; lo stallo di sosta liberato quando un'auto affonda; la targa a terra del
+commissariato.
+
+**Costo, misurato.** fps nella solita banda del container (43-58 a riposo, 32-39 con un incendio
+da 22 pozze), `update` in strada da 1,0 a 0,9-1,0 ms mediani, `update` dentro un negozio
+invariato a 0,2 ms. `city.stats` **identico** (`buildings 418, props 1299, blocks 122, nodes 196,
+edges 279, doglegs 4, stairs 3`): niente di tutto questo ha spostato una `rng` in generazione.
+
 ---
 
 ## 6. Backlog successivo (già concordato con l'utente)
 
-**Fase 3 — contenuti.** È in corso: negozi e interni (§5.8), la mappa (§5.9) e il ciclo
-giorno-notte (§5.11) sono fatti, e la segnalazione sul traffico è chiusa (§5.10). Restano le
-**missioni**, che sono il lavoro grosso: impianto (attivazione sulla mappa, obiettivi,
-fallimento e ripetizione), cutscene a pannelli a fumetto, e i contenuti. **Le scelte di design
-vanno concordate con l'utente prima di scrivere codice** — è la prima cosa da chiedere in
-apertura di sessione.
+**Fase 3 — contenuti.** Negozi e interni (§5.8), la mappa (§5.9), il ciclo giorno-notte
+(§5.11) e il giro di arretrati (§5.12) sono fatti; la segnalazione sul traffico è chiusa
+(§5.10). **Restano le missioni**, che sono il lavoro grosso: impianto (attivazione sulla mappa,
+obiettivi, fallimento e ripetizione), cutscene a pannelli a fumetto, e i contenuti. **Le scelte
+di design vanno concordate con l'utente prima di scrivere codice** — è la prima cosa da chiedere
+in apertura di sessione.
 
-**Cose rimaste indietro dal ciclo giorno-notte** (§5.11), in ordine di quanto si sentono:
-- **Nessuno si ripara dalla pioggia.** I pedoni aprono l'ombrello e basta: non si infilano
-  sotto una tettoia, non affrettano il passo, non entrano nei locali. Il pezzo che manca è uno
-  stato `shelter` in `pedestrians`, e i portoni dei negozi sono già dei punti noti.
-- **La pioggia non bagna niente di quello che è già lì.** Non spegne le pozze della molotov,
-  non lava il sangue, non fa slittare chi va a piedi. La prima delle tre è quella che si nota.
-- **Il traffico non sa che piove**: frena alle stesse distanze, e sul bagnato scoda in curva
-  (+30% di urti laterali, §5.11). Farlo rallentare in curva è già stato provato e **misurato
-  peggiore** — costa più flusso di quanti urti risparmia. Se qualcuno ci riprova, il pezzo che
-  manca è rallentare *prima* della curva invece che dentro, cioè guardare `nextChoice` un arco
-  più avanti.
-- **Non c'è modo di far passare il tempo.** Se un giorno una missione dirà «vediamoci
-  all'alba», servirà un letto nella safehouse o un'attesa: oggi si aspettano venti minuti veri.
-- **Gli interni non cambiano con l'ora**: un 술집 alle nove di sera ha la stessa gente delle
-  due di notte, e i lampioni degli interni sono sempre accesi finché il locale è aperto.
-- **Il sole non entra nella scelta dei colori delle facciate**: `facadeGradient` ha una
-  direzione di luce fissa, quindi al tramonto le ombre sono lunghe ma il lato illuminato di un
-  palazzo è sempre lo stesso. Renderlo mobile costa l'invalidazione di `gradCache` a ogni tacca
-  del sole — fattibile, ma è la cosa che si nota meno di tutto l'elenco.
+Quello che segue è quanto resta indietro, in ordine di quanto si sente. È molto più corto di
+prima: il §5.12 ha pagato diciannove voci di questo elenco.
+
+**Le cose che si sentono di più, oggi:**
+- **Niente audio.** `game.audio` è ancora `null` e i quattro punti di chiamata esistenti
+  (`honk`, `doorClose`) girano a vuoto con l'optional chaining. Un sintetizzatore WebAudio
+  procedurale — spari, motore, sirene, pioggia, l'insegna che ronza — è la cosa che manca di
+  più adesso che a schermo succede tutto. Non è difficile, è **diffuso**: i punti di chiamata
+  vanno messi in quasi tutti i file.
+- **Niente salvataggio.** Con del denaro in tasca, un arsenale comprato, un orologio che avanza
+  e degli interni che si ricordano, chiudere la pagina butta via tutto. localStorage con 3 slot:
+  la città è deterministica dalla seed, quindi si salvano solo giocatore, ricercato, orologio,
+  statistiche e le poche cose che `shops.cache` ricorda davvero (casse svuotate, morti).
+- **Arresto (busted).** La polizia spara e basta, non ti carica in volante. Adesso che assedia
+  la porta è anche più strano che non lo faccia. Vedi §5.5 per le ragioni per cui era stato
+  rimandato: raddoppia i flussi di fine partita (celle, cauzione, arsenale confiscato).
+
+**Rimasto indietro dal ciclo giorno-notte** (§5.11):
+- **Il traffico non sa che piove**: frena alle stesse distanze e sul bagnato scoda in curva
+  (+30% di urti laterali). Farlo rallentare *in* curva è già stato provato e **misurato
+  peggiore**. Se qualcuno ci riprova, il pezzo che manca è rallentare **prima** della curva,
+  cioè guardare `nextChoice` un arco più avanti.
+- **Il sole non entra nella scelta dei colori delle facciate**: al tramonto le ombre sono lunghe
+  ma il lato illuminato di un palazzo è sempre lo stesso. Costa l'invalidazione di `gradCache`
+  a ogni tacca del sole, ed è la cosa che si nota meno di tutto l'elenco.
 - **Niente neve, nebbia o stagioni**, per le ragioni in §5.11.
 
-**Cose rimaste indietro dai negozi**, in ordine di quanto si sentono:
-- **La polizia non ti aspetta fuori.** Entrare con quattro stelle e uscire dopo un minuto ti
-  ridà la strada esattamente com'era. Basterebbe far girare `police.update` anche mentre sei
-  dentro (il ricercato è già congelato apposta): costa un ramo in `main.update` e regala la
-  scena migliore di tutta la meccanica.
-- **Nessuno chiama la polizia da dentro.** Una rapina alza l'heat, ma il commesso che scappa
-  dalla porta non porta nessuno con sé.
-- **Gli interni non hanno finestre né retro**: una sola uscita, quella da cui sei entrato.
-  Una porta sul retro che dà nel cortile dell'isolato sarebbe la via di fuga che manca.
-- **Il mercato nero dinamico** — prezzi diversi per distretto — è due righe in `stockFor` più
-  un moltiplicatore per distretto, ed è quello che rende sensato attraversare la città.
-- **Niente ruba-e-rivendi**: il banco dei pegni ricompra solo le armi, non le auto.
+**Rimasto indietro dai negozi** (§5.8) e dagli interni:
+- **Nessuno chiama la polizia *da fuori***: l'allarme silenzioso alza l'heat, ma il commesso che
+  scappa dalla porta non porta nessuno con sé in strada. Serve un aggancio in `pedestrians` al
+  momento del `gone`.
+- **Dal retro non si entra e non si sale**: la porta di servizio è solo un'uscita.
+- **Chi dorme non paga niente**: il letto è gratis e cura del tutto. Se la clinica deve avere
+  senso, la leva è curare solo in parte.
+- **La folla non ricorda chi era lì**: due visite alla stessa ora hanno gli stessi posti ma
+  persone nuove. Ricordarle vorrebbe dire una lista permanente per fascia oraria, e non si nota.
+- **I 전당포 stanno in 4 distretti su 7**, quindi le tre righe più caratterizzate di
+  `shops.MARKETS` (armi 0.68 e auto 1.35 al porto, munizioni 1.40 in campagna) si toccano solo
+  attraverso il prezzo dell'officina. Un banco dei pegni per distretto in `citygen.placeShops`,
+  come `placeGarages` fa con le officine, e il mercato si vedrebbe tutto.
 
-**Cose rimaste indietro dalla tappa C**, in ordine di quanto si sentono:
-- **Il fuoco non si propaga**: due molotov vicine fanno due pozze separate, e un'auto che
-  brucia non incendia l'asfalto sotto. Propagare vorrebbe dire far generare pozze alle pozze,
-  con un tetto duro: senza, mezza Seoul prende fuoco in venti secondi.
-- **Nessuno tira esplosivi al giocatore**: la polizia spara e basta. Una granata dallo SWAT
-  sarebbe il naturale livello 5 e riuserebbe `throwItem` così com'è.
-- **Gli esplosivi non hanno un peso proprio nel ricercato**: lanciare vale come uno sparo
-  (`gunshot`), e il resto dell'heat arriva dai morti e dai veicoli distrutti. Se serve, è
-  una riga in `wanted.CRIMES`.
-- **La minigun non ha un limite di calore**: 600 colpi si sparano tutti di fila.
+**Rimasto indietro dalla polizia** (§5.5, §5.12):
+- **Durante l'assedio non si posano blocchi né chiodi**: uscendo non si trova mai una transenna
+  davanti alla porta. `manageObstacles` ragiona su un vettore velocità, e una porta non ce l'ha.
+- **Durante l'assedio gli agenti attraversano i muri** (nessuna collisione, per scelta di costo):
+  per un frame se ne può vedere uno dentro una vetrina prima che lo steering lo rimetta a posto.
+- **Non si entra nei commissariati**: non esiste un `biz` `police` in `interiors.js`.
+- **Le motovedette non speronano e non fanno posti di blocco d'acqua**; non c'è un'unità aerea
+  d'attacco oltre all'elicottero.
+- **La granata è solo della SWAT e solo a cinque stelle**: niente lanci dal finestrino.
 
-**Cose rimaste indietro dalla tappa B**, in ordine di quanto si sentono:
-- **Arresto (busted)**: oggi la polizia spara e basta, non ti carica in volante. Vedi §5.5.
-- **Equipaggio che risale in macchina**: dopo lo sbarco la volante resta ferma per sempre.
-- **Commissariati**: nessuna posizione in `city`, le unità nascono sulle strade attorno al
-  giocatore. Un `city.stations` calcolato come `city.hospitals` (senza consumare rng, quindi
-  senza ridisegnare la città) darebbe blip sulla mappa e un punto di partenza più credibile.
-- **Traffico civile e chiodi**: le strisce le controlla solo il mezzo del giocatore.
+**Rimasto indietro dal traffico** (§5.10):
+- **Nessuno sorpassa.** Sull'arteria le due corsie per senso restano inutilizzate. Un tentativo
+  è già stato fatto e misurato peggiore: manca la scelta della corsia in base alla svolta
+  successiva. **È l'ultimo debito grosso del traffico**, adesso che il ciclo del semaforo è
+  stato misurato (§5.12).
+- **Il traffico non sa niente della quota**: un'auto in salita rallenta per fisica ma non se lo
+  aspetta, e alza il gas dopo.
+- **`MAX_TRAFFIC` resta a 44, e adesso si sa che il semaforo non lo sblocca.** §5.10 lo aveva
+  sceso da 54 indicando il ciclo del semaforo come la leva per rialzarlo; §5.12 l'ha misurata e
+  la leva non c'è (accorciare non dà niente, allungare fa danni). Chi vuole più densità deve
+  cercare la capacità da un'altra parte — il sorpasso, o la priorità fra i mezzi.
+- **Non c'è priorità fra i mezzi**: un autobus (158 px) e uno scooter (44 px) trattano l'incrocio
+  allo stesso modo, e il primo lo occupa per il doppio del tempo.
 
-**Cose rimaste indietro dal traffico** (§5.10), in ordine di quanto si sentono:
-- **Nessuno sorpassa.** Sull'arteria le due corsie per senso restano inutilizzate e dietro al
-  primo furgone lento si incolonna tutto. Un tentativo è già stato fatto e misurato peggiore:
-  §5.10 dice cosa manca (scegliere la corsia in base alla svolta successiva).
-- **Il ciclo del semaforo non è mai stato tarato con code vere.** `SIGNAL_CYCLE` vale 15,5 s
-  dai tempi in cui nessuno si fermava. È la leva giusta se si vuole rialzare `MAX_TRAFFIC`.
-- **Il traffico civile ignora ancora i chiodi** e **non sa niente della quota**: un'auto in
-  salita rallenta per fisica ma non se lo aspetta, e alza il gas dopo.
-- **Non c'è priorità fra i mezzi.** Un autobus (158 px) e uno scooter (44 px) trattano
-  l'incrocio allo stesso modo, e il primo lo occupa per il doppio del tempo.
-
-**Cose rimaste indietro dalla mappa nuova**, in ordine di quanto si sentono:
-- **In volo e in barca la polizia non ti prende.** A cinque stelle l'elicottero c'è, ma sotto
-  non esiste nessuna unità che segua un velivolo o una barca: si scappa banalmente. Un
-  elicottero d'inseguimento anticipato a tre stelle e una motovedetta al porto sarebbero due
-  riusi quasi diretti di `police.spawnCar`.
-- **Nessun traffico aereo o navale**: aerei e barche sono tutti fermi. Un paio di battelli che
-  fanno la spola sul Han costerebbero un `ai` semplice (nessun grafo: il fiume è una linea).
-- **In campagna non c'è niente da fare**: nessun negozio (le cascine non hanno vetrine), nessuna
-  officina utile, nessuna raccolta. È la superficie migliore su cui mettere le attività
-  secondarie (consegne, salti, corse) quando arriveranno.
-- **Le bande non hanno un'economia.** Occupano, difendono e basta: non vendono, non comprano,
-  non si fanno la guerra. `city.turfs` ha già `trade` per banda e non lo legge nessuno.
+**Rimasto indietro dalla mappa** (§5.9) e dagli esplosivi (§5.7):
+- **Nessun traffico aereo o navale**: aerei e barche civili sono tutti fermi. Un paio di battelli
+  che fanno la spola sul Han costerebbero un `ai` semplice — il fiume è una linea, non serve grafo.
+- **Le bande non si fanno la guerra e non si conquistano.** Adesso commerciano (§5.12), ma
+  restano quattro banchi: niente faide, niente territori che cambiano padrone. È materia della
+  storia.
+- **In campagna c'è da raccogliere ma non da fare**: le attività secondarie (consegne, salti,
+  corse) sono ancora la superficie migliore su cui metterle.
 - **L'aeroporto non ha interni**: terminal e hangar sono volumi chiusi.
+- **Il fuoco non attacca gli edifici**: lambisce le facciate e si ferma. Bruciare un palazzo
+  vorrebbe dire uno stato sui volumi e un modo di disegnarlo.
 
 **Fase 3 — quello che resta.**
 12 missioni in 3 atti con cutscene a **pannelli a fumetto** (gli interni sono anche il posto
-dove ambientarne metà: un incontro in un 노래방 non ha bisogno di niente di nuovo, e adesso
-un appuntamento può anche avere un'ora); attività secondarie (taxi, consegne, salti); audio
-procedurale WebAudio (`game.audio` è già chiamato con optional chaining: `honk`, `doorClose` —
-e adesso ci sarebbe anche la pioggia da far sentire); salvataggio localStorage con 3 slot —
-ora che c'è del denaro, un arsenale comprato e un orologio che avanza, il salvataggio serve
-davvero.
+dove ambientarne metà: un incontro in un 노래방 non ha bisogno di niente di nuovo, un
+appuntamento può avere un'ora, e adesso una banda ha anche un motivo per parlarti); attività
+secondarie (taxi, consegne, salti); audio procedurale WebAudio e salvataggio localStorage, che
+sono in cima all'elenco qui sopra.
 
 ## 7. Vincoli e convenzioni
 
@@ -1354,7 +1627,7 @@ davvero.
 | Cortesia massima all'incrocio | `traffic.driveAI` `ai.boxT` | 3,5 s, poi si entra lo stesso |
 | Prenotazione dell'incrocio | `driveAI` (solo nodi senza semaforo) | scade dopo 0,6 s senza rinnovo |
 | Fermo troppo a lungo → manovra | `driveAI` `ai.stallT` | 9 s (il rosso più lungo dura 7,7 s) |
-| Ciclo del semaforo | `roadgraph.SIGNAL_CYCLE` | 15,5 s (verde 6,8 per asse) |
+| Ciclo del semaforo | `roadgraph.SIGNAL_CYCLE` / `YELLOW` | 15,5 s (verde 6,75 per asse, giallo 1) — misurato in §5.12: 19 s è peggio, 12 s è indistinguibile |
 | Pedoni | `pedestrians.BASE_MAX` | 62 (× densità distretto) |
 | Pendenza minima per una scalinata | `citygen.STAIR_GRADE` | 0.018 (→ 8 scalinate su 14 vicoli passanti) |
 | Danno / cadenza delle armi | `weapons.WEAPONS` | pugni 15·0.34 · mazza 46·0.52 · katana 92·0.4 · pistola 27·0.22 · pompa 13×8·0.84 · SMG 15·0.075 · fucile 24·0.105 · sniper 145·1.35 · minigun 12·0.045 |
@@ -1418,6 +1691,36 @@ davvero.
 | Affondamento di un mezzo di terra | `vehicle.sink` | 0.75 s in acqua, poi `onVehicleSunk` |
 | Guardie per territorio · raggio di spawn | `pedestrians.spawnTurf` | max 4 · almeno 300 px dal giocatore |
 | Provocazione di una banda | `pedestrians.watchTurfs` | arma diversa dai pugni **oppure** ricercato ≥ 1 stella |
+| **— arretrati (§5.12) —** | | |
+| Commissariati | `citygen`, sezione «Commissariati» | uno per distretto urbano (4 con la seed attuale), a più di 420 px dall'ospedale |
+| Raggio del commissariato per lo spawn | `police.STATION_REACH` | 1600 px (oltre, si ricade sull'anello) |
+| Assedio: agenti attorno alla porta / volanti / rinforzi | `police.siegeCop` · `siegeCar` · `siege` | 60-220 px · in corsia, 52 px oltre la porta e una ogni 78 · uno ogni 1,4 s |
+| Richiamo dell'equipaggio | `police.RECALL_FAR` / `RECALL_LOST` / `RECALL_R` / `RECALL_GIVEUP` / `BOARD_R` | 750 px · 5 s · 260 px · 12 s · 30 px |
+| Motovedette | `police.MAX_BOATS` / `MARINE_LEVEL` · `sprites.VEHICLE_TYPES.patrol` | max 2 · da 3 stelle, solo in acqua o in barca · 104×34, 355 px/s, grip 0,33, 190 HP |
+| Elicottero anticipato | `police.updateChopper` (`offT`) | 3 stelle se in volo o in barca (memoria 6 s), 5 negli altri casi |
+| Granata della SWAT | `police.NADE_MIN` / `NADE_MAX` / `NADE_CD` / `NADE_GAP` | 200-430 px · 9 s per agente · 5 s per la squadra · max 1 in volo |
+| Distanza di ingaggio a piedi | `police.copBehavior` | SWAT 190-320 px, divisa 120-240 px |
+| Chiodi sul traffico civile | `police.SPIKE_WATCH` / `SPIKE_SLICE` | 700 px · 6 veicoli per frame a rotazione, 3 punti per carrozzeria |
+| Peso di un lancio esplosivo | `wanted.CRIMES.blast` | 6 (due granate = una stella) |
+| Riparo dei pedoni | `pedestrians.RAIN_SHELTER` / `SHELTER_REACH` / `SHELTER_MAX` / `RAIN_HURRY` | 0.35 · 340 px · 40 s · ×(1 + rain × 0.12) |
+| Chi si ripara | `pedestrians.createPed` `shy` | 75% di chi non ha l'ombrello (≈28% del totale) |
+| Pioggia che spegne le pozze / lava il sangue | `projectiles.RAIN_DOUSE` · `fx.WASH_RATE` | `1 + rain² × 3.6` (9,7 / 4,6 / 2,1 s) · 0.05 di opacità al secondo × rain |
+| Propagazione del fuoco | `projectiles.MAX_FIRES` / `SPREAD_EVERY` / `SPREAD_LIFE` / `SPREAD_R` / `RAIN_STOP` | 22 pozze · 0,9 s · vita × 0.62 · raggio × 0.86 · rain 0.35 |
+| Auto che incendia l'asfalto | `projectiles.updateFires` | sotto il 45% della lamiera, 50% per tick |
+| Minigun: calore | `player.HEAT_TIME` / `HEAT_COOL` / `HEAT_OK` / `HEAT_GRACE` | 4,5 s di raffica (100 colpi) · 0.16/s · riparte a 0.35 · 0,35 s di respiro |
+| Scivolata a piedi sul bagnato | `player.WET_SLIDE` | 0.6 (dimezzamento 0.055 → 0.088 s) |
+| Mercato per distretto | `shops.MARKETS` · `MARKET_BASE` | 7 distretti × armi/munizioni/generi/auto + ricompra · ×1 e 45% il riferimento |
+| Arrotondamento dei prezzi | `shops.roundPrice` | 100₩ sotto i 20k, 500₩ sopra |
+| Valore di un mezzo · consegna | `shops.CAR_VALUE` · `vehiclePrice` · `SELL_REACH` | scooter 18k … sportiva 210k … turboelica 900k · `0.35 + 0.65 × hp/maxHp`, gomme ×0.88 · 108 px, fermo sotto 24 px/s |
+| Sconto delle bande | `shops.GANG_GUNS` / `SMUGGLE` / `CHOP` / `FENCE_BONUS` / `FENCE_CAP` | 0.88 · 1.18 · 1.42 · +0.14 · tetto 0.56 (tiene la catena in perdita) |
+| Raggio del banco di una banda | `shops.DEAL_REACH` | 54 px a piedi, 108 al volante (철마파) |
+| Rimpiazzo del 거래책 | `pedestrians.DEALER_WAIT` · `canDeal` | 18 s se lo hai steso, subito se l'ha portato via lo streaming · recinto + 80 px |
+| Allarme silenzioso | `shops.ALARM_DELAY` · `updateAlarm` | 17 s · `rob × 0.55` ≈ 12 di heat (22 + 12 = seconda stella) |
+| Gente di passaggio, ora per ora | `interiors.RUSH` · `crowd()` | frazione di `biz.crowd` per fasce, 13 tipi di locale · `crowd + 2` posti |
+| Varco sul retro | `interiors.BACK_W` · `shops.backDoorSpot` / `SIDE_SCAN` | 44 px all'estremo del muro di fondo · fuori 18-60 px, di lato fino a ±124 (42 negozi su 113) |
+| Sonno | `shops.sleepTarget` · `sleep` · `daycycle.advance` | 06:30 o 20:00 · vietato da 3 stelle · passi di 5 s reali |
+| Luce dalla porta di un interno | `interiorscene.drawDoorLight` | profondità `34 + 78 × (1 − lamps)` px |
+| Raccolte in campagna e sui moli | `pickups.RURAL_TABLE` / `PIER_TABLE` / `placeRural` | 32% dei campi · 85% dei moli del porto, 30% degli scali sul Han (43 raccolte in tutto) |
 | Limite pixel canvas | `main.MAX_PIXELS` | 2.9 M (scala il DPR) |
 
 ---
@@ -1458,8 +1761,14 @@ e un `return` a livello di file lo farebbe fallire.
 
 | Scena | Cosa misura |
 | --- | --- |
-| `traffic-census.scene` | urti al minuto e loro tipo, flusso in px/min per veicolo, su cinque zone. È la misura con cui è stato tarato §5.10 — e l'unica onesta per giudicare una modifica alla guida AI |
+| `traffic-census.scene` | urti al minuto e loro tipo, flusso in px/min per veicolo, su cinque zone. È la misura con cui è stato tarato §5.10 — e l'unica onesta per giudicare una modifica alla guida AI **o al ciclo del semaforo** (`roadgraph.SIGNAL_CYCLE`, che dalla §5.12 è una manopola sola: il giallo è fisso e il verde si prende quello che avanza) |
 | `daylight-sweep.scene` | la luce ora per ora su tutto il giro, più quattro campioni col temporale. Serve a vedere in una tabella quello che altrimenti vuole ventiquattro screenshot: tinta, velo caldo, lampioni, ombre, popolamento |
+
+⚠️ **Una misura alla volta.** La scena cambia zona a tempo di *orologio*, non di simulazione:
+due censimenti che girano insieme sulla stessa macchina si rubano la CPU e i teletrasporti
+cadono in istanti diversi. Ancora peggio se condividono l'albero, perché ognuno riscrive il
+parametro che l'altro sta misurando — è un modo silenzioso di produrre numeri che sembrano buoni
+e non vogliono dire niente. Un albero per configurazione (`git worktree add`), e in fila.
 
 Per forzare ora e meteo in una scena qualunque: `game.dayCycle.hour = 21.5`,
 `game.dayCycle.setWeather('storm')`, `game.dayCycle.paused = true`. Per misurare qualcosa che

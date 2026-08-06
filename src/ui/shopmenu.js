@@ -1,18 +1,25 @@
-// Listino di un negozio. Il pannello non sa niente di armi, cure o vestiti: legge
+// Listino di un banco. Il pannello non sa niente di armi, cure o vestiti: legge
 // una lista di articoli da `entities/shops.js`, disegna una riga per ciascuno e
 // chiama `buy(game)` su quello scelto. Aggiungere merce non passa da qui.
+//
+// Non sa nemmeno **dietro a che cosa** sta il banco: `showStock` vuole
+// un'intestazione (insegna, mestiere, colore, orario) e un modo di rileggere la
+// merce. È così che il cortile di una banda usa lo stesso pannello di un 총포상
+// senza che qui dentro compaia la parola "banda".
 import { roundPath } from './hud.js';
 import { clamp } from '../core/math.js';
-import { stockFor, won } from '../entities/shops.js';
+import { stockFor, won, marketFor } from '../entities/shops.js';
 import { bizAlwaysOpen, clockLabel } from '../world/interiors.js';
 import { getWeaponIcon } from '../render/sprites.js';
 
 const ROW = 46;
+const CHROME = 190;   // testata + piede: quanto resta al pannello oltre le righe
 
 export class ShopMenu {
   constructor() {
     this.open = false;
-    this.floor = null;
+    this.counter = null;   // insegna del banco: negozio o territorio
+    this.restock = null;   // come si rilegge la merce dopo una compravendita
     this.items = [];
     this.index = 0;
     this.hover = -1;
@@ -22,21 +29,36 @@ export class ShopMenu {
     // pausa il primo articolo verrebbe comprato nello stesso frame.
     this.cooldown = 0;
     this.rows = [];
+    this.first = 0;        // prima riga visibile (l'elenco può non starci tutto)
   }
 
   show(floor, game) {
-    this.floor = floor;
-    this.items = stockFor(floor.biz.shop, game);
+    this.showStock({
+      hangul: floor.biz.hangul,
+      label: floor.biz.label,
+      accent: floor.biz.pal.accent,
+      hours: hoursLabel(floor.biz),
+    }, () => stockFor(floor.biz.shop, game), game);
+  }
+
+  /** Apre il pannello su un banco qualunque. `counter` è solo l'intestazione. */
+  showStock(counter, restock, game) {
+    this.counter = counter;
+    this.restock = restock;
+    this.items = restock();
     this.index = 0;
+    this.first = 0;
     this.hover = -1;
     this.note = '';
     this.cooldown = 0.25;
     this.open = this.items.length > 0;
+    if (!this.open) game.hud.toast(`${counter.hangul} — oggi non hanno niente per te`, 2.4);
   }
 
   close(game) {
     this.open = false;
-    this.floor = null;
+    this.counter = null;
+    this.restock = null;
     game.player.enterCooldown = 0.3;
   }
 
@@ -82,8 +104,10 @@ export class ShopMenu {
     pl.money -= it.price;
     if (it.price > 0) game.shops.spent += it.price;
     this.say(msg, true);
-    // Il banco dei pegni compra: dopo una vendita la lista è un'altra.
-    this.items = stockFor(this.floor.biz.shop, game);
+    // Il banco dei pegni compra, e il ricettatore di 황소파 pure: dopo una vendita
+    // la lista è un'altra. Finita la merce, il banco chiude da solo.
+    this.items = this.restock();
+    if (!this.items.length) { this.close(game); return; }
     this.index = clamp(this.index, 0, this.items.length - 1);
   }
 
@@ -97,10 +121,16 @@ export class ShopMenu {
     if (!this.open) return;
     const w = game.camera.viewW;
     const h = game.camera.viewH;
-    const biz = this.floor.biz;
-    const pal = biz.pal;
+    const counter = this.counter;
+    const accent = counter.accent;
     const pw = 520;
-    const ph = Math.min(h - 120, 190 + this.items.length * ROW);
+    // Un elenco che non ci sta si fa scorrere, non si taglia: il ricettatore
+    // compra undici armi e su uno schermo basso le ultime finivano sotto al piede
+    // del pannello, invisibili e non comprabili.
+    const fit = Math.max(3, Math.floor((h - 120 - CHROME) / ROW));
+    const shown = Math.min(this.items.length, fit);
+    this.first = clamp(this.index - (shown >> 1), 0, Math.max(0, this.items.length - shown));
+    const ph = CHROME + shown * ROW;
     const x = (w - pw) / 2;
     const y = (h - ph) / 2;
 
@@ -111,23 +141,34 @@ export class ShopMenu {
     ctx.fillStyle = 'rgba(14,16,20,0.96)';
     roundPath(ctx, x, y, pw, ph, 14);
     ctx.fill();
-    ctx.strokeStyle = hexA(pal.accent, 0.5);
+    ctx.strokeStyle = hexA(accent, 0.5);
     ctx.lineWidth = 1.6;
     ctx.stroke();
 
     // Testata: insegna in hangul, mestiere in italiano, contanti a destra.
     ctx.textAlign = 'left';
-    ctx.fillStyle = pal.accent;
+    ctx.fillStyle = accent;
     ctx.font = '800 30px system-ui, "Apple SD Gothic Neo", sans-serif';
-    ctx.fillText(biz.hangul, x + 26, y + 46);
+    ctx.fillText(counter.hangul, x + 26, y + 46);
+    const titleW = ctx.measureText(counter.hangul).width;
+    // Il quartiere in cui stai comprando, accanto all'insegna: senza dirlo, prezzi
+    // diversi da un negozio all'altro sembrano un bug invece che un mercato.
+    const market = counter.market || marketFor(game);
+    ctx.font = '700 13px system-ui, "Apple SD Gothic Neo", sans-serif';
+    ctx.fillStyle = hexA(accent, 0.6);
+    ctx.fillText(`시세 ${market.hangul}`, x + 42 + titleW, y + 44);
     ctx.fillStyle = 'rgba(238,242,248,0.9)';
     ctx.font = '700 16px system-ui, sans-serif';
-    const label = biz.label.toUpperCase();
+    // Questa riga corre verso i contanti in alto a destra e un'insegna lunga ci
+    // finisce sopra («usura · il vicolo dei debiti»). A cedere è la seconda metà,
+    // non l'orario: quello è il pezzo per cui la riga esiste.
+    const room = pw - 52 - 84 - ctx.measureText(counter.hours).width - 14;
+    const label = ellipsis(ctx, counter.label.toUpperCase(), room);
     ctx.fillText(label, x + 26, y + 68);
     // L'orario sta qui perché è qui che si decide di spendere: sapere che fra
     // un'ora chiude cambia quanto ci si carica addosso adesso.
     ctx.fillStyle = 'rgba(238,242,248,0.42)';
-    ctx.fillText(hoursLabel(biz), x + 40 + ctx.measureText(label).width, y + 68);
+    ctx.fillText(counter.hours, x + 40 + ctx.measureText(label).width, y + 68);
     ctx.textAlign = 'right';
     ctx.fillStyle = '#ffd23f';
     ctx.font = '700 22px ui-monospace, monospace';
@@ -146,9 +187,10 @@ export class ShopMenu {
     // Righe
     this.rows.length = 0;
     this.hover = -1;
+    let deviation = false;
     const m = game.input.mouse;
     let ry = y + 96;
-    for (let i = 0; i < this.items.length; i++) {
+    for (let i = this.first; i < this.first + shown; i++) {
       const it = this.items[i];
       const sel = i === this.index;
       const sell = it.price < 0;
@@ -157,11 +199,11 @@ export class ShopMenu {
       const rw = pw - 36;
       if (m.x >= rx && m.x <= rx + rw && m.y >= ry && m.y <= ry + ROW - 6) this.hover = i;
 
-      ctx.fillStyle = sel ? hexA(pal.accent, 0.16) : 'rgba(255,255,255,0.03)';
+      ctx.fillStyle = sel ? hexA(accent, 0.16) : 'rgba(255,255,255,0.03)';
       roundPath(ctx, rx, ry, rw, ROW - 6, 8);
       ctx.fill();
       if (sel) {
-        ctx.strokeStyle = hexA(pal.accent, 0.8);
+        ctx.strokeStyle = hexA(accent, 0.8);
         ctx.lineWidth = 1.4;
         ctx.stroke();
       }
@@ -189,7 +231,17 @@ export class ShopMenu {
       ctx.textAlign = 'right';
       ctx.fillStyle = sell ? '#4ad98a' : afford ? '#ffd23f' : '#e04a3a';
       ctx.font = '700 16px ui-monospace, monospace';
-      ctx.fillText(sell ? `+${won(-it.price)}` : won(it.price), rx + rw - 14, ry + 28);
+      ctx.fillText(sell ? `+${won(-it.price)}` : won(it.price), rx + rw - 14, ry + 24);
+      // Scostamento dal listino di Seoul. Su una riga di vendita il segno si legge
+      // al contrario — pagarti il 12% in più è una buona notizia — e il colore
+      // segue quello, non il segno.
+      const dev = Math.round(((it.mul || 1) - 1) * 100);
+      if (Math.abs(dev) >= 2) {
+        deviation = true;
+        ctx.font = '700 11px system-ui, sans-serif';
+        ctx.fillStyle = (sell ? dev > 0 : dev < 0) ? 'rgba(74,217,138,0.85)' : 'rgba(224,90,74,0.9)';
+        ctx.fillText(`${dev > 0 ? '+' : ''}${dev}%`, rx + rw - 14, ry + 38);
+      }
       ctx.globalAlpha = 1;
       ry += ROW;
     }
@@ -208,8 +260,28 @@ export class ShopMenu {
     ctx.fillStyle = 'rgba(235,240,250,0.4)';
     ctx.font = '500 12px system-ui, sans-serif';
     ctx.fillText('W / S — scegli · E — compra · ESC — esci', x + pw / 2, y + ph - 18);
+    if (this.items.length > shown) {
+      ctx.textAlign = 'right';
+      ctx.fillStyle = hexA(accent, 0.55);
+      ctx.font = '600 11px ui-monospace, monospace';
+      ctx.fillText(`${this.index + 1}/${this.items.length}`, x + pw - 22, y + ph - 18);
+      ctx.textAlign = 'center';
+    }
+    if (deviation) {
+      ctx.fillStyle = 'rgba(235,240,250,0.32)';
+      ctx.font = '500 11px system-ui, sans-serif';
+      ctx.fillText(`${market.hangul} — scostamento dal listino di Seoul: rosso = ci rimetti, verde = ci guadagni`, x + pw / 2, y + ph - 56);
+    }
     ctx.restore();
   }
+}
+
+/** Taglia una scritta perché stia in `max` px, con i puntini. */
+function ellipsis(ctx, text, max) {
+  if (ctx.measureText(text).width <= max) return text;
+  let s = text;
+  while (s.length > 1 && ctx.measureText(`${s}…`).width > max) s = s.slice(0, -1);
+  return `${s}…`;
 }
 
 function hoursLabel(biz) {

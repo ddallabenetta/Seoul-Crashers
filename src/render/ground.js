@@ -664,6 +664,7 @@ export class GroundRenderer {
     g.fillRect(b.x + b.w - 7, b.y + 4, 3, b.h - 8);
 
     if (b.hospital) this.drawHospital(g, b);
+    if (b.station) this.drawStation(g, b);
 
     // Cortili interni: asfalto con stalli di parcheggio
     for (const y of b.yards) {
@@ -780,6 +781,28 @@ export class GroundRenderer {
     g.fillStyle = '#c62f34';
     g.fillRect(cx - 4.5, cy - 10, 9, 20);
     g.fillRect(cx - 14, cy - 4.5, 28, 9);
+  }
+
+  // Il commissariato sta sul marciapiede a sud, l'ospedale su quello a nord: sullo
+  // stesso isolato restano due posti diversi anche a colpo d'occhio da lontano.
+  drawStation(g, b) {
+    const cx = b.x + b.w / 2;
+    const cy = b.y + b.h - 16;
+    g.fillStyle = 'rgba(238,242,248,0.9)';
+    g.fillRect(cx - 26, cy - 13, 52, 26);
+    g.fillStyle = '#2f5fbf';
+    g.fillRect(cx - 22, cy - 9, 44, 18);
+    // Un distintivo, non il taegeuk: dipinto largo quattordici pixel di mondo,
+    // qualunque dettaglio interno diventa una macchia. Anello più punto si legge.
+    g.strokeStyle = 'rgba(238,242,248,0.92)';
+    g.lineWidth = 2;
+    g.beginPath();
+    g.arc(cx, cy, 6.5, 0, 6.2832);
+    g.stroke();
+    g.fillStyle = 'rgba(238,242,248,0.92)';
+    g.beginPath();
+    g.arc(cx, cy, 2.6, 0, 6.2832);
+    g.fill();
   }
 }
 

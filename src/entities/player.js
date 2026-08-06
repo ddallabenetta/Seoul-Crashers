@@ -16,6 +16,22 @@ const WEAPON_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6']
 // oltre il quale non va: senza tetto il punto fisso fra camera e cursore scappa via.
 const SCOPE_LEAD = 0.5;
 const SCOPE_MAX = 300;
+// Calore delle canne, e vale solo per le armi con `spinUp` (oggi la sola minigun):
+// una SMG che si inceppa non la vuole nessuno. `HEAT_TIME` è la raffica continua
+// che si può tenere prima dell'inceppamento — 4,5 s, cioè un centinaio di colpi
+// sui 600 del nastro: le raffiche lunghe restano possibili, svuotare il nastro
+// tutto di fila no. `HEAT_OK` è la soglia sotto cui riparte, `HEAT_GRACE` il
+// respiro prima che cominci a raffreddare (senza, raffredda mentre spara).
+const HEAT_TIME = 4.5;
+const HEAT_COOL = 0.16;
+const HEAT_OK = 0.35;
+const HEAT_GRACE = 0.35;
+// Quanto scivola il passo sull'asfalto bagnato: con `wet` a 1 il tempo di
+// dimezzamento della velocità passa da 0.055 a 0.088 s, cioè 2,4 px di spazio
+// d'arresto in più (3,8 → 6,2) e 0,11 s in più per fermarsi. Volutamente poco: il
+// combattimento a piedi è mira col mouse più passo laterale, e un protagonista
+// che pattina lo cancella. A 0.8 lo spazio d'arresto raddoppiava e si sentiva.
+const WET_SLIDE = 0.6;
 
 export class Player {
   constructor(x, y) {
@@ -56,6 +72,11 @@ export class Player {
     this.spin = 0;
     this.scoping = false;
     this.weaponT = 0;
+    // Calore delle canne (0..1) e inceppamento: li legge l'HUD, li scrive solo
+    // `attack` e il raffreddamento qui sotto.
+    this.heat = 0;
+    this.overheated = false;
+    this.heatCd = 0;
   }
 
   get spec() {
@@ -77,6 +98,7 @@ export class Player {
     this.fireCd = Math.max(0, this.fireCd - dt);
     this.hurtT = Math.max(0, this.hurtT - dt);
     this.weaponT = Math.max(0, this.weaponT - dt);
+    this.updateHeat(dt, game);
 
     // Il puntatore vale sempre: da fermo, in corsa e al volante.
     const m = game.camera.screenToWorld(game.input.mouse.x, game.input.mouse.y);
@@ -103,6 +125,28 @@ export class Player {
       const prev = this.district;
       this.district = d;
       if (prev) game.onDistrictChange(d);
+    }
+  }
+
+  /**
+   * Le canne si raffreddano da ferme, non mentre sparano: senza il respiro di
+   * `HEAT_GRACE` il calore che sale e quello che scende si annullerebbero e il
+   * nastro finirebbe prima dell'inceppamento. Sopra 1 la canna si pianta e non
+   * riparte finché non è scesa sotto `HEAT_OK` — e nel frattempo le canne
+   * rallentano, così il mirino dice che l'arma non è pronta invece di mentire.
+   */
+  updateHeat(dt, game) {
+    this.heatCd = Math.max(0, this.heatCd - dt);
+    if (this.heat > 0 && this.heatCd <= 0) {
+      this.heat = Math.max(0, this.heat - dt * HEAT_COOL);
+    }
+    if (!this.overheated && this.heat >= 1) {
+      this.overheated = true;
+      game.hud.toast('Canne surriscaldate — lascia raffreddare', 1.8);
+      game.fx.addSmoke(this.x, this.y, 7, 1.2);
+    } else if (this.overheated) {
+      if (Math.random() < dt * 6) game.fx.addSmoke(this.x, this.y, 1, 0.9);
+      if (this.heat <= HEAT_OK) this.overheated = false;
     }
   }
 
@@ -168,8 +212,13 @@ export class Player {
 
     const tvx = mv.x * target;
     const tvy = mv.y * target;
-    this.vx = damp(this.vx, tvx, 0.055, dt);
-    this.vy = damp(this.vy, tvy, 0.055, dt);
+    // Sul bagnato le suole tengono meno: si parte e ci si ferma con un filo di
+    // ritardo in più. Dentro un negozio il pavimento è asciutto, qualunque tempo
+    // faccia fuori.
+    const wet = game.indoors ? 0 : game.dayCycle.wet;
+    const grip = 0.055 * (1 + wet * WET_SLIDE);
+    this.vx = damp(this.vx, tvx, grip, dt);
+    this.vy = damp(this.vy, tvy, grip, dt);
 
     this.x += this.vx * dt;
     this.y += this.vy * dt;
@@ -205,8 +254,11 @@ export class Player {
 
     // Minigun: le canne devono arrivare in giro prima che parta il primo colpo, e
     // rallentano da sole appena molli il grilletto. È tutto il carattere dell'arma.
+    // Da inceppata rallentano comunque: rimettere in giro le canne è il secondo
+    // pezzo della penalità, dopo l'attesa.
     if (spec.spinUp) {
-      this.spin = clamp(this.spin + (input.mouse.down ? dt / spec.spinUp : -dt / (spec.spinUp * 0.7)), 0, 1);
+      const up = input.mouse.down && !this.overheated;
+      this.spin = clamp(this.spin + (up ? dt / spec.spinUp : -dt / (spec.spinUp * 0.7)), 0, 1);
     } else if (this.spin > 0) {
       this.spin = Math.max(0, this.spin - dt * 2);
     }
@@ -215,7 +267,9 @@ export class Player {
     // stringerlo — a 1900 px di gittata il bersaglio è fuori schermo, non lontano.
     this.scoping = !!spec.scope && input.mouse.right;
 
-    if (held && this.fireCd <= 0 && (!spec.spinUp || this.spin >= 1)) this.attack(game, spec);
+    if (held && this.fireCd <= 0 && !this.overheated && (!spec.spinUp || this.spin >= 1)) {
+      this.attack(game, spec);
+    }
 
     // Dentro un negozio l'inquadratura è la stanza intera, non il personaggio.
     const base = game.indoors ? game.shops.roomZoom(game.camera) : 1.12;
@@ -270,6 +324,13 @@ export class Player {
     }
     this.fireCd = spec.rate;
     this.ammo[spec.id]--;
+    // Il calore si conta a colpi, non a secondi di grilletto: così `HEAT_TIME`
+    // resta la raffica utile qualunque cadenza abbia l'arma, e finire le munizioni
+    // interrompe anche il surriscaldamento.
+    if (spec.spinUp) {
+      this.heat = Math.min(1.15, this.heat + spec.rate / HEAT_TIME);
+      this.heatCd = HEAT_GRACE;
+    }
     game.wanted?.report('gunshot', game);
     const ang = assistAim(game, this.x, this.y, this.angle, spec.range, this);
     // Un fucile di precisione sparato all'anca è un fucile di precisione sprecato.
@@ -314,8 +375,9 @@ export class Player {
     const reach = dist(ox, oy, this.aimX, this.aimY);
     game.projectiles.throwItem(game, this, spec, ox, oy, ang, reach);
     game.camera.addShake(spec.shake * 0.35);
-    // Una molotov che vola in mezzo alla strada la vede tutto l'isolato.
-    game.wanted?.report('gunshot', game);
+    // Una molotov che vola in mezzo alla strada la vede tutto l'isolato, e non la si
+    // scambia per una lite finita male: pesa il doppio di uno sparo.
+    game.wanted?.report('blast', game);
     game.alarm(ox, oy, 300, this);
   }
 
@@ -543,6 +605,8 @@ export class Player {
     this.weapon = 'fists';
     this.spin = 0;
     this.scoping = false;
+    this.heat = 0;
+    this.overheated = false;
   }
 
   heal(amount) {

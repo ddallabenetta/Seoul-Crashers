@@ -12,6 +12,21 @@ const BASE_MAX = 62;
 const GUN_RANGE = 330;
 const FIST_RANGE = 34;
 
+// Sotto questa pioggia chi non ha l'ombrello smette di vagare e si infila sotto
+// una tettoia. Chi l'ombrello ce l'ha tira dritto: è per quello che se lo porta.
+const RAIN_SHELTER = 0.35;
+// Quanto lontano si va a cercare un portone. Più in là si arriva zuppi lo stesso
+// e si attraversa mezzo quartiere in mezzo al traffico.
+const SHELTER_REACH = 340;
+// Un portone è una sosta, non un parcheggio: scaduto il tempo si riprende la
+// strada. Senza questo tetto i marciapiedi si svuotano una volta sola e restano
+// vuoti per tutto il temporale — e i fermi occupano il tetto dello streaming al
+// posto di chi cammina.
+const SHELTER_MAX = 40;
+// Quanto si affretta il passo sotto l'acqua. Poco: un marciapiede al piccolo
+// trotto si legge come panico, non come pioggia.
+const RAIN_HURRY = 0.12;
+
 /** Tinte degli ombrelli. La trasparente è quella coreana per eccellenza. */
 export const UMBRELLAS = ['#1c2029', '#2f4f7a', '#8c2f3c', '#3f6b4a', '#d9dde4', '#b8b0d8'];
 
@@ -60,6 +75,7 @@ export function createPed(kind, x, y, rng) {
     hostile: false,
     armed,
     turf: null,       // territorio presidiato: lo guida lo stato `guard`
+    dealer: false,    // 거래책: l'uomo con cui si tratta (vedi `spawnTurf`)
     cop: false,       // in servizio: lo stato lo guida `police.copBehavior`
     copWeapon: null,
     gone: false,      // despawnato dallo streaming (vedi `stream`)
@@ -72,7 +88,58 @@ export function createPed(kind, x, y, rng) {
     // *è* un ombrello, e vederli comparire tutti insieme sopra le teste
     // tradirebbe che sono un effetto e non una cosa che la gente ha con sé.
     umbrella: rng.chance(0.62) ? rng.int(0, UMBRELLAS.length - 1) : -1,
+    // Chi, restando a mani nude sotto l'acqua, si infila sotto una tettoia invece
+    // di rassegnarsi. Come per l'ombrello si decide alla nascita, e per la stessa
+    // ragione: vedere tutti muoversi nello stesso istante tradirebbe l'effetto.
+    shy: rng.chance(0.75),
+    shelterCd: rng.range(0, 7),   // sfasa anche la prima corsa al riparo
+    shelterT: 0,
+    shelterX: 0, shelterY: 0, shelterA: 0,
+    // Soglia di pioggia sotto la quale *questo* pedone decide che è passata: chi
+    // esce prima e chi aspetta l'ultima goccia.
+    rainOut: rng.range(0.08, 0.3),
   };
+}
+
+/**
+ * Chi può fare il 거래책 di un territorio. Il criterio è **dov'è**, non come si
+ * sente: chiedere `state === 'guard'` sembrava più sicuro e chiudeva il banco al
+ * primo spavento — un'auto che accosta, un tamponamento a due isolati, un allarme
+ * — cioè quasi sempre. Fuori dal recinto invece non si tratta davvero: uno che sta
+ * scappando per strada non è il contatto di nessuno.
+ */
+export function canDeal(t, d) {
+  return !!d && !d.dead && !d.gone && !d.hostile && d.turf === t
+    && d.x > t.x - 80 && d.x < t.x + t.w + 80
+    && d.y > t.y - 80 && d.y < t.y + t.h + 80;
+}
+
+function dealerLost(t) {
+  return !canDeal(t, t.dealer);
+}
+
+/**
+ * Il contatto va rimpiazzato, ma non subito se lo hai steso tu. Senza rimpiazzo un
+ * territorio resta senza banco per il resto della partita appena lo streaming si
+ * porta via il 거래책 — e succede da solo, standogli lontano un minuto. Con un
+ * rimpiazzo istantaneo, invece, sparargli non costerebbe niente.
+ */
+const DEALER_WAIT = 18;
+
+function refreshDealer(t, peds, dt) {
+  if (!dealerLost(t)) { t.dealerT = 0; return; }
+  // Steso: si aspetta. Sparito dallo streaming: subentra il primo che c'è.
+  const killed = t.dealer && t.dealer.dead;
+  t.dealerT = (t.dealerT || 0) + dt;
+  if (killed && t.dealerT < DEALER_WAIT) return;
+  for (const p of peds) {
+    if (!canDeal(t, p)) continue;
+    if (t.dealer) t.dealer.dealer = false;
+    t.dealer = p;
+    p.dealer = true;
+    t.dealerT = 0;
+    return;
+  }
 }
 
 /** Punto centrale del marciapiede per lato/t di un isolato. */
@@ -98,6 +165,7 @@ export class PedestrianSystem {
     this.peds = peds;
     this.tmp = {};
     this.spawnTimer = 0;
+    this._sq = [];   // scratch per la ricerca dei portoni
   }
 
   /**
@@ -106,15 +174,19 @@ export class PedestrianSystem {
    * banda che ti lascia passeggiare in mezzo ai suoi affari non è una banda.
    * Passarci disarmati e in fretta si può: è l'unica via per andare a trattare.
    */
-  watchTurfs(game) {
+  watchTurfs(game, dt = 0) {
     const pl = game.player;
+    for (const t of this.city.turfs || []) refreshDealer(t, this.peds, dt);
     if (pl.dying) return;
     const provoking = pl.weapon !== 'fists' || (game.wanted && game.wanted.level > 0);
     for (const t of this.city.turfs || []) {
       const inside = pl.x > t.x - 40 && pl.x < t.x + t.w + 40 && pl.y > t.y - 40 && pl.y < t.y + t.h + 40;
       if (inside && !t.warned) {
         t.warned = true;
-        game.hud.toast(`${t.hangul} — ${t.place}`, 3);
+        // Il mestiere della banda si legge entrando: è l'unico posto in cui il
+        // giocatore può scoprire che qui si commercia, e perché adesso non può.
+        game.hud.toast(`${t.hangul} · ${t.trade} — ${t.place}`, 3);
+        if (provoking) game.hud.toast('Con questa addosso non trattano', 2.8);
       } else if (!inside && t.warned && dist(pl.x, pl.y, t.cx, t.cy) > 700) {
         t.warned = false;
       }
@@ -129,7 +201,7 @@ export class PedestrianSystem {
 
   update(dt, game) {
     this.stream(dt, game);
-    this.watchTurfs(game);
+    this.watchTurfs(game, dt);
     for (const p of this.peds) this.updatePed(p, dt, game);
   }
 
@@ -191,6 +263,10 @@ export class PedestrianSystem {
       ped.gang = t.gang;
       ped.armed = rng.chance(0.7); // in casa propria sono armati quasi tutti
       ped.state = 'guard';
+      // Chi fa il 거래책 lo decide `refreshDealer` al prossimo frame, e lo decide
+      // da solo: due punti che scrivono lo stesso flag lasciavano in giro un
+      // secondo uomo marchiato come contatto, e il giocatore andava a parlare con
+      // quello sbagliato.
       this.peds.push(ped);
       return ped;
     }
@@ -281,6 +357,27 @@ export class PedestrianSystem {
       p.state = p.panic > 0 ? 'flee' : 'walk';
     }
 
+    // Una guardia che ha finito di correre o di sparare torna al recinto. Senza,
+    // qualunque spavento la promuove a passante per sempre: e siccome dai 철마파
+    // ci si arriva **guidando**, e un'auto che accosta fa scappare chi ha intorno,
+    // il 거래책 spariva proprio nel momento in cui serviva.
+    // Non basta guardare se è ancora dentro il recinto: fuggendo a 2,1× per due
+    // secondi ne esce di trecento pixel, e da `walk` non ci tornerebbe mai più.
+    // È lo stato `guard` a riportarcelo, camminando.
+    if (p.turf && !p.hostile && p.panic <= 0 && (p.state === 'walk' || p.state === 'idle')) {
+      p.state = 'guard';
+    }
+
+    // Il riparo è uno stato di riposo, non una gabbia: panico, ostilità e
+    // servizio riscrivono `state` da soli e portano fuori dal portone senza che
+    // qui serva un caso apposta.
+    const rain = game.dayCycle.rain;
+    if (p.shelterCd > 0) p.shelterCd -= dt;
+    if (rain > RAIN_SHELTER && p.shy && p.umbrella < 0 && p.shelterCd <= 0
+      && (p.state === 'walk' || p.state === 'idle')) {
+      this.seekShelter(p, game);
+    }
+
     let targetSpeed = p.baseSpeed;
     let tx = p.x, ty = p.y;
 
@@ -338,6 +435,29 @@ export class PedestrianSystem {
         }
         break;
       }
+      case 'shelter': {
+        p.shelterT -= dt;
+        // Smesso di piovere non si riparte tutti insieme: la fine della pioggia
+        // diventa un conto alla rovescia diverso per ognuno, e sotto la tettoia
+        // resta chi ci sta ancora bene.
+        if (rain < p.rainOut && p.shelterT > 6) p.shelterT = 1 + this.rng.range(0, 5);
+        if (p.shelterT <= 0) {
+          p.state = 'walk';
+          p.shelterCd = 4 + this.rng.range(0, 8);
+          break;
+        }
+        tx = p.shelterX;
+        ty = p.shelterY;
+        if (dist(p.x, p.y, tx, ty) < 9) {
+          targetSpeed = 0;
+          // Da fermi si guarda la strada, non il muro: è quello che rende
+          // leggibile dall'alto una fila di gente sotto una tettoia.
+          p.angle = approachAngle(p.angle, p.shelterA, 3 * dt);
+        } else {
+          targetSpeed = p.baseSpeed * 1.35;   // gli ultimi metri si fanno di corsa
+        }
+        break;
+      }
       case 'guard': {
         // Presidio: si gira dentro il proprio recinto e non ne esce. Uscire
         // vorrebbe dire pathfinding e marciapiedi, e un tizio che ciondola
@@ -347,6 +467,16 @@ export class PedestrianSystem {
         if (p.idleT > 0) {
           p.idleT -= dt;
           targetSpeed = 0;
+          break;
+        }
+        // Il 거래책 non fa il giro del recinto: sta dove tratta. Un contatto che
+        // ciondola trasforma i 54 px del banco in un inseguimento con `E` in mano,
+        // ed è anche il modo in cui si capisce chi comanda in un cortile.
+        if (p.dealer) {
+          if (!p.postX) { p.postX = p.x; p.postY = p.y; }
+          tx = p.postX;
+          ty = p.postY;
+          targetSpeed = dist(p.x, p.y, tx, ty) > 8 ? p.baseSpeed * 0.5 : 0;
           break;
         }
         targetSpeed = p.baseSpeed * 0.55;
@@ -433,6 +563,13 @@ export class PedestrianSystem {
       }
     }
 
+    // Sotto l'acqua si allunga il passo, ombrello o no: è il modo più economico
+    // di far vedere che piove su chi non si ripara. Chi scappa o è in servizio ha
+    // già una sua andatura e non c'entra niente con il tempo.
+    if (rain > 0.05 && (p.state === 'walk' || p.state === 'crossing' || p.state === 'shelter')) {
+      targetSpeed *= 1 + rain * RAIN_HURRY;
+    }
+
     // Steering verso il punto obiettivo
     const dx = tx - p.x;
     const dy = ty - p.y;
@@ -464,7 +601,11 @@ export class PedestrianSystem {
 
     // Non attraversano i muri. I solidi `vehicleOnly` (le scalinate) sì: sono
     // fatti apposta per lasciar passare chi va a piedi.
-    if (p.state === 'flee' || p.state === 'crossing' || p.state === 'hostile' || p.state === 'duty') {
+    // Chi è già arrivato sotto la tettoia è fermo contro un muro che ha già
+    // scavalcato: rifargli la query dei solidi a ogni frame, per venti persone,
+    // è il grosso di quello che costa la pioggia.
+    if (p.state === 'flee' || p.state === 'crossing' || p.state === 'hostile'
+      || p.state === 'duty' || (p.state === 'shelter' && targetSpeed > 0)) {
       const solids = this.city.solidGrid.queryRect(p.x - 24, p.y - 24, 48, 48);
       for (const s of solids) {
         if (s.vehicleOnly) continue;
@@ -474,6 +615,34 @@ export class PedestrianSystem {
         p.y += push.ny * push.depth;
       }
     }
+  }
+
+  /**
+   * Cerca il portone più vicino e ci si mette sotto. I portoni sono punti che
+   * esistono già (`b.shop`), quindi non serve un indice nuovo: bastano gli
+   * edifici attorno. La ricerca è dietro a `shelterCd` perché una query di
+   * 680×680 px per pedone per frame, sotto la pioggia, si paga.
+   */
+  seekShelter(p, game) {
+    p.shelterCd = 2 + this.rng.range(0, 3);
+    const R = SHELTER_REACH;
+    let best = null;
+    let bd = R * R;
+    for (const b of this.city.buildingGrid.queryRect(p.x - R, p.y - R, R * 2, R * 2, this._sq)) {
+      if (!b.shop) continue;
+      const d2 = (b.shop.x - p.x) ** 2 + (b.shop.y - p.y) ** 2;
+      if (d2 < bd) { bd = d2; best = b.shop; }
+    }
+    if (!best) return;
+    // Sotto la tettoia, non sullo zerbino: un filo più in fuori della soglia (o
+    // si finisce dentro il muro) e spostati di lato, o cinque persone allo stesso
+    // portone stanno tutte nello stesso pixel.
+    const off = ((p.id % 5) - 2) * 11;
+    p.shelterX = best.x + best.nx * 6 - best.ny * off;
+    p.shelterY = best.y + best.ny * 6 + best.nx * off;
+    p.shelterA = Math.atan2(best.ny, best.nx);
+    p.shelterT = SHELTER_MAX;
+    p.state = 'shelter';
   }
 
   /**

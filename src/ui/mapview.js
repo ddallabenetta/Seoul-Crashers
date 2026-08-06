@@ -154,6 +154,24 @@ export class MapView {
       ctx.fillRect(s.x - 4.5, s.y - 1.5, 9, 3);
     }
 
+    // Commissariati: sulla carta servono a decidere da che parte *non* scappare.
+    for (const st of city.stations || []) {
+      const s2 = toScreen(st.x, st.y);
+      ctx.fillStyle = '#2f5fbf';
+      ctx.fillRect(s2.x - 6, s2.y - 6, 12, 12);
+      ctx.strokeStyle = 'rgba(226,234,248,0.9)';
+      ctx.lineWidth = 1.4;
+      ctx.strokeRect(s2.x - 6, s2.y - 6, 12, 12);
+      ctx.fillStyle = 'rgba(226,234,248,0.95)';
+      ctx.fillRect(s2.x - 4, s2.y - 1.5, 8, 3);
+      if (zoom > 1.6) {
+        ctx.fillStyle = 'rgba(240,244,250,0.8)';
+        ctx.font = '600 9px system-ui, "Apple SD Gothic Neo", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('경찰서', s2.x, s2.y + 17);
+      }
+    }
+
     // Negozi con un servizio e officine di verniciatura: la mappa piena serve
     // proprio a decidere dove andare a rifornirsi o a farsi ridipingere l'auto.
     for (const sh of city.shops || []) {

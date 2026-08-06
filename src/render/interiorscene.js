@@ -34,6 +34,7 @@ export class InteriorScene {
     if (f.stairUp) this.drawStairs(ctx, f.stairUp, pal, 1);
     if (f.stairDown) this.drawStairs(ctx, f.stairDown, pal, -1);
     if (f.idx === 0) this.drawMat(ctx, f, pal, game);
+    if (f.back && game.shops.backSpot) this.drawBackDoor(ctx, f, pal, game);
 
     // Ombre a terra, tutte in un pass prima dei volumi (come in scene.js).
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
@@ -66,6 +67,7 @@ export class InteriorScene {
 
     this.scene.drawThrown(ctx, game, cam);
     if (game.fx) game.fx.draw(ctx, cam, game.time);
+    if (game.shops.alarmT > 0) this.drawCaller(ctx, game);
 
     // Locale chiuso: luci spente. Dentro non arriva l'ora del giorno — la luce
     // di un interno è artificiale, e infatti un negozio aperto è illuminato
@@ -80,6 +82,46 @@ export class InteriorScene {
       ctx.globalCompositeOperation = 'source-over';
       ctx.globalAlpha = 1;
     }
+    if (game.shops.alarmT > 0) this.drawAlarmBadge(ctx, game, cam);
+  }
+
+  /**
+   * Chi sta telefonando. Un allarme silenzioso che non si vede è solo una stella
+   * che arriva dal nulla: l'anello sotto i piedi è il tempo che resta, e finché
+   * quello è in sala il testimone si può ancora fermare.
+   */
+  drawCaller(ctx, game) {
+    const p = game.shops.alarmCaller;
+    if (!p || p.dead || p.gone) return;
+    const frac = game.shops.alarmFrac;
+    const puls = 0.55 + 0.45 * Math.sin(game.time * (5 + 12 * (1 - frac)));
+    ctx.save();
+    ctx.strokeStyle = `rgba(232,90,74,${0.35 + 0.4 * puls})`;
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 15, -Math.PI / 2, -Math.PI / 2 + 6.2832 * frac);
+    ctx.stroke();
+    // Cornetta sopra la testa: un rettangolino con la banda accesa, come il till.
+    ctx.fillStyle = `rgba(232,90,74,${0.6 + 0.4 * puls})`;
+    ctx.fillRect(p.x - 4, p.y - 26, 8, 12);
+    ctx.fillStyle = 'rgba(255,240,236,0.9)';
+    ctx.fillRect(p.x - 2.5, p.y - 24, 5, 6);
+    ctx.restore();
+  }
+
+  /** Il conto alla rovescia resta a schermo anche quando il testimone è uscito. */
+  drawAlarmBadge(ctx, game, cam) {
+    const left = game.shops.alarmT;
+    cam.applyUI(ctx);
+    ctx.save();
+    ctx.textAlign = 'center';
+    const puls = 0.6 + 0.4 * Math.sin(game.time * 7);
+    ctx.fillStyle = `rgba(232,90,74,${0.16 + 0.12 * puls})`;
+    ctx.fillRect(cam.viewW / 2 - 108, 18, 216, 30);
+    ctx.fillStyle = `rgba(255,214,206,${0.75 + 0.25 * puls})`;
+    ctx.font = '700 14px system-ui, "Apple SD Gothic Neo", sans-serif';
+    ctx.fillText(`112 — stanno chiamando · ${left.toFixed(0)}s`, cam.viewW / 2, 38);
+    ctx.restore();
   }
 
   drawFloor(ctx, f, pal, game) {
@@ -116,6 +158,63 @@ export class InteriorScene {
     ctx.lineTo(e.x + 7, e.y + 3);
     ctx.closePath();
     ctx.fill();
+    this.drawDoorLight(ctx, f, game, e.x, f.h - WALL, -1);
+  }
+
+  /**
+   * Porta di servizio sul retro. Si disegna in grigio ferro e non con l'accento del
+   * locale: è un'uscita antipanico, non una vetrina, e va riconosciuta come *altra*
+   * cosa rispetto alla porta da cui si è entrati.
+   */
+  drawBackDoor(ctx, f, pal, game) {
+    const b = f.back;
+    const cx = b.x + b.w / 2;
+    ctx.fillStyle = 'rgba(150,158,170,0.30)';
+    ctx.fillRect(b.x, 0, b.w, WALL);
+    ctx.fillStyle = 'rgba(20,22,26,0.45)';
+    ctx.fillRect(b.x + 2, WALL, b.w - 4, 15);
+    // Freccia verso il varco, in controfase con quella dell'ingresso: due frecce
+    // che pulsano insieme sembrano lo stesso invito, e qui l'invito è l'opposto.
+    ctx.fillStyle = `rgba(120,220,160,${0.45 + 0.28 * Math.sin(game.time * 3 + Math.PI)})`;
+    ctx.beginPath();
+    ctx.moveTo(cx, WALL + 2);
+    ctx.lineTo(cx - 7, WALL + 12);
+    ctx.lineTo(cx + 7, WALL + 12);
+    ctx.closePath();
+    ctx.fill();
+    this.drawDoorLight(ctx, f, game, cx, WALL, 1);
+  }
+
+  /**
+   * La luce che entra dal varco. Dentro un edificio il velo dell'ora non c'è (§3
+   * dell'HANDOFF): la luce di un negozio è artificiale e alle tre di notte è la
+   * stessa di mezzogiorno. Quello che cambia davvero è il rettangolo di giorno che
+   * entra dalla porta — lungo e bianco a mezzogiorno, un fondo d'arancione da
+   * lampione la notte — ed è l'unica cosa dell'ora che si vede da dentro.
+   */
+  drawDoorLight(ctx, f, game, cx, wallY, dir) {
+    const dc = game.dayCycle;
+    if (!dc || f.openNow === false) return;
+    const lamps = dc.light.lamps;
+    const depth = 34 + 78 * (1 - lamps);
+    const y0 = wallY;
+    const y1 = wallY + dir * depth;
+    const g = ctx.createLinearGradient(0, y0, 0, y1);
+    const col = lamps > 0.5 ? '255,182,96' : '255,244,222';
+    g.addColorStop(0, `rgba(${col},${0.30 * (1 - lamps) + 0.10 * lamps})`);
+    g.addColorStop(1, `rgba(${col},0)`);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    // Il fascio si allarga entrando: un rettangolo netto sembra un tappeto.
+    ctx.moveTo(cx - 30, y0);
+    ctx.lineTo(cx + 30, y0);
+    ctx.lineTo(cx + 30 + depth * 0.5, y1);
+    ctx.lineTo(cx - 30 - depth * 0.5, y1);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
   }
 
   drawStairs(ctx, s, pal, dir) {

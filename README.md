@@ -72,10 +72,20 @@ insegne che si legge dalla strada dice cosa c'è a ogni piano, e le scale ci por
 | **피시방 · 노래방 · 당구장 · 사무실 · 주택** | non si compra niente: si esplora, e c'è una cassa |
 | **도색** officina | ci si guida dentro: ripara, riverniciata e **azzera il ricercato** |
 
-Il denaro (**₩**) serve e si finisce. Si rifà svuotando le casse con `F`: serve un'arma da
-fuoco in pugno, e il commesso di un'armeria o di un bar non sta a guardare — è armato, e
-spara. Una rapina vale una stella, un cadavere due: la polizia però non entra, ti aspetta
-fuori. Mentre sei dentro la città è ferma, ricercato compreso: la porta non è un nascondiglio.
+Ogni locale ha un orario, e chi c'è dentro dipende dall'ora: un 술집 alle undici di sera è
+pieno, alle tre ci sono due persone; un ufficio la sera è vuoto. In un **주택** c'è un futon,
+e ci si può dormire fino all'alba — ma non con le sirene là fuori.
+
+Il denaro (**₩**) serve e si finisce, e **costa diverso a seconda del quartiere**: la stessa
+pompa costa ₩98.500 al porto di Incheon e ₩188.500 a Gangnam. Il listino te lo dice. Si rifà
+svuotando le casse con `F` — serve un'arma in pugno, e il commesso di un'armeria o di un bar è
+armato e spara — oppure rivendendo al 전당포 il mezzo che hai parcheggiato davanti alla porta.
+
+Una rapina vale una stella, e se qualcuno ti ha visto **chiama la polizia**: hai diciassette
+secondi prima che la centrale sappia. La polizia dentro non entra, ma **ti aspetta fuori**: il
+tuo livello di ricercato resta congelato mentre sei al riparo, e intanto loro si mettono
+davanti alla porta. Al piano terra molti locali hanno una **porta sul retro** che dà nel
+cortile: è per quello che c'è.
 
 ## Il protagonista
 
@@ -96,7 +106,10 @@ alza il livello di **수배** (ricercato), da una a cinque stelle:
 | ★★ | volanti con sirena, l'equipaggio scende quando sei a piedi |
 | ★★★ | speronamenti e colpi dal finestrino |
 | ★★★★ | posti di blocco e strisce chiodate sulla tua strada |
-| ★★★★★ | furgoni SWAT ed elicottero col riflettore |
+| ★★★★★ | furgoni SWAT che tirano granate, ed elicottero col riflettore |
+
+In volo o in barca non ci si libera così facilmente: l'elicottero arriva già a tre stelle, e
+dal porto partono le motovedette.
 
 Le stelle scendono **solo se nessuno ti vede**: basta un poliziotto con la linea di vista
 libera, o il cono del riflettore addosso, e il cronometro della fuga riparte da zero. Un
@@ -112,8 +125,9 @@ venduto a un consorzio immobiliare che sta ripulendo i quartieri vecchi con la s
 riqualificazione: prima gli sgomberi, poi le gru, poi le torri di vetro di Gangnam.
 
 Tre atti, dodici missioni, sette zone: dai vicoli di Hongdae fino ai piani alti dove
-il crimine indossa un completo. (Missioni e cutscene a fumetti arrivano nella fase 3 —
-vedi *Stato* più sotto.)
+il crimine indossa un completo. (Missioni e cutscene a fumetti sono l'ultimo pezzo che manca —
+vedi *Stato* più sotto. Le bande però ci sono già, e con loro si può trattare: basta entrare
+nel loro cortile a mani vuote.)
 
 ## I quartieri
 
@@ -232,11 +246,27 @@ miccia, mina di prossimità. Onda d'urto condivisa che fa saltare anche i veicol
 esplosioni), barra armi a sei file, mirino che mostra il raggio dello scoppio, SWAT passata
 al fucile d'assalto.
 
-**Fase 3, negozi e interni — completata.** 139 vetrine e 369 attività su più piani in tutta
+**Fase 3, negozi e interni — completata.** 113 vetrine e 324 attività su più piani in tutta
 Seoul, dodici tipi di locale con pianta, arredo e gente propri; denaro, listini, banco dei
 pegni che ricompra, cambio d'abito che toglie una stella, casse da svuotare, officine di
 verniciatura che azzerano il ricercato.
 
-**Fase 3, il resto — da fare.** Le 12 missioni con cutscene a fumetti, mercato nero dinamico
-con prezzi per distretto, attività secondarie, ciclo giorno-notte e meteo, audio procedurale,
-salvataggio su localStorage.
+**Fase 3, la mappa — completata.** Mondo 5400×5400 che la città non riempie: il mare a ovest
+con l'aeroporto di Gimpo e il porto di Incheon, la campagna in mezzo, le colline attorno. Si
+vola (elicottero, turboelica) e si naviga (motoscafo, battello); in acqua si annega e le auto
+affondano. Sei territori di bande.
+
+**Fase 3, il tempo — completata.** Un giro di ventiquattr'ore ogni ventiquattro minuti, quattro
+condizioni di tempo legate in catena, le finestre che si accendono la sera, la pioggia che si
+sente al volante e i locali che aprono e chiudono.
+
+**Fase 3, il giro di arretrati — completata.** La polizia assedia la porta del negozio in cui
+ti sei infilato; l'equipaggio sbarcato risale in volante; quattro commissariati sulla mappa;
+elicottero e motovedette per chi scappa in volo o via acqua; granate della SWAT. I pedoni si
+riparano sotto i portoni quando piove, la pioggia spegne il fuoco e lava il sangue, l'incendio
+si propaga, la minigun si surriscalda. Prezzi per quartiere, mezzi rubati da rivendere, interni
+che cambiano con l'ora, un futon per dormire fino all'alba, l'allarme silenzioso dopo una
+rapina, la porta sul retro. E le bande commerciano: quattro banchi, uno per mestiere.
+
+**Fase 3, il resto — da fare.** Le 12 missioni con cutscene a fumetti, le attività secondarie,
+l'audio procedurale e il salvataggio su localStorage.
