@@ -40,6 +40,7 @@
 //   Non è un negozio in più: è lo stesso listino con un mercato piegato dal
 //   mestiere della banda, in un posto dove si entra solo a mani vuote.
 import { Rng } from '../core/rng.js';
+import { autosave } from '../core/save.js';
 import { clamp, damp, dist, approachAngle, circleRectPush, pointInRect } from '../core/math.js';
 import { createPed, canDeal } from './pedestrians.js';
 import { WEAPONS, shoot, hasLineOfSight } from './weapons.js';
@@ -968,6 +969,9 @@ export class ShopSystem {
     // L'ora è un'altra: il piano va riletto come se ci si fosse appena arrivati —
     // aperture, luci e gente di passaggio.
     this.showFloor(game, this.floor);
+    // Il letto è il punto di salvataggio di qualunque gioco che ne abbia uno: ci
+    // si dorme apposta quando si è messo via qualcosa da non perdere.
+    autosave(game, 'dopo il sonno');
   }
 
   /**

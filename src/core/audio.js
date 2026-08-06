@@ -25,6 +25,7 @@
 // scarto orizzontale → panning. Dentro un edificio funziona identico perché le
 // coordinate della pianta e quelle della camera sono le stesse (§3 dell'HANDOFF).
 import { clamp, damp } from './math.js';
+import { MusicSystem } from './music.js';
 import { VEHICLE_TYPES } from '../render/sprites.js';
 
 // Oltre questa distanza dall'ascoltatore un suono non viene proprio creato.
@@ -49,7 +50,7 @@ const GUN_TONE = {
 };
 
 /** Volumi di partenza. Si spostano dal menu e restano in localStorage. */
-const DEFAULT_MIX = { master: 0.7, sfx: 1, ambient: 0.8, ui: 0.75, radio: 0.8 };
+const DEFAULT_MIX = { master: 0.7, sfx: 1, ambient: 0.8, music: 0.7, ui: 0.75, radio: 0.8 };
 const MIX_KEY = 'seoul.audio';
 
 export class AudioSystem {
@@ -67,6 +68,7 @@ export class AudioSystem {
     this._crackle = 0;    // prossimo scoppiettio del fuoco
     this._q = [];         // buffer riusato dalle query sulla griglia dei veicoli
     this.beds = null;
+    this.music = null;    // esiste solo a contesto acceso, come i letti
   }
 
   /**
@@ -97,6 +99,7 @@ export class AudioSystem {
         sirena: +b.siren.g.toFixed(2), rotore: +b.rotor.g.toFixed(2), fuoco: +b.fire.g.toFixed(2),
         gomme: +b.skid.g.toFixed(2), canne: +b.spin.g.toFixed(2),
       } : null,
+      musica: this.music ? this.music.stats : null,
     };
   }
 
@@ -148,6 +151,13 @@ export class AudioSystem {
     this.amb.gain.value = this.mix.ambient;
     this.amb.connect(this.comp);
 
+    // La musica **passa dal compressore**, al contrario dell'interfaccia: quando
+    // scoppia una granata deve abbassarsi come tutto il resto, o un pezzo che
+    // continua indifferente sopra un'esplosione la fa sembrare piccola.
+    this.mus = ctx.createGain();
+    this.mus.gain.value = this.mix.music;
+    this.mus.connect(this.comp);
+
     // L'interfaccia non passa dal compressore: un click di menu non deve abbassare
     // l'esplosione che c'è sotto, e in pausa dev'essere l'unica cosa che si sente.
     this.uiBus = ctx.createGain();
@@ -157,6 +167,7 @@ export class AudioSystem {
     this.white = this.makeNoise(2.4, false);
     this.pink = this.makeNoise(2.4, true);
     this.buildBeds();
+    this.music = new MusicSystem(this);
     this.built = true;
   }
 
@@ -217,6 +228,7 @@ export class AudioSystem {
       if (bus === 'master') this.master.gain.value = this.muted ? 0 : this.mix.master;
       else if (bus === 'sfx') this.sfx.gain.value = this.mix.sfx;
       else if (bus === 'ambient') this.amb.gain.value = this.mix.ambient;
+      else if (bus === 'music') this.mus.gain.value = this.mix.music;
       else if (bus === 'ui') this.uiBus.gain.value = this.mix.ui;
       // `radio` non ha un nodo: lo stream sta in un `<audio>` fuori dal grafo
       // (vedi `core/radio.js`), e legge questo numero da solo.
@@ -623,6 +635,9 @@ export class AudioSystem {
       b.g = damp(b.g, b.target, b.smooth, dt);
       b.node.gain.value = b.g;
     }
+    // La musica gira anche in pausa e anche a menu aperto: è l'unica cosa che non
+    // ha un `duck`, perché in quei due momenti è la sola cosa che si sente.
+    this.music.update(dt, game);
   }
 
   updateBeds(dt, game) {
@@ -1072,12 +1087,19 @@ export class AudioSystem {
    * finirebbe per tarare «Ambiente» ascoltando un clic che passa da un'altra parte.
    */
   preview(bus) {
-    const dest = bus === 'ambient' ? this.amb : bus === 'ui' ? this.uiBus : this.sfx;
+    const dest = bus === 'ambient' ? this.amb : bus === 'ui' ? this.uiBus
+      : bus === 'music' ? this.mus : this.sfx;
     const out = this._at(null, null, 0.32, 0.5, dest);
     if (!out) return;
     if (bus === 'ambient') {
       const lp = this._filter(out, 'lowpass', 900, 0.8, { f1: 300, sweep: 0.4 });
       this._noise(lp, { dur: 0.4, peak: 0.7, attack: 0.04, pink: true });
+    } else if (bus === 'music') {
+      // Un accordo, non un clic: la musica si regola su quello che suonerà, e
+      // quasi sempre in quel momento non sta suonando niente.
+      for (const n of [0, 3, 7]) {
+        this._tone(out, { type: 'triangle', f0: 220 * Math.pow(2, n / 12), dur: 0.5, peak: 0.3, attack: 0.02 });
+      }
     } else {
       this._tone(out, { type: 'triangle', f0: 660, dur: 0.12, peak: 0.4 });
       this._tone(out, { type: 'triangle', f0: 990, dur: 0.2, peak: 0.3, t: 0.07 });

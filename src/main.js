@@ -21,11 +21,12 @@ import { ProjectileSystem } from './entities/projectiles.js';
 import { WantedSystem } from './entities/wanted.js';
 import { PoliceSystem } from './entities/police.js';
 import { ShopSystem, won } from './entities/shops.js';
-import { usedSlots } from './core/save.js';
+import { autosave, tickAutosave } from './core/save.js';
 import { InteriorScene } from './render/interiorscene.js';
 import { Hud } from './ui/hud.js';
 import { MapView } from './ui/mapview.js';
 import { PauseMenu } from './ui/menu.js';
+import { StartMenu } from './ui/startmenu.js';
 import { ShopMenu } from './ui/shopmenu.js';
 
 const MAX_PIXELS = 2_900_000;
@@ -43,6 +44,10 @@ class Game {
     this.time = 0;
     this.debug = false;
     this.paused = false;
+    // Falso finché il menu iniziale è a schermo: il mondo gira lo stesso, il
+    // giocatore no (§5.18).
+    this.started = false;
+    this.attractT = 0;
     // Il meteo ha un rng suo: pescare da `this.rng` sposterebbe tutto quello che
     // ci pesca dopo (spawn del traffico, dei pedoni) a ogni cambio di tempo.
     this.dayCycle = new DayCycle(new Rng(20260731));
@@ -141,6 +146,7 @@ class Game {
     this.hud = new Hud(this.city, this.mapTexture);
     this.mapView = new MapView(this.city, this.mapTexture);
     this.menu = new PauseMenu(this.mapView);
+    this.startMenu = new StartMenu();
     this.shopMenu = new ShopMenu();
 
     // Riempie subito la scena, così il giocatore non parte in una città deserta.
@@ -148,18 +154,34 @@ class Game {
     this.traffic.prewarm(this, 72, 32);
     this.pedSystem.prewarm(this, 64);
 
-    this.hud.showDistrict(this.player.district);
     this.stats.districts.add(this.player.district.id);
-    this.hud.toast('E per rubare un\'auto · M per la mappa', 5);
-    this.hud.toast('Mouse per mirare e sparare · 1-6 per l\'arma', 6.5);
-    this.hud.toast('E sulla porta di un negozio per entrare · F svuota la cassa', 8);
-    // Il gioco parte in strada, senza schermata iniziale: se non lo si dice qui,
-    // una partita salvata resta invisibile finché non si apre il menu per caso.
-    if (usedSlots() > 0) this.hud.toast('Hai una partita salvata · ESC → Salvataggi', 9.5);
 
     await onProgress('Pronti.', 1);
     this.loop = new Loop((dt) => this.update(dt), () => this.render());
     this.loop.start();
+    // `?autostart` salta il menu iniziale: è come `probe.mjs` (§9) e le scene di
+    // prova trovano il gioco in strada, esattamente come prima che il menu ci fosse.
+    if (new URLSearchParams(window.location.search).has('autostart')) this.start(false);
+  }
+
+  /**
+   * Si comincia. `loaded` dice se il mondo è già stato riscritto da un
+   * salvataggio: in quel caso non si dà il benvenuto a chi sta *tornando*, e
+   * soprattutto non si tocca niente di quello che `save.apply` ha appena messo
+   * a posto.
+   */
+  start(loaded) {
+    this.started = true;
+    this.startMenu.open = false;
+    this.camera.setZoomTarget(1);
+    this.camera.snapTo(this.player.x, this.player.y);
+    this.autoT = undefined;
+    this.audio.music?.sting('go');
+    this.hud.showDistrict(this.player.district);
+    if (loaded) return;
+    this.hud.toast('E per rubare un\'auto · M per la mappa', 5);
+    this.hud.toast('Mouse per mirare e sparare · 1-6 per l\'arma', 6.5);
+    this.hud.toast('E sulla porta di un negozio per entrare · F svuota la cassa', 8);
   }
 
   /** True quando il giocatore è dentro un edificio: la città è ferma. */
@@ -381,6 +403,10 @@ class Game {
     pl.money -= bill;
     this.hud.toast(`Ospedale di ${best.name}: ti hanno ricucito, l'arsenale no`, 4);
     if (bill > 0) this.hud.toast(`Conto della clinica: ${won(bill)}`, 4);
+    // Uscire dall'ospedale è un punto pulito: niente stelle, HP pieni, in piedi
+    // davanti a una porta. Se una sconfitta non si salva qui, l'unico modo di
+    // riavere quello che si aveva prima è non ricaricare mai.
+    autosave(this, 'ospedale');
   }
 
   /**
@@ -421,14 +447,20 @@ class Game {
     pl.district = this.city.districtAt(pl.x, pl.y);
     this.hud.showDistrict(pl.district);
     this.audio.playerDown();
+    this.audio.music?.sting('busted');
     this.hud.toast(`Arrestato — commissariato di ${best.name}`, 4);
     this.hud.toast('Sei ore dentro, e l\'arsenale se lo tengono', 4);
     if (bail > 0) this.hud.toast(`Cauzione: ${won(bail)}`, 4);
+    autosave(this, 'uscito di cella');
   }
 
   // --- ciclo ----------------------------------------------------------------
   update(dt) {
     const input = this.input;
+    if (!this.started) {
+      this.updateAttract(dt);
+      return;
+    }
 
     if (input.wasPressed('Escape')) {
       // `backOut` è il pannello audio del menu: ESC lì dentro torna alle voci
@@ -510,6 +542,7 @@ class Game {
     this.projectiles.update(dt, this);
     this.fx.update(dt, this);
     this.hud.update(dt);
+    tickAutosave(dt, this);
 
     // Statistiche di guida. Entrare e uscire da una porta è un salto di coordinate,
     // non un chilometro percorso: durante lo stacco non si conta.
@@ -526,6 +559,42 @@ class Game {
     this.camera.follow(this.player.cameraTarget(this), dt, this.player.onFoot ? 0.2 : 0.4);
 
     input.endFrame();
+  }
+
+  /**
+   * Menu iniziale: Seoul gira dietro al titolo. Girano traffico, pedoni ed
+   * effetti — cioè tutto quello che si vede — e restano fermi il giocatore (non
+   * risponde ai comandi finché non si comincia) e **l'orologio**: dieci minuti
+   * passati a leggere il menu sono dieci ore di gioco, e la partita comincerebbe
+   * a un'ora decisa da quanto ci si è messi a premere Invio.
+   *
+   * La camera gira piano attorno al punto di partenza e non si allontana: lo
+   * streaming immette il traffico attorno al **giocatore** (§3), e una camera che
+   * scappasse via inquadrerebbe strade vuote con le auto che svaniscono in vista.
+   */
+  updateAttract(dt) {
+    this.audio.update(dt, this);
+    this.radio.update(dt, this);
+    if (this.canvas.style.cursor !== 'default') this.canvas.style.cursor = 'default';
+    this.startMenu.update(dt, this);
+    if (this.started) { this.input.endFrame(); return; }
+
+    this.vehicleGrid.rebuild(this.vehicles);
+    this.pedGrid.rebuild(this.peds);
+    this.traffic.update(dt, this);
+    this.pedSystem.update(dt, this);
+    this.fx.update(dt, this);
+    this.hud.update(dt);
+    this.emitSkids(dt);
+
+    this.attractT += dt;
+    const a = this.attractT * 0.16;
+    this.camera.setZoomTarget(0.92);
+    this.camera.follow({
+      x: this.player.x + Math.cos(a) * 250,
+      y: this.player.y + Math.sin(a) * 170,
+    }, dt, 0);
+    this.input.endFrame();
   }
 
   /**
@@ -581,6 +650,10 @@ class Game {
     if (this.indoors) this.interiorScene.render(ctx, this);
     else this.scene.render(ctx, this);
     this.camera.applyUI(ctx);
+    if (!this.started) {
+      this.startMenu.draw(ctx, this);
+      return;
+    }
     this.hud.draw(ctx, this);
     this.mapView.draw(ctx, this);
     this.menu.draw(ctx, this);

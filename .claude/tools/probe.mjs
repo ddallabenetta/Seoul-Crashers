@@ -33,7 +33,7 @@ function loadPlaywright() {
 }
 
 function parseArgs(argv) {
-  const opts = { seconds: 3, evals: [], scripts: [], size: '1280x720', port: 0, shot: null, quiet: false, boot: 45 };
+  const opts = { seconds: 3, evals: [], scripts: [], size: '1280x720', port: 0, shot: null, quiet: false, boot: 45, menu: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = () => argv[++i];
@@ -47,6 +47,7 @@ function parseArgs(argv) {
       case '--size': opts.size = next(); break;
       case '--port': opts.port = parseInt(next(), 10); break;
       case '--boot-timeout': opts.boot = parseFloat(next()); break;
+      case '--menu': opts.menu = true; break;
       case '--quiet': case '-q': opts.quiet = true; break;
       case '--help': case '-h': opts.help = true; break;
       default: throw new Error(`opzione sconosciuta: ${a}`);
@@ -67,6 +68,7 @@ const HELP = `probe.mjs — avvia il gioco headless e lo interroga
   --size WxH         viewport (default 1280x720)
   --port N           porta del server statico (default: una libera)
   --boot-timeout N   secondi massimi di attesa del boot (default 45)
+  --menu             lascia il menu iniziale a schermo (default: si parte in strada)
   --quiet            stampa solo i risultati degli --eval
 `;
 
@@ -134,7 +136,11 @@ async function main() {
 
     // Niente cache: è la trappola numero uno del progetto (vedi HANDOFF §1).
     await page.route('**/*', (route) => route.continue());
-    await page.goto(`http://127.0.0.1:${port}/index.html`, { waitUntil: 'load' });
+    // `?autostart` salta il menu iniziale: una scena di prova deve trovare il
+    // gioco in strada, con il giocatore che risponde ai comandi. Con `--menu` si
+    // resta sul titolo, che è l'unico modo di fotografarlo.
+    const qs = opts.menu ? '' : '?autostart=1';
+    await page.goto(`http://127.0.0.1:${port}/index.html${qs}`, { waitUntil: 'load' });
 
     log(`[probe] boot… (porta ${port})`);
     await page.waitForFunction(() => window.game && window.game.loop && window.game.city, null,

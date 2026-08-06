@@ -1,0 +1,92 @@
+// Censimento della musica: cosa suona, quando, e quanto forte.
+//
+// La musica non si sceglie a orecchio più di quanto si scelga un mix (§5.13): il
+// tema deve stare sopra il fondo urbano e sotto un colpo di pistola, e la caccia
+// deve *aggiungersi* alle sirene senza coprirle. Qui si misurano tutte e due con
+// lo stesso analizzatore del censimento audio, e si controlla la regia — cioè
+// che il pezzo giusto parta e si fermi dove deve (§5.19).
+//
+// Va lanciata **con il menu iniziale a schermo**, che è dove il tema suona:
+//
+//   node .claude/tools/probe.mjs --menu --seconds 1 --quiet \
+//     --script .claude/tools/scenes/music-census.scene
+//
+// Riferimenti sani (Chromium headless in container, mix di fabbrica):
+//   tema del menu rms ~0.045 · caccia 3 stelle ~0.034 · caccia 5 stelle ~0.069
+//   in strada e da puliti ~0.015 (è il fondo urbano: la musica tace)
+//   passo musica in JS < 0.01 ms per frame
+// La caccia a cinque stelle **non è musica sola**: dentro ci sono sirene,
+// elicottero e piombo. Il pezzo da solo vale ~0.03 di quel numero.
+// Quello che deve restare vero, più dei numeri: **`pezzo` è `null` in strada** e
+// **la radio accesa spegne la musica** anche a cinque stelle.
+const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
+const A = game.audio;
+A.unlock();
+await wait(1.2);
+if (!A.ready) return { errore: 'contesto audio non partito: probe.mjs passa --autoplay-policy?' };
+
+const ctx = A.ctx;
+const an = ctx.createAnalyser();
+an.fftSize = 2048;
+A.master.connect(an);
+const buf = new Float32Array(an.fftSize);
+
+const meas = async (secs) => {
+  let sum = 0;
+  let n = 0;
+  let peak = 0;
+  const t0 = performance.now();
+  while (performance.now() - t0 < secs * 1000) {
+    an.getFloatTimeDomainData(buf);
+    for (let i = 0; i < buf.length; i++) {
+      sum += buf[i] * buf[i];
+      if (Math.abs(buf[i]) > peak) peak = Math.abs(buf[i]);
+    }
+    n += buf.length;
+    await new Promise((r) => setTimeout(r, 12));
+  }
+  return { rms: +Math.sqrt(sum / n).toFixed(4), picco: +peak.toFixed(3) };
+};
+const shot = async (etichetta, secs) => ({ [etichetta]: { ...A.music.stats, ...(await meas(secs)) } });
+
+const out = {};
+// 1. Il tema, sul menu iniziale.
+if (game.started) return { errore: 'serve --menu: il tema suona solo sul menu iniziale' };
+await wait(2);
+Object.assign(out, await shot('tema', 3));
+
+// 2. In strada, puliti: non deve suonare niente.
+game.start(false);
+await wait(4);
+Object.assign(out, await shot('strada', 2));
+
+// 3. Caccia, ai due gradini in cui entrano gli strati. Il giocatore va tenuto
+//    vivo a mano, o la SWAT lo stende, il ricercato si azzera e il pezzo si
+//    ferma proprio mentre lo si stava misurando (HANDOFF §4).
+const pl = game.player;
+const vivo = setInterval(() => { pl.hp = 1e6; }, 200);
+game.wanted.add(60, game);
+await wait(3);
+Object.assign(out, await shot('caccia3', 3));
+game.wanted.add(120, game);
+await wait(2.5);
+Object.assign(out, await shot('caccia5', 3));
+
+// 4. La radio vince: accesa, la musica del gioco si toglie di mezzo.
+game.radio.pending = 0;
+await wait(3);
+out.conRadio = { ...A.music.stats, radio: game.radio.on };
+game.radio.pending = -1;
+
+// 5. Si torna puliti e il pezzo si spegne.
+game.wanted.reset();
+clearInterval(vivo);
+await wait(3.5);
+Object.assign(out, await shot('calma', 2));
+
+// 6. Costo in JS del passo musica, misurato a parte dal frame.
+const t0 = performance.now();
+for (let i = 0; i < 600; i++) A.music.update(1 / 60, game);
+out.ms_per_frame = +((performance.now() - t0) / 600).toFixed(4);
+out.fps = game.loop.fps;
+return out;
