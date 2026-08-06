@@ -49,7 +49,7 @@ export function createVehicle(kind, x, y, angle = 0, colorIndex = 0) {
 }
 
 /** Cerchi di collisione lungo l'asse longitudinale. */
-function collisionCircles(v, spec) {
+export function collisionCircles(v, spec = VEHICLE_TYPES[v.kind]) {
   const cos = Math.cos(v.angle);
   const sin = Math.sin(v.angle);
   const r = spec.wid * 0.46;
