@@ -16,9 +16,24 @@ import { WEATHERS } from '../world/daycycle.js';
 import { createVehicle } from '../entities/vehicle.js';
 
 export const SLOTS = 3;
+/**
+ * Lo slot dell'autosave. **Non è uno dei tre manuali**: un salvataggio automatico
+ * che sovrascrive quello che il giocatore ha messo da parte è un salvataggio che
+ * gli fa perdere la partita invece di conservargliela. Quattro schede in lista,
+ * l'ultima con la chiave sua.
+ */
+export const AUTO_SLOT = 3;
+export const ALL_SLOTS = 4;
 const VERSION = 1;
 const SEED = 20260730;
-const KEY = (i) => `seoul.save.${i}`;
+const KEY = (i) => (i === AUTO_SLOT ? 'seoul.save.auto' : `seoul.save.${i}`);
+const AUTO_KEY = 'seoul.autosave';
+// Ogni quanto scatta l'autosave a tempo, in secondi di gioco.
+const AUTO_EVERY = 240;
+// Quanto si aspetta prima di riprovare quando il momento non è buono (stelle
+// addosso, quasi morto): riprovare a ogni frame vorrebbe dire chiedere a
+// `localStorage` sessanta volte al secondo per tutta la caccia.
+const AUTO_RETRY = 20;
 
 /**
  * localStorage non c'è sempre: in navigazione privata su qualche browser
@@ -238,9 +253,90 @@ export function clearSlot(i) {
   }
 }
 
-/** Quanti slot occupati: serve solo a decidere se dirlo all'avvio. */
+/** Quanti slot occupati, autosave compreso. */
 export function usedSlots() {
   let n = 0;
-  for (let i = 0; i < SLOTS; i++) if (readSlot(i)) n++;
+  for (let i = 0; i < ALL_SLOTS; i++) if (readSlot(i)) n++;
   return n;
+}
+
+/** Lo slot scritto più di recente: è quello che «Continua» riapre. −1 se non ce n'è. */
+export function latestSlot() {
+  let best = -1;
+  let at = -1;
+  for (let i = 0; i < ALL_SLOTS; i++) {
+    const d = readSlot(i);
+    if (d && d.at > at) { at = d.at; best = i; }
+  }
+  return best;
+}
+
+/** Etichetta di uno slot in lista. */
+export function slotLabel(i) {
+  return i === AUTO_SLOT ? 'AUTO' : `SLOT ${i + 1}`;
+}
+
+// --- autosave -----------------------------------------------------------------
+//
+// Il §5.15 aveva scelto di non averlo, con una ragione buona: «un autosave che
+// scatta da solo mentre hai quattro stelle addosso è una trappola». Resta vera,
+// ed è per questo che l'autosave di qui non scatta *quando gli pare* ma solo dove
+// la partita è in un punto da cui si può ripartire — e si può spegnere.
+
+export function autosaveOn() {
+  try {
+    return window.localStorage?.getItem(AUTO_KEY) !== '0';
+  } catch {
+    return true;
+  }
+}
+
+export function setAutosave(v) {
+  try {
+    window.localStorage?.setItem(AUTO_KEY, v ? '1' : '0');
+  } catch { /* niente localStorage: resta acceso per questa sessione e basta */ }
+  return !!v;
+}
+
+export function toggleAutosave() {
+  return setAutosave(!autosaveOn());
+}
+
+/**
+ * Il momento è buono? Le condizioni sono tutte la stessa: **si salva solo un
+ * punto da cui si può ripartire**. Con le stelle addosso si ricaricherebbe dentro
+ * l'inseguimento, morendo si ricaricherebbe a un passo dalla morte, e con le
+ * manette che si stringono si ricaricherebbe in arresto.
+ */
+export function canAutosave(game) {
+  if (!autosaveOn() || !game.started) return false;
+  if (game.player.dying || game.player.hp <= 25) return false;
+  if (game.wanted.level > 0) return false;
+  return !(game.police && game.police.bustProgress > 0);
+}
+
+/** Scrive lo slot automatico, se il momento è buono. `reason` finisce nel toast. */
+export function autosave(game, reason) {
+  if (!canAutosave(game)) return false;
+  const ok = writeSlot(AUTO_SLOT, game);
+  game.autoT = AUTO_EVERY;
+  if (ok) {
+    game.hud.toast(`Salvataggio automatico · ${reason}`, 2);
+    game.audio?.ui('move');
+  }
+  return ok;
+}
+
+/**
+ * L'autosave a tempo. Gli altri tre punti di chiamata sono eventi (il letto,
+ * l'ospedale, la cella) e sanno già di essere un buon momento; questo è l'unico
+ * che deve chiederselo, e quando la risposta è no riprova più tardi invece di
+ * saltare il giro.
+ */
+export function tickAutosave(dt, game) {
+  if (game.autoT === undefined) game.autoT = AUTO_EVERY;
+  game.autoT -= dt;
+  if (game.autoT > 0) return;
+  game.autoT = AUTO_RETRY;
+  autosave(game, 'in strada');
 }

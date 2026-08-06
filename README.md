@@ -29,6 +29,7 @@ Poi apri <http://localhost:8123>.
 | `1` … `6` | barra armi: una fila per tasto, ripremi per scorrere la fila (rotella = tutto l'arsenale) |
 | `M` | mappa a tutto schermo (rotella = zoom, trascina = sposta) |
 | `ESC` | menu di pausa (mappa, **salvataggi**, audio, comandi, statistiche) |
+| `F` (nei salvataggi) | accende e sospende il salvataggio automatico |
 | `F3` | pannello tecnico (fps, entità, posizione) |
 | `F4` | audio muto |
 | `R` | radio: accendi · stazione successiva |
@@ -42,11 +43,23 @@ contanti in meno: la clinica presenta il conto.
 Le auto sono solide anche quando sei a piedi: non ci si passa attraverso e non ci si cammina
 sopra. Una che ti arriva addosso a velocità ti stende, una ferma ti sposta e basta.
 
+## Il menu iniziale
+
+Il gioco si apre su un titolo con Seoul che gira dietro — traffico, pedoni e luci sono già
+quelli veri, non un'immagine. In cima c'è **Continua** se hai qualcosa da riprendere (ti dice
+dove eri e che ora era), poi *Nuova partita*, *Carica partita* e *Comandi*. `W`/`S` per
+scegliere, `Invio` per confermare.
+
 ## Salvataggi
 
-`ESC` → **Salvataggi**: tre slot nel browser, con `W`/`S` per lo slot, `A`/`D` per l'azione
-(salva · carica · cancella) e `Invio` per confermare — due volte, se stai per sovrascrivere o
-cancellare. Ogni slot dice dove eri, che ora era e quanto avevi in tasca.
+`ESC` → **Salvataggi**: tre slot nel browser più uno automatico, con `W`/`S` per lo slot,
+`A`/`D` per l'azione (salva · carica · cancella) e `Invio` per confermare — due volte, se stai
+per sovrascrivere o cancellare. Ogni slot dice dove eri, che ora era e quanto avevi in tasca.
+
+Il quarto slot lo scrive il gioco: **quando dormi**, quando esci dall'ospedale o dalla cella e
+ogni quattro minuti in strada — ma **solo se sei in un punto da cui si può ripartire**: con le
+stelle addosso, quasi morto o mentre ti stanno ammanettando non salva, e riprova più tardi. I
+tuoi tre slot non li tocca mai. Se non lo vuoi, `F` su quel pannello lo sospende.
 
 Dentro c'è solo quello che Seoul non sa rifare da sola: la città nasce sempre uguale da una
 seed, quindi si salvano tu, il mezzo che stavi guidando, l'orologio col suo tempo, le stelle,
@@ -252,6 +265,12 @@ Alcune scelte tecniche che spiegano il risultato a schermo:
   fucile di precisione si sente quello che si vede. L'audio parte al primo clic (lo impongono
   i browser); i volumi stanno nel menu di pausa, `F4` è il muto.
 
+- **La musica sa quando tacere.** È sintetizzata come tutto il resto e suona in due momenti
+  soli: il **tema** sul menu iniziale e l'**inseguimento** quando ti stanno addosso — con gli
+  strumenti che si aggiungono man mano che salgono le stelle, così senti quanto sei nei guai
+  prima di contarle sull'HUD. In strada non suona niente, perché in strada c'è già Seoul; in
+  macchina c'è la radio, e la radio vince sempre. Volume suo nel mixer.
+
 - **La radio è vera.** In macchina `R` accende l'autoradio e ci trovi **stazioni coreane in
   streaming**, prese da una directory pubblica che non chiede nessuna chiave; nei 편의점
   aperti la stessa stazione si sente bassa di sottofondo. È l'unica cosa del gioco che parla
@@ -325,5 +344,10 @@ con dentro solo quello che la seed non sa rifare (meno di mille byte a slot). E 
 che non è la morte: la polizia ti ammanetta invece di spararti quando non hai una pistola in
 pugno o sei quasi a terra, e la cella costa sei ore di orologio, la cauzione e l'arsenale.
 
-**Fase 3, il resto — da fare.** Le 12 missioni con cutscene a fumetti, le attività secondarie
-e la musica del gioco.
+**Fase 3, menu, musica e autosave — completata.** Un menu d'avvio con «Continua» sopra la
+città che gira davvero; la musica del gioco, generata come il resto dell'audio — un tema sul
+titolo e un inseguimento che cresce con le stelle, e silenzio dove Seoul si sente già da sola;
+un quarto slot che il gioco scrive da solo dormendo, uscendo dall'ospedale o dalla cella e
+ogni quattro minuti in strada, ma soltanto dove si può davvero ripartire.
+
+**Fase 3, il resto — da fare.** Le 12 missioni con cutscene a fumetti e le attività secondarie.

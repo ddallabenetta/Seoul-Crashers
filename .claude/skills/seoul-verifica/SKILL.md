@@ -28,7 +28,12 @@ node .claude/tools/probe.mjs --seconds 6 --shot /tmp/hud.png --zoom 2 --clip 420
 
 Opzioni: `--seconds N` (secondi di gioco prima di valutare), `--eval "expr"` (ripetibile,
 `game` in scope, stampa JSON), `--script file.js` (corpo di funzione async: serve a
-**preparare la scena**), `--shot`, `--clip x,y,w,h`, `--zoom N`, `--size WxH`.
+**preparare la scena**), `--shot`, `--clip x,y,w,h`, `--zoom N`, `--size WxH`, `--menu`.
+
+Dal §5.18 il gioco si apre su un **menu iniziale**. Il probe lo salta da sé (`?autostart=1`):
+una scena deve trovare il gioco in strada, o il giocatore non risponde a niente perché
+`player.update` non viene chiamato. `--menu` lascia il titolo a schermo — serve solo a
+fotografarlo, a provare «Continua» e a misurare il tema musicale.
 
 ## Preparare una scena
 

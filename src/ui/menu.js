@@ -1,10 +1,11 @@
 // Menu di pausa: voci a sinistra, mappa con la posizione del giocatore a destra.
 import { roundPath } from './hud.js';
 import { KMH } from '../core/math.js';
-import { won } from '../entities/shops.js';
-import { SLOTS, readSlot, writeSlot, clearSlot, describe, apply } from '../core/save.js';
+import { SaveSlots } from './saveslots.js';
 
-const CONTROLS = [
+// Esportata perché la usa anche il menu iniziale (§5.18): i comandi sono uno solo,
+// e una seconda copia sarebbe una copia che invecchia.
+export const CONTROLS = [
   ['W A S D / Frecce', 'muoviti · guida'],
   ['Shift', 'corri (a piedi)'],
   ['Spazio', 'freno a mano'],
@@ -23,19 +24,12 @@ const CONTROLS = [
   ['Shift + R', 'radio: spegni'],
 ];
 
-// Azioni di uno slot di salvataggio. `Salva` vale sempre, le altre due solo su
-// uno slot occupato: A/D scelgono la colonna, W/S la riga, Invio conferma.
-const SLOT_ACTIONS = [
-  { id: 'save', label: 'Salva' },
-  { id: 'load', label: 'Carica' },
-  { id: 'wipe', label: 'Cancella' },
-];
-
 // Righe del pannello audio: la chiave è il bus in `AudioSystem.mix`.
 const MIXER = [
   ['master', 'Generale'],
   ['sfx', 'Effetti'],
   ['ambient', 'Ambiente'],
+  ['music', 'Musica'],
   ['ui', 'Interfaccia'],
   ['radio', 'Radio'],
 ];
@@ -49,7 +43,7 @@ export class PauseMenu {
     this.items = [
       { id: 'resume', label: 'Riprendi', hint: 'Torna in strada' },
       { id: 'map', label: 'Mappa', hint: 'Vista completa di Seoul' },
-      { id: 'saves', label: 'Salvataggi', hint: 'Tre slot nel browser' },
+      { id: 'saves', label: 'Salvataggi', hint: 'Tre slot più l\'autosave' },
       { id: 'audio', label: 'Audio', hint: 'Volumi · F4 per il muto' },
       { id: 'controls', label: 'Comandi', hint: 'Tastiera e mouse' },
       { id: 'stats', label: 'Statistiche', hint: 'La tua corsa finora' },
@@ -61,17 +55,7 @@ export class PauseMenu {
     this.focus = 'items';
     this.mixIndex = 0;
     this.bars = [];
-    this.slotIndex = 0;
-    this.slotAction = 0;
-    // Sovrascrivere o cancellare vuole due Invio: uno slot con dentro un'ora di
-    // partita non si perde per un tasto premuto per sbaglio.
-    this.confirm = -1;
-    this.slotBoxes = [];
-    this.slotHover = null;
-    // Gli slot si leggono all'apertura del pannello e dopo ogni azione, non a
-    // ogni frame: `readSlot` fa un `JSON.parse` di qualche kB, e farlo tre volte
-    // per sessanta frame al secondo per disegnare tre schede ferme è sprecato.
-    this.slots = [];
+    this.saves = new SaveSlots({ canSave: true });
   }
 
   toggle() {
@@ -85,7 +69,7 @@ export class PauseMenu {
   backOut() {
     if (!this.open || this.focus === 'items') return false;
     this.focus = 'items';
-    this.confirm = -1;
+    this.saves.confirm = -1;
     return true;
   }
 
@@ -96,7 +80,12 @@ export class PauseMenu {
       return;
     }
     if (this.focus === 'saves') {
-      this.updateSaves(game);
+      // Caricare una partita chiude il menu: restare aperti sopra una Seoul che
+      // non è più quella di prima non ha nessun senso.
+      if (this.saves.update(game) === 'loaded') {
+        this.open = false;
+        this.focus = 'items';
+      }
       return;
     }
     const input = game.input;
@@ -153,86 +142,6 @@ export class PauseMenu {
     }
   }
 
-  /**
-   * W/S scelgono lo slot, A/D l'azione, Invio conferma. Su uno slot occupato
-   * `Salva` e `Cancella` chiedono un secondo Invio: un'ora di partita non si
-   * butta via con un tasto premuto per sbaglio.
-   */
-  updateSaves(game) {
-    const input = game.input;
-    const audio = game.audio;
-    const was = `${this.slotIndex}/${this.slotAction}`;
-    if (input.wasPressed('KeyW') || input.wasPressed('ArrowUp')) {
-      this.slotIndex = (this.slotIndex - 1 + SLOTS) % SLOTS;
-    }
-    if (input.wasPressed('KeyS') || input.wasPressed('ArrowDown')) {
-      this.slotIndex = (this.slotIndex + 1) % SLOTS;
-    }
-    if (input.wasPressed('KeyD') || input.wasPressed('ArrowRight')) {
-      this.slotAction = (this.slotAction + 1) % SLOT_ACTIONS.length;
-    }
-    if (input.wasPressed('KeyA') || input.wasPressed('ArrowLeft')) {
-      this.slotAction = (this.slotAction - 1 + SLOT_ACTIONS.length) % SLOT_ACTIONS.length;
-    }
-    if (this.slotHover) {
-      if (input.mouse.pressed) {
-        this.slotIndex = this.slotHover.slot;
-        this.slotAction = this.slotHover.action;
-      }
-    }
-    if (`${this.slotIndex}/${this.slotAction}` !== was) {
-      this.confirm = -1;
-      audio?.ui('move');
-    }
-    const go = input.wasPressed('Space') || input.wasPressed('Enter')
-      || (this.slotHover && input.mouse.pressed);
-    if (go) this.runSlotAction(game);
-  }
-
-  refreshSlots() {
-    this.slots = [];
-    for (let i = 0; i < SLOTS; i++) this.slots.push(readSlot(i));
-  }
-
-  runSlotAction(game) {
-    const i = this.slotIndex;
-    const action = SLOT_ACTIONS[this.slotAction].id;
-    const filled = !!this.slots[i];
-    const audio = game.audio;
-    if (action !== 'save' && !filled) {
-      game.hud.toast(`Slot ${i + 1}: è vuoto`, 1.6);
-      audio?.ui('deny');
-      return;
-    }
-    // Conferma solo dove si perde qualcosa: salvare su uno slot vuoto no.
-    if ((action === 'wipe' || (action === 'save' && filled)) && this.confirm !== this.slotAction) {
-      this.confirm = this.slotAction;
-      audio?.ui('move');
-      return;
-    }
-    this.confirm = -1;
-    if (action === 'save') {
-      const ok = writeSlot(i, game);
-      this.refreshSlots();
-      game.hud.toast(ok ? `Partita salvata nello slot ${i + 1}` : 'Il browser non lascia salvare', 2.4);
-      audio?.ui(ok ? 'ok' : 'deny');
-      return;
-    }
-    if (action === 'wipe') {
-      clearSlot(i);
-      this.refreshSlots();
-      game.hud.toast(`Slot ${i + 1} cancellato`, 2);
-      audio?.ui('ok');
-      return;
-    }
-    const data = this.slots[i];
-    apply(game, data);
-    this.open = false;
-    this.focus = 'items';
-    audio?.ui('ok');
-    game.hud.toast(`Slot ${i + 1} caricato`, 2.6);
-  }
-
   activate(game) {
     const item = this.items[this.index];
     game.audio?.ui(item.id === 'resume' ? 'close' : 'ok');
@@ -247,8 +156,8 @@ export class PauseMenu {
       case 'saves':
         this.tab = 'saves';
         this.focus = 'saves';
-        this.confirm = -1;
-        this.refreshSlots();
+        this.saves.confirm = -1;
+        this.saves.refresh();
         break;
       case 'audio':
         this.tab = 'audio';
@@ -315,7 +224,7 @@ export class PauseMenu {
     ctx.font = '500 12px system-ui, sans-serif';
     const legend = {
       audio: 'W/S per la riga · A/D per il volume · Invio per il muto · ESC per tornare',
-      saves: 'W/S per lo slot · A/D per l\'azione · Invio conferma · ESC per tornare',
+      saves: 'W/S per lo slot · A/D per l\'azione · Invio conferma · F autosave · ESC per tornare',
       items: 'W/S per navigare · Invio per confermare · ESC per riprendere',
     };
     ctx.fillText(legend[this.focus] || legend.items, 60, h - 42);
@@ -334,42 +243,12 @@ export class PauseMenu {
   }
 
   drawControls(ctx, x, y, size) {
-    ctx.fillStyle = 'rgba(10,12,16,0.92)';
-    roundPath(ctx, x, y, size, size, 10);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(235,240,250,0.18)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#f2f5fa';
-    ctx.font = '700 20px system-ui, sans-serif';
-    ctx.fillText('Comandi', x + 28, y + 44);
-    // Passo e corpo stretti: il pannello è quadrato e largo 0.44 dello schermo,
-    // su una finestra alta e stretta undici righe da 30 px uscirebbero dal fondo.
-    let ly = y + 80;
-    for (const [key, desc] of CONTROLS) {
-      ctx.fillStyle = 'rgba(56,214,255,0.92)';
-      ctx.font = '600 12px ui-monospace, monospace';
-      ctx.fillText(key, x + 24, ly);
-      ctx.fillStyle = 'rgba(235,240,250,0.66)';
-      ctx.font = '500 12px system-ui, sans-serif';
-      ctx.fillText(desc, x + 150, ly);
-      ly += 26;
-    }
+    panelCard(ctx, x, y, size, size, 'Comandi');
+    drawControlsList(ctx, x + 24, y + 80);
   }
 
   drawAudio(ctx, game, x, y, size) {
-    ctx.fillStyle = 'rgba(10,12,16,0.92)';
-    roundPath(ctx, x, y, size, size, 10);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(235,240,250,0.18)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#f2f5fa';
-    ctx.font = '700 20px system-ui, sans-serif';
-    ctx.fillText('Audio', x + 28, y + 44);
-
+    panelCard(ctx, x, y, size, size, 'Audio');
     const audio = game.audio;
     const muted = audio ? audio.muted : true;
     ctx.font = '600 12px system-ui, sans-serif';
@@ -409,134 +288,17 @@ export class PauseMenu {
     ctx.fillText(info, x + 28, y + 92 + MIXER.length * 58 + 12);
   }
 
-  /**
-   * Tre schede, una per slot. Ognuna dice dove eri, che ora era e con quanto in
-   * tasca: senza quelle tre righe uno slot è una data, e fra due partite non si
-   * riconosce quale sia quale.
-   */
+  /** Quattro schede: i tre slot manuali e quello dell'autosave. */
   drawSaves(ctx, game, x, y, size) {
-    ctx.fillStyle = 'rgba(10,12,16,0.92)';
-    roundPath(ctx, x, y, size, size, 10);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(235,240,250,0.18)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#f2f5fa';
-    ctx.font = '700 20px system-ui, sans-serif';
-    ctx.fillText('Salvataggi', x + 28, y + 44);
+    panelCard(ctx, x, y, size, size, 'Salvataggi');
     ctx.fillStyle = 'rgba(235,240,250,0.4)';
     ctx.font = '500 12px system-ui, sans-serif';
     ctx.fillText('Nel browser, non sul disco: svuotare i dati del sito li porta via.', x + 28, y + 64);
-
-    const mx = game.input.mouse.x;
-    const my = game.input.mouse.y;
-    this.slotBoxes.length = 0;
-    this.slotHover = null;
-    const cardH = Math.min(126, (size - 130) / SLOTS);
-    for (let i = 0; i < SLOTS; i++) {
-      const cy = y + 84 + i * (cardH + 12);
-      const cw = size - 56;
-      const sel = this.focus === 'saves' && i === this.slotIndex;
-      ctx.fillStyle = sel ? 'rgba(255,95,162,0.10)' : 'rgba(255,255,255,0.04)';
-      roundPath(ctx, x + 28, cy, cw, cardH, 8);
-      ctx.fill();
-      if (sel) {
-        ctx.fillStyle = '#ff5fa2';
-        ctx.fillRect(x + 28, cy, 3, cardH);
-      }
-
-      const data = this.slots[i];
-      ctx.fillStyle = sel ? '#ffffff' : 'rgba(235,240,250,0.6)';
-      ctx.font = '700 13px system-ui, sans-serif';
-      ctx.fillText(`SLOT ${i + 1}`, x + 46, cy + 26);
-
-      if (!data) {
-        ctx.fillStyle = 'rgba(235,240,250,0.32)';
-        ctx.font = '500 13px system-ui, sans-serif';
-        ctx.fillText('vuoto', x + 46, cy + 50);
-      } else {
-        const d = describe(data, game);
-        ctx.textAlign = 'right';
-        ctx.fillStyle = 'rgba(235,240,250,0.35)';
-        ctx.font = '500 11px system-ui, sans-serif';
-        ctx.fillText(d.at.toLocaleString('it-IT', {
-          day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
-        }), x + 28 + cw - 18, cy + 26);
-        ctx.textAlign = 'left';
-        ctx.fillStyle = 'rgba(235,240,250,0.72)';
-        ctx.font = '600 14px system-ui, "Apple SD Gothic Neo", sans-serif';
-        ctx.fillText(d.place, x + 46, cy + 48);
-        ctx.fillStyle = 'rgba(235,240,250,0.42)';
-        ctx.font = '500 12px system-ui, sans-serif';
-        ctx.fillText(d.clock, x + 46, cy + 66);
-        ctx.fillStyle = '#ffd23f';
-        ctx.font = '700 13px system-ui, sans-serif';
-        ctx.fillText(won(d.money), x + 46, cy + 86);
-        if (d.stars) {
-          ctx.fillStyle = '#ff5fa2';
-          ctx.fillText('★'.repeat(d.stars), x + 150, cy + 86);
-        }
-      }
-
-      // Pulsanti: sempre tutti e tre, ma spenti dove non hanno senso. Nasconderli
-      // farebbe ballare la riga fra uno slot pieno e uno vuoto.
-      let bx = x + 28 + cw - 16;
-      for (let a = SLOT_ACTIONS.length - 1; a >= 0; a--) {
-        const act = SLOT_ACTIONS[a];
-        const on = act.id === 'save' || !!data;
-        ctx.font = '700 12px system-ui, sans-serif';
-        const bw = ctx.measureText(act.label.toUpperCase()).width + 24;
-        const bh = 26;
-        const bxx = bx - bw;
-        const byy = cy + cardH - bh - 12;
-        const hot = mx >= bxx && mx <= bxx + bw && my >= byy && my <= byy + bh;
-        if (hot && on) this.slotHover = { slot: i, action: a };
-        const active = sel && a === this.slotAction;
-        const asking = active && this.confirm === a;
-        ctx.fillStyle = asking ? 'rgba(255,95,162,0.85)'
-          : active ? 'rgba(56,214,255,0.22)' : 'rgba(255,255,255,0.06)';
-        roundPath(ctx, bxx, byy, bw, bh, 6);
-        ctx.fill();
-        if (active) {
-          ctx.strokeStyle = asking ? '#ffffff' : 'rgba(56,214,255,0.8)';
-          ctx.lineWidth = 1.2;
-          ctx.stroke();
-        }
-        ctx.fillStyle = !on ? 'rgba(235,240,250,0.22)' : asking ? '#0b0d11' : active ? '#ffffff' : 'rgba(235,240,250,0.6)';
-        ctx.textAlign = 'center';
-        ctx.fillText(act.label.toUpperCase(), bxx + bw / 2, byy + 17);
-        ctx.textAlign = 'left';
-        this.slotBoxes.push({ x: bxx, y: byy, w: bw, h: bh, slot: i, action: a });
-        bx = bxx - 8;
-      }
-    }
-
-    // La richiesta di conferma sta qui e non dentro il pulsante: cambiargli
-    // l'etichetta gli cambierebbe la larghezza, e le tre file ballerebbero.
-    if (this.confirm >= 0 && this.focus === 'saves') {
-      ctx.fillStyle = '#ff5fa2';
-      ctx.font = '700 12px system-ui, sans-serif';
-      ctx.fillText(
-        this.confirm === 0
-          ? `Invio di nuovo per sovrascrivere lo slot ${this.slotIndex + 1}`
-          : `Invio di nuovo per cancellare lo slot ${this.slotIndex + 1}`,
-        x + 28, y + 84 + SLOTS * (cardH + 12) + 20
-      );
-    }
+    this.saves.draw(ctx, game, x + 28, y + 84, size - 56, size - 110, this.focus === 'saves');
   }
 
   drawStats(ctx, game, x, y, size) {
-    ctx.fillStyle = 'rgba(10,12,16,0.92)';
-    roundPath(ctx, x, y, size, size, 10);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(235,240,250,0.18)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#f2f5fa';
-    ctx.font = '700 20px system-ui, sans-serif';
-    ctx.fillText('Statistiche', x + 28, y + 44);
+    panelCard(ctx, x, y, size, size, 'Statistiche');
     const s = game.stats;
     const rows = [
       ['Tempo in strada', formatTime(game.time)],
@@ -575,4 +337,36 @@ function formatTime(t) {
   const m = Math.floor(t / 60);
   const s = Math.floor(t % 60);
   return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+/** La cornice dei pannelli di destra: quattro schede, la stessa scatola. */
+export function panelCard(ctx, x, y, w, h, title) {
+  ctx.fillStyle = 'rgba(10,12,16,0.92)';
+  roundPath(ctx, x, y, w, h, 10);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(235,240,250,0.18)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#f2f5fa';
+  ctx.font = '700 20px system-ui, sans-serif';
+  ctx.fillText(title, x + 28, y + 44);
+}
+
+/**
+ * L'elenco dei comandi. Passo e corpo stretti: il pannello è quadrato e largo
+ * 0.44 dello schermo, su una finestra alta e stretta sedici righe da 30 px
+ * uscirebbero dal fondo.
+ */
+export function drawControlsList(ctx, x, y) {
+  let ly = y;
+  for (const [key, desc] of CONTROLS) {
+    ctx.fillStyle = 'rgba(56,214,255,0.92)';
+    ctx.font = '600 12px ui-monospace, monospace';
+    ctx.fillText(key, x, ly);
+    ctx.fillStyle = 'rgba(235,240,250,0.66)';
+    ctx.font = '500 12px system-ui, sans-serif';
+    ctx.fillText(desc, x + 126, ly);
+    ly += 26;
+  }
 }
