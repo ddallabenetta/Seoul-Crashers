@@ -22,8 +22,10 @@ tools.push(pw ? 'playwright ok' : 'playwright MANCA (probe.mjs e sprite.mjs non 
 
 const brief = `Seoul Crashers — briefing di sessione
 
-- Stato, mappa dei file, trappole già pagate e backlog stanno in HANDOFF.md: **leggilo prima
-  di toccare src/**. Il README descrive il gioco, l'HANDOFF descrive come svilupparlo.
+- **HANDOFF.md è l'indice** (~130 righe): stato del progetto e tabella di cosa sta dove.
+  Leggilo prima di toccare src/, poi apri da docs/ **solo** il documento che ti serve —
+  verifica, architettura, trappole, parametri, backlog, strumenti, storico. Non caricarli
+  tutti: sono ~2400 righe. I rimandi §N si risolvono con la tabella dentro HANDOFF.md.
 - Vincoli non negoziabili: zero dipendenze, nessun build step, nessun asset esterno (tutta la
   grafica è generata da codice), commenti in italiano e solo dove spiegano un *perché*.
 - **Verifica nel browser, non nel sorgente.** Diversi bug di questo progetto erano invisibili
