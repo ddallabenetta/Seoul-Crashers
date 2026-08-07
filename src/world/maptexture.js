@@ -157,10 +157,28 @@ export function buildMapTexture(city) {
   // (Namsan al centro, il terreno che degrada verso il Han).
   drawRelief(g, city);
 
-  // Bordo mappa
-  g.strokeStyle = 'rgba(0,0,0,0.6)';
+  // Bordo cartografico: doppia cornice e tacche, coerenti con la geografia.
+  // La vecchia riga nera sembrava semplicemente il bordo del canvas.
+  const region = city.region?.id || 'seoul';
+  const border = region === 'jeju' ? '#6fb7cf' : region === 'busan' ? '#568da7' : '#667d5f';
+  g.strokeStyle = 'rgba(6,10,13,0.92)';
+  g.lineWidth = 18;
+  g.strokeRect(9, 9, MAP_SIZE - 18, MAP_SIZE - 18);
+  g.strokeStyle = border;
   g.lineWidth = 6;
-  g.strokeRect(0, 0, MAP_SIZE, MAP_SIZE);
+  g.strokeRect(10, 10, MAP_SIZE - 20, MAP_SIZE - 20);
+  g.strokeStyle = 'rgba(235,242,239,0.42)';
+  g.lineWidth = 1.5;
+  g.strokeRect(17, 17, MAP_SIZE - 34, MAP_SIZE - 34);
+  g.lineWidth = 3;
+  for (let p = 72; p < MAP_SIZE - 50; p += 86) {
+    g.beginPath();
+    g.moveTo(p, 10); g.lineTo(p, 24);
+    g.moveTo(p, MAP_SIZE - 10); g.lineTo(p, MAP_SIZE - 24);
+    g.moveTo(10, p); g.lineTo(24, p);
+    g.moveTo(MAP_SIZE - 10, p); g.lineTo(MAP_SIZE - 24, p);
+    g.stroke();
+  }
 
   return c;
 }

@@ -2,6 +2,9 @@
 
 > §5.23 del progetto. Corregge ed estende il §5.22; indice generale e mappa dei rimandi:
 > [HANDOFF.md](../../HANDOFF.md).
+>
+> Stato storico precedente al §5.24: conteggi e geometria degli ingressi qui sotto descrivono
+> la prima consegna delle mappe dedicate, non la revisione corrente.
 
 ### 5.23 — Tre mappe vere e una stazione da attraversare
 

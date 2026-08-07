@@ -1,13 +1,16 @@
 // Metropolitana fisica: in strada si entra da una scala riconoscibile, dentro si
 // cammina davvero fra atrio, tornelli e banchina. Il pannello delle destinazioni
 // compare soltanto davanti alle porte del treno, non al bordo del marciapiede.
-import { dist, clamp } from '../core/math.js';
+import { dist, clamp, damp, approachAngle, circleRectPush } from '../core/math.js';
 import { SpatialGrid } from '../core/spatial.js';
+import { Rng } from '../core/rng.js';
+import { createPed } from '../entities/pedestrians.js';
 import { roundPath } from './hud.js';
 
 const ENTRANCE_REACH = 72;
 const ACTION_REACH = 48;
 const WALL = 18;
+const KIOSK_PRICE = 2500;
 
 const REGION_LINKS = [
   { id: 'seoul', label: 'Seoul', hangul: '서울', service: 'KTX' },
@@ -17,6 +20,44 @@ const REGION_LINKS = [
 
 function solid(x, y, w, h, type, extra = {}) {
   return { x, y, w, h, type, solid: true, z: extra.z ?? 28, ...extra };
+}
+
+function stationSeed(station) {
+  let h = 0x6d657472;
+  for (const ch of station.id || station.name || 'metro') h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  return h >>> 0;
+}
+
+function buildPeople(station) {
+  const rng = new Rng(stationSeed(station));
+  const routes = [
+    [[540, 164], [540, 350], [430, 470], [650, 470], [540, 350]],
+    [[292, 190], [292, 380], [292, 474], [430, 474], [292, 380]],
+    [[788, 190], [788, 380], [788, 474], [650, 474], [788, 380]],
+    [[258, 202], [390, 190], [540, 190], [680, 190], [822, 202], [680, 190], [390, 190]],
+  ];
+  const kinds = ['civil', 'office', 'student', 'tourist', 'worker'];
+  const people = [];
+  for (let i = 0; i < 10; i++) {
+    const route = routes[i % routes.length];
+    const at = i % route.length;
+    const p = createPed(kinds[i % kinds.length], route[at][0], route[at][1], rng);
+    p.metroRoute = route;
+    p.metroRouteIndex = (at + 1) % route.length;
+    p.metroWalker = true;
+    p.indoor = true;
+    p.umbrella = -1;
+    p.baseSpeed *= 0.58 + (i % 3) * 0.08;
+    people.push(p);
+  }
+  const keeper = createPed('worker', 132, 132, rng);
+  keeper.metroKeeper = true;
+  keeper.indoor = true;
+  keeper.umbrella = -1;
+  keeper.state = 'post';
+  keeper.home = { x: keeper.x, y: keeper.y };
+  people.push(keeper);
+  return people;
 }
 
 /** Una stazione completa e giocabile, abbastanza larga da avere atrio e banchina. */
@@ -34,6 +75,7 @@ function buildStationFloor(station) {
     // Il parapetto separa la banchina dai binari. Le porte del treno si usano dal lato sicuro.
     solid(18, 544, 1044, 14, 'platformEdge', { z: 16 }),
   ];
+  const kioskFixture = solid(52, 76, 164, 106, 'shopKiosk', { z: 46 });
   const furni = [
     solid(342, 232, 38, 76, 'ticketGate', { z: 30 }),
     solid(442, 232, 38, 76, 'ticketGate', { z: 30 }),
@@ -48,6 +90,7 @@ function buildStationFloor(station) {
     // risolutore delle collisioni.
     solid(400, 112, 34, 34, 'pillar', { z: 62 }),
     solid(523, 386, 34, 34, 'pillar', { z: 62 }),
+    kioskFixture,
   ];
   const grid = new SpatialGrid(w, h, 120);
   for (const o of [...walls, ...furni]) grid.insertRect(o);
@@ -55,11 +98,12 @@ function buildStationFloor(station) {
     floor: '#38424c', wall: '#53606b', trim: '#7d8b96', accent: '#48c8ff',
   };
   return {
-    w, h, grid, walls, furni, people: [], idx: 0,
+    w, h, grid, walls, furni, people: buildPeople(station), idx: 0,
     entry: { x: 540, y: 82, angle: Math.PI / 2 },
     exit: { x: 540, y: 82 },
     platform: { x: 540, y: 486 },
     trainDoor: { x: 540, y: 506 },
+    kiosk: { x: 242, y: 132, price: KIOSK_PRICE, fixture: kioskFixture },
     biz: { id: 'metro', hangul: '지하철', label: 'metropolitana', pal },
     label: `${station.hangul} ${station.name}`,
     station,
@@ -112,6 +156,9 @@ export class MetroSystem {
     if (dist(game.player.x, game.player.y, this.floor.trainDoor.x, this.floor.trainDoor.y) < ACTION_REACH + 14) {
       return 'E  —  consulta le destinazioni e sali sul treno';
     }
+    if (dist(game.player.x, game.player.y, this.floor.kiosk.x, this.floor.kiosk.y) < ACTION_REACH + 10) {
+      return 'E  —  compra 김밥 e caffè · ₩2.500';
+    }
     return 'Attraversa i tornelli e raggiungi la banchina';
   }
 
@@ -145,7 +192,9 @@ export class MetroSystem {
     const pl = game.player;
     const e = this.entranceOf(station);
     this.station = station;
-    this.outside = { x: e.x, y: e.y, angle: pl.angle };
+    // Con l'accesso solido il centro della scala non è più un punto valido in
+    // cui riapparire: conserviamo il punto reale dal quale il giocatore entra.
+    this.outside = { x: pl.x, y: pl.y, angle: pl.angle };
     this.floor = buildStationFloor(station);
     this.inside = true;
     this.open = false;
@@ -179,6 +228,67 @@ export class MetroSystem {
     this.open = false;
     this.options = [];
     game.audio?.ui('close');
+  }
+
+  buyAtKiosk(game) {
+    const pl = game.player;
+    if (pl.money < KIOSK_PRICE) {
+      game.hud.toast('편의점 — ti mancano i won per 김밥 e caffè', 2.2);
+      game.audio?.ui('deny');
+      return;
+    }
+    pl.money -= KIOSK_PRICE;
+    pl.heal(22);
+    pl.stamina = 1;
+    game.hud.toast('편의점 — 김밥 e caffè · ₩2.500', 2.2);
+    game.audio?.ui('ok');
+  }
+
+  /** Folla leggera da interno: segue percorsi fra atrio, tornelli e banchina. */
+  updatePeople(dt, game) {
+    const people = this.floor?.people || [];
+    const grid = this.floor?.grid;
+    if (!grid) return;
+    for (const p of people) {
+      if (p.dead) {
+        p.deadT += dt;
+        p.vx = damp(p.vx, 0, 0.1, dt);
+        p.vy = damp(p.vy, 0, 0.1, dt);
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        continue;
+      }
+      if (p.metroKeeper) {
+        p.vx = 0;
+        p.vy = 0;
+        p.angle = approachAngle(p.angle, Math.atan2(game.player.y - p.y, game.player.x - p.x), 2.8 * dt);
+        continue;
+      }
+      const route = p.metroRoute;
+      let target = route[p.metroRouteIndex];
+      if (dist(p.x, p.y, target[0], target[1]) < 13) {
+        p.metroRouteIndex = (p.metroRouteIndex + 1) % route.length;
+        target = route[p.metroRouteIndex];
+      }
+      const dx = target[0] - p.x;
+      const dy = target[1] - p.y;
+      const d = Math.max(1, Math.hypot(dx, dy));
+      p.vx = damp(p.vx, dx / d * p.baseSpeed, 0.11, dt);
+      p.vy = damp(p.vy, dy / d * p.baseSpeed, 0.11, dt);
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      const speed = Math.hypot(p.vx, p.vy);
+      if (speed > 3) {
+        p.angle = approachAngle(p.angle, Math.atan2(p.vy, p.vx), 9 * dt);
+        p.animT += speed * dt * 0.2;
+      }
+      for (const s of grid.queryRect(p.x - 20, p.y - 20, 40, 40)) {
+        const push = circleRectPush(p.x, p.y, 7, s);
+        if (!push) continue;
+        p.x += push.nx * push.depth;
+        p.y += push.ny * push.depth;
+      }
+    }
   }
 
   forceExit(game) {
@@ -224,6 +334,7 @@ export class MetroSystem {
     }
 
     if (!this.open) {
+      this.updatePeople(dt, game);
       if (game.player.enterCooldown > 0) return false;
       if (dist(game.player.x, game.player.y, this.floor.exit.x, this.floor.exit.y) < ACTION_REACH
         && input.wasPressed('KeyE')) {
@@ -233,6 +344,11 @@ export class MetroSystem {
       if (dist(game.player.x, game.player.y, this.floor.trainDoor.x, this.floor.trainDoor.y) < ACTION_REACH + 14
         && input.wasPressed('KeyE')) {
         this.openBoard(game);
+        return true;
+      }
+      if (dist(game.player.x, game.player.y, this.floor.kiosk.x, this.floor.kiosk.y) < ACTION_REACH + 10
+        && input.wasPressed('KeyE')) {
+        this.buyAtKiosk(game);
         return true;
       }
       return false;

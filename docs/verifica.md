@@ -105,14 +105,14 @@ game.city.graph.usableNodes.filter(n => n.out.length === 1).map(n => [n.x | 0, n
 game.city.stats // { buildings, props, blocks, nodes, edges, doglegs, stairs }
 ```
 
-Valori attesi con le seed attuali (§5.23): Seoul `7200×7200`, 849 edifici, 1991 props,
-234 isolati e grafo `306/479`; Busan `6400×5600`, 757 edifici, 1455 props, 150 isolati e
-grafo `177/300`; Jeju `5400×5400`, 399 edifici, 1418 props, 226 isolati e grafo `294/425`.
+Valori attesi con le seed attuali (§5.24): Seoul `7200×7200`, 842 edifici, 1987 props,
+234 isolati e grafo `306/479`; Busan `6400×5600`, 741 edifici, 1456 props, 150 isolati e
+grafo `177/300`; Jeju `5400×5400`, 377 edifici, 1376 props, 226 isolati e grafo `294/425`.
 Sono tre generatori deterministici con firme topologiche distinte: Busan e Jeju non chiamano
 `generateCity`. Seoul ha 16 fermate; le altre due 7 ciascuna. Ogni fermata deve avere una
-`entrance.visible`, un prop `metro_entrance` e un arrivo asciutto e libero.
+`entrance.visible`, un prop `metro_entrance` solido e un arrivo asciutto, libero e fuori strada.
 
-Per le regioni e la metro (§5.22-5.23):
+Per le regioni e la metro (§5.22-5.24):
 
 ```js
 // identità e consistenza della regione attiva
@@ -121,10 +121,10 @@ Per le regioni e la metro (§5.22-5.23):
    negozi: game.city.shops.length, landmark: game.city.landmarks.length,
    fermate: game.city.transitStations.length })
 
-// ogni uscita deve essere entro i confini, asciutta e fuori dai solidi
+// ogni uscita deve essere entro i confini, asciutta, fuori strada e fuori dai solidi
 game.city.transitStations.filter((s) =>
   s.arrivalX < 0 || s.arrivalY < 0 || s.arrivalX > game.city.w || s.arrivalY > game.city.h ||
-  game.city.isWater(s.arrivalX, s.arrivalY) ||
+  game.city.isWater(s.arrivalX, s.arrivalY) || game.city.isOnRoad(s.arrivalX, s.arrivalY) ||
   game.city.solidGrid.queryCircle(s.arrivalX, s.arrivalY, 12).some((o) =>
     s.arrivalX > o.x - 12 && s.arrivalX < o.x + o.w + 12 &&
     s.arrivalY > o.y - 12 && s.arrivalY < o.y + o.h + 12))
@@ -133,7 +133,14 @@ game.city.transitStations.filter((s) =>
 // ogni fermata ha un ingresso fisico associato al marker della carta
 game.city.transitStations.filter((s) =>
   !s.entrance?.visible ||
-  !game.city.props.some((p) => p.stationId === s.id && p.type === 'metro_entrance'))
+  !game.city.props.some((p) => p.stationId === s.id && p.type === 'metro_entrance' &&
+    p.solid && p.collisionW === s.entrance.w && p.collisionH === s.entrance.h))
+// atteso: []
+
+// il bordo fisico deve esistere su tutti e quattro gli angoli
+[[1, 1], [game.city.w - 1, 1], [1, game.city.h - 1],
+ [game.city.w - 1, game.city.h - 1]].filter(([x, y]) =>
+  !game.city.solidGrid.queryCircle(x, y, 1).some((o) => o.isBoundary))
 // atteso: []
 
 // cambio regione a freddo; conserva inventario e orologio, ricostruisce i sistemi cittadini
@@ -141,16 +148,23 @@ game.travelTo('busan'); game.travelTo('jeju'); game.travelTo('seoul');
 ```
 
 Valori attesi nell'ordine edifici / isolati / nodi / archi / negozi / landmark / fermate:
-Seoul `849 / 234 / 306 / 479 / 240 / 21 / 16`, Busan
-`757 / 150 / 177 / 300 / 139 / 6 / 7`, Jeju
-`399 / 226 / 294 / 425 / 129 / 8 / 7`.
+Seoul `842 / 234 / 306 / 479 / 240 / 21 / 16`, Busan
+`741 / 150 / 177 / 300 / 140 / 6 / 7`, Jeju
+`377 / 226 / 294 / 425 / 129 / 8 / 7`.
 
-Verifica browser minima: a Seoul trovare il totem `M · 지하철`, premere `E`, camminare dalla
-scala attraverso i tornelli fino alla banchina e aprire il tabellone soltanto davanti al treno;
-poi viaggiare a Busan e Jeju e aprire le due carte. Busan deve mostrare baia/Nakdong e Jeju il
-mare su tutti e quattro i bordi. `?autostart&metrotest=platform` è il solo hook di prova per
-saltare il tratto a movimento continuo; non cambia il percorso normale. La console deve restare
-senza errori. I tornelli devono rifiutare l'ingresso con almeno una stella.
+Verifica browser minima: a Seoul trovare il totem `M · 지하철` fuori dalle corsie, provare che
+non sia attraversabile, premere `E`, osservare i passeggeri muoversi, comprare al chiosco e
+camminare attraverso i tornelli fino alla banchina. Il tabellone si apre soltanto davanti al
+treno. Poi viaggiare a Busan e Jeju e aprire le due carte: Busan mostra baia/Nakdong e Jeju il
+mare su tutti e quattro i bordi. Gli hook locali sono `?regiontest=busan|jeju`,
+`?metrotest=entrance|kiosk|platform` e `?edgetest=east`; servono solo alle prove e non cambiano
+il percorso normale. La console deve restare senza errori. I tornelli devono rifiutare
+l'ingresso con almeno una stella.
+
+Dopo qualunque modifica a generatori, landmark o arredo, la sola query `isOnRoad` non basta:
+va eseguito un audit rettangolare con `roadclearance.rectIntersectsRoad`, includendo larghezza
+e rotazione di ogni volume. Il risultato atteso è zero per edifici ordinari, props solidi e
+30 ingressi metro in tutte e tre le regioni.
 
 Per il combattimento:
 

@@ -8,9 +8,10 @@
 (§5.11), i due giri di arretrati (§5.12 e §5.21), il salvataggio (§5.15), l'arresto (§5.16),
 il menu iniziale (§5.18), la musica (§5.19) e l'autosave (§5.20) sono fatti; la segnalazione
 sul traffico è chiusa (§5.10) e quella sulle auto attraversabili pure (§5.17, e dal §5.21 vale
-anche per i pedoni). Dal §5.22-5.23 sono fatti anche **Seoul estesa, le geografie autonome di
-Busan e Jeju, gli interni metro e i collegamenti interurbani**, con mappe e salvataggi
-consapevoli della regione.
+anche per i pedoni). Dal §5.22-5.24 sono fatti anche **Seoul estesa, le geografie autonome di
+Busan e Jeju, gli interni metro e i collegamenti interurbani**: ingressi solidi fuori dalle
+corsie, passeggeri e chiosco nelle stazioni, confini collisionabili e coste rifinite. Mappe e
+salvataggi sono consapevoli della regione.
 **Restano le missioni**, che sono il lavoro grosso: impianto (attivazione sulla mappa,
 obiettivi, fallimento e ripetizione), cutscene a pannelli a fumetto, e i contenuti. **Le scelte
 di design vanno concordate con l'utente prima di scrivere codice** — è la prima cosa da chiedere
@@ -125,7 +126,7 @@ il §5.21 altre undici — fra cui le due che erano tornate in cima.
   meno (sono sagome della stessa taglia che si sovrappongono per un istante), ma è lo stesso
   steering e costerebbe una query in più per pedone per frame.
 
-**Rimasto indietro dalle regioni e dalla metro** (§5.22-5.23):
+**Rimasto indietro dalle regioni e dalla metro** (§5.22-5.24):
 - **Lasciare una regione non conserva il suo stato locale.** Geometria e texture restano in
   cache, ma `ShopSystem` e gli interni vengono ricostruiti: casse svuotate, spese, vendite e
   personale di Busan non aspettano il giocatore dopo un viaggio a Jeju. Il salvataggio conserva

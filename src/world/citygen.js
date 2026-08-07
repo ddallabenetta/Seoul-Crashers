@@ -938,7 +938,10 @@ function fillPortBlock(rng, city, block, district) {
 function decorateBlockEdges(rng, city, block, district) {
   const step = 132;
   // Il marciapiede è la fascia interna dell'isolato: l'arredo va lì, non sull'asfalto.
-  const m = SIDEWALK * 0.5;
+  // Chioschi e distributori arrivano a 18 px di raggio: al centro della fascia
+  // da 20 px restavano fisicamente sull'asfalto. Il centro va sul margine
+  // interno del marciapiede, con tutto l'ingombro fuori dalla carreggiata.
+  const m = SIDEWALK;
   const edges = [
     { x0: block.x, y0: block.y + m, dx: 1, dy: 0, len: block.w },
     { x0: block.x, y0: block.y + block.h - m, dx: 1, dy: 0, len: block.w },

@@ -169,18 +169,40 @@ class Game {
     // prova trovano il gioco in strada, esattamente come prima che il menu ci fosse.
     const probe = new URLSearchParams(window.location.search);
     if (probe.has('autostart')) this.start(false);
-    // Hook di prova locale: porta direttamente alla banchina senza falsare il
-    // percorso normale, che resta ingresso in strada -> atrio -> tornelli. Serve
-    // al browser automatico, che può premere tasti ma non tenerli premuti a lungo.
-    if (probe.get('metrotest') === 'platform') {
+    // Hook di prova locale: mette il browser in scene ripetibili senza falsare il
+    // percorso normale ingresso -> atrio -> tornelli. Il controllo automatico
+    // può premere tasti ma non tenerli premuti per attraversare mezza città.
+    const regionProbe = probe.get('regiontest');
+    if (['seoul', 'busan', 'jeju'].includes(regionProbe) && regionProbe !== 'seoul') {
+      if (!this.started) this.start(false);
+      this.travelTo(regionProbe, null, { silent: true });
+    }
+    const metroProbe = probe.get('metrotest');
+    if (['entrance', 'kiosk', 'platform'].includes(metroProbe)) {
       if (!this.started) this.start(false);
       const station = this.city.transitStations?.[0];
-      if (station && this.metro.enterStation(this, station)) {
-        this.player.x = this.metro.floor.trainDoor.x;
-        this.player.y = this.metro.floor.trainDoor.y - 24;
+      if (station && metroProbe === 'entrance') {
+        this.player.x = station.arrivalX;
+        this.player.y = station.arrivalY;
+        this.player.district = this.city.districtAt(this.player.x, this.player.y);
+        this.player.enterCooldown = 0;
+        this.camera.snapTo(this.player.x, this.player.y);
+      } else if (station && this.metro.enterStation(this, station)) {
+        const target = metroProbe === 'kiosk' ? this.metro.floor.kiosk : this.metro.floor.trainDoor;
+        this.player.x = target.x;
+        this.player.y = target.y + (metroProbe === 'kiosk' ? 0 : -24);
         this.player.enterCooldown = 0;
         this.camera.snapTo(this.metro.floor.w / 2, this.metro.floor.h / 2);
       }
+    }
+    if (probe.get('edgetest') === 'east') {
+      if (!this.started) this.start(false);
+      let edgeX = this.city.w - 78;
+      while (edgeX > 96 && this.city.isWater(edgeX, this.city.h * 0.5)) edgeX -= 32;
+      this.player.x = edgeX;
+      this.player.y = this.city.h * 0.5;
+      this.player.district = this.city.districtAt(this.player.x, this.player.y);
+      this.camera.snapTo(this.player.x, this.player.y);
     }
   }
 

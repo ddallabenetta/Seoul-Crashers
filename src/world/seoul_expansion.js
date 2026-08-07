@@ -1,6 +1,7 @@
 // Contenuti fissi per la Seoul allargata. Il modulo non importa il generatore:
 // può quindi essere applicato subito dopo `generateCity` senza creare cicli e
 // senza consumare lo stato del generatore pseudo-casuale.
+import { rectIntersectsRoad } from './roadclearance.js';
 
 const DEFAULT_WORLD_W = 7200;
 const DEFAULT_WORLD_H = 7200;
@@ -199,7 +200,7 @@ function nearbyEdges(city, cx, cy, radius) {
 
 function rectIsSafe(city, x, y, w, h) {
   const rect = { x, y, w, h };
-  const edgePad = 6;
+  const edgePad = 8;
   if (x < 10 || y < 10 || x + w > city.w - 10 || y + h > city.h - 10) return false;
 
   // Sample the perimeter as well as the centre; this catches a landmark that
@@ -222,6 +223,11 @@ function rectIsSafe(city, x, y, w, h) {
   for (const stair of city.stairs || []) {
     if (stair && rectsOverlap(rect, stair, 4)) return false;
   }
+
+  // Il renderer dipinge tutta la larghezza della strada. Il grafo ne descrive
+  // soltanto l'asse, quindi il suo controllo da solo non impedisce a un tetto di
+  // sporgere visivamente e fisicamente sulla corsia.
+  if (rectIntersectsRoad(city, rect, 12)) return false;
 
   // Keep a small clearance from each navigable graph segment. The generated
   // building lots already leave the road width outside the graph centreline;

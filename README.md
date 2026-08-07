@@ -201,11 +201,12 @@ si annega, e un'auto che finisce nel Han affonda.
 ## Metro e regioni
 
 Le fermate della metro sono segnate con una **M ciano** sulla minimappa e sulla carta, e in
-strada hanno una scala con totem `M · 지하철`. Vai a piedi all'ingresso e premi `E`: entri in
-un vero interno, percorri l'atrio, attraversi i tornelli e raggiungi la banchina. Il tabellone
-delle destinazioni compare soltanto davanti alle porte del treno; da lì puoi viaggiare nella
-stessa città o prendere un collegamento interurbano. Con le stelle di ricercato attive i
-tornelli restano chiusi.
+strada hanno una scala solida con totem `M · 지하철`, sempre appoggiata al marciapiede invece
+che alle corsie. Vai a piedi all'ingresso e premi `E`: entri in un vero interno, percorri
+l'atrio insieme ai passeggeri, puoi comprare 김밥 e caffè al chiosco, attraversi i tornelli e
+raggiungi la banchina. Il tabellone delle destinazioni compare soltanto davanti alle porte del
+treno; da lì puoi viaggiare nella stessa città o prendere un collegamento interurbano. Con le
+stelle di ricercato attive i tornelli restano chiusi.
 
 **Seoul** ora misura 7200×7200: COEX Mall, Gyeongbokgung, Lotte World Tower, Dongdaemun,
 N Seoul Tower e la cintura metropolitana stanno dentro un tessuto urbano sensibilmente più
@@ -349,8 +350,9 @@ verniciatura che azzerano il ricercato.
 
 **Fase 3, la mappa — completata.** Seoul 7200×7200 con mare a ovest, Gimpo, Incheon e cintura
 urbana; Busan 6400×5600 con baia ed estuario; Jeju 5400×5400 con profilo insulare completo.
-Si vola (elicottero, turboelica) e si naviga (motoscafo, battello); in acqua si annega e le
-auto affondano. Sei territori di bande.
+Le coste hanno battigia, rocce e schiuma, mentre i bordi terrestri proseguono in una fascia
+verde protetta da guardrail e collisione. Si vola (elicottero, turboelica) e si naviga
+(motoscafo, battello); in acqua si annega e le auto affondano. Sei territori di bande.
 
 **Fase 3, il tempo — completata.** Un giro di ventiquattr'ore ogni ventiquattro minuti, quattro
 condizioni di tempo legate in catena, le finestre che si accendono la sera, la pioggia che si

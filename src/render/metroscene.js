@@ -63,6 +63,7 @@ export class MetroScene {
     for (const o of [...floor.walls, ...floor.furni]) {
       shadow(ctx, o.x + o.w / 2, o.y + o.h / 2, Math.max(5, o.w / 2), Math.max(4, o.h / 2), o.z || 24);
     }
+    for (const p of floor.people) if (!p.dead) shadow(ctx, p.x, p.y, 8, 7, 20);
     if (game.player.onFoot) shadow(ctx, game.player.x, game.player.y, 9, 8, 20);
     if (game.fx) game.fx.drawDecals(ctx);
     this.scene.drawFires(ctx, game);
@@ -72,12 +73,16 @@ export class MetroScene {
     list.length = 0;
     for (const o of floor.walls) list.push({ type: 'wall', o, d: this.depth(o, cam) });
     for (const o of floor.furni) list.push({ type: 'furni', o, d: this.depth(o, cam) });
+    for (const p of floor.people) {
+      list.push({ type: 'ped', o: p, d: (p.x - cam.cx) ** 2 + (p.y - cam.cy) ** 2 });
+    }
     if (game.player.onFoot) {
       list.push({ type: 'player', o: game.player, d: (game.player.x - cam.cx) ** 2 + (game.player.y - cam.cy) ** 2 });
     }
     list.sort((a, b) => b.d - a.d);
     for (const item of list) {
       if (item.type === 'player') this.scene.drawPlayer(ctx, game.player, cam, game);
+      else if (item.type === 'ped') this.scene.drawPed(ctx, item.o, cam, game);
       else this.drawFixture(ctx, item.o, cam, pal, game);
     }
 
@@ -222,6 +227,7 @@ export class MetroScene {
     else if (o.type === 'ticketMachine') { body = '#254e6b'; top = '#48c8ff'; }
     else if (o.type === 'bench') { body = '#4f5a64'; top = '#7d8b96'; }
     else if (o.type === 'pillar') { body = '#5b6872'; top = '#87949e'; }
+    else if (o.type === 'shopKiosk') { body = '#7d3f32'; top = '#d96c45'; }
     const p = drawBox(ctx, o, cam, body, top);
     if (o.type === 'ticketGate') {
       ctx.fillStyle = '#48c8ff';
@@ -242,6 +248,22 @@ export class MetroScene {
       for (let x = p.x + 10; x < p.x + o.w - 4; x += 20) {
         ctx.beginPath(); ctx.moveTo(x, p.y + 3); ctx.lineTo(x, p.y + o.h - 3); ctx.stroke();
       }
+    } else if (o.type === 'shopKiosk') {
+      ctx.fillStyle = '#ffd45c';
+      ctx.fillRect(p.x + 6, p.y + 7, o.w - 12, 17);
+      ctx.fillStyle = '#4d281f';
+      ctx.font = '900 12px system-ui, "Apple SD Gothic Neo", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('편의점 · SNACK', p.x + o.w / 2, p.y + 20);
+      ctx.fillStyle = '#1c2329';
+      ctx.fillRect(p.x + 12, p.y + 34, o.w - 24, 35);
+      for (let i = 0; i < 6; i++) {
+        ctx.fillStyle = ['#ef645e', '#69bfe6', '#f0c84b'][i % 3];
+        ctx.fillRect(p.x + 17 + i * 21, p.y + 42, 13, 17);
+      }
+      ctx.fillStyle = '#e6edf2';
+      ctx.font = '800 9px system-ui, sans-serif';
+      ctx.fillText('김밥  COFFEE  ₩2.500', p.x + o.w / 2, p.y + o.h - 9);
     }
   }
 }

@@ -170,7 +170,9 @@ function fillDock(city, rng, block, district) {
   const shedW = Math.min(260, area.w * 0.34), shedH = Math.min(150, area.h * 0.58);
   city.buildings.push(makeBuilding(rng, district, area.x + area.w - shedW, area.y + (area.h - shedH) / 2, shedW, shedH, { style: 'warehouse', h3d: rng.int(46, 76), streetEdges: ['right'], signChance: 0.35 }));
   const cols = Math.max(2, Math.floor((area.w - shedW - 44) / 58));
-  const rows = Math.max(1, Math.floor(area.h / 110));
+  // Le ultime celle costiere possono essere basse: forzare una riga da 92 px
+  // in un piazzale più sottile la faceva uscire sulla strada di confine.
+  const rows = Math.max(0, Math.floor((area.h - 24) / 110));
   for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) if (rng.chance(0.74)) {
     const palette = ['#c8493a', '#3f7ea8', '#cf9a2f', '#4a8f5e', '#8f5aa8'];
     city.buildings.push({ x: area.x + 12 + i * 58, y: area.y + 12 + j * 110, w: 40, h: 92, h3d: 26 * rng.int(1, 3), elev: 0, style: 'container', color: weightedPick(rng, palette), roofColor: '#2c3336', variant: 1, litSeed: rng.int(0, 9999), district: district.id, solid: true, signs: [], landmark: false, ac: 0, water: false, region: 'busan' });

@@ -5,10 +5,10 @@ resta corto apposta.** Il contenuto vero sta in `docs/`, e si apre un documento 
 non tutti. Il `README.md` descrive il gioco e i comandi; qui c'è quello che serve a
 *sviluppare*. Avvio e vincoli stanno in `CLAUDE.md`, che si carica da solo.
 
-Ultimo aggiornamento: **geografie dedicate e metro fisica** (§5.23) — Seoul misura
-7200×7200 e conserva la densità urbana; Busan e Jeju hanno generatori autonomi; 30 ingressi
-metro visibili conducono a un atrio percorribile con tornelli, banchina e treno. Le tappe
-precedenti sono §5.8-5.22, in ordine nella tabella qui sotto.
+Ultimo aggiornamento: **strade libere, metro viva e confini rifiniti** (§5.24) — i 30 ingressi
+metro sono solidi e stanno fuori dalla carreggiata, l'atrio ha passeggeri in movimento e un
+chiosco utilizzabile, e i limiti delle tre mappe hanno collisioni e transizioni visive proprie.
+Le geografie dedicate restano descritte nel §5.23; le tappe precedenti sono §5.8-5.22.
 
 > 📌 **Da concordare con l'utente prima di scrivere codice:** della Fase 3 restano le
 > **missioni**, che sono il lavoro grosso e pieno di scelte di design (quante, come si
@@ -57,6 +57,7 @@ commenti resta valido: si risolve qui.
 | §5.21 Secondo giro di arretrati | `docs/storico/10-secondo-giro-di-arretrati.md` |
 | §5.22 Regioni e metro | `docs/storico/11-regioni-e-metro.md` |
 | §5.23 Geografie dedicate e metro fisica | `docs/storico/12-geografie-dedicate-e-metro-fisica.md` |
+| §5.24 Strade libere, metro viva e confini | `docs/storico/13-strade-metro-confini.md` |
 | §6 Backlog | `docs/backlog.md` |
 | §8 Parametri | `docs/parametri.md` |
 | §9 Strumenti (`.claude/`) | `docs/strumenti.md` |
@@ -72,8 +73,8 @@ Canvas 2D puro, moduli ES nativi, **zero dipendenze, nessun build step**. Tutta 
 Stato: **Fase 1, Fase 1.5, Fase 2 (tutte e tre le tappe) e le prime tre tappe della Fase 3
 completate e collaudate**, più la revisione della guida AI del traffico (§5.10), i due giri di
 arretrati (§5.12 e §5.21), l'audio procedurale del §5.13, il salvataggio del §5.15, il giro
-menu-musica-autosave del §5.18-5.20 e le tre regioni collegate e ricostruite del §5.22-5.23.
-~24.400 righe in 46 moduli. 60 fps con ~44 veicoli e ~93
+menu-musica-autosave del §5.18-5.20 e le tre regioni collegate e ricostruite del §5.22-5.24.
+~25.100 righe in 47 moduli. 60 fps con ~44 veicoli e ~93
 pedoni attivi, e restano 60 anche sotto raffica continua di SMG. Dentro un edificio il costo è
 trascurabile: la città non gira. Il ciclo giorno-notte costa **1,5 ms di JS per frame nel caso
 peggiore** (notte con temporale) — ma i veli a schermo intero non sono misurabili onestamente
@@ -118,9 +119,10 @@ sempre. Dal menu di pausa si torna al titolo, e da lì si ricomincia davvero (§
 landmark reali e densità edilizia conservata; Busan è una costa 6400×5600 con baia, Nakdong,
 ponti e quartieri propri; Jeju è un'isola 5400×5400 chiusa dal mare, con Hallasan, campagne e
 due poli urbani. Tutte espongono lo stesso contratto sistemico, ma Busan e Jeju non derivano
-più dalla maglia di Seoul. Ogni fermata ha una scala visibile: si entra, si cammina attraverso
-l'atrio e i tornelli, si raggiunge la banchina e solo davanti al treno si sceglie la tratta.
-Geometria e texture sono in cache per città; traffico e pedoni restano streaming.
+più dalla maglia di Seoul. Ogni fermata ha una scala solida sul marciapiede: si entra, si
+cammina fra passeggeri e chiosco attraverso atrio e tornelli, si raggiunge la banchina e solo
+davanti al treno si sceglie la tratta. Geometria e texture sono in cache per città; traffico e
+pedoni restano streaming.
 
 La Fase 2 era divisa in tre tappe, concordate con l'utente: **A** combattimento base,
 **B** polizia e ricercato a 5 livelli, **C** armi pesanti ed esplosivi. **Sono tutte fatte.**

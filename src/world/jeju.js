@@ -4,6 +4,7 @@ import { Rng } from '../core/rng.js';
 import { SpatialGrid } from '../core/spatial.js';
 import { buildRoadGraph } from './roadgraph.js';
 import { BUSINESSES, DISTRICT_MIX } from './interiors.js';
+import { rectIntersectsRoad, rectsOverlap } from './roadclearance.js';
 
 export const JEJU_SEED = 20260808;
 
@@ -87,12 +88,12 @@ const GANGS = [
 const LANDMARKS = [
   // I landmark occupano celle libere fra gli assi stradali: restano ampi e
   // leggibili, ma nessun volume solido si sovrappone al grafo navigabile.
-  { id: 'hallasan', name: 'Hallasan', hangul: '한라산', label: 'Monte Hallasan', kind: 'mountain', district: 'gyeonggi', target: [0.5093, 0.5278], style: 'hill', w: 280, h: 210, h3d: 360, color: '#3d6746', roofColor: '#294231' },
-  { id: 'dongmun-market', name: 'Dongmun Market', hangul: '동문시장', label: 'Mercato Dongmun', kind: 'market', district: 'hongdae', target: [0.3, 0.2074], style: 'warehouse', w: 240, h: 160, h3d: 82, color: '#ae7152', roofColor: '#554139' },
-  { id: 'seongsan-ilchulbong', name: 'Seongsan Ilchulbong', hangul: '성산일출봉', label: 'Picco dell’alba di Seongsan', kind: 'coastal', district: 'myeongdong', target: [0.8407, 0.2074], style: 'hill', w: 230, h: 180, h3d: 210, color: '#527b58', roofColor: '#38543c' },
-  { id: 'jusangjeolli', name: 'Jusangjeolli Coast', hangul: '주상절리', label: 'Scogliere di Jusangjeolli', kind: 'coastal', district: 'gangnam', target: [0.8407, 0.7778], style: 'hill', w: 230, h: 220, h3d: 124, color: '#4e6664', roofColor: '#364b4c' },
-  { id: 'jeju-city', name: 'Jeju City', hangul: '제주시', label: 'Città di Jeju', kind: 'city', district: 'hongdae', target: [0.2519, 0.163], style: 'tower', w: 180, h: 170, h3d: 185, color: '#6e8a94', roofColor: '#394e57' },
-  { id: 'seogwipo', name: 'Seogwipo', hangul: '서귀포', label: 'Città di Seogwipo', kind: 'city', district: 'gangnam', target: [0.7315, 0.7796], style: 'glass', w: 240, h: 220, h3d: 210, color: '#527b95', roofColor: '#304654' },
+  { id: 'hallasan', name: 'Hallasan', hangul: '한라산', label: 'Monte Hallasan', kind: 'mountain', district: 'gyeonggi', target: [0.5093, 0.5278], style: 'hill', w: 150, h: 104, h3d: 360, color: '#3d6746', roofColor: '#294231' },
+  { id: 'dongmun-market', name: 'Dongmun Market', hangul: '동문시장', label: 'Mercato Dongmun', kind: 'market', district: 'hongdae', target: [0.3, 0.2074], style: 'warehouse', w: 150, h: 126, h3d: 82, color: '#ae7152', roofColor: '#554139' },
+  { id: 'seongsan-ilchulbong', name: 'Seongsan Ilchulbong', hangul: '성산일출봉', label: 'Picco dell’alba di Seongsan', kind: 'coastal', district: 'myeongdong', target: [0.8407, 0.2074], style: 'hill', w: 170, h: 140, h3d: 210, color: '#527b58', roofColor: '#38543c' },
+  { id: 'jusangjeolli', name: 'Jusangjeolli Coast', hangul: '주상절리', label: 'Scogliere di Jusangjeolli', kind: 'coastal', district: 'gangnam', target: [0.8407, 0.7778], style: 'hill', w: 170, h: 150, h3d: 124, color: '#4e6664', roofColor: '#364b4c' },
+  { id: 'jeju-city', name: 'Jeju City', hangul: '제주시', label: 'Città di Jeju', kind: 'city', district: 'hongdae', target: [0.2519, 0.163], style: 'tower', w: 140, h: 136, h3d: 185, color: '#6e8a94', roofColor: '#394e57' },
+  { id: 'seogwipo', name: 'Seogwipo', hangul: '서귀포', label: 'Città di Seogwipo', kind: 'city', district: 'gangnam', target: [0.7315, 0.7796], style: 'glass', w: 170, h: 150, h3d: 210, color: '#527b95', roofColor: '#304654' },
 ];
 
 const TRANSIT = [
@@ -251,9 +252,10 @@ function fillUrban(rng, city, block, d) {
 }
 
 function decorateEdges(rng, city, block, d) {
+  const edgeInset = 20;
   const sides = [
-    { x: block.x, y: block.y + 10, dx: 1, dy: 0, len: block.w }, { x: block.x, y: block.y + block.h - 10, dx: 1, dy: 0, len: block.w },
-    { x: block.x + 10, y: block.y, dx: 0, dy: 1, len: block.h }, { x: block.x + block.w - 10, y: block.y, dx: 0, dy: 1, len: block.h },
+    { x: block.x, y: block.y + edgeInset, dx: 1, dy: 0, len: block.w }, { x: block.x, y: block.y + block.h - edgeInset, dx: 1, dy: 0, len: block.w },
+    { x: block.x + edgeInset, y: block.y, dx: 0, dy: 1, len: block.h }, { x: block.x + block.w - edgeInset, y: block.y, dx: 0, dy: 1, len: block.h },
   ];
   for (const e of sides) {
     for (let i = 70; i < e.len - 20; i += 132) {
@@ -311,13 +313,15 @@ function fillDock(rng, city, block, d, opts = {}) {
   // i container restano visibili senza diventare ostacoli ad archi stradali.
   if (opts.roadSafe) {
     const palette = ['#c8493a', '#3f7ea8', '#cf9a2f', '#4a8f5e', '#8f5aa8'];
-    const cols = Math.min(3, Math.floor((w - 20) / 58));
-    const rows = Math.min(2, Math.floor((h - 180) / 116));
+    // Una sola fila 2×1 entra davvero nella cella compresa fra le carreggiate
+    // x=760/1000 e y=1000/1240 (larghezze incluse).
+    const cols = Math.min(2, Math.floor((w - 20) / 58));
+    const rows = Math.min(1, Math.floor((h - 180) / 116));
     for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
       if (rng.chance(0.27)) continue;
-      city.buildings.push({ x: x + 10 + i * 58, y: y + 82 + j * 102, w: 40, h: 90, h3d: 26 * rng.int(1, 3), elev: 0, style: 'container', color: rng.pick(palette), roofColor: '#2c3336', variant: rng.int(1, 3), litSeed: rng.int(0, 9999), district: d.id, districtName: d.name, districtHangul: d.hangul, solid: true, signs: [], edges: [], landmark: false, ac: 0, water: false, region: 'jeju' });
+      city.buildings.push({ x: x + 10 + i * 58, y: y + 128 + j * 80, w: 40, h: 66, h3d: 26 * rng.int(1, 3), elev: 0, style: 'container', color: rng.pick(palette), roofColor: '#2c3336', variant: rng.int(1, 3), litSeed: rng.int(0, 9999), district: d.id, districtName: d.name, districtHangul: d.hangul, solid: true, signs: [], edges: [], landmark: false, ac: 0, water: false, region: 'jeju' });
     }
-    city.props.push({ type: 'crane', x: x + w * 0.55, y: y + h * 0.45, rot: 0, z: 150, solid: true, r: 26 });
+    city.props.push({ type: 'crane', x: x + 50, y: y + 190, rot: 0, z: 150, solid: true, r: 18 });
     return;
   }
   if (rng.chance(0.52)) city.buildings.push(makeBuilding(rng, d, x + w * 0.18, y + h * 0.2, w * 0.62, h * 0.54, { style: 'warehouse', h3d: rng.int(38, 68), streetEdges: ['top', 'bottom'], signChance: 0.25 }));
@@ -337,9 +341,9 @@ function fillAirport(rng, city, block, d) {
   city.aprons.push({ x: r.x + 150, y: r.y + r.h * 0.48, w: r.w - 300, h: r.h * 0.28 });
   city.helipads.push({ x: r.x + r.w * 0.82, y: r.y + r.h * 0.67, r: 44 });
   for (let i = 0; i < 4; i++) city.airSpots.push({ x: r.x + 200 + i * 170, y: r.y + r.h * 0.62, angle: -Math.PI / 2, kind: i === 2 ? 'heli' : 'plane' });
-  // Il terminale resta fra le linee x=1240/1480 e y=760/1000; la pista e
+  // Il terminale resta fra le *carreggiate* x=1240/1480 e y=760/1000; la pista e
   // l'apron conservano l'impronta grande dello scalo senza bloccare il grafo.
-  city.buildings.push(makeBuilding(rng, d, r.x + 440, r.y + 165, 200, 180, { style: 'glass', h3d: 70, signChance: 0 }));
+  city.buildings.push(makeBuilding(rng, d, 1312, 814, 94, 110, { style: 'glass', h3d: 70, signChance: 0 }));
   city.props.push({ type: 'windsock', x: r.x + 100, y: r.y + r.h * 0.26, rot: 0, z: 62, solid: false, r: 9 });
   city.props.push({ type: 'windsock', x: r.x + r.w - 100, y: r.y + r.h * 0.26, rot: 0, z: 62, solid: false, r: 9 });
   block.yards.push({ x: r.x + 140, y: r.y + r.h * 0.45, w: r.w - 280, h: r.h * 0.32 });
@@ -359,9 +363,9 @@ function fillPort(rng, city, block, d) {
   block.yards.push({ x: r.x + 20, y: r.y + 20, w: r.w - 40, h: r.h - 40, turfSafe: false });
   // Zona libera a sud del molo: anche il margine del prop (r=12) resta nella
   // cella x=520..760, y=1000..1240, lontano dai centri degli archi.
-  block.yards.push({ x: r.x + 20, y: r.y + 120, w: 170, h: 190, turfSafe: true });
+  block.yards.push({ x: 600, y: 1080, w: 100, h: 108, turfSafe: true });
   // Magazzino sul lato sud-ovest, nella cella x=520..760/y=1240..1480.
-  city.buildings.push(makeBuilding(rng, d, r.x + 42, r.y + 360, 170, 130, { style: 'warehouse', h3d: 58, streetEdges: [], signChance: 0.3 }));
+  city.buildings.push(makeBuilding(rng, d, 594, 1318, 118, 104, { style: 'warehouse', h3d: 58, streetEdges: [], signChance: 0.3 }));
   city.helipads.push({ x: r.x + r.w * 0.72, y: r.y + r.h * 0.78, r: 42 });
   fillDock(rng, city, { x: r.x + 240, y: r.y + 30, w: r.w - 260, h: r.h - 60, yards: block.yards }, d, { roadSafe: true });
 }
@@ -522,9 +526,70 @@ function nearestRoadPoint(city, target) {
   return chosen ? { x: chosen.x, y: chosen.y } : { x: ISLAND.cx, y: ISLAND.cy };
 }
 
+function landmarkSite(city, spec) {
+  const wanted = { x: spec.target[0] * city.w, y: spec.target[1] * city.h };
+  // I generatori riempiono gli isolati prima dei landmark. Riserviamo quindi il
+  // lotto più vicino all'ancora e liberiamo soltanto il suo cortile: il volume
+  // resta nel luogo riconoscibile, senza essere costretto a migrare di chilometri
+  // per evitare i palazzi procedurali già nati lì.
+  const lots = city.blocks
+    .filter((b) => b.type !== 'airport' && b.type !== 'port'
+      && b.w >= spec.w + 20 && b.h >= spec.h + 20)
+    .map((b) => ({
+      block: b,
+      score: (b.x + b.w / 2 - wanted.x) ** 2 + (b.y + b.h / 2 - wanted.y) ** 2
+        + (b.district === spec.district ? 0 : 900 * 900),
+    }))
+    .sort((a, b) => a.score - b.score);
+  for (const { block } of lots) {
+    const rect = {
+      x: block.x + (block.w - spec.w) / 2,
+      y: block.y + (block.h - spec.h) / 2,
+      w: spec.w,
+      h: spec.h,
+    };
+    if (rectIntersectsRoad(city, rect, 12)) continue;
+    if (city.buildings.some((b) => b.landmark && rectsOverlap(rect, b, 18))) continue;
+    let wet = false;
+    for (const fy of [0.04, 0.5, 0.96]) for (const fx of [0.04, 0.5, 0.96]) {
+      if (city.isWater(rect.x + rect.w * fx, rect.y + rect.h * fy)) wet = true;
+    }
+    if (wet) continue;
+    city.buildings = city.buildings.filter((b) => b.landmark || !rectsOverlap(rect, b, 14));
+    city.props = city.props.filter((p) => !rectsOverlap(rect, {
+      x: p.x - (p.r || 0), y: p.y - (p.r || 0), w: (p.r || 0) * 2, h: (p.r || 0) * 2,
+    }, 10));
+    block.jejuLandmark = spec.id;
+    return rect;
+  }
+
+  const candidate = (cx, cy) => {
+    const rect = { x: cx - spec.w / 2, y: cy - spec.h / 2, w: spec.w, h: spec.h };
+    if (rect.x < 72 || rect.y < 72 || rect.x + rect.w > city.w - 72 || rect.y + rect.h > city.h - 72) return null;
+    for (const fy of [0.04, 0.5, 0.96]) for (const fx of [0.04, 0.5, 0.96]) {
+      if (city.isWater(rect.x + rect.w * fx, rect.y + rect.h * fy)) return null;
+    }
+    if (rectIntersectsRoad(city, rect, 12)) return null;
+    if (city.buildings.some((b) => b.solid && rectsOverlap(rect, b, 8))) return null;
+    if (city.props.some((p) => p.solid && rectsOverlap(rect, {
+      x: p.x - (p.r || 0), y: p.y - (p.r || 0), w: (p.r || 0) * 2, h: (p.r || 0) * 2,
+    }, 5))) return null;
+    return rect;
+  };
+  for (let radius = 0; radius <= 1500; radius += 24) {
+    const count = radius ? Math.max(16, Math.ceil(Math.PI * 2 * radius / 32)) : 1;
+    for (let i = 0; i < count; i++) {
+      const a = radius ? Math.PI * 2 * i / count : 0;
+      const found = candidate(wanted.x + Math.cos(a) * radius, wanted.y + Math.sin(a) * radius);
+      if (found) return found;
+    }
+  }
+  throw new Error(`Nessun lotto libero per il landmark ${spec.id}`);
+}
+
 function landmarkBuilding(city, spec) {
-  const x = spec.target[0] * city.w - spec.w / 2, y = spec.target[1] * city.h - spec.h / 2;
-  const d = city.districtById[spec.district], b = makeBuilding(new Rng((city.seed ^ spec.id.length * 811) >>> 0), d, Math.max(40, Math.min(city.w - spec.w - 40, x)), Math.max(40, Math.min(city.h - spec.h - 40, y)), spec.w, spec.h, { style: spec.style, h3d: spec.h3d, color: spec.color, roofColor: spec.roofColor, landmark: true, signChance: 0, ac: 0, water: false, solid: true, streetEdges: [] });
+  const site = landmarkSite(city, spec);
+  const d = city.districtById[spec.district], b = makeBuilding(new Rng((city.seed ^ spec.id.length * 811) >>> 0), d, site.x, site.y, site.w, site.h, { style: spec.style, h3d: spec.h3d, color: spec.color, roofColor: spec.roofColor, landmark: true, signChance: 0, ac: 0, water: false, solid: true, streetEdges: [] });
   b.name = spec.name; b.hangul = spec.hangul; b.label = spec.label; b.kind = spec.kind; b.region = 'jeju'; b.districtName = d.name; b.districtHangul = d.hangul;
   city.buildings.push(b);
   return b;

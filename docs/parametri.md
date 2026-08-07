@@ -10,9 +10,11 @@
 | Regioni giocabili · seed | `regions.createRegion` · `busan.BUSAN_SEED` · `jeju.JEJU_SEED` | Seoul 20260730 · Busan 20260807 · Jeju 20260808 |
 | Cache regionale | `main.regionCache` | geometria + texture, create alla prima visita |
 | Fermate passeggeri | `city.transitStations` | Seoul 16 · Busan 7 · Jeju 7 |
-| Ingresso metro · raggio d'uso | `regions.entranceSpot` · `metro.ENTRANCE_REACH` | scala 72×46 px · uso entro 72 px, solo a piedi |
+| Ingresso metro · raggio d'uso | `regions.ENTRANCE_W/H` · `metro.ENTRANCE_REACH` | scala 86×58 px, ruotata col fronte stradale e solida · uso entro 72 px, solo a piedi |
 | Interno metro · azione | `metro.buildStationFloor` · `ACTION_REACH` | 1080×720 px · uscita/tabellone entro 48 px (porta treno +14) |
-| Ricerca uscita libera | `regions.freeArrival` | anelli ogni 24 px, 8 direzioni, fino a 120 px |
+| Folla e chiosco metro | `metro.buildPeople` · `KIOSK_PRICE` | 10 passeggeri mobili + 1 negoziante · 김밥 e caffè ₩2.500, +22 HP e stamina piena |
+| Ricerca uscita libera | `regions.freeArrival` | anelli ogni 16 px, 16 direzioni, 56–144 px; ripiego fino a 168 px |
+| Fascia di collisione del confine | `regions.BOUNDARY_DEPTH` | 64 px su tutti e quattro i lati |
 | Tempo di viaggio interurbano | `main.travelTo` | Seoul↔Busan 1,25 h · ogni tratta con Jeju 2 h |
 | Sagoma di Seoul | `districts.URBAN_BLOBS` | 12 macchie, raggio 0.11–0.195 della larghezza |
 | Acqua regionale | `ground.drawRegionalWater` · `maptexture.drawWaterMask` | campione ogni 12 px nei tile · griglia 240×240 sulla carta |
