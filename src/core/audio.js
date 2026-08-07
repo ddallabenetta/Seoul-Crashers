@@ -95,7 +95,7 @@ export const SPACES = {
   alley:  { sec: 1.0, decay: 1.8, damp: 0.34, wet: 0.36, early: [[0.005, 0.9], [0.011, 0.66], [0.018, 0.48], [0.026, 0.3]] },
   // Una stanza: 노래방, 편의점, retro di un'officina. **È l'unico spazio interno**,
   // e non è una semplificazione: le piante del gioco vanno da 78k a 117k px²
-  // (misurate su tutte e 113 le vetrine), cioè sono tutte stanze. Una «sala» qui
+  // (misurate su tutte e 114 le vetrine), cioè sono tutte stanze. Una «sala» qui
   // non avrebbe niente da rappresentare — la vorrà il primo interno grande, che
   // sarà il terminal dell'aeroporto quando ce l'avrà (§6).
   room:   { sec: 0.4, decay: 2.2, damp: 0.56, wet: 0.28, early: [[0.004, 0.85], [0.009, 0.55], [0.014, 0.32]] },

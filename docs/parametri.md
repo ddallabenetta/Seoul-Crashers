@@ -72,7 +72,7 @@
 | Gomme a terra | `vehicle` `flatTires` | velocità × 0.6, grip × 0.72, tiraggio `flatPull` |
 | Ritmo di posa di blocchi e chiodi | `police.manageObstacles` | uno ogni 7 s, alternati |
 | Raccolte a terra | `pickups` densità / `RESPAWN` | 0.4 per cortile (43 totali) / 55 s |
-| Densità delle vetrine | `citygen.placeShops` | `signDensity × 0.55` (139 negozi, 369 locali), una porta ogni 80 px |
+| Densità delle vetrine | `citygen.placeShops` | `signDensity × 0.55` (114 negozi, 325 locali), una porta ogni 80 px |
 | Attività per edificio | `citygen.makeShop` | `1 + (h3d − 30) / 46`, massimo 4 |
 | Taglia di un interno | `interiors.buildInterior` | footprint × 1.8, limitato a 300-470 × 260-390 |
 | Muri e vani scala | `interiors` `WALL` / `STAIR_W×H` / `DOOR_W` | 12 · 58×78 · 54 |
@@ -132,7 +132,7 @@
 | Rimpiazzo del 거래책 | `pedestrians.DEALER_WAIT` · `canDeal` | 18 s se lo hai steso, subito se l'ha portato via lo streaming · recinto + 80 px |
 | Allarme silenzioso | `shops.ALARM_DELAY` · `updateAlarm` | 17 s · `rob × 0.55` ≈ 12 di heat (22 + 12 = seconda stella) |
 | Gente di passaggio, ora per ora | `interiors.RUSH` · `crowd()` | frazione di `biz.crowd` per fasce, 13 tipi di locale · `crowd + 2` posti |
-| Varco sul retro | `interiors.BACK_W` · `shops.backDoorSpot` / `SIDE_SCAN` | 44 px all'estremo del muro di fondo · fuori 18-60 px, di lato fino a ±124 (42 negozi su 113) |
+| Varco sul retro | `interiors.BACK_W` · `shops.backDoorSpot` / `SIDE_SCAN` | 44 px all'estremo del muro di fondo · fuori 18-60 px, di lato fino a ±124 (43 negozi su 114) |
 | Sonno | `shops.sleepTarget` · `sleep` · `daycycle.advance` | 06:30 o 20:00 · vietato da 3 stelle · passi di 5 s reali |
 | Luce dalla porta di un interno | `interiorscene.drawDoorLight` | profondità `34 + 78 × (1 − lamps)` px |
 | Raccolte in campagna e sui moli | `pickups.RURAL_TABLE` / `PIER_TABLE` / `placeRural` | 32% dei campi · 85% dei moli del porto, 30% degli scali sul Han (43 raccolte in tutto) |
@@ -160,8 +160,22 @@
 | Peso di uno slot · costo di un caricamento | misurato | 0,7 kB · 2,7 ms (fps invariati) |
 | Ripopolamento dopo un caricamento | `save.apply` | `prewarm(40, 18)` veicoli e 40 pedoni |
 | Fermo: raggio, tempo, decadenza | `police.BUST_R` / `BUST_TIME` | 46 px · 1,4 s · si perde al doppio della velocità |
-| Chi arresta e quando | `police.ARREST_LEVEL` / `BUST_HP` · `updateArrest` | fino a 3 stelle, solo `kind: 'cop'`, con arma da mischia in pugno **oppure** HP ≤ 25 |
+| Chi arresta e quando | `police.ARREST_LEVEL` / `BUST_HP` · `updateArrest` | fino a 3 stelle, solo `kind: 'cop'`, con arma da mischia in pugno **oppure** HP ≤ 25 — e **non** mentre la stai usando (§5.21) |
 | Costo della cella | `main.bustPlayer` | 20% dei contanti (cauzione) · 6 ore di orologio · arsenale confiscato |
 | Investimento a piedi: soglia, danno, cadenza | `player.RUNOVER_SPEED` / `RUNOVER_DMG` / `RUNOVER_GAP` | 70 px/s (21 km/h) · `(v − 70) × 0.3` · un urto ogni 0,5 s |
+| **— secondo giro di arretrati (§5.21) —** | | |
+| Pedone contro una lamiera ferma | `pedestrians.PED_R` / `CAR_LOOK` / `CAR_CLEAR` | raggio 6 px (il giocatore ha 7) · si guarda 66 px avanti · si passa 6 px larghi |
+| Quali lamiere sono solide per un pedone | `pedestrians.updatePed` | solo `!v.driver` e ferme (< 12 px/s): in sosta, abbandonate, lasciate lì dal giocatore |
+| Valvola anti-incastro dei pedoni | `pedestrians.STUCK_TIME` · `unstick` | 2,2 s sotto il 28% della velocità voluta, poi si cambia obiettivo |
+| Spazi acustici | `audio.SPACES` | `open` 0,7 s a 0.07 · `street` 1,2 s a 0.17 · `alley` 1,0 s a 0.36 · `room` 0,4 s a 0.28 |
+| Come si sceglie lo spazio | `audio.SPACE_EVERY` / `SPACE_NEAR` / `ALLEY_SIDES` | una lettura ogni 0,3 s · muri entro 115 px · vicolo da 3 lati su 4 |
+| Coda misurata di uno sparo | `reverb-census.scene` | 192 · 248 · 457 · 632 ms (aperto · stanza · strada · vicolo) |
+| Sparo lontano: portata e coda | `audio.FAR_RANGE` / `FAR_TAIL` | 900 px = massima trasformazione · fino a +0,6 s di coda; banda del crack −50%, picco −55% |
+| Voci dei pedoni | `audio.VOICES` · `pedestrians.VOICE_MIX` | 4 timbri (f0, due formanti, raschio, tremolo) · peso per tipo di pedone |
+| Generazioni dell'autosave | `save.AUTO_GENS` · `rotateAuto` | 3 (≈2 kB); la 0 tiene la chiave storica `seoul.save.auto` |
+| Resistenza all'arresto con un'arma da mischia | `player.SWING_RESIST` | 1,4 s dopo ogni colpo (la mazza ha cadenza 0,52 s); i pugni non contano |
+| Uscita di chi scappa da un negozio | `shops.spillOutside` | 30 px oltre la soglia, sfalsati di ±24 px · panico entro 300 px |
+| Quanto cura il riposo | `shops.REST_CAP` / `REST_PER_HOUR` | fino al 70% della salute · 9 punti per ora dormita |
+| Banchi dei pegni garantiti | `citygen.ensurePawnShops` | uno per distretto **che abbia edifici da vetrina** (5 su 7: Gimpo e la campagna non ne hanno) |
 
 ---

@@ -42,7 +42,7 @@ process.stdin.on('end', () => {
       + 'chiamata a `rng.*` la Seoul collaudata cambia tutta. Verifica con '
       + '`node .claude/tools/probe.mjs --eval "game.city.stats"` — attesi '
       + 'buildings 418, props 1299, blocks 122, nodes 196, edges 279, doglegs 4, stairs 3 '
-      + '(shops 113, venues 324, garages 7, turfs 6 hanno un rng loro e non seguono la città).'
+      + '(shops 114, venues 325, garages 7, turfs 6 hanno un rng loro e non seguono la città).'
     );
   }
   if (file.endsWith('render/ground.js') || file.endsWith('world/citygen.js')) {

@@ -129,6 +129,47 @@ il pezzo taccia in strada e con la radio accesa. Riferimenti: tema ~0.045, cacci
 ~0.034, in strada ~0.015 (che è il fondo urbano, cioè musica zero). Serve `--menu`, o il
 tema non parte.
 
+## Lo spazio, e perché non è una proprietà del suono
+
+Dal §5.21 il bus `sfx` ha una **mandata parallela in un `ConvolverNode`**: il secco arriva al
+compressore per conto suo, il convolutore ci aggiunge il bagnato. Quattro spazi in `SPACES`
+(`open`, `street`, `alley`, `room`), scelti da `pickSpace` guardando **da quanti lati arrivano
+i muri** attorno all'ascoltatore.
+
+Cosa devi sapere prima di toccarlo:
+
+- **Un suono nuovo su `sfx` sta già nello spazio.** Non c'è niente da fare, e non c'è un
+  parametro per suono: se lo mandi su `amb` (pioggia, città, vento, mare) resta asciutto, ed è
+  giusto — un letto ambientale passato per una coda è fango. `uiBus` non ci passa mai.
+- **La coda non si sostituisce a caldo.** `updateSpace` sfuma il ritorno a zero e *solo lì*
+  cambia `rev.buffer`, come `music.direct` cambia pezzo. Se aggiungi uno spazio, non
+  scavalcarlo.
+- **Ogni risposta all'impulso è normalizzata a energia uno** (`makeImpulse`). È l'unica ragione
+  per cui i `wet` di `SPACES` si confrontano fra loro: se ne aggiungi una a mano, senza
+  normalizzarla la sua durata diventa un volume.
+- **La distanza è un'altra cosa ancora.** Lo spazio dice *dove sei*, `shot` guarda *quanto è
+  lontana la sorgente* e le toglie lo schiocco (`FAR_RANGE`, `FAR_TAIL`). Sono due effetti che
+  si sommano e non vanno confusi.
+
+```bash
+node .claude/tools/probe.mjs --seconds 2 --quiet \
+  --script .claude/tools/scenes/reverb-census.scene
+```
+
+Coda dello stesso sparo nei quattro spazi. Riferimenti: 192 · 248 · 457 · 632 ms
+(`open` · `room` · `street` · `alley`). **Vanno letti in colonna**: l'ordine è quello che
+conta, i valori assoluti dipendono dalla macchina.
+
+## Chi urla ha una voce
+
+`VOICES` in `audio.js`: quattro timbri (`uomo`, `donna`, `giovane`, `anziano`), ognuno con `f0`,
+**due formanti** e il suo tremolo. La formante è quello che rende una voce *quella* voce:
+spostare solo `f0`, che è quello che si faceva prima del §5.21, dà lo stesso timbro cantato più
+acuto. Chi ha che voce lo decide `pedestrians.VOICE_MIX`, un peso per tipo di pedone.
+
+Un suono di gola nuovo (un richiamo, un lamento, un ordine) passa di lì: `scream(x, y, voice)`
+e `hurt(x, y, isPlayer, voice)` sono i due esempi, e il chiamante passa sempre `p.voice`.
+
 ## La radio è un'altra cosa
 
 `src/core/radio.js` **non passa dal grafo di `audio.js`** ed è l'unica parte del gioco che

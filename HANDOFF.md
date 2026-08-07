@@ -5,20 +5,20 @@ resta corto apposta.** Il contenuto vero sta in `docs/`, e si apre un documento 
 non tutti. Il `README.md` descrive il gioco e i comandi; qui c'è quello che serve a
 *sviluppare*. Avvio e vincoli stanno in `CLAUDE.md`, che si carica da solo.
 
-Ultimo aggiornamento: **il gioco ha un menu iniziale** (§5.18), **una musica sua** (§5.19) e
-**un salvataggio automatico** (§5.20) — le tre voci che il §6 teneva in cima. Prima c'erano il
-salvataggio manuale (§5.15), l'arresto (§5.16) e la lamiera solida (§5.17); prima ancora
-l'audio procedurale (§5.13) e la radio (§5.14), il giro di arretrati (§5.12), il ciclo
-giorno-notte (§5.11), il traffico (§5.10), la mappa (§5.9), i negozi (§5.8).
+Ultimo aggiornamento: **secondo giro di arretrati** (§5.21) — undici voci del §6 in una
+sessione, fra cui le due che stavano in cima (i pedoni che attraversavano le auto in sosta e
+il ritorno al titolo) e **il riverbero**, che era quello che mancava di più all'audio. Le
+tappe precedenti sono §5.8-5.20, in ordine nella tabella qui sotto.
 
 > 📌 **Da concordare con l'utente prima di scrivere codice:** della Fase 3 restano le
 > **missioni**, che sono il lavoro grosso e pieno di scelte di design (quante, come si
 > attivano, cutscene a fumetti, fallimento e ripetizione). L'utente vuole essere consultato
-> invece di trovarsele fatte (§7): **chiediglielo in apertura di sessione.** La musica adesso
-> c'è ma copre due momenti soli (menu e caccia, §5.19): i pezzi che accompagnano una missione
-> sono un'altra scelta di regia, e si fanno insieme alle missioni. Il §6 è corto: gli
-> arretrati grossi sono stati pagati, e quello che resta è quasi tutto materia della storia o
-> roba che si nota poco.
+> invece di trovarsele fatte (§7): **chiediglielo in apertura di sessione.** La musica copre
+> due momenti soli (menu e caccia, §5.19): i pezzi che accompagnano una missione sono un'altra
+> scelta di regia, e si fanno insieme alle missioni. Il §6 adesso è **corto davvero**: dopo il
+> §5.21 quello che resta è materia della storia, o roba che costa molto e si nota poco — le
+> due voci più concrete sono il sorpasso (l'ultimo debito grosso del traffico) e l'arresto che
+> ti carica in volante invece di stacchi al nero.
 
 ---
 
@@ -55,6 +55,7 @@ commenti resta valido: si risolve qui.
 | §5.13–5.14 Audio e radio | `docs/storico/07-audio-e-radio.md` |
 | §5.15–5.17 Salvataggio, arresto, lamiera | `docs/storico/08-salvataggio-arresto-lamiera.md` |
 | §5.18–5.20 Menu, musica, autosave | `docs/storico/09-menu-musica-autosave.md` |
+| §5.21 Secondo giro di arretrati | `docs/storico/10-secondo-giro-di-arretrati.md` |
 | §6 Backlog | `docs/backlog.md` |
 | §8 Parametri | `docs/parametri.md` |
 | §9 Strumenti (`.claude/`) | `docs/strumenti.md` |
@@ -68,12 +69,13 @@ Canvas 2D puro, moduli ES nativi, **zero dipendenze, nessun build step**. Tutta 
 (sprite, facciate, terreno, mappa) è generata da codice a runtime: non esistono asset esterni.
 
 Stato: **Fase 1, Fase 1.5, Fase 2 (tutte e tre le tappe) e le prime tre tappe della Fase 3
-completate e collaudate**, più la revisione della guida AI del traffico (§5.10), il giro di
-arretrati del §5.12, l'audio procedurale del §5.13, il salvataggio del §5.15 e il giro
-menu-musica-autosave del §5.18-5.20. ~20.900 righe in 38 moduli. 60 fps con ~44 veicoli e ~93 pedoni attivi, e restano 60 anche sotto raffica
-continua di SMG. Dentro un edificio il costo è trascurabile: la città non gira. Il ciclo
-giorno-notte costa **1,5 ms di JS per frame nel caso peggiore** (notte con temporale) — ma i
-veli a schermo intero non sono misurabili onestamente in headless, vedi l'avvertenza in §5.11.
+completate e collaudate**, più la revisione della guida AI del traffico (§5.10), i due giri di
+arretrati (§5.12 e §5.21), l'audio procedurale del §5.13, il salvataggio del §5.15 e il giro
+menu-musica-autosave del §5.18-5.20. ~21.400 righe in 39 moduli. 60 fps con ~44 veicoli e ~93
+pedoni attivi, e restano 60 anche sotto raffica continua di SMG. Dentro un edificio il costo è
+trascurabile: la città non gira. Il ciclo giorno-notte costa **1,5 ms di JS per frame nel caso
+peggiore** (notte con temporale) — ma i veli a schermo intero non sono misurabili onestamente
+in headless, vedi l'avvertenza in §5.11.
 
 **Seoul ha un'ora e un tempo.** L'orologio gira sempre (24 minuti reali = 24 ore, anche dentro
 un negozio), la luce cambia con l'ora, il cielo passa da sereno a temporale e viceversa, e i
@@ -81,12 +83,15 @@ locali hanno un orario di apertura. Non è una decorazione: di notte la polizia 
 sotto l'acqua si frena peggio, e alle tre del mattino l'unica insegna accesa è quella del 편의점.
 
 **Seoul si sente, e nemmeno un byte di audio è un file.** Spari, motori, sirene, rotori,
-pioggia, tuoni, urla, casse che si aprono e menu che scorrono nascono da oscillatori e da
-due buffer di rumore generati al boot (§5.13). Vale lo stesso vincolo della grafica, con lo
-stesso vantaggio: il timbro di un'arma è cinque numeri in tabella, il motore cambia giro con
-la marcia e la pioggia si sente ovattata dentro un negozio senza che esista un secondo suono
-di pioggia. L'audio parte **al primo clic o tasto premuto** — è una regola dei browser, non
-una scelta — e `F4` è il muto.
+pioggia, tuoni, urla, casse che si aprono e menu che scorrono nascono da oscillatori e da due
+buffer di rumore generati al boot (§5.13) — e dalla §5.21 anche **la coda del riverbero**, che
+è un file per definizione. Vale lo stesso vincolo della grafica, con lo stesso vantaggio: il
+timbro di un'arma è cinque numeri in tabella, e la pioggia si sente ovattata dentro un negozio
+senza che esista un secondo suono di pioggia. Ci sono quattro spazi (aperto, strada, vicolo,
+stanza) e quale sia lo dice **da quanti lati arrivano i muri**, non quanti ce ne sono; uno
+sparo lontano non è uno sparo piano ma uno sparo *senza schiocco*; i passanti hanno quattro
+timbri di voce. L'audio parte **al primo clic o tasto premuto** — regola dei browser, non una
+scelta — e `F4` è il muto.
 
 **E in macchina c'è la radio, con stazioni coreane vere** (§5.14): `R` accende e cambia
 stazione, `Shift+R` spegne, e nei 편의점 aperti la si sente bassa di sottofondo. È **l'unica
@@ -94,16 +99,18 @@ cosa del gioco che parla con la rete**, non lo fa finché non premi `R`, e quand
 c'è il gioco si comporta esattamente come prima.
 
 **La partita si salva, e la polizia adesso ti prende vivo.** Tre slot in `localStorage` dal
-menu di pausa (§5.15) più **uno automatico** (§5.20): dentro c'è solo quello che Seoul non sa
-rifare da sola, cioè 0,7 kB — la città nasce da una seed fissa e il traffico è streaming. E la
-divisa, se hai i pugni al posto della pistola o sei quasi a terra, ti ammanetta invece di
-spararti (§5.16): sei ore di cella, la cauzione, e l'arsenale se lo tengono.
+menu di pausa (§5.15) più **uno automatico a tre generazioni** (§5.20, §5.21): dentro c'è solo
+quello che Seoul non sa rifare da sola, cioè 0,7 kB — la città nasce da una seed fissa e il
+traffico è streaming. E la divisa, se hai i pugni al posto della pistola o sei quasi a terra,
+ti ammanetta invece di spararti (§5.16): sei ore di cella, la cauzione, e l'arsenale se lo
+tengono. Con una mazza si può essere ammanettati, ma **non mentre la stai usando** (§5.21).
 
 **Il gioco comincia da un menu, e ha una musica sua.** Il titolo sta sopra una Seoul che gira
 davvero — traffico, pedoni, luci — con «Continua» in cima se c'è qualcosa da riprendere
-(§5.18). La musica è sintetizzata come tutto il resto e suona in **due momenti soli**: il
-tema sul menu e l'inseguimento quando ti stanno addosso (§5.19). In strada non suona niente,
-perché in strada c'è già Seoul, e in macchina c'è la radio — che vince sempre.
+(§5.18), i comandi e i volumi. La musica è sintetizzata come tutto il resto e suona in **due
+momenti soli**: il tema sul menu e l'inseguimento quando ti stanno addosso (§5.19). In strada
+non suona niente, perché in strada c'è già Seoul, e in macchina c'è la radio — che vince
+sempre. Dal menu di pausa si torna al titolo, e da lì si ricomincia davvero (§5.21).
 
 **Il mondo è 5400×5400 e la città non lo riempie: ha una sagoma.** A ovest il mare, con
 l'aeroporto di Gimpo e il porto di Incheon sulla costa e la campagna in mezzo; a est, nord e
