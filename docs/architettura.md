@@ -106,6 +106,18 @@ distanza radiale **decrescente dal nadir**: chi è lontano dal nadir è più lon
 — esattamente, perché `distanza dall'occhio² = distanza dal nadir² + PROJ²`. Le ombre vanno
 tutte in un pass precedente.
 
+**Anche i mezzi e la gente sono volumi** (§5.22). Un palazzo si apre e una figurina no: con
+la camera piegata la differenza è la prima cosa che si vede, e riduce persone e auto a decal
+stampate sull'asfalto. Quindi `scene.extrudeVehicle` e `scene.extrudePerson` estrudono anche
+loro nella **stessa** proiezione — un mezzo su due piani (scocca e abitacolo, da `spec.cabin`),
+una persona su una capsula fino alle spalle. Due regole da non perdere:
+
+- l'altezza (`spec.tall`, `PED_H`) **non** esce da `PX_PER_M` ma dalla scala con cui la cosa è
+  disegnata *in pianta*, che è più grande del vero perché a schermo si legga. Quello che deve
+  tornare sono i rapporti fra le altezze, non i metri;
+- il volume parte dalla **quota** dell'oggetto, non da terra: un elicottero a 200 px estruso
+  dall'asfalto è una colonna alta duecento pixel.
+
 **Il protagonista non può sparire.** Con la camera a picco i volumi si aprivano *da* lui,
 quindi non gli finivano mai sopra; piegata, un palazzo a sud gli si apre addosso — ed è
 corretto, quel palazzo è più vicino all'occhio. L'ordine resta quello giusto e

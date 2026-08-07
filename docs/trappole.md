@@ -111,6 +111,9 @@ codice spiega il perché nel punto giusto.
 | Le auto compaiono in campo visivo dopo aver piegato la camera | `bounds()` restituiva il rettangolo di prima, ma lo schermo schiacciato ne inquadra il 9% in più in verticale: l'anello di streaming cadeva dentro l'inquadratura | `camera.bounds`, `viewH / (2 · zoom · TILT_COS)` |
 | Entrando in un negozio il muro di fondo copre tutta la pianta | il nadir della vista piegata sta 393 px a sud, cioè più in là del muro di una stanza profonda 300 | `InteriorScene.render`, `cam.lean = 0` — lo schiacciamento resta, l'apertura no |
 | Il protagonista sparisce dietro al palazzo che ha appena superato | è l'inclinazione, e l'ordine di disegno è corretto: quel volume è più vicino all'occhio | `scene.drawPlayerThrough`, sagoma in trasparenza; l'ordine non si tocca |
+| Un elicottero in volo ha una colonna che scende fino all'asfalto | il volume veniva estruso da terra invece che dalla quota del mezzo: `v.z` entrava nell'altezza da estrudere anziché nella base | `scene.drawVehicle`, base a `v.z` e spessore `spec.tall` |
+| Un'auto a 24° sembra ancora una figurina piatta | l'altezza era in scala reale (PX_PER_M) sopra una pianta disegnata il 40% più grande | `VEHICLE_TYPES[].tall` ricavata dalla scala di pianta di ogni mezzo |
+| L'estrusione di mezzi e pedoni costa 3 ms per frame | `shade()` fa parsing di una stringa e ne costruisce una nuova, e veniva chiamata per ogni entità a ogni frame per un valore che non cambia mai | tinta del fianco in cache sull'oggetto (`v._side`, `p._side`), come `b._shadow` |
 | I palazzi compaiono a scatti sul bordo basso dello schermo | con la camera piegata un volume si apre verso l'alto anche al centro: chi ha la pianta appena sotto il bordo ha il tetto dentro | `scene.BUILD_PAD`, margine in più **solo verso sud** (allargarlo tutt'intorno costa il 28% di edifici disegnati) |
 
 Regola generale emersa: **prima di dare la colpa all'AI, verifica la geometria.** Quasi tutti

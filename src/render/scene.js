@@ -11,6 +11,7 @@ import {
 import {
   getVehicleSprite, getPedSprite, getPropSprite, getWreckSprite, getPickupSprite,
   getHeroSprite, getChopperSprite, getSpikeSprite, getThrownSprite, VEHICLE_TYPES, PED_FRAMES,
+  PED_KINDS, HERO_OUTFITS, vehicleColor, shade,
 } from './sprites.js';
 import { WEAPONS } from '../entities/weapons.js';
 import { airborne } from '../entities/vehicle.js';
@@ -41,6 +42,13 @@ const RAIN_DROPS = 340;
 // grattacieli più alti della città restano fuori — è la stessa approssimazione
 // che il gioco già faceva ai bordi laterali.
 const BUILD_PAD = Math.round((TILT_LEAN * 190) / PROJ);
+
+// Altezza di una persona in pixel di mondo. Come `spec.tall` per i mezzi non esce
+// da PX_PER_M ma dalla scala con cui la figura è *disegnata in pianta*, che è più
+// grande del vero perché a schermo si legga (§5.22). Quello che deve tornare sono
+// i rapporti: un uomo è alto 1,17 volte una berlina, qui 28 contro 24.
+const PED_H = 28;
+const HERO_H = 30;
 
 function hash1(i) {
   let h = Math.imul(i | 0, 374761393) + 668265263;
@@ -86,6 +94,60 @@ function sweptCovers(b, ox, oy, px, py) {
     t1 = Math.min(t1, c);
   }
   return t0 <= t1;
+}
+
+/**
+ * Estrude un rettangolo *ruotato* lungo il vettore di proiezione, ed è la stessa
+ * regola di `drawBuilding`: una faccia si vede quando la sua normale uscente
+ * punta **contro** la proiezione (`dot(n, o) < 0`), quindi ne restano al massimo
+ * due delle quattro. Serve a dare un volume a quello che finora era una figurina
+ * stampata sull'asfalto — mezzi, e la scatola di un pedone.
+ *
+ * Non costruisce l'inviluppo convesso come fa l'ombra di un palazzo: lì il
+ * poligono si calcola una volta e si mette in cache, qui cambia a ogni frame
+ * perché il mezzo si muove, e due quadrilateri non allocano niente.
+ */
+function extrudeRect(ctx, cx, cy, len, wid, cos, sin, ox, oy, fill) {
+  const hx = (len / 2) * cos, hy = (len / 2) * sin;   // mezzo asse longitudinale
+  const wx = (-wid / 2) * sin, wy = (wid / 2) * cos;  // mezzo asse trasversale
+  const ax = cx + hx + wx, ay = cy + hy + wy;         // muso, lato sinistro
+  const bx = cx + hx - wx, by = cy + hy - wy;         // muso, lato destro
+  const dx = cx - hx - wx, dy = cy - hy - wy;         // coda, lato destro
+  const ex = cx - hx + wx, ey = cy - hy + wy;         // coda, lato sinistro
+  ctx.fillStyle = fill;
+  extrudeSide(ctx, ax, ay, bx, by, cos, sin, ox, oy);      // muso
+  extrudeSide(ctx, bx, by, dx, dy, sin, -cos, ox, oy);     // fiancata destra
+  extrudeSide(ctx, dx, dy, ex, ey, -cos, -sin, ox, oy);    // coda
+  extrudeSide(ctx, ex, ey, ax, ay, -sin, cos, ox, oy);     // fiancata sinistra
+}
+
+/** Un lato e la sua normale uscente: si disegna solo se la normale punta contro. */
+function extrudeSide(ctx, ax, ay, bx, by, nx, ny, ox, oy) {
+  if (nx * ox + ny * oy >= 0) return;
+  ctx.beginPath();
+  ctx.moveTo(ax, ay);
+  ctx.lineTo(bx, by);
+  ctx.lineTo(bx + ox, by + oy);
+  ctx.lineTo(ax + ox, ay + oy);
+  ctx.closePath();
+  ctx.fill();
+}
+
+/**
+ * Il fianco di una figura tonda — il corpo di un pedone — è il disco spazzato
+ * lungo la proiezione, cioè una capsula: due semicerchi e i due lati che li
+ * uniscono, in un path solo. Un tratto grosso quanto il diametro darebbe la
+ * stessa forma con una riga di codice in meno, ma un `stroke` costa più di un
+ * `fill` e qui si paga cento volte per frame.
+ */
+function extrudeDisc(ctx, x, y, r, ox, oy, fill) {
+  const a = Math.atan2(oy, ox);
+  ctx.fillStyle = fill;
+  ctx.beginPath();
+  ctx.arc(x, y, r, a + 1.5708, a - 1.5708);
+  ctx.arc(x + ox, y + oy, r, a - 1.5708, a + 1.5708);
+  ctx.closePath();
+  ctx.fill();
 }
 
 function convexHull(pts) {
@@ -289,13 +351,14 @@ export class Scene {
     const pl = game.player;
     if (!pl.onFoot && !pl.vehicle) return;
     const ccx = cam.projX, ccy = cam.projY;
-    // Il punto da coprire è dove la figura viene *disegnata*, non dove sta: a
-    // piedi si stacca del 70% della proiezione, in auto di tutta.
-    const z = pl.onFoot ? 21 : 13 + (pl.vehicle.z || 0);
-    const k = pl.onFoot ? 0.7 : 1;
+    // Il punto da coprire è dove la figura viene *disegnata*, non dove sta:
+    // stessa altezza con cui `drawPlayer`/`drawVehicle` la proiettano.
+    const z = pl.onFoot
+      ? HERO_H
+      : VEHICLE_TYPES[pl.vehicle.kind].tall + (pl.vehicle.z || 0);
     const px = pl.onFoot ? pl.x : pl.vehicle.x;
     const py = pl.onFoot ? pl.y : pl.vehicle.y;
-    const f = (z / PROJ) * k;
+    const f = z / PROJ;
     const sx = px + (px - ccx) * f;
     const sy = py + (py - ccy) * f;
     const mine = (px - ccx) ** 2 + (py - ccy) ** 2;
@@ -433,12 +496,16 @@ export class Scene {
       ctx.ellipse(x + ox, y + oy, rx, ry, ang, 0, 6.2832);
       ctx.fill();
     };
+    // La quota dell'ombra è la stessa che estrude il volume: se le due si
+    // scostano, l'ombra si stacca dai piedi di quello che la proietta.
     for (const v of game.vehicles) {
       const s = VEHICLE_TYPES[v.kind];
-      drawShadow(v.x, v.y, s.len * 0.48, s.wid * 0.5, v.angle, 14 + (v.z || 0));
+      drawShadow(v.x, v.y, s.len * 0.48, s.wid * 0.5, v.angle, s.tall + (v.z || 0));
     }
-    for (const p of game.peds) drawShadow(p.x, p.y, 8, 7, 0, 20);
-    if (game.player.onFoot) drawShadow(game.player.x, game.player.y, 9, 8, 0, 20);
+    for (const p of game.peds) drawShadow(p.x, p.y, 8, 7, 0, p.dead ? 5 : PED_H);
+    if (game.player.onFoot) {
+      drawShadow(game.player.x, game.player.y, 9, 8, 0, game.player.dying ? 5 : HERO_H);
+    }
   }
 
   /**
@@ -808,12 +875,21 @@ export class Scene {
   drawVehicle(ctx, v, cam, game) {
     const spec = VEHICLE_TYPES[v.kind];
     // La quota entra nella stessa proiezione dei palazzi: è per questo che un
-    // elicottero a 300 px si vede spostato rispetto alla sua ombra.
-    const z = 13 + (v.z || 0);
-    const f = z / PROJ;
+    // elicottero si vede spostato rispetto alla sua ombra. Il volume però parte
+    // **dalla quota**, non da terra, o quell'elicottero avrebbe una colonna alta
+    // duecento pixel al posto della fusoliera: a terra `v.z` è zero e la base
+    // coincide con la pianta. Un rottame si è accasciato su sé stesso.
+    const tall = v.dead ? spec.tall * 0.6 : spec.tall;
+    const bf = (v.z || 0) / PROJ;
+    const f = ((v.z || 0) + tall) / PROJ;
+    const bx = (v.x - cam.projX) * bf;
+    const by = (v.y - cam.projY) * bf;
     const ox = (v.x - cam.projX) * f;
     const oy = (v.y - cam.projY) * f;
     const spr = v.dead ? getWreckSprite(v.kind) : getVehicleSprite(v.kind, v.colorIndex);
+    const cos = Math.cos(v.angle), sin = Math.sin(v.angle);
+
+    this.extrudeVehicle(ctx, v, spec, cos, sin, bx, by, ox - bx, oy - by);
 
     ctx.save();
     ctx.translate(v.x + ox, v.y + oy);
@@ -823,7 +899,6 @@ export class Scene {
 
     if (v.dead) return;
 
-    const cos = Math.cos(v.angle), sin = Math.sin(v.angle);
     if (spec.air) {
       this.drawRotors(ctx, v, spec, cam, game, v.x + ox, v.y + oy);
       return;
@@ -899,6 +974,44 @@ export class Scene {
       }
       ctx.restore();
     }
+  }
+
+  /**
+   * La carrozzeria, estrusa. Due piani e non uno: la scocca fino alla cintura e
+   * poi l'abitacolo, che è più corto e più stretto (`spec.cabin` è la stessa
+   * proporzione con cui lo sprite disegna il tetto). È quello scalino a far
+   * leggere un'auto come un'auto invece che come una scatola col disegno di
+   * un'auto sopra — e a distinguere una berlina da un furgone, che dall'alto
+   * hanno la stessa pianta.
+   *
+   * Barche e velivoli restano un piano solo: uno scafo non ha una cintura, e un
+   * elicottero lo si vede dal basso comunque perché vola.
+   */
+  extrudeVehicle(ctx, v, spec, cos, sin, bx, by, ox, oy) {
+    // La tinta del fianco si calcola una volta e resta sul mezzo, come l'ombra di
+    // un edificio resta in `b._shadow`: `shade` fa parsing di una stringa e ne
+    // costruisce una nuova, e sarebbero duecento chiamate per frame — fra mezzi e
+    // pedoni — per un valore che cambia solo quando l'auto diventa rottame.
+    if (!v._side || v._sideDead !== v.dead) {
+      const base = v.dead ? '#31343a' : vehicleColor(v.kind, v.colorIndex);
+      v._sideDead = v.dead;
+      v._side = [shade(base, -0.3), shade(base, -0.52)];
+    }
+    const col = v._side;
+    const belt = spec.marine || spec.air ? 1 : spec.box ? 0.86 : 0.56;
+    extrudeRect(ctx, v.x + bx, v.y + by, spec.len, spec.wid, cos, sin, ox * belt, oy * belt, col[0]);
+    if (belt === 1) return;
+
+    // L'abitacolo poggia sulla cintura, quindi la sua *pianta* è già spostata di
+    // tutta l'estrusione della scocca: da lì in su gli resta il resto.
+    const [c0, c1] = spec.cabin;
+    const cl = spec.len * (c1 - c0);
+    const cd = spec.len * ((c0 + c1) / 2 - 0.5);
+    extrudeRect(
+      ctx, v.x + bx + cos * cd + ox * belt, v.y + by + sin * cd + oy * belt,
+      cl, spec.wid * 0.74, cos, sin,
+      ox * (1 - belt), oy * (1 - belt), col[1]
+    );
   }
 
   /**
@@ -985,8 +1098,9 @@ export class Scene {
   }
 
   drawPed(ctx, p, cam, game) {
-    const z = 20;
-    const f = z / PROJ;
+    // Chi è a terra è a terra: un corpo steso non si proietta come uno in piedi,
+    // e senza questo resterebbe sospeso all'altezza in cui è stato colpito.
+    const f = (p.dead ? 5 : PED_H) / PROJ;
     const ox = (p.x - cam.projX) * f;
     const oy = (p.y - cam.projY) * f;
     const frame = p.dead ? 0 : Math.floor(p.animT) % PED_FRAMES;
@@ -1002,8 +1116,15 @@ export class Scene {
     } else if (p.dealer && !p.dead && p.turf) {
       this.drawDealerMark(ctx, p, cam, game);
     }
+    if (!p.dead) {
+      if (!p._side) {
+        const k = PED_KINDS[p.kind] || PED_KINDS.civil;
+        p._side = shade(k.coats[p.colorIndex % k.coats.length], -0.3);
+      }
+      this.extrudePerson(ctx, p.x, p.y, ox, oy, p._side);
+    }
     ctx.save();
-    ctx.translate(p.x + ox * 0.7, p.y + oy * 0.7);
+    ctx.translate(p.x + ox, p.y + oy);
     ctx.rotate(p.angle);
     if (p.dead) {
       ctx.globalAlpha = 0.95;
@@ -1025,6 +1146,20 @@ export class Scene {
       const uf = 34 / PROJ;
       this.drawUmbrella(ctx, p, (p.x - cam.projX) * uf, (p.y - cam.projY) * uf, rain);
     }
+  }
+
+  /**
+   * Il fianco di una persona. Due dischi spazzati: il corpo fino alle spalle e
+   * la testa sopra. Non è un dettaglio decorativo — con la camera piegata un
+   * pedone senza volume è una macchia dipinta sul marciapiede in mezzo a una
+   * città di scatole, e la differenza fra "in piedi" e "steso" smette di
+   * leggersi. Le tinte sono le stesse dello sprite visto da sopra, scurite:
+   * quello che si vede è un fianco, e un fianco non prende la luce dall'alto.
+   */
+  extrudePerson(ctx, x, y, ox, oy, col) {
+    // Fino alle spalle e basta: la testa è già coperta dallo sprite visto da
+    // sopra, e una capsula in meno per pedone sono cento path per frame.
+    extrudeDisc(ctx, x, y, 6.6, ox * 0.8, oy * 0.8, col);
   }
 
   /**
@@ -1108,16 +1243,22 @@ export class Scene {
   }
 
   drawPlayer(ctx, pl, cam, game) {
-    const z = 21;
-    const f = z / PROJ;
+    const f = (pl.dying ? 5 : HERO_H) / PROJ;
     const ox = (pl.x - cam.projX) * f;
     const oy = (pl.y - cam.projY) * f;
     const frame = pl.dying ? 0 : Math.floor(pl.animT) % PED_FRAMES;
     // Con un'arma da fuoco in pugno la posa cambia: braccia tese verso il mirino.
     const aiming = !pl.dying && !WEAPONS[pl.weapon].melee;
     const spr = getHeroSprite(frame, aiming ? 'aim' : 'walk', pl.outfit);
+    if (!pl.dying) {
+      if (pl._sideKit !== pl.outfit) {
+        pl._sideKit = pl.outfit;
+        pl._side = shade((HERO_OUTFITS[pl.outfit] || HERO_OUTFITS[0]).jacket, -0.3);
+      }
+      this.extrudePerson(ctx, pl.x, pl.y, ox, oy, pl._side);
+    }
     ctx.save();
-    ctx.translate(pl.x + ox * 0.7, pl.y + oy * 0.7);
+    ctx.translate(pl.x + ox, pl.y + oy);
     ctx.rotate(pl.angle);
     if (pl.dying) {
       ctx.globalAlpha = 0.95;

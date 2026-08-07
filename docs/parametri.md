@@ -28,6 +28,9 @@
 | **Inclinazione della camera** | `camera.TILT` | **0,42 rad (24°)** — 0 torna alla vista a picco. Da qui escono `TILT_COS` (0,913: schiacciamento del piano) e `TILT_LEAN` (393 px: quanto è a sud l'origine della proiezione). Un palazzo di 60 px si alza di 24 px al centro dello schermo |
 | Margine sud della query edifici | `scene.BUILD_PAD` | 85 px = `TILT_LEAN × 190 / PROJ`: l'apertura di una torre da 190 px |
 | Trasparenza del protagonista coperto | `scene.drawPlayerThrough` | alone 0,50 · sagoma 0,82 |
+| Altezza dei mezzi | `sprites.VEHICLE_TYPES[].tall` | 20 (scooter) … 50 (camion); `box: true` = scocca fino all'86% invece del 56% |
+| Altezza delle persone | `scene.PED_H` / `HERO_H` | 28 / 30 — i rapporti contano, non i metri: un uomo è 1,17 volte una berlina |
+| Scurimento dei fianchi | `scene.extrudeVehicle` / `extrudePerson` | scocca −0,30 · abitacolo −0,52 · corpo −0,30 |
 | Direzione/lunghezza ombre | `camera.SUN` | 0.5 / 0.66, scala 0.42 |
 | Larghezza carreggiate | `citygen.genLines` | boulevard 144, strada 76 |
 | Corsie | `roadgraph.laneOffset` | 18/54 (boulevard), 19 (strada) |

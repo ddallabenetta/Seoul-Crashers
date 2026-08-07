@@ -5,11 +5,11 @@ resta corto apposta.** Il contenuto vero sta in `docs/`, e si apre un documento 
 non tutti. Il `README.md` descrive il gioco e i comandi; qui c'è quello che serve a
 *sviluppare*. Avvio e vincoli stanno in `CLAUDE.md`, che si carica da solo.
 
-Ultimo aggiornamento: **la camera si è piegata** (§5.21) — Seoul non si guarda più a picco, si
-guarda da 24°, come in *Chinatown Wars*. Prima: menu iniziale, musica e autosave (§5.18-5.20),
-salvataggio, arresto e lamiera solida (§5.15-5.17), audio e radio (§5.13-5.14), il giro di
-arretrati (§5.12), il ciclo giorno-notte (§5.11), il traffico (§5.10), la mappa (§5.9), i
-negozi (§5.8).
+Ultimo aggiornamento: **la camera si è piegata a 24°** come in *Chinatown Wars* (§5.21), e
+**mezzi e persone sono diventati volumi** (§5.22) invece di figurine piatte in mezzo a una
+città di scatole. Prima: menu, musica e autosave (§5.18-5.20), salvataggio, arresto e lamiera
+(§5.15-5.17), audio e radio (§5.13-5.14), arretrati (§5.12), giorno-notte (§5.11), traffico
+(§5.10), mappa (§5.9), negozi (§5.8).
 
 > 📌 **Da concordare con l'utente prima di scrivere codice:** della Fase 3 restano le
 > **missioni**, che sono il lavoro grosso e pieno di scelte di design (quante, come si
@@ -56,6 +56,7 @@ commenti resta valido: si risolve qui.
 | §5.15–5.17 Salvataggio, arresto, lamiera | `docs/storico/08-salvataggio-arresto-lamiera.md` |
 | §5.18–5.20 Menu, musica, autosave | `docs/storico/09-menu-musica-autosave.md` |
 | §5.21 Vista piegata | `docs/storico/10-vista-piegata.md` |
+| §5.22 Volumi di mezzi e persone | `docs/storico/11-volumi-di-mezzi-e-persone.md` |
 | §6 Backlog | `docs/backlog.md` |
 | §8 Parametri | `docs/parametri.md` |
 | §9 Strumenti (`.claude/`) | `docs/strumenti.md` |
@@ -68,9 +69,10 @@ Web game d'azione top-down 2.5D ambientato a Seoul, stile *GTA: Chinatown Wars*.
 Canvas 2D puro, moduli ES nativi, **zero dipendenze, nessun build step**. Tutta la grafica
 (sprite, facciate, terreno, mappa) è generata da codice a runtime: non esistono asset esterni.
 
-**E la si guarda da storto** (§5.21): la camera è inclinata di 24°, i volumi si aprono da un
-punto che sta *sotto* il bordo basso dello schermo, e di ogni palazzo si legge la facciata sud
-— cioè le insegne. Un angolo solo (`camera.TILT`), e a 0 si torna alla vista a picco di prima.
+**E la si guarda da storto** (§5.21): camera inclinata di 24°, volumi che si aprono da un punto
+*sotto* il bordo basso dello schermo, e di ogni palazzo si legge la facciata sud — le insegne.
+Un angolo solo (`camera.TILT`), a 0 si torna a picco. **Volumi** vuol dire tutto: anche auto e
+persone hanno un fianco (§5.22). L'arredo urbano no, ed è l'unica cosa rimasta piatta.
 
 Stato: **Fase 1, Fase 1.5, Fase 2 (tutte e tre le tappe) e le prime tre tappe della Fase 3
 completate e collaudate**, più la revisione della guida AI del traffico (§5.10), il giro di
@@ -115,10 +117,10 @@ l'aeroporto di Gimpo e il porto di Incheon sulla costa e la campagna in mezzo; a
 sud le colline. Si vola (elicottero, turboelica) e si naviga (motoscafo, battello); in acqua
 si annega e le auto affondano. Sei territori di bande occupano cortili, piazzali e capannoni.
 
-La Fase 2 era divisa in tre tappe, concordate con l'utente: **A** combattimento base,
-**B** polizia e ricercato a 5 livelli, **C** armi pesanti ed esplosivi. **Sono tutte fatte.**
-La Fase 3 (contenuti) è cominciata da **negozi e interni** (§5.8), poi la mappa (§5.9) e il
-ciclo giorno-notte (§5.11); il §5.12 ha chiuso gli arretrati. **Restano le missioni**, §6.
+La Fase 2 era in tre tappe concordate con l'utente — **A** combattimento, **B** polizia e
+ricercato, **C** armi pesanti — e **sono tutte fatte**. La Fase 3 (contenuti) è cominciata da
+negozi e interni (§5.8), mappa (§5.9), giorno-notte (§5.11); il §5.12 ha chiuso gli arretrati.
+**Restano le missioni**, §6.
 
 ---
 

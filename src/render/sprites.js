@@ -58,39 +58,52 @@ function sprite(key, w, h, draw) {
 // ---------------------------------------------------------------------------
 // VEICOLI
 // ---------------------------------------------------------------------------
+// `tall` è l'altezza del volume in pixel di mondo, e `box` dice se il mezzo è una
+// scatola (la scocca sale quasi fino al tetto) o ha un abitacolo che fa scalino.
+// Non servono alla fisica: servono a `scene.drawVehicle` per estrudere la
+// carrozzeria nella stessa proiezione dei palazzi (§5.22) — con la camera piegata
+// un mezzo senza volume resta una figurina stampata sull'asfalto in mezzo a una
+// città di scatole.
+//
+// Le altezze **non** escono da PX_PER_M ma dalla scala di pianta di ogni mezzo
+// (`len` diviso la lunghezza vera): una berlina è 78 px per 4,6 m, cioè 17 px/m e
+// non 12. Le carrozzerie sono disegnate un 40% più grandi del vero perché a
+// schermo si leggano, e un'altezza in scala reale sopra una pianta esagerata dà
+// un mezzo schiacciato. Quello che deve tornare sono i **rapporti**: un uomo è
+// 1,17 volte una berlina, qui 28 contro 24.
 export const VEHICLE_TYPES = {
-  hatch:   { len: 66, wid: 30, mass: 0.85, topSpeed: 300, accel: 235, grip: 1.02, hp: 100, cabin: [0.30, 0.66], label: 'utilitaria' },
-  sedan:   { len: 78, wid: 32, mass: 1.0,  topSpeed: 330, accel: 220, grip: 1.0,  hp: 115, cabin: [0.30, 0.62], label: 'berlina' },
-  taxi:    { len: 78, wid: 32, mass: 1.0,  topSpeed: 325, accel: 225, grip: 1.0,  hp: 115, cabin: [0.30, 0.62], label: 'taxi' },
-  suv:     { len: 88, wid: 36, mass: 1.35, topSpeed: 315, accel: 205, grip: 0.94, hp: 155, cabin: [0.28, 0.68], label: 'suv' },
-  sport:   { len: 80, wid: 34, mass: 0.95, topSpeed: 440, accel: 300, grip: 1.12, hp: 100, cabin: [0.32, 0.58], label: 'sportiva' },
-  van:     { len: 96, wid: 36, mass: 1.5,  topSpeed: 280, accel: 175, grip: 0.9,  hp: 175, cabin: [0.52, 0.86], label: 'furgone' },
-  truck:   { len: 132, wid: 40, mass: 2.4, topSpeed: 250, accel: 140, grip: 0.82, hp: 240, cabin: [0.62, 0.92], label: 'camion' },
-  bus:     { len: 158, wid: 41, mass: 2.8, topSpeed: 235, accel: 125, grip: 0.78, hp: 280, cabin: [0.0, 1.0], label: 'autobus' },
-  scooter: { len: 44, wid: 17, mass: 0.4,  topSpeed: 290, accel: 260, grip: 1.05, hp: 45,  cabin: [0.3, 0.6], label: 'scooter' },
-  police:  { len: 82, wid: 34, mass: 1.1,  topSpeed: 380, accel: 260, grip: 1.06, hp: 150, cabin: [0.30, 0.62], label: 'volante' },
-  swat:    { len: 100, wid: 38, mass: 1.9, topSpeed: 320, accel: 200, grip: 0.95, hp: 260, cabin: [0.55, 0.88], label: 'furgone SWAT' },
-  tractor: { len: 80, wid: 40, mass: 1.9,  topSpeed: 135, accel: 105, grip: 0.84, hp: 190, cabin: [0.24, 0.6], label: 'trattore' },
+  hatch:   { len: 66, wid: 30, tall: 24, mass: 0.85, topSpeed: 300, accel: 235, grip: 1.02, hp: 100, cabin: [0.30, 0.66], label: 'utilitaria' },
+  sedan:   { len: 78, wid: 32, tall: 24, mass: 1.0,  topSpeed: 330, accel: 220, grip: 1.0,  hp: 115, cabin: [0.30, 0.62], label: 'berlina' },
+  taxi:    { len: 78, wid: 32, tall: 25, mass: 1.0,  topSpeed: 325, accel: 225, grip: 1.0,  hp: 115, cabin: [0.30, 0.62], label: 'taxi' },
+  suv:     { len: 88, wid: 36, tall: 30, mass: 1.35, topSpeed: 315, accel: 205, grip: 0.94, hp: 155, cabin: [0.28, 0.68], label: 'suv' },
+  sport:   { len: 80, wid: 34, tall: 21, mass: 0.95, topSpeed: 440, accel: 300, grip: 1.12, hp: 100, cabin: [0.32, 0.58], label: 'sportiva' },
+  van:     { len: 96, wid: 36, tall: 38, mass: 1.5,  topSpeed: 280, accel: 175, grip: 0.9,  hp: 175, box: true, cabin: [0.52, 0.86], label: 'furgone' },
+  truck:   { len: 132, wid: 40, tall: 50, mass: 2.4, topSpeed: 250, accel: 140, grip: 0.82, hp: 240, box: true, cabin: [0.62, 0.92], label: 'camion' },
+  bus:     { len: 158, wid: 41, tall: 46, mass: 2.8, topSpeed: 235, accel: 125, grip: 0.78, hp: 280, box: true, cabin: [0.0, 1.0], label: 'autobus' },
+  scooter: { len: 44, wid: 17, tall: 20, mass: 0.4,  topSpeed: 290, accel: 260, grip: 1.05, hp: 45,  cabin: [0.3, 0.6], label: 'scooter' },
+  police:  { len: 82, wid: 34, tall: 26, mass: 1.1,  topSpeed: 380, accel: 260, grip: 1.06, hp: 150, cabin: [0.30, 0.62], label: 'volante' },
+  swat:    { len: 100, wid: 38, tall: 44, mass: 1.9, topSpeed: 320, accel: 200, grip: 0.95, hp: 260, box: true, cabin: [0.55, 0.88], label: 'furgone SWAT' },
+  tractor: { len: 80, wid: 40, tall: 42, mass: 1.9,  topSpeed: 135, accel: 105, grip: 0.84, hp: 190, box: true, cabin: [0.24, 0.6], label: 'trattore' },
 
   // Velivoli. `air` è il tipo di sostentamento: 'rotor' sale da fermo, 'wing'
   // pretende di aver preso velocità sulla pista (`rotate`). `ceiling` è la quota
   // massima, `climb` quanti px/s si guadagnano tenendo premuto.
   heli:    {
-    len: 100, wid: 34, mass: 1.7, topSpeed: 460, accel: 190, grip: 1.5, hp: 210,
+    len: 100, wid: 34, tall: 30, mass: 1.7, topSpeed: 460, accel: 190, grip: 1.5, hp: 210,
     cabin: [0.46, 0.9], label: 'elicottero', air: 'rotor', climb: 130, ceiling: 400, rotor: 56,
   },
   plane:   {
-    len: 132, wid: 96, mass: 2.1, topSpeed: 620, accel: 175, grip: 2.4, hp: 190,
+    len: 132, wid: 96, tall: 40, mass: 2.1, topSpeed: 620, accel: 175, grip: 2.4, hp: 190,
     cabin: [0.5, 0.86], label: 'turboelica', air: 'wing', climb: 105, ceiling: 460, rotate: 250,
   },
   // Imbarcazioni. `marine` significa: galleggia, l'asfalto la ferma come un muro,
   // e il grip laterale bassissimo è quello che fa scarrocciare la poppa in virata.
-  boat:    { len: 90, wid: 30, mass: 1.0, topSpeed: 400, accel: 165, grip: 0.34, hp: 130, cabin: [0.24, 0.6], label: 'motoscafo', marine: true },
-  ferry:   { len: 154, wid: 54, mass: 3.4, topSpeed: 215, accel: 82, grip: 0.26, hp: 340, cabin: [0.34, 0.68], label: 'battello', marine: true },
+  boat:    { len: 90, wid: 30, tall: 24, mass: 1.0, topSpeed: 400, accel: 165, grip: 0.34, hp: 130, cabin: [0.24, 0.6], label: 'motoscafo', marine: true },
+  ferry:   { len: 154, wid: 54, tall: 34, mass: 3.4, topSpeed: 215, accel: 82, grip: 0.26, hp: 340, cabin: [0.34, 0.68], label: 'battello', marine: true },
   // Motovedetta della polizia. Più lenta del motoscafo civile ma più robusta: in
   // acqua non ci sono vicoli in cui infilarsi, e se ti raggiungesse in dieci
   // secondi la fuga in barca smetterebbe di essere una fuga.
-  patrol:  { len: 104, wid: 34, mass: 1.4, topSpeed: 355, accel: 150, grip: 0.33, hp: 190, cabin: [0.24, 0.62], label: 'motovedetta', marine: true },
+  patrol:  { len: 104, wid: 34, tall: 28, mass: 1.4, topSpeed: 355, accel: 150, grip: 0.33, hp: 190, cabin: [0.24, 0.62], label: 'motovedetta', marine: true },
 };
 
 export const VEHICLE_COLORS = [
@@ -550,20 +563,28 @@ function drawBoatHull(g, w, h, color, big) {
   g.beginPath(); g.arc(w * 0.86, h * 0.76, 2.2, 0, 6.2832); g.fill();
 }
 
+/**
+ * Tinta della carrozzeria. Sta fuori da `getVehicleSprite` perché la usa anche
+ * `scene.extrudeVehicle` per i fianchi: se le due si scostassero, un mezzo
+ * avrebbe il tetto di un colore e le fiancate di un altro.
+ */
+export function vehicleColor(kind, colorIndex = 0) {
+  if (kind === 'taxi') return ['#d98f2b', '#c3c8cf', '#2f5f9e'][colorIndex % 3];
+  if (kind === 'bus') return ['#2f6fb5', '#3f8f5a', '#c9a13c'][colorIndex % 3];
+  if (kind === 'police' || kind === 'patrol') return '#e8ecf2';
+  if (kind === 'swat') return '#2b3138';
+  if (kind === 'truck') return ['#7b8288', '#4a5560', '#8f6a42'][colorIndex % 3];
+  if (kind === 'tractor') return ['#3f7a3a', '#b5502a', '#c9a13c'][colorIndex % 3];
+  if (kind === 'heli') return ['#2f3b48', '#8a2f2f', '#3f5a3a'][colorIndex % 3];
+  if (kind === 'plane') return ['#dfe4ea', '#c8ccd2', '#9fb3c8'][colorIndex % 3];
+  if (kind === 'boat') return ['#e8ecf0', '#2f5f9e', '#c9d0d8'][colorIndex % 3];
+  if (kind === 'ferry') return ['#4a6a86', '#5c6660', '#8a7a5a'][colorIndex % 3];
+  return VEHICLE_COLORS[colorIndex % VEHICLE_COLORS.length];
+}
+
 export function getVehicleSprite(kind, colorIndex = 0) {
   const spec = VEHICLE_TYPES[kind] || VEHICLE_TYPES.sedan;
-  let color = VEHICLE_COLORS[colorIndex % VEHICLE_COLORS.length];
-  if (kind === 'taxi') color = ['#d98f2b', '#c3c8cf', '#2f5f9e'][colorIndex % 3];
-  if (kind === 'bus') color = ['#2f6fb5', '#3f8f5a', '#c9a13c'][colorIndex % 3];
-  if (kind === 'police') color = '#e8ecf2';
-  if (kind === 'swat') color = '#2b3138';
-  if (kind === 'truck') color = ['#7b8288', '#4a5560', '#8f6a42'][colorIndex % 3];
-  if (kind === 'tractor') color = ['#3f7a3a', '#b5502a', '#c9a13c'][colorIndex % 3];
-  if (kind === 'heli') color = ['#2f3b48', '#8a2f2f', '#3f5a3a'][colorIndex % 3];
-  if (kind === 'plane') color = ['#dfe4ea', '#c8ccd2', '#9fb3c8'][colorIndex % 3];
-  if (kind === 'boat') color = ['#e8ecf0', '#2f5f9e', '#c9d0d8'][colorIndex % 3];
-  if (kind === 'ferry') color = ['#4a6a86', '#5c6660', '#8a7a5a'][colorIndex % 3];
-  if (kind === 'patrol') color = '#e8ecf2';
+  const color = vehicleColor(kind, colorIndex);
 
   const key = `veh:${kind}:${colorIndex}`;
   const pad = 4;

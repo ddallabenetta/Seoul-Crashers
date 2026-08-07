@@ -220,6 +220,11 @@ Alcune scelte tecniche che spiegano il risultato a schermo:
   si legge la facciata sud, con le insegne: la vista di *Chinatown Wars*, ottenuta spostando
   un'origine invece di aggiungere una dimensione. Un palazzo a sud può coprire il
   protagonista, ed è corretto — in quel caso la sua sagoma si ridisegna in trasparenza sopra.
+- **Anche le auto e la gente hanno un fianco.** Nella stessa proiezione dei palazzi: un mezzo è
+  estruso su due piani (scocca e abitacolo, e lo sprite visto dall'alto fa da tetto), una
+  persona su una capsula fino alle spalle. Le altezze non sono in scala metrica ma in scala col
+  *disegno*, che è più grande del vero perché a schermo si legga; quello che torna sono i
+  rapporti, e un uomo resta 1,17 volte una berlina.
 - **Terreno a tile.** Asfalto, marciapiedi, segnaletica e fiume sono pre-renderizzati in
   riquadri da 512 px con cache LRU: una mappa 5400×5400 non si ridisegna ogni frame.
 - **Maglia stradale irregolare.** Le vie non sono una scacchiera: ogni linea esiste o no
