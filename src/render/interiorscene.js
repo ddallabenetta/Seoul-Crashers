@@ -25,6 +25,12 @@ export class InteriorScene {
     const f = game.shops.floor;
     const pal = f.biz.pal;
 
+    // Dentro, la camera torna a picco: il nadir della vista piegata sta 390 px a
+    // sud, cioè più in là del muro di fondo di qualunque stanza, e il muro sud si
+    // aprirebbe sopra tutta la pianta invece che verso fuori. Lo schiacciamento
+    // del piano resta — è la stessa camera, e un interno che si sgonfia sulla
+    // soglia si vede.
+    cam.lean = 0;
     cam.applyUI(ctx);
     ctx.fillStyle = '#07080a';
     ctx.fillRect(0, 0, cam.viewW, cam.viewH);
@@ -49,7 +55,7 @@ export class InteriorScene {
     // Ordinamento radiale: lontano dal centro camera = lontano dall'occhio.
     const list = this.list;
     list.length = 0;
-    const ccx = cam.cx, ccy = cam.cy;
+    const ccx = cam.projX, ccy = cam.projY;
     for (const w of f.walls) list.push({ t: 0, o: w, d: (w.x + w.w / 2 - ccx) ** 2 + (w.y + w.h / 2 - ccy) ** 2 });
     for (const o of f.furni) list.push({ t: 1, o, d: (o.x + o.w / 2 - ccx) ** 2 + (o.y + o.h / 2 - ccy) ** 2 });
     for (const p of f.people) list.push({ t: 2, o: p, d: (p.x - ccx) ** 2 + (p.y - ccy) ** 2 });
@@ -251,8 +257,8 @@ export class InteriorScene {
     const body = spec.color || pal.trim;
     drawBox(ctx, o, cam, o.z, body, spec.top || shade(body, 0.2));
     const f = o.z / PROJ;
-    const rx = o.x + (o.x + o.w / 2 - cam.cx) * f;
-    const ry = o.y + (o.y + o.h / 2 - cam.cy) * f;
+    const rx = o.x + (o.x + o.w / 2 - cam.projX) * f;
+    const ry = o.y + (o.y + o.h / 2 - cam.projY) * f;
     if (spec.detail) {
       ctx.save();
       spec.detail(ctx, rx, ry, o.w, o.h, pal, game);
@@ -287,8 +293,8 @@ function face(ctx, ax, ay, bx, by, ox, oy, color) {
  */
 function drawBox(ctx, o, cam, z, sideColor, topColor) {
   const f = z / PROJ;
-  const ox = (o.x + o.w / 2 - cam.cx) * f;
-  const oy = (o.y + o.h / 2 - cam.cy) * f;
+  const ox = (o.x + o.w / 2 - cam.projX) * f;
+  const oy = (o.y + o.h / 2 - cam.projY) * f;
   const dark = shade(sideColor, -0.3);
   const lit = shade(sideColor, 0.12);
   if (oy < -0.5) face(ctx, o.x, o.y + o.h, o.x + o.w, o.y + o.h, ox, oy, dark);

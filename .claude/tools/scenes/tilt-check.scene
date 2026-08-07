@@ -1,0 +1,130 @@
+// Camera piegata (§5.21): verifica che il mirino punti ancora dove punta il
+// cursore. È la sola cosa che l'inclinazione può rompere in modo invisibile —
+// una vista storta si guarda in uno screenshot, una mira storta no: sbaglia di
+// pochi pixel, cresce con la distanza dal centro, e a schermo sembra soltanto
+// che l'arma disperda.
+//
+//   node .claude/tools/probe.mjs --seconds 0 --quiet \
+//     --script .claude/tools/scenes/tilt-check.scene
+//
+// Le tre trasformazioni della camera devono essere la stessa cosa, e sono
+// scritte in tre posti diversi: `apply` (quella che disegna, sul contesto),
+// `worldToScreen` (quella che l'HUD usa per ancorare i segni al mondo) e
+// `screenToWorld` (quella con cui si mira). Toccarne una sola è il modo tipico
+// di rompere la mira, e nessuno screenshot lo mostra.
+//
+//   disegno_vs_hud_px   `apply` contro `worldToScreen`, su nove punti
+//   andata_ritorno_px   `worldToScreen` contro `screenToWorld`, sugli stessi
+//   mira_errore_px      il punto di mira del giocatore contro il punto di mondo
+//                       su cui è stato messo il cursore: è la catena vera,
+//                       input → camera → `player.aimX/aimY`
+//   colpito             e un colpo che parte davvero, contro un bersaglio
+//                       inchiodato sul posto. Arma automatica: `mouse.down`
+//                       scritto a mano non alza `mouse.pressed` (§4).
+// Estensione `.scene` e non `.js` perché è il corpo di una funzione async.
+const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
+const { TILT, TILT_COS, TILT_LEAN } = await import('/src/render/camera.js');
+const { rayCast } = await import('/src/entities/weapons.js');
+const cam = game.camera;
+const pl = game.player;
+const F = [0.12, 0.5, 0.88];
+
+// --- le tre trasformazioni ---------------------------------------------------
+// `apply` include il DPR, `worldToScreen` no: si confrontano in pixel CSS.
+const probe = document.createElement('canvas').getContext('2d');
+cam.apply(probe);
+const m = probe.getTransform();
+let drawErr = 0;
+let worst = 0;
+for (const fx of F) {
+  for (const fy of F) {
+    const sx = cam.viewW * fx;
+    const sy = cam.viewH * fy;
+    const w = cam.screenToWorld(sx, sy);
+    const s = cam.worldToScreen(w.x, w.y);
+    worst = Math.max(worst, Math.abs(s.x - sx), Math.abs(s.y - sy));
+    const dx = (m.a * w.x + m.c * w.y + m.e) / cam.dpr;
+    const dy = (m.b * w.x + m.d * w.y + m.f) / cam.dpr;
+    drawErr = Math.max(drawErr, Math.abs(dx - s.x), Math.abs(dy - s.y));
+  }
+}
+
+// --- la mira, dalla catena vera ----------------------------------------------
+// Il giocatore va su un marciapiede noto e la camera ci arriva di colpo: una
+// camera smorzata falsa la conversione mondo→schermo di un istante prima (§4).
+const spot = game.city.hospitals[0];
+pl.x = spot.x;
+pl.y = spot.y;
+pl.hp = 1e6;
+pl.giveWeapon('smg', 600);
+pl.setWeapon('smg');
+cam.snapTo(pl.x, pl.y);
+await wait(0.3);
+
+// Il punto atteso si ricalcola **dopo** l'attesa: fra un frame e l'altro lo zoom
+// si smorza ancora verso il suo bersaglio, e un punto di mondo calcolato prima
+// non è più quello di adesso. Quello che resta è un frame di scarto.
+let aimErr = 0;
+for (const fx of F) {
+  for (const fy of F) {
+    const sx = cam.viewW * fx;
+    const sy = cam.viewH * fy;
+    game.input.mouse.x = sx;
+    game.input.mouse.y = sy;
+    await wait(0.06);
+    const w = cam.screenToWorld(sx, sy);
+    aimErr = Math.max(aimErr, Math.hypot(pl.aimX - w.x, pl.aimY - w.y));
+  }
+}
+
+// --- e un colpo vero ---------------------------------------------------------
+// Il bersaglio si sceglie fra i pochi punti con linea di tiro libera (fra i
+// palazzi e le auto in sosta di un marciapiede non ce ne sono molti) e poi si
+// inchioda: un pedone cammina, e in mezzo secondo di raffica esce dal cono.
+const mark = game.peds.find((p) => !p.dead && !p.cop);
+let target = null;
+mark.hp = 4000;
+mark.panic = 0;
+for (let r = 320; r >= 120 && !target; r -= 100) {
+  for (let i = 0; i < 16 && !target; i++) {
+    const a = (i * Math.PI) / 8;
+    mark.x = pl.x + Math.cos(a) * r;
+    mark.y = pl.y + Math.sin(a) * r;
+    await wait(0.034);
+    const rc = rayCast(game, pl.x, pl.y, Math.cos(a), Math.sin(a), 520, pl);
+    if (rc.hit === mark) target = [Math.cos(a) * r, Math.sin(a) * r];
+  }
+}
+let dmg = -1;
+if (target) {
+  const pin = setInterval(() => {
+    mark.x = pl.x + target[0];
+    mark.y = pl.y + target[1];
+    mark.hp = Math.max(mark.hp, 1000);
+  }, 16);
+  const s = cam.worldToScreen(pl.x + target[0], pl.y + target[1]);
+  game.input.mouse.x = s.x;
+  game.input.mouse.y = s.y;
+  await wait(0.2);
+  const before = mark.hp;
+  game.input.mouse.down = true;
+  await wait(0.5);
+  game.input.mouse.down = false;
+  dmg = before - mark.hp;
+  clearInterval(pin);
+}
+
+return {
+  angolo_gradi: +((TILT * 180) / Math.PI).toFixed(1),
+  schiacciamento: +TILT_COS.toFixed(3),
+  nadir_px: Math.round(TILT_LEAN),
+  nadir_attivo: Math.round(cam.projY - cam.cy),
+  alzata_palazzo_60px: +(60 * Math.sin(TILT)).toFixed(1),
+  disegno_vs_hud_px: +drawErr.toFixed(4),
+  andata_ritorno_px: +worst.toFixed(4),
+  mira_errore_px: +aimErr.toFixed(3),
+  bersaglio: target,
+  colpito: dmg > 0,
+  danno: dmg,
+  fps: game.loop.fps,
+};

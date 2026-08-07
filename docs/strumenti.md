@@ -56,6 +56,7 @@ e un `return` a livello di file lo farebbe fallire.
 | `daylight-sweep.scene` | la luce ora per ora su tutto il giro, più quattro campioni col temporale. Serve a vedere in una tabella quello che altrimenti vuole ventiquattro screenshot: tinta, velo caldo, lampioni, ombre, popolamento |
 | `audio-census.scene` | **livelli veri dell'audio**: un analizzatore sul master dà rms e picco di ogni scenario (ambiente, temporale, motore, caccia) e il picco di ogni arma, più voci vive e costo in ms. È l'unico modo di bilanciare senza una cassa, ed è quello che ha trovato l'ambiente tarato tre volte troppo alto (§5.13) |
 | `music-census.scene` | **livello e regia della musica** (§5.19): rms e picco del tema e della caccia ai due gradini di stelle, e la verifica che il pezzo *taccia* dove deve — in strada da puliti e con la radio accesa. Va lanciata con `--menu`, o il tema non suona |
+| `tilt-check.scene` | **che il mirino punti dove punta il cursore** (§5.21). La camera piegata è scritta in tre trasformazioni — `apply`, `worldToScreen`, `screenToWorld` — e cambiarne una sola non si vede in nessuno screenshot: sbaglia di pochi pixel, l'errore cresce col raggio, e a schermo sembra soltanto che l'arma disperda. Le confronta fra loro, poi manda un colpo vero mirato col cursore. Da rilanciare dopo ogni modifica a `camera.js` |
 
 ⚠️ **Una misura alla volta.** La scena cambia zona a tempo di *orologio*, non di simulazione:
 due censimenti che girano insieme sulla stessa macchina si rubano la CPU e i teletrasporti

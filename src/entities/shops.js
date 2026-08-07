@@ -46,6 +46,7 @@ import { createPed, canDeal } from './pedestrians.js';
 import { WEAPONS, shoot, hasLineOfSight } from './weapons.js';
 import { buildInterior, BUSINESSES, bizOpenAt, clockLabel, crowdAt, rushAt } from '../world/interiors.js';
 import { HERO_OUTFITS, VEHICLE_COLORS, VEHICLE_TYPES } from '../render/sprites.js';
+import { TILT_COS } from '../render/camera.js';
 
 const DOOR_REACH = 34;   // quanto ci si deve avvicinare alla porta dalla strada
 const DESK_REACH = 54;   // raggio del bancone: comprare e rapinare
@@ -453,7 +454,9 @@ export class ShopSystem {
   roomZoom(cam) {
     const f = this.floor;
     if (!f) return 1.12;
-    return clamp(Math.min(cam.viewW / (f.w + 130), cam.viewH / (f.h + 130)), 1.15, 2.6);
+    // Il piano di terra è schiacciato da TILT_COS anche dentro: senza dividerlo,
+    // il fit verticale è più largo del vero e la stanza resta piccola in mezzo.
+    return clamp(Math.min(cam.viewW / (f.w + 130), (cam.viewH / TILT_COS) / (f.h + 130)), 1.15, 2.6);
   }
 
   // --- ingresso e uscita ------------------------------------------------------

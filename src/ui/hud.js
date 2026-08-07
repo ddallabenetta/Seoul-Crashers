@@ -4,6 +4,7 @@ import { MAP_SIZE } from '../world/maptexture.js';
 import { VEHICLE_TYPES, getHeroPortrait, getWeaponIcon } from '../render/sprites.js';
 import { WEAPONS, WEAPON_SLOTS } from '../entities/weapons.js';
 import { won } from '../entities/shops.js';
+import { TILT_COS } from '../render/camera.js';
 
 const MINIMAP = 196;
 const MINIMAP_WORLD = 1000; // porzione di mondo inquadrata
@@ -471,7 +472,10 @@ export class Hud {
       ctx.strokeStyle = spec.fire ? 'rgba(255,140,60,0.55)' : 'rgba(255,90,70,0.5)';
       ctx.lineWidth = 1.4;
       ctx.beginPath();
-      ctx.arc(s.x, s.y, r, 0, 6.2832);
+      // Il raggio dello scoppio è un cerchio *per terra*: con la camera piegata
+      // si vede come un'ellisse, come tutto il resto che sta a terra. Disegnarlo
+      // tondo lo farebbe promettere più gittata di quanta ne ha verso il fondo.
+      ctx.ellipse(s.x, s.y, r, r * TILT_COS, 0, 0, 6.2832);
       ctx.stroke();
       ctx.restore();
     }

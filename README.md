@@ -208,11 +208,18 @@ src/
 Alcune scelte tecniche che spiegano il risultato a schermo:
 
 - **Profondità 2.5D.** Ogni volume viene proiettato verso l'esterno dello schermo in
-  proporzione alla propria altezza (`offset = (pos − camera) · h / 880`). Le facciate restano
+  proporzione alla propria altezza (`offset = (pos − nadir) · h / 880`). Le facciate restano
   parallelogrammi, quindi si possono texturizzare con una singola trasformazione affine del
   contesto: un `fillRect` col gradiente della tinta + un overlay di finestre riusabile per
-  tutte le tinte. Gli oggetti alti vengono ordinati per distanza radiale dal centro camera e
-  disegnati dal più lontano al più vicino.
+  tutte le tinte. Gli oggetti alti vengono ordinati per distanza radiale e disegnati dal più
+  lontano al più vicino.
+- **La camera è piegata di 24°**, non a picco. Sono due conseguenze di un angolo solo: il
+  piano di terra si schiaccia di `cos θ`, e il punto da cui i volumi si aprono — il nadir, il
+  terreno sotto l'occhio — si sposta di `880 · tan θ` verso il basso dello schermo, cioè fuori
+  dall'inquadratura. Il risultato è che tutta la città si apre verso l'alto e di ogni palazzo
+  si legge la facciata sud, con le insegne: la vista di *Chinatown Wars*, ottenuta spostando
+  un'origine invece di aggiungere una dimensione. Un palazzo a sud può coprire il
+  protagonista, ed è corretto — in quel caso la sua sagoma si ridisegna in trasparenza sopra.
 - **Terreno a tile.** Asfalto, marciapiedi, segnaletica e fiume sono pre-renderizzati in
   riquadri da 512 px con cache LRU: una mappa 5400×5400 non si ridisegna ogni frame.
 - **Maglia stradale irregolare.** Le vie non sono una scacchiera: ogni linea esiste o no

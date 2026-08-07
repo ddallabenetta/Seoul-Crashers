@@ -107,6 +107,11 @@ codice spiega il perché nel punto giusto.
 | **In una prova scriptata** il giocatore non risponde a niente | il menu iniziale è ancora a schermo: `player.update` non viene chiamato finché `game.started` è falso (§5.18) | `probe.mjs` apre la pagina con `?autostart=1`; a mano si chiama `game.start(false)` |
 | **In una prova scriptata** la musica della caccia si spegne da sola a metà misura | a cinque stelle la SWAT stende il giocatore, `player.dying` diventa vero e la regia toglie il pezzo | `pl.hp = 1e6` mentre si misura, come già serviva per il ricercato |
 | Uno stacco musicale non si sente proprio dove serviva | il bus del pezzo è a zero (è lì che la musica tace): quello che ci passa dentro esce a volume zero | `music.stings`, un bus che non sfuma mai, separato da `music.bus` |
+| La mira sbaglia sempre di più allontanandosi dal centro | `apply` schiacciava il piano di terra e `screenToWorld` no: sono tre trasformazioni scritte in tre posti (`apply`, `worldToScreen`, `screenToWorld`) e vanno cambiate tutte e tre | `camera.js`, e `tilt-check.scene` le confronta fra loro (§9) |
+| Le auto compaiono in campo visivo dopo aver piegato la camera | `bounds()` restituiva il rettangolo di prima, ma lo schermo schiacciato ne inquadra il 9% in più in verticale: l'anello di streaming cadeva dentro l'inquadratura | `camera.bounds`, `viewH / (2 · zoom · TILT_COS)` |
+| Entrando in un negozio il muro di fondo copre tutta la pianta | il nadir della vista piegata sta 393 px a sud, cioè più in là del muro di una stanza profonda 300 | `InteriorScene.render`, `cam.lean = 0` — lo schiacciamento resta, l'apertura no |
+| Il protagonista sparisce dietro al palazzo che ha appena superato | è l'inclinazione, e l'ordine di disegno è corretto: quel volume è più vicino all'occhio | `scene.drawPlayerThrough`, sagoma in trasparenza; l'ordine non si tocca |
+| I palazzi compaiono a scatti sul bordo basso dello schermo | con la camera piegata un volume si apre verso l'alto anche al centro: chi ha la pianta appena sotto il bordo ha il tetto dentro | `scene.BUILD_PAD`, margine in più **solo verso sud** (allargarlo tutt'intorno costa il 28% di edifici disegnati) |
 
 Regola generale emersa: **prima di dare la colpa all'AI, verifica la geometria.** Quasi tutti
 gli "stalli dell'AI" erano problemi di ingombri, corsie o posizionamento.

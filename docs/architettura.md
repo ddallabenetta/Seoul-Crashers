@@ -73,19 +73,45 @@ src/ui/
 ## 3. Concetti da conoscere prima di toccare qualcosa
 
 **Proiezione 2.5D.** `PROJ = 880` in `camera.js`. Un punto ad altezza `z` viene disegnato con
-offset `(pos − camera) * z / PROJ`, **lineare in z**, non prospettico. È una scelta: mantiene
+offset `(pos − origine) * z / PROJ`, **lineare in z**, non prospettico. È una scelta: mantiene
 le facciate parallelogrammi, quindi in `scene.drawBuilding` si può usare `ctx.transform(...)`
 e riempirle con una texture affine. Se passi a una proiezione prospettica reale, le facciate
 diventano trapezi e tutta la pipeline delle texture salta.
 
+**La camera è piegata, e sono due numeri** (§5.21). `TILT` è l'angolo rispetto alla verticale
+(0,42 rad); tutto il resto ne discende:
+
+- **`TILT_COS` schiaccia il piano di terra**, e sta dentro `camera.apply`. Nessuno a valle sa
+  che esiste: asfalto, strisce, ombre, decalcomanie e sprite si schiacciano insieme perché
+  sono tutti disegnati in coordinate di mondo. Chi converte a mano fra mondo e schermo però
+  deve tenerne conto — `worldToScreen`, `screenToWorld` e `bounds` sono gli unici tre posti,
+  e devono restare la stessa trasformazione (c'è una scena che lo verifica, §9).
+- **`TILT_LEAN` sposta l'origine della proiezione a sud della camera**: è il punto di terra
+  sotto l'occhio, il nadir. `cam.projX/projY` lo espongono, e **chiunque proietti un'altezza
+  usa quelli, mai `cx`/`cy`** — dentro un edificio `lean` torna 0 e le stesse formule danno la
+  vista a picco di prima.
+
+Messi insieme sono una camera inclinata con prospettiva debole: al centro dello schermo un
+volume alto `z` si alza di `z·sin(TILT)`, verso i bordi conserva l'apertura radiale del
+diorama. Non è una decorazione della vista a picco: è la stessa formula con l'origine spostata.
+
 **Facce visibili.** Il tetto si sposta *verso l'esterno* dello schermo, quindi la facciata
-visibile è quella rivolta *verso* il centro camera: `oy < 0 → 'bottom'`, `oy > 0 → 'top'`,
-`ox < 0 → 'right'`, `ox > 0 → 'left'`. Sbagliarle è il tipico "edificio che si apre al
-contrario".
+visibile è quella rivolta *verso* l'origine della proiezione: `oy < 0 → 'bottom'`,
+`oy > 0 → 'top'`, `ox < 0 → 'right'`, `ox > 0 → 'left'`. Sbagliarle è il tipico "edificio che
+si apre al contrario". Col nadir a sud del bordo basso, `oy` è negativo quasi ovunque: di
+fatto si vede la facciata sud di tutto, ed è quello che rende la città una fila di insegne.
 
 **Ordinamento.** Un'unica lista (edifici + props + veicoli + pedoni + giocatore) ordinata per
-distanza radiale **decrescente** dal centro camera: chi è lontano dal centro è più lontano
-dalla camera, quindi va disegnato prima. Le ombre vanno tutte in un pass precedente.
+distanza radiale **decrescente dal nadir**: chi è lontano dal nadir è più lontano dall'occhio
+— esattamente, perché `distanza dall'occhio² = distanza dal nadir² + PROJ²`. Le ombre vanno
+tutte in un pass precedente.
+
+**Il protagonista non può sparire.** Con la camera a picco i volumi si aprivano *da* lui,
+quindi non gli finivano mai sopra; piegata, un palazzo a sud gli si apre addosso — ed è
+corretto, quel palazzo è più vicino all'occhio. L'ordine resta quello giusto e
+`scene.drawPlayerThrough` ridisegna la sagoma in trasparenza sopra chi la copre. Barare
+sull'ordine sarebbe stato peggio: rimetterebbe il protagonista *sopra il tetto* di un edificio
+dietro cui sta.
 
 **Terreno a tile.** `GroundRenderer` rende riquadri da 512 px in canvas cachati (LRU 96). Il
 tile disegna, in ordine: base del distretto → fiume e lungofiume → asfalto → segnaletica →

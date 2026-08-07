@@ -25,6 +25,9 @@
 | Forza dell'ombreggiatura | `ground.RELIEF_SLOPE` / ampiezza | 0.062 / ±44 (mappa: 0.07 / ±58) |
 | Gravità in pendenza | `vehicle.SLOPE_G` / `MAX_SLOPE` | 780 / 0.14 |
 | Forza della parallasse | `camera.PROJ` | 880 (più basso = più estrusione) |
+| **Inclinazione della camera** | `camera.TILT` | **0,42 rad (24°)** — 0 torna alla vista a picco. Da qui escono `TILT_COS` (0,913: schiacciamento del piano) e `TILT_LEAN` (393 px: quanto è a sud l'origine della proiezione). Un palazzo di 60 px si alza di 24 px al centro dello schermo |
+| Margine sud della query edifici | `scene.BUILD_PAD` | 85 px = `TILT_LEAN × 190 / PROJ`: l'apertura di una torre da 190 px |
+| Trasparenza del protagonista coperto | `scene.drawPlayerThrough` | alone 0,50 · sagoma 0,82 |
 | Direzione/lunghezza ombre | `camera.SUN` | 0.5 / 0.66, scala 0.42 |
 | Larghezza carreggiate | `citygen.genLines` | boulevard 144, strada 76 |
 | Corsie | `roadgraph.laneOffset` | 18/54 (boulevard), 19 (strada) |

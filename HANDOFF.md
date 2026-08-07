@@ -5,11 +5,11 @@ resta corto apposta.** Il contenuto vero sta in `docs/`, e si apre un documento 
 non tutti. Il `README.md` descrive il gioco e i comandi; qui c'è quello che serve a
 *sviluppare*. Avvio e vincoli stanno in `CLAUDE.md`, che si carica da solo.
 
-Ultimo aggiornamento: **il gioco ha un menu iniziale** (§5.18), **una musica sua** (§5.19) e
-**un salvataggio automatico** (§5.20) — le tre voci che il §6 teneva in cima. Prima c'erano il
-salvataggio manuale (§5.15), l'arresto (§5.16) e la lamiera solida (§5.17); prima ancora
-l'audio procedurale (§5.13) e la radio (§5.14), il giro di arretrati (§5.12), il ciclo
-giorno-notte (§5.11), il traffico (§5.10), la mappa (§5.9), i negozi (§5.8).
+Ultimo aggiornamento: **la camera si è piegata** (§5.21) — Seoul non si guarda più a picco, si
+guarda da 24°, come in *Chinatown Wars*. Prima: menu iniziale, musica e autosave (§5.18-5.20),
+salvataggio, arresto e lamiera solida (§5.15-5.17), audio e radio (§5.13-5.14), il giro di
+arretrati (§5.12), il ciclo giorno-notte (§5.11), il traffico (§5.10), la mappa (§5.9), i
+negozi (§5.8).
 
 > 📌 **Da concordare con l'utente prima di scrivere codice:** della Fase 3 restano le
 > **missioni**, che sono il lavoro grosso e pieno di scelte di design (quante, come si
@@ -55,6 +55,7 @@ commenti resta valido: si risolve qui.
 | §5.13–5.14 Audio e radio | `docs/storico/07-audio-e-radio.md` |
 | §5.15–5.17 Salvataggio, arresto, lamiera | `docs/storico/08-salvataggio-arresto-lamiera.md` |
 | §5.18–5.20 Menu, musica, autosave | `docs/storico/09-menu-musica-autosave.md` |
+| §5.21 Vista piegata | `docs/storico/10-vista-piegata.md` |
 | §6 Backlog | `docs/backlog.md` |
 | §8 Parametri | `docs/parametri.md` |
 | §9 Strumenti (`.claude/`) | `docs/strumenti.md` |
@@ -66,6 +67,10 @@ commenti resta valido: si risolve qui.
 Web game d'azione top-down 2.5D ambientato a Seoul, stile *GTA: Chinatown Wars*.
 Canvas 2D puro, moduli ES nativi, **zero dipendenze, nessun build step**. Tutta la grafica
 (sprite, facciate, terreno, mappa) è generata da codice a runtime: non esistono asset esterni.
+
+**E la si guarda da storto** (§5.21): la camera è inclinata di 24°, i volumi si aprono da un
+punto che sta *sotto* il bordo basso dello schermo, e di ogni palazzo si legge la facciata sud
+— cioè le insegne. Un angolo solo (`camera.TILT`), e a 0 si torna alla vista a picco di prima.
 
 Stato: **Fase 1, Fase 1.5, Fase 2 (tutte e tre le tappe) e le prime tre tappe della Fase 3
 completate e collaudate**, più la revisione della guida AI del traffico (§5.10), il giro di

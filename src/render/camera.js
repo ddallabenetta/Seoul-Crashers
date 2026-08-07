@@ -1,12 +1,36 @@
 // Camera 2.5D: segue il bersaglio, guarda avanti in base alla velocità, trema.
-// EYE è l'altezza virtuale dell'osservatore: governa la forza della parallasse
-// con cui gli edifici si "aprono" verso il bordo dello schermo.
+// Le due costanti qui sotto dicono da dove guarda: PROJ è l'altezza virtuale
+// dell'osservatore (la forza della parallasse con cui gli edifici si "aprono"
+// verso il bordo), TILT è di quanto è inclinato rispetto alla verticale.
 import { clamp, damp } from '../core/math.js';
 
 // Divisore della proiezione: più è basso, più i volumi si "aprono" verso i bordi.
 // Lineare in altezza (non prospettico) così le facciate restano parallelogrammi
 // e possono essere texturizzate con una trasformazione affine.
 export const PROJ = 880;
+
+// Inclinazione della camera rispetto alla verticale (§5.21). A 0 si torna alla
+// vista a picco che il gioco aveva prima. Da questo angolo escono i due soli
+// numeri che il resto del renderer usa, e sono l'uno la conseguenza dell'altro:
+//
+//  - TILT_COS schiaccia il piano di terra. Guardando da storto un isolato
+//    quadrato è un rettangolo, e vale per *tutto* quello che sta a terra:
+//    asfalto, strisce, ombre, decalcomanie. Sta nella trasformazione mondo →
+//    schermo, quindi nessuno a valle deve saperlo.
+//  - TILT_LEAN sposta l'origine della proiezione a sud della camera. È il punto
+//    sotto l'occhio (il nadir): i volumi si aprono da lì invece che dal centro
+//    dell'inquadratura, e siccome sta *sotto* il bordo basso dello schermo tutto
+//    quello che si vede si apre verso l'alto. È questo a fare la vista piegata —
+//    lo schiacciamento da solo è solo uno zoom anisotropo.
+//
+// Messi insieme sono esattamente una camera inclinata con prospettiva debole: al
+// centro dello schermo un volume alto z si alza di z·sin(TILT) (la formula di
+// un'assonometria), verso i bordi conserva l'apertura radiale che dà il diorama,
+// e l'ordinamento per distanza dal nadir è l'ordinamento per distanza dall'occhio
+// — perché distanza dall'occhio² = distanza dal nadir² + PROJ².
+export const TILT = 0.42;
+export const TILT_COS = Math.cos(TILT);
+export const TILT_LEAN = PROJ * Math.tan(TILT);
 
 // Direzione della luce (ombre verso sud-est) e lunghezza delle ombre. Sta qui, e
 // non in scene.js, perché la usa anche il hillshade del terreno in ground.js.
@@ -24,6 +48,10 @@ export class Camera {
     this.shake = 0;
     this.shakeX = 0;
     this.shakeY = 0;
+    // Quanto è a sud della camera l'origine della proiezione. Dentro un edificio
+    // vale 0 (vedi `InteriorScene.render`): una stanza è profonda 300 px e il
+    // nadir sta a 390, quindi il muro sud si aprirebbe sopra tutta la pianta.
+    this.lean = TILT_LEAN;
     this._t = 0;
   }
 
@@ -65,10 +93,19 @@ export class Camera {
   get cx() { return this.x + this.shakeX; }
   get cy() { return this.y + this.shakeY; }
 
+  // Origine della proiezione: il punto di terra sotto l'occhio. Con la camera a
+  // picco coincide con il centro dell'inquadratura; inclinata sta `lean` più a
+  // sud. È da qui che si aprono i volumi ed è da qui che si misura la profondità
+  // nell'ordinamento del painter: chiunque proietti un'altezza usa questi due,
+  // mai `cx`/`cy`.
+  get projX() { return this.x + this.shakeX; }
+  get projY() { return this.y + this.shakeY + this.lean; }
+
   /** Applica la trasformazione mondo->schermo al contesto (incluso il DPR). */
   apply(ctx) {
     const z = this.zoom * this.dpr;
-    ctx.setTransform(z, 0, 0, z, -this.cx * z + (this.viewW * this.dpr) / 2, -this.cy * z + (this.viewH * this.dpr) / 2);
+    const zy = z * TILT_COS;
+    ctx.setTransform(z, 0, 0, zy, -this.cx * z + (this.viewW * this.dpr) / 2, -this.cy * zy + (this.viewH * this.dpr) / 2);
   }
 
   /** Trasformazione per la UI: coordinate in pixel CSS. */
@@ -80,7 +117,7 @@ export class Camera {
     const z = this.zoom;
     return {
       x: (wx - this.cx) * z + this.viewW / 2,
-      y: (wy - this.cy) * z + this.viewH / 2,
+      y: (wy - this.cy) * z * TILT_COS + this.viewH / 2,
     };
   }
 
@@ -88,14 +125,19 @@ export class Camera {
     const z = this.zoom;
     return {
       x: (sx - this.viewW / 2) / z + this.cx,
-      y: (sy - this.viewH / 2) / z + this.cy,
+      y: (sy - this.viewH / 2) / (z * TILT_COS) + this.cy,
     };
   }
 
-  /** Rettangolo di mondo visibile, con margine in pixel di mondo. */
+  /**
+   * Rettangolo di mondo visibile, con margine in pixel di mondo. Il piano di
+   * terra è schiacciato, quindi lo schermo ne inquadra *più* in verticale: senza
+   * il TILT_COS al denominatore lo streaming del traffico farebbe comparire le
+   * auto in campo visivo.
+   */
   bounds(pad = 0) {
     const hw = this.viewW / (2 * this.zoom) + pad;
-    const hh = this.viewH / (2 * this.zoom) + pad;
+    const hh = this.viewH / (2 * this.zoom * TILT_COS) + pad;
     return { x: this.cx - hw, y: this.cy - hh, w: hw * 2, h: hh * 2 };
   }
 

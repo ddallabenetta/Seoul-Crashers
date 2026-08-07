@@ -1,8 +1,10 @@
 // Renderer principale. Ogni volume viene estruso verso l'esterno dello schermo in
 // base alla sua altezza: è questo a dare la profondità "diorama" tipo GTA2/CTW.
-// Tutti gli oggetti alti vengono ordinati per distanza radiale dal centro camera
-// (painter's algorithm radiale) e disegnati dal più lontano al più vicino.
-import { PROJ, SUN } from './camera.js';
+// Il punto da cui si aprono non è il centro dell'inquadratura ma il nadir della
+// camera piegata (`cam.projX/projY`, §5.21), e tutti gli oggetti alti vengono
+// ordinati per distanza radiale **da lì** — che è l'ordine per distanza
+// dall'occhio — e disegnati dal più lontano al più vicino.
+import { PROJ, SUN, TILT_LEAN } from './camera.js';
 import {
   facadeTexture, facadeLights, facadeGradient, bucketCols, bucketRows, signSprite, mix, FTW, FTH,
 } from './facades.js';
@@ -34,6 +36,12 @@ const SUN_STEP = 0.055;
 // unico path: 340 tratti costano meno di un decimo di millisecondo.
 const RAIN_DROPS = 340;
 
+// Margine in più per la query degli edifici: quanto si apre verso l'alto un
+// volume alto 190 px (una torre di Gangnam) con la camera piegata. I due o tre
+// grattacieli più alti della città restano fuori — è la stessa approssimazione
+// che il gioco già faceva ai bordi laterali.
+const BUILD_PAD = Math.round((TILT_LEAN * 190) / PROJ);
+
 function hash1(i) {
   let h = Math.imul(i | 0, 374761393) + 668265263;
   h = Math.imul(h ^ (h >>> 13), 1274126177);
@@ -47,6 +55,37 @@ function hash1(i) {
  */
 function projHeight(b) {
   return b.h3d + (b.elev || 0);
+}
+
+/**
+ * Il punto (px, py) sta dentro il volume disegnato di `b`? Pianta, facciate e
+ * tetto non sono tre forme: sono il rettangolo di pianta spazzato lungo il
+ * vettore di proiezione (ox, oy). Quindi basta chiedersi se esiste una frazione
+ * t del vettore che riporta il punto dentro la pianta — due intervalli da
+ * intersecare, nessun poligono da costruire.
+ */
+function sweptCovers(b, ox, oy, px, py) {
+  let t0 = 0;
+  let t1 = 1;
+  if (Math.abs(ox) < 1e-6) {
+    if (px < b.x || px > b.x + b.w) return false;
+  } else {
+    let a = (px - b.x - b.w) / ox;
+    let c = (px - b.x) / ox;
+    if (a > c) { const s = a; a = c; c = s; }
+    t0 = Math.max(t0, a);
+    t1 = Math.min(t1, c);
+  }
+  if (Math.abs(oy) < 1e-6) {
+    if (py < b.y || py > b.y + b.h) return false;
+  } else {
+    let a = (py - b.y - b.h) / oy;
+    let c = (py - b.y) / oy;
+    if (a > c) { const s = a; a = c; c = s; }
+    t0 = Math.max(t0, a);
+    t1 = Math.min(t1, c);
+  }
+  return t0 <= t1;
 }
 
 function convexHull(pts) {
@@ -117,12 +156,20 @@ export class Scene {
   render(ctx, game) {
     const cam = game.camera;
     const city = this.city;
+    cam.lean = TILT_LEAN;
     cam.applyUI(ctx);
     ctx.fillStyle = '#0a0b0d';
     ctx.fillRect(0, 0, cam.viewW, cam.viewH);
     cam.apply(ctx);
 
     const view = cam.bounds(140);
+    // Gli edifici si prendono con un margine più largo, **e solo verso sud**: con
+    // la camera piegata un volume si apre verso l'alto anche quando è inquadrato
+    // al centro, quindi un palazzo la cui pianta sta appena sotto il bordo basso
+    // ha il tetto dentro lo schermo. A nord non serve niente (chi sta oltre il
+    // bordo alto si apre ancora più in là) e allargare tutt'intorno costerebbe il
+    // 28% di edifici disegnati per un problema che ha un lato solo.
+    const bh = view.h + BUILD_PAD;
 
     // 1) Terreno
     this.ground.draw(ctx, cam);
@@ -140,7 +187,7 @@ export class Scene {
     const sun = this.sunNow(game);
     const shade = game.dayCycle.light.shadow;
     ctx.fillStyle = `rgba(0,0,0,${shade.toFixed(3)})`;
-    const buildings = city.buildingGrid.queryRect(view.x, view.y, view.w, view.h, this._bq);
+    const buildings = city.buildingGrid.queryRect(view.x, view.y, view.w, bh, this._bq);
     for (const b of buildings) {
       if (b.isBelt) continue;
       const hull = this.buildingShadow(b, sun);
@@ -160,7 +207,7 @@ export class Scene {
     // 5) Oggetti alti ordinati per profondità radiale
     const list = this.list;
     list.length = 0;
-    const ccx = cam.cx, ccy = cam.cy;
+    const ccx = cam.projX, ccy = cam.projY;
 
     for (const b of buildings) {
       const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
@@ -204,6 +251,9 @@ export class Scene {
       }
     }
 
+    // 5bis) Il protagonista visto attraverso quello che gli si è aperto addosso.
+    this.drawPlayerThrough(ctx, game, cam, buildings);
+
     // 6) Transenne dei posti di blocco ed elicottero: stanno sopra tutto il resto
     // (le prime sono basse ma nascono a runtime, il secondo vola a 210 px di quota).
     for (const v of flying) this.drawVehicle(ctx, v, cam, game);
@@ -221,6 +271,65 @@ export class Scene {
     // disegnato. È l'unico modo di illuminare una città fatta di tile cachati
     // da 512 px senza rigenerarli a ogni minuto di orologio.
     this.drawLight(ctx, game);
+  }
+
+  /**
+   * Con la camera a picco il protagonista non poteva sparire: i volumi si
+   * aprivano *dalla* camera, cioè da lui, quindi non gli finivano mai sopra.
+   * Piegando la vista, un palazzo a sud si apre **verso** di lui — ed è giusto
+   * così, quel palazzo è più vicino all'occhio. Barare sull'ordine lo
+   * rimetterebbe sopra il tetto di un edificio dietro cui sta, che si legge
+   * peggio di una sagoma trasparente. Quindi l'ordine resta corretto e la
+   * sagoma si ridisegna sopra chi la copre, sbiadita.
+   *
+   * Il test costa un rettangolo per edificio, e solo per quelli disegnati
+   * *dopo* il giocatore: gli altri gli stanno dietro per costruzione.
+   */
+  drawPlayerThrough(ctx, game, cam, buildings) {
+    const pl = game.player;
+    if (!pl.onFoot && !pl.vehicle) return;
+    const ccx = cam.projX, ccy = cam.projY;
+    // Il punto da coprire è dove la figura viene *disegnata*, non dove sta: a
+    // piedi si stacca del 70% della proiezione, in auto di tutta.
+    const z = pl.onFoot ? 21 : 13 + (pl.vehicle.z || 0);
+    const k = pl.onFoot ? 0.7 : 1;
+    const px = pl.onFoot ? pl.x : pl.vehicle.x;
+    const py = pl.onFoot ? pl.y : pl.vehicle.y;
+    const f = (z / PROJ) * k;
+    const sx = px + (px - ccx) * f;
+    const sy = py + (py - ccy) * f;
+    const mine = (px - ccx) ** 2 + (py - ccy) ** 2;
+
+    let covered = false;
+    for (const b of buildings) {
+      const bcx = b.x + b.w / 2, bcy = b.y + b.h / 2;
+      if ((bcx - ccx) ** 2 + (bcy - ccy) ** 2 >= mine) continue;
+      const bf = projHeight(b) / PROJ;
+      if (sweptCovers(b, (bcx - ccx) * bf, (bcy - ccy) * bf, sx, sy)) { covered = true; break; }
+    }
+    // Letto da fuori solo per misurare quanto spesso scatta: se restasse vero
+    // per interi minuti di guida vorrebbe dire che l'inclinazione è troppa, e
+    // la sagoma trasparente da eccezione diventerebbe il modo normale di vedersi.
+    this.playerCovered = covered;
+    if (!covered) return;
+
+    // Un alone scuro sotto, o la sagoma si perde: una facciata è fatta di
+    // finestre grandi quanto un uomo, e un uomo in trasparenza sopra le finestre
+    // è un'altra finestra.
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = '#0a0c10';
+    ctx.beginPath();
+    if (pl.onFoot) ctx.ellipse(sx, sy, 15, 14, 0, 0, 6.2832);
+    else {
+      const spec = VEHICLE_TYPES[pl.vehicle.kind];
+      ctx.ellipse(sx, sy, spec.len * 0.58, spec.wid * 0.7, pl.vehicle.angle, 0, 6.2832);
+    }
+    ctx.fill();
+    ctx.globalAlpha = 0.82;
+    if (pl.onFoot) this.drawPlayer(ctx, pl, cam, game);
+    else this.drawVehicle(ctx, pl.vehicle, cam, game);
+    ctx.restore();
   }
 
   drawLight(ctx, game) {
@@ -431,8 +540,8 @@ export class Scene {
     const f = h3d / PROJ;
     const bcx = b.x + b.w / 2;
     const bcy = b.y + b.h / 2;
-    const ox = (bcx - cam.cx) * f;
-    const oy = (bcy - cam.cy) * f;
+    const ox = (bcx - cam.projX) * f;
+    const oy = (bcy - cam.projY) * f;
 
     const rows = bucketRows(h3d);
     const stackVariant = b.style === 'container' ? b.variant : b.variant;
@@ -635,8 +744,8 @@ export class Scene {
 
   drawProp(ctx, p, cam, game) {
     const f = p.z / PROJ;
-    const ox = (p.x - cam.cx) * f;
-    const oy = (p.y - cam.cy) * f;
+    const ox = (p.x - cam.projX) * f;
+    const oy = (p.y - cam.projY) * f;
     const spr = getPropSprite(p);
 
     if (p.type === 'lamp') {
@@ -702,8 +811,8 @@ export class Scene {
     // elicottero a 300 px si vede spostato rispetto alla sua ombra.
     const z = 13 + (v.z || 0);
     const f = z / PROJ;
-    const ox = (v.x - cam.cx) * f;
-    const oy = (v.y - cam.cy) * f;
+    const ox = (v.x - cam.projX) * f;
+    const oy = (v.y - cam.projY) * f;
     const spr = v.dead ? getWreckSprite(v.kind) : getVehicleSprite(v.kind, v.colorIndex);
 
     ctx.save();
@@ -878,8 +987,8 @@ export class Scene {
   drawPed(ctx, p, cam, game) {
     const z = 20;
     const f = z / PROJ;
-    const ox = (p.x - cam.cx) * f;
-    const oy = (p.y - cam.cy) * f;
+    const ox = (p.x - cam.projX) * f;
+    const oy = (p.y - cam.projY) * f;
     const frame = p.dead ? 0 : Math.floor(p.animT) % PED_FRAMES;
     const spr = getPedSprite(p.kind, p.colorIndex, frame);
     // Chi ce l'ha con te va riconosciuto al volo: nella folla un teppista nero
@@ -914,7 +1023,7 @@ export class Scene {
       // Sta sopra la testa, quindi si proietta più in fuori del pedone: è quello
       // scarto a dire che è un oggetto tenuto in alto e non un disco dipinto a terra.
       const uf = 34 / PROJ;
-      this.drawUmbrella(ctx, p, (p.x - cam.cx) * uf, (p.y - cam.cy) * uf, rain);
+      this.drawUmbrella(ctx, p, (p.x - cam.projX) * uf, (p.y - cam.projY) * uf, rain);
     }
   }
 
@@ -945,8 +1054,8 @@ export class Scene {
     const zf = 52 / PROJ;
     ctx.globalAlpha = 1;
     ctx.translate(
-      p.x + (p.x - cam.cx) * zf,
-      p.y + (p.y - cam.cy) * zf - 22 + Math.sin(game.time * 2.6 + p.id) * 2.2
+      p.x + (p.x - cam.projX) * zf,
+      p.y + (p.y - cam.projY) * zf - 22 + Math.sin(game.time * 2.6 + p.id) * 2.2
     );
     ctx.beginPath();
     ctx.moveTo(0, -7);
@@ -1001,8 +1110,8 @@ export class Scene {
   drawPlayer(ctx, pl, cam, game) {
     const z = 21;
     const f = z / PROJ;
-    const ox = (pl.x - cam.cx) * f;
-    const oy = (pl.y - cam.cy) * f;
+    const ox = (pl.x - cam.projX) * f;
+    const oy = (pl.y - cam.projY) * f;
     const frame = pl.dying ? 0 : Math.floor(pl.animT) % PED_FRAMES;
     // Con un'arma da fuoco in pugno la posa cambia: braccia tese verso il mirino.
     const aiming = !pl.dying && !WEAPONS[pl.weapon].melee;
@@ -1087,7 +1196,7 @@ export class Scene {
 
       const f = z / PROJ;
       ctx.save();
-      ctx.translate(it.x + (it.x - cam.cx) * f, it.y + (it.y - cam.cy) * f);
+      ctx.translate(it.x + (it.x - cam.projX) * f, it.y + (it.y - cam.projY) * f);
       ctx.rotate(it.angle);
       ctx.drawImage(spr.canvas, -spr.w / 2, -spr.h / 2, spr.w, spr.h);
       ctx.restore();
@@ -1097,7 +1206,7 @@ export class Scene {
         const blink = Math.sin(game.time * 22) > 0;
         ctx.fillStyle = blink ? 'rgba(255,120,60,0.9)' : 'rgba(255,220,140,0.5)';
         ctx.beginPath();
-        ctx.arc(it.x + (it.x - cam.cx) * f, it.y + (it.y - cam.cy) * f - 6, 1.8, 0, 6.2832);
+        ctx.arc(it.x + (it.x - cam.projX) * f, it.y + (it.y - cam.projY) * f - 6, 1.8, 0, 6.2832);
         ctx.fill();
       }
     }
@@ -1111,7 +1220,7 @@ export class Scene {
         const cy = bar.y + bar.h / 2;
         const f = 20 / PROJ;
         ctx.save();
-        ctx.translate(cx + (cx - cam.cx) * f * 0.65, cy + (cy - cam.cy) * f * 0.65);
+        ctx.translate(cx + (cx - cam.projX) * f * 0.65, cy + (cy - cam.projY) * f * 0.65);
         ctx.rotate(b.vertical ? 0 : Math.PI / 2);
         ctx.drawImage(spr.canvas, -spr.w / 2, -spr.h / 2, spr.w, spr.h);
         ctx.restore();
@@ -1127,8 +1236,8 @@ export class Scene {
     const c = game.police.chopper;
     if (!c) return;
     const f = c.z / PROJ;
-    const px = c.x + (c.x - cam.cx) * f;
-    const py = c.y + (c.y - cam.cy) * f;
+    const px = c.x + (c.x - cam.projX) * f;
+    const py = c.y + (c.y - cam.projY) * f;
 
     // Riflettore
     ctx.save();

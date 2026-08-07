@@ -219,8 +219,8 @@ export function rayCast(game, ox, oy, dx, dy, maxDist, ignore = null, ignoreVehi
   const chop = game.police && game.police.chopper;
   if (chop && ignore === pl) {
     const f = chop.z / PROJ;
-    const cx = chop.x + (chop.x - game.camera.cx) * f;
-    const cy = chop.y + (chop.y - game.camera.cy) * f;
+    const cx = chop.x + (chop.x - game.camera.projX) * f;
+    const cy = chop.y + (chop.y - game.camera.projY) * f;
     const t = rayCircle(ox, oy, dx, dy, cx, cy, 24);
     if (t !== null && t < bd) { bd = t; hit = chop; type = 'chopper'; }
   }

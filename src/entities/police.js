@@ -1356,8 +1356,8 @@ export class PoliceSystem {
   chopperBurst(game, c) {
     const pl = game.player;
     const cam = game.camera;
-    const ox = c.x + (c.x - cam.cx) * (c.z / PROJ);
-    const oy = c.y + (c.y - cam.cy) * (c.z / PROJ);
+    const ox = c.x + (c.x - cam.projX) * (c.z / PROJ);
+    const oy = c.y + (c.y - cam.projY) * (c.z / PROJ);
     for (let i = 0; i < 3; i++) {
       const dx = (Math.random() - 0.5) * 54;
       const dy = (Math.random() - 0.5) * 54;
@@ -1380,7 +1380,7 @@ export class PoliceSystem {
     c.hp -= dmg;
     if (c.hp > 0) return;
     const cam = game.camera;
-    game.fx.addExplosion(c.x + (c.x - cam.cx) * (c.z / PROJ), c.y + (c.y - cam.cy) * (c.z / PROJ));
+    game.fx.addExplosion(c.x + (c.x - cam.projX) * (c.z / PROJ), c.y + (c.y - cam.projY) * (c.z / PROJ));
     game.fx.addExplosion(c.x, c.y);
     game.camera.addShake(22);
     game.audio?.explosion(c.x, c.y, 1.3);
