@@ -395,7 +395,7 @@ class Game {
     this.audio.bodyFall(p.x, p.y);
     // Investito, non colpito: il grido è quello di chi ha visto la macchina
     // arrivare. Chi muore di piombo cade e basta.
-    if (v && Math.random() < 0.6) this.audio.scream(p.x, p.y, 1.1);
+    if (v && Math.random() < 0.6) this.audio.scream(p.x, p.y, p.voice, true);
     if (v) {
       this.fx.addDust(p.x, p.y, v.vx, v.vy, 3);
       if (v.driver === 'player') this.camera.addShake(6);

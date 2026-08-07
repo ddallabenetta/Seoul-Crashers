@@ -35,6 +35,13 @@ const HEAR = 1500;
 const PAN_W = 760;
 // Tetto dei suoni brevi vivi insieme.
 const MAX_VOICES = 24;
+// Distanza a cui uno sparo è «lontano» quanto può esserlo. Molto più corta di
+// `HEAR`: a settecento pixel un colpo è già dall'altra parte dell'isolato, e
+// tarare la trasformazione sul limite dell'udibile la renderebbe invisibile
+// proprio nell'intervallo in cui si gioca.
+const FAR_RANGE = 900;
+// Quanto si allunga la coda di uno sparo lontano.
+const FAR_TAIL = 0.6;
 
 // Timbro delle bocche da fuoco. `f` è il centro della banda dello schiocco, `dec`
 // quanto ci mette a spegnersi, `body` il colpo basso sotto (il "tonfo" nel petto),
@@ -47,6 +54,18 @@ const GUN_TONE = {
   rifle:   { f: 2050, dec: 0.12, body: 132, tail: 0.2,  gain: 0.6 },
   sniper:  { f: 1150, dec: 0.42, body: 74,  tail: 0.75, gain: 1 },
   minigun: { f: 2450, dec: 0.055, body: 178, tail: 0.05, gain: 0.34 },
+};
+
+// Le voci di Seoul. Un grido si riconosce dalle **formanti** — le due risonanze
+// del tratto vocale — non dall'altezza: spostare solo `f0`, che è quello che si
+// faceva prima, dà lo stesso timbro cantato più acuto, e infatti uomini, donne e
+// vecchi urlavano tutti uguale. `f1` e `f2` sono le due formanti, `rough` quanto
+// la voce raschia, `trem` la frequenza del tremolo (un anziano ne ha molto).
+const VOICES = {
+  uomo:    { f0: [250, 350], f1: 620,  f2: 1150, rough: 1,    trem: [5, 7],   gain: 0.32 },
+  donna:   { f0: [400, 560], f1: 830,  f2: 2150, rough: 0.7,  trem: [6, 9],   gain: 0.34 },
+  giovane: { f0: [480, 680], f1: 920,  f2: 2600, rough: 0.55, trem: [7, 11],  gain: 0.3 },
+  anziano: { f0: [215, 300], f1: 570,  f2: 990,  rough: 1.35, trem: [8, 13],  gain: 0.26 },
 };
 
 /** Volumi di partenza. Si spostano dal menu e restano in localStorage. */
@@ -1006,16 +1025,37 @@ export class AudioSystem {
    * quello che spara — giocatore, polizia, teppisti — perché `weapons.shoot` è
    * l'unico imbuto del fuoco.
    */
+  /**
+   * Una bocca da fuoco. Il timbro non dipende solo dall'arma ma **da quanto è
+   * lontana**: prima le armi dei nemici erano le tue un po' più piano, e a
+   * orecchio non c'era modo di distinguere «ti stanno sparando addosso» da «si
+   * spara da qualche parte» (§6). Non è una questione di volume — quello lo fa
+   * già `_at` — è che l'aria si mangia lo schiocco e lascia il rimbombo: a
+   * duecento metri di uno sparo arriva la coda, non il crack.
+   */
   shot(spec, x, y, fromPlayer = false) {
     const tone = GUN_TONE[spec.id] || gunTone(spec);
-    const out = this._at(x, y, tone.gain * (fromPlayer ? 1 : 0.85), tone.dec + tone.tail + 0.2);
+    // La tua arma è sempre all'orecchio, anche se la camera è scivolata via col
+    // mirino: sei tu che premi il grilletto.
+    const far = fromPlayer ? 0
+      : clamp(Math.hypot(x - this.lx, y - this.ly) / FAR_RANGE, 0, 1);
+    const boom = far * far;   // il rimbombo cresce tardi: da vicino resta uno sparo
+    const tailDur = tone.tail + boom * FAR_TAIL;
+    const out = this._at(x, y, tone.gain * (fromPlayer ? 1 : 0.85), tone.dec + tailDur + 0.2);
     if (!out) return;
-    const crack = this._filter(out, 'bandpass', tone.f, 0.8, { f1: tone.f * 0.45, sweep: tone.dec });
-    this._noise(crack, { dur: tone.dec, peak: 0.9, attack: 0.001 });
+    // Lo schiocco perde acuti e mordente con la distanza…
+    const cf = tone.f * (1 - 0.5 * far);
+    const crack = this._filter(out, 'bandpass', cf, 0.8, { f1: cf * 0.45, sweep: tone.dec });
+    this._noise(crack, { dur: tone.dec, peak: 0.9 * (1 - 0.55 * far), attack: 0.001 });
+    // …il colpo basso no, i bassi viaggiano.
     this._tone(out, { type: 'triangle', f0: tone.body, f1: tone.body * 0.4, dur: tone.dec * 1.6, peak: 0.7, attack: 0.002 });
-    if (tone.tail > 0.06) {
-      const tail = this._filter(out, 'lowpass', 1400, 0.7, { f1: 300, sweep: tone.tail });
-      this._noise(tail, { dur: tone.tail, peak: 0.22, attack: 0.02, t: 0.03, pink: true });
+    // …e quello che resta è la coda: più lunga, più cupa e in ritardo.
+    if (tailDur > 0.06) {
+      const tail = this._filter(out, 'lowpass', 1400 - 950 * far, 0.7, { f1: 300, sweep: tailDur });
+      this._noise(tail, {
+        dur: tailDur, peak: 0.22 + boom * 0.5, attack: 0.02 + far * 0.05,
+        t: 0.03 + far * 0.05, pink: true,
+      });
     }
   }
 
@@ -1129,28 +1169,41 @@ export class AudioSystem {
    * dentro una formante stretta, con vibrato e una discesa di tono. Stilizzato,
    * corto e piano — di più suonerebbe finto invece che stilizzato.
    */
-  scream(x, y, pitch = 1) {
-    const out = this._at(x, y, 0.3, 0.7);
+  /**
+   * Un grido. `voice` è il timbro di chi lo tira (vedi `VOICES`), `hurt` alza il
+   * tono e accorcia — è il verso di chi ha visto arrivare la macchina, non di chi
+   * ha sentito uno sparo lontano.
+   */
+  scream(x, y, voice = 'uomo', hurt = false) {
+    const v = VOICES[voice] || VOICES.uomo;
+    const out = this._at(x, y, v.gain, 0.7);
     if (!out) return;
-    const f0 = (320 + Math.random() * 240) * pitch;
-    const form = this._filter(out, 'bandpass', f0 * 2.6, 4.5);
-    const osc = this._tone(form, { type: 'sawtooth', f0, f1: f0 * 0.6, dur: 0.55, sweep: 0.5, peak: 0.32, attack: 0.05 });
+    const f0 = (v.f0[0] + Math.random() * (v.f0[1] - v.f0[0])) * (hurt ? 1.18 : 1);
+    const dur = hurt ? 0.4 : 0.55;
+    // Due formanti in parallelo: è quello che rende una voce *quella* voce. La
+    // seconda è più stretta e più piano, come nel tratto vocale vero.
+    const osc = this._tone(this._filter(out, 'bandpass', v.f1, 3.2),
+      { type: 'sawtooth', f0, f1: f0 * 0.6, dur, sweep: dur * 0.9, peak: 0.3 * v.rough, attack: 0.05 });
+    this._tone(this._filter(out, 'bandpass', v.f2, 6),
+      { type: 'sawtooth', f0, f1: f0 * 0.6, dur, sweep: dur * 0.9, peak: 0.13, attack: 0.05 });
     const vib = this.ctx.createOscillator();
-    vib.frequency.value = 6.5 + Math.random() * 3;
+    vib.frequency.value = v.trem[0] + Math.random() * (v.trem[1] - v.trem[0]);
     const vg = this.ctx.createGain();
-    vg.gain.value = f0 * 0.06;
+    vg.gain.value = f0 * 0.05 * v.rough;
     vib.connect(vg);
     vg.connect(osc.frequency);
     vib.start();
-    vib.stop(this.ctx.currentTime + 0.6);
+    vib.stop(this.ctx.currentTime + dur + 0.05);
   }
 
   /** Colpo incassato: un grugnito corto, più cupo per il giocatore. */
-  hurt(x, y, isPlayer = false) {
+  /** Il verso di chi incassa. Stesso timbro del grido: è la stessa gola. */
+  hurt(x, y, isPlayer = false, voice = 'uomo') {
     const out = this._at(x, y, isPlayer ? 0.36 : 0.24, 0.3);
     if (!out) return;
-    const f0 = isPlayer ? 150 : 220 + Math.random() * 120;
-    const form = this._filter(out, 'bandpass', f0 * 3, 3);
+    const v = VOICES[voice] || VOICES.uomo;
+    const f0 = isPlayer ? 150 : (v.f0[0] + Math.random() * (v.f0[1] - v.f0[0])) * 0.72;
+    const form = this._filter(out, 'bandpass', isPlayer ? f0 * 3 : v.f1, 3);
     this._tone(form, { type: 'sawtooth', f0, f1: f0 * 0.7, dur: 0.2, peak: 0.4, attack: 0.01 });
     this._noise(this._filter(out, 'bandpass', 700, 1.5), { dur: 0.09, peak: 0.25, attack: 0.002 });
   }

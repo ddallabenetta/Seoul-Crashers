@@ -45,6 +45,22 @@ const RAIN_HURRY = 0.12;
 /** Tinte degli ombrelli. La trasparente è quella coreana per eccellenza. */
 export const UMBRELLAS = ['#1c2029', '#2f4f7a', '#8c2f3c', '#3f6b4a', '#d9dde4', '#b8b0d8'];
 
+// Chi ha che voce (i timbri stanno in `audio.VOICES`). Non è un dato del
+// personaggio e non si vede da nessuna parte: l'unica cosa che il giocatore ne
+// sente è un grido ogni tanto, e basta una probabilità per tipo. Le ripetizioni
+// sono il peso — in un ufficio ci sono più uomini che donne, in un cantiere quasi
+// solo uomini, e i vecchi stanno dove sta la gente qualunque.
+const VOICE_MIX = {
+  civil:    ['uomo', 'donna', 'anziano', 'giovane', 'donna'],
+  office:   ['uomo', 'uomo', 'donna'],
+  student:  ['giovane', 'giovane', 'donna'],
+  tourist:  ['donna', 'uomo', 'anziano'],
+  worker:   ['uomo', 'uomo', 'anziano'],
+  gangster: ['uomo'],
+  cop:      ['uomo', 'uomo', 'donna'],
+  swat:     ['uomo'],
+};
+
 /** Anello di streaming: i pedoni nascono appena oltre il bordo dello schermo. */
 function ringFor(game) {
   const cam = game.camera;
@@ -74,6 +90,7 @@ export function createPed(kind, x, y, rng) {
     vx: 0, vy: 0,
     animT: rng.range(0, 8),
     colorIndex: rng.int(0, k.coats.length - 1),
+    voice: rng.pick(VOICE_MIX[kind] || VOICE_MIX.civil),
     baseSpeed: k.speed * rng.range(0.85, 1.15),
     state: 'walk',
     block: null,
@@ -821,7 +838,7 @@ export class PedestrianSystem {
       return;
     }
     p.bleedT = 0.4;
-    game.audio?.hurt(p.x, p.y, false);
+    game.audio?.hurt(p.x, p.y, false, p.voice);
     if (p.cop) {
       // Un agente ferito non scappa e non cambia stato: resta in servizio, e la
       // centrale se lo segna.
@@ -876,7 +893,7 @@ export class PedestrianSystem {
       p.state = 'flee';
       if (!voiced) {
         voiced = true;
-        game.audio?.scream(p.x, p.y);
+        game.audio?.scream(p.x, p.y, p.voice);
       }
     }
   }
