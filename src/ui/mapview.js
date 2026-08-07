@@ -1,5 +1,5 @@
 // Mappa della città: pannello riusabile dal menu di pausa e dalla vista a tutto schermo.
-import { MAP_SIZE } from '../world/maptexture.js';
+import { MAP_W, MAP_H } from '../world/maptexture.js';
 import { DISTRICTS } from '../world/districts.js';
 import { clamp } from '../core/math.js';
 import { VEHICLE_TYPES } from '../render/sprites.js';
@@ -63,17 +63,20 @@ export class MapView {
     roundPath(ctx, x, y, size, size, 10);
     ctx.clip();
 
-    // Con zoom > 1 la vista si centra sul giocatore
-    const drawSize = size * zoom;
-    let dx = x + (size - drawSize) / 2 + panX;
-    let dy = y + (size - drawSize) / 2 + panY;
+    // Il pannello resta quadrato, la Corea no: la carta ci sta dentro con il suo
+    // rapporto, centrata, invece di essere schiacciata su un lato.
+    const fit = Math.min(size / MAP_W, size / MAP_H);
+    const drawW = MAP_W * fit * zoom;
+    const drawH = MAP_H * fit * zoom;
+    let dx = x + (size - drawW) / 2 + panX;
+    let dy = y + (size - drawH) / 2 + panY;
     if (zoom > 1.01) {
-      dx = x + size / 2 - (p.x / city.w) * drawSize + panX;
-      dy = y + size / 2 - (p.y / city.h) * drawSize + panY;
-      dx = clamp(dx, x + size - drawSize, x);
-      dy = clamp(dy, y + size - drawSize, y);
+      dx = x + size / 2 - (p.x / city.w) * drawW + panX;
+      dy = y + size / 2 - (p.y / city.h) * drawH + panY;
+      dx = clamp(dx, x + Math.min(0, size - drawW), x + Math.max(0, size - drawW));
+      dy = clamp(dy, y + Math.min(0, size - drawH), y + Math.max(0, size - drawH));
     }
-    ctx.drawImage(this.texture, 0, 0, MAP_SIZE, MAP_SIZE, dx, dy, drawSize, drawSize);
+    ctx.drawImage(this.texture, 0, 0, MAP_W, MAP_H, dx, dy, drawW, drawH);
 
     // Velo notturno sulla carta, più leggero che sulla minimappa: una mappa
     // aperta va letta, e qui non c'è la scena attorno a dare il contesto
@@ -89,8 +92,8 @@ export class MapView {
     }
 
     const toScreen = (wx, wy) => ({
-      x: dx + (wx / city.w) * drawSize,
-      y: dy + (wy / city.h) * drawSize,
+      x: dx + (wx / city.w) * drawW,
+      y: dy + (wy / city.h) * drawH,
     });
 
     // Etichette dei distretti
@@ -316,11 +319,13 @@ export class MapView {
     ctx.textAlign = 'left';
     ctx.fillStyle = '#f2f5fa';
     ctx.font = '800 26px system-ui, sans-serif';
-    const region = game.city.region || { name: 'Seoul', hangul: '서울' };
-    ctx.fillText(region.name.toUpperCase(), px, y + 30);
+    // La carta è una sola: il titolo dice dove si è, non quale mappa è aperta.
+    const here = game.areaAt?.(game.player.x, game.player.y)
+      || { name: 'Corea', hangul: '대한민국' };
+    ctx.fillText(here.name.toUpperCase(), px, y + 30);
     ctx.fillStyle = '#ff5fa2';
     ctx.font = '700 18px system-ui, "Apple SD Gothic Neo", sans-serif';
-    ctx.fillText(`${region.hangul} — 지도`, px, y + 54);
+    ctx.fillText(`${here.hangul} — 지도`, px, y + 54);
 
     const d = game.player.district;
     let ly = y + 96;

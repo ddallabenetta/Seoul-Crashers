@@ -97,8 +97,33 @@ export class SpatialGrid {
 
 /** Griglia dinamica, ricostruita ogni frame per entità in movimento. */
 export class DynamicGrid extends SpatialGrid {
+  constructor(width, height, cell) {
+    super(width, height, cell);
+    this._used = [];
+  }
+
+  /**
+   * Si svuotano **solo le celle toccate** l'ultima volta, non tutto l'array.
+   * Finché il mondo era una città sola le celle erano un paio di migliaia e
+   * riallocarle sessanta volte al secondo non si notava; sulla mappa unificata
+   * sono decine di migliaia per griglia, e quella riallocazione da sola valeva
+   * più della metà del frame rate.
+   */
   rebuild(items) {
-    this.clear();
+    for (let i = 0; i < this._used.length; i++) this.buckets[this._used[i]] = undefined;
+    this._used.length = 0;
     for (const it of items) this.insertPoint(it);
+  }
+
+  insertPoint(obj) {
+    const cx = Math.min(this.cols - 1, this._cellOf(obj.x));
+    const cy = Math.min(this.rows - 1, this._cellOf(obj.y));
+    const i = this._idx(cx, cy);
+    let bucket = this.buckets[i];
+    if (!bucket) {
+      bucket = this.buckets[i] = [];
+      this._used.push(i);
+    }
+    bucket.push(obj);
   }
 }

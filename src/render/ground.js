@@ -23,6 +23,18 @@ function clampWorld(value, max) {
 
 const ROAD_WORDS = ['버스', '천천히', '어린이보호'];
 
+// Colore esadecimale -> terzina, con cache: la tinta di fondo di un tile ne
+// chiede quattro, e i tile si rifanno a ogni invalidazione della cache.
+const RGB_CACHE = new Map();
+function rgbOf(hex) {
+  let v = RGB_CACHE.get(hex);
+  if (v) return v;
+  const h = hex.replace('#', '');
+  v = [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  RGB_CACHE.set(hex, v);
+  return v;
+}
+
 export class GroundRenderer {
   constructor(city) {
     this.city = city;
@@ -60,6 +72,107 @@ export class GroundRenderer {
     return t;
   }
 
+  districtAt(x, y) {
+    const city = this.city;
+    return city.districtAt ? city.districtAt(x, y) : districtAtNorm(x / city.w, y / city.h);
+  }
+
+  /**
+   * La tinta di fondo di un tile. Finché il mondo era una città sola bastava un
+   * riempimento piatto col colore del distretto centrale: due tile confinanti si
+   * distinguevano appena. Con la campagna attaccata al bordo di Seoul quel salto
+   * diventa una riga dritta lunga tutta la mappa, e si legge come un errore.
+   * I quattro angoli si campionano e si interpolano con un'immagine 2×2 tirata
+   * in scala: il filtro bilineare del canvas fa il degradé, e i tile vicini
+   * combaciano perché condividono gli stessi punti di campionamento.
+   */
+  drawGroundBase(g, ox, oy, center) {
+    const corners = [
+      this.districtAt(ox, oy), this.districtAt(ox + TILE, oy),
+      this.districtAt(ox, oy + TILE), this.districtAt(ox + TILE, oy + TILE),
+    ];
+    if (corners.every((c) => c.ground === center.ground)) {
+      g.fillStyle = center.ground;
+      g.fillRect(ox, oy, TILE, TILE);
+      return;
+    }
+    const img = new ImageData(2, 2);
+    for (let i = 0; i < 4; i++) {
+      const [r, gr, b] = rgbOf(corners[i].ground);
+      img.data[i * 4] = r;
+      img.data[i * 4 + 1] = gr;
+      img.data[i * 4 + 2] = b;
+      img.data[i * 4 + 3] = 255;
+    }
+    const src = document.createElement('canvas');
+    src.width = 2;
+    src.height = 2;
+    src.getContext('2d').putImageData(img, 0, 0);
+    g.save();
+    g.beginPath();
+    g.rect(ox, oy, TILE, TILE);
+    g.clip();
+    g.imageSmoothingEnabled = true;
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(src, ox - TILE / 2, oy - TILE / 2, TILE * 2, TILE * 2);
+    g.restore();
+  }
+
+  /**
+   * Boschi, macchie e appezzamenti fra una città e l'altra. La prova si fa
+   * **cella per cella**, non una volta per tile: decidere sul centro del tile
+   * faceva cominciare la campagna su una riga dritta lunga 512 px, e a quel
+   * punto il confine fra Seoul e i campi si leggeva come un errore di disegno.
+   * Vicino al bordo di una città la macchia si dirada invece di tagliarsi netta.
+   */
+  drawCountryside(g, ox, oy) {
+    const city = this.city;
+    const cell = 128;
+    const FADE = 320;
+    const edgeDistance = (x, y) => {
+      let best = Infinity;
+      for (const a of city.areas || []) {
+        const dx = Math.max(a.x0 - x, 0, x - a.x1);
+        const dy = Math.max(a.y0 - y, 0, y - a.y1);
+        const d = Math.hypot(dx, dy);
+        if (d < best) best = d;
+      }
+      return best;
+    };
+    for (let y = oy; y < oy + TILE; y += cell) {
+      for (let x = ox; x < ox + TILE; x += cell) {
+        const rv = hash2(x, y);
+        const cx = x + cell / 2;
+        const cy = y + cell / 2;
+        if (city.areaAt(cx, cy) || city.isWater(cx, cy)) continue;
+        const near = edgeDistance(cx, cy);
+        if (near < FADE && hash2(x + 7, y + 3) > near / FADE) continue;
+        if (rv < 0.34) {
+          // Appezzamento: il segno con cui la campagna coreana si riconosce
+          // dall'alto, anche senza una strada che ci porti.
+          const w = cell * (0.62 + hash2(x, y + 1) * 0.3);
+          const h = cell * (0.55 + hash2(x + 1, y) * 0.34);
+          g.fillStyle = rv < 0.16 ? 'rgba(58,79,44,0.55)' : 'rgba(74,78,40,0.45)';
+          g.fillRect(x + 8, y + 8, w, h);
+          g.strokeStyle = 'rgba(30,38,24,0.35)';
+          g.lineWidth = 2;
+          g.strokeRect(x + 8, y + 8, w, h);
+        } else if (rv < 0.86) {
+          const n = 2 + ((rv * 100) | 0) % 3;
+          for (let i = 0; i < n; i++) {
+            const px = x + hash2(x + i * 13, y) * cell;
+            const py = y + hash2(x, y + i * 17) * cell;
+            const rr = 18 + hash2(px, py) * 30;
+            g.fillStyle = `rgba(40,${62 + (hash2(i, px) * 26) | 0},38,0.42)`;
+            g.beginPath();
+            g.ellipse(px, py, rr, rr * 0.72, hash2(py, px) * 6.28, 0, 6.2832);
+            g.fill();
+          }
+        }
+      }
+    }
+  }
+
   renderTile(tx, ty) {
     const city = this.city;
     const c = document.createElement('canvas');
@@ -74,16 +187,33 @@ export class GroundRenderer {
     g.translate(-ox, -oy);
 
     // --- Base: terra del distretto -------------------------------------------
-    const d = city.districtAt
-      ? city.districtAt(ox + TILE / 2, oy + TILE / 2)
-      : districtAtNorm((ox + TILE / 2) / city.w, (oy + TILE / 2) / city.h);
-    g.fillStyle = d.ground;
-    g.fillRect(ox, oy, TILE, TILE);
+    const d = this.districtAt(ox + TILE / 2, oy + TILE / 2);
+    this.drawGroundBase(g, ox, oy, d);
 
-    // --- Fiume Han ------------------------------------------------------------
+    // --- Campagna: quello che c'è fra una città e l'altra ---------------------
+    // Fuori dai tre rettangoli non esistono isolati, quindi non c'è niente che
+    // disegni il terreno: resterebbe una tinta piatta da orizzonte a orizzonte.
+    // Boschi e appezzamenti sono dipinti qui, come le strisce pedonali — non
+    // fermano niente e non entrano nell'ordinamento radiale.
+    if (city.areaAt) this.drawCountryside(g, ox, oy);
+
+    // --- Acqua ----------------------------------------------------------------
+    // La maschera `isWater` è l'autorità su tutta l'acqua del mondo (Han, mare
+    // occidentale, baia di Busan, canale di Jeju). Il disegno editoriale del Han
+    // e della costa di Seoul resta, ma **sopra** e ritagliato sul suo rettangolo:
+    // fuori da lì quelle coordinate non vogliono dire più niente.
+    const seoulArea = city.seoulArea;
+    const inSeoul = !!seoulArea && ox < seoulArea.x1 && ox + TILE > seoulArea.x0
+      && oy < seoulArea.y1 && oy + TILE > seoulArea.y0;
+    if (city.isWater) this.drawRegionalWater(g, ox, oy);
+    if (inSeoul) {
+      g.save();
+      g.beginPath();
+      g.rect(seoulArea.x0, seoulArea.y0, seoulArea.x1 - seoulArea.x0, seoulArea.y1 - seoulArea.y0);
+      g.clip();
+    }
     const r = city.river;
-    const seoulWater = (city.region?.id || 'seoul') === 'seoul';
-    if (seoulWater && oy < r.y1 && oy + TILE > r.y0) {
+    if (inSeoul && oy < r.y1 && oy + TILE > r.y0) {
       const grad = g.createLinearGradient(0, r.y0, 0, r.y1);
       grad.addColorStop(0, '#1b3a4a');
       grad.addColorStop(0.35, '#16303f');
@@ -143,8 +273,8 @@ export class GroundRenderer {
     }
 
     // --- Mare (서해), piana di marea e banchina --------------------------------
-    if (seoulWater && city.waterX > 0 && ox < city.quayX + TILE) this.drawSea(g, ox, oy);
-    else if (!seoulWater && city.isWater) this.drawRegionalWater(g, ox, oy);
+    if (inSeoul && city.waterX > 0 && ox < city.quayX + TILE) this.drawSea(g, ox, oy);
+    if (inSeoul) g.restore();
 
     // --- Asfalto --------------------------------------------------------------
     const noise = g.createPattern(noiseCanvas(), 'repeat');
@@ -220,9 +350,8 @@ export class GroundRenderer {
 
   drawWorldBoundary(g, view) {
     const city = this.city;
-    const region = city.region?.id || 'seoul';
     const depth = 64;
-    const wetAt = (x, y) => region !== 'seoul' && typeof city.isWater === 'function' && city.isWater(x, y);
+    const wetAt = (x, y) => typeof city.isWater === 'function' && city.isWater(x, y);
     const fillOutside = (x, y, w, h, wet) => {
       if (w <= 0 || h <= 0) return;
       g.fillStyle = wet ? '#0d2a3b' : '#17251b';
@@ -298,11 +427,18 @@ export class GroundRenderer {
     const step = 12;
     const xEnd = ox + TILE;
     const yEnd = oy + TILE;
+    // Dentro Seoul l'acqua ha un disegno suo (banchina, piana di marea,
+    // lungofiume) che passa subito dopo: qui va lasciata stare, o la schiuma
+    // generica correrebbe anche lungo gli argini del Han.
+    const sa = city.seoulArea;
+    const wetAt = sa
+      ? (x, y) => !(x >= sa.x0 && x < sa.x1 && y >= sa.y0 && y < sa.y1) && city.isWater(x, y)
+      : (x, y) => city.isWater(x, y);
     g.fillStyle = '#123447';
     for (let y = oy; y < yEnd; y += step) {
       let run = null;
       for (let x = ox; x <= xEnd + step; x += step) {
-        const wet = x <= xEnd && city.isWater(x + step / 2, y + step / 2);
+        const wet = x <= xEnd && wetAt(x + step / 2, y + step / 2);
         if (wet && run === null) run = x;
         if (!wet && run !== null) {
           g.fillRect(run, y, x - run + 0.8, step + 0.8);
@@ -315,9 +451,9 @@ export class GroundRenderer {
     // le dà spessore visivo con rocce, sabbia scura e schiuma. Senza, soprattutto
     // sul lato est di Jeju, la costa sembrava il taglio verticale di una tile.
     for (let y = oy; y < yEnd; y += step) {
-      let prevWet = city.isWater(ox - step / 2, y + step / 2);
+      let prevWet = wetAt(ox - step / 2, y + step / 2);
       for (let x = ox; x <= xEnd; x += step) {
-        const wet = city.isWater(x + step / 2, y + step / 2);
+        const wet = wetAt(x + step / 2, y + step / 2);
         if (wet !== prevWet) {
           const shoreX = x;
           const landSide = wet ? -1 : 1;
@@ -618,30 +754,27 @@ export class GroundRenderer {
     g.restore();
   }
 
+  /**
+   * Segnaletica fra un incrocio e il successivo. I tratti arrivano già pronti in
+   * `l.marks` (vedi `korea.buildLaneMarks`): leggerli da `l.on[j]` significava
+   * indicizzare la perpendicolare, e con tre maglie nello stesso array quell'indice
+   * non individua più niente.
+   */
   drawMarkings(g, view) {
     const city = this.city;
-    const { hLines, vLines } = city;
 
-    // Verticali: tratti tra due incroci consecutivi
-    for (const l of vLines) {
+    for (const l of city.vLines) {
       const x = l.c;
       if (x + l.width < view.x || x - l.width > view.x + view.w) continue;
-      for (let j = 0; j < hLines.length - 1; j++) {
-        if (!l.on[j]) continue;
-        const a = hLines[j].c + hLines[j].width / 2;
-        const b = hLines[j + 1].c - hLines[j + 1].width / 2;
+      for (const [a, b] of l.marks || []) {
         if (b < view.y - 20 || a > view.y + view.h + 20) continue;
         this.laneMarks(g, x, a, b, l, true);
       }
     }
-    // Orizzontali
-    for (const l of hLines) {
+    for (const l of city.hLines) {
       const y = l.c;
       if (y + l.width < view.y || y - l.width > view.y + view.h) continue;
-      for (let i = 0; i < vLines.length - 1; i++) {
-        if (!l.on[i]) continue;
-        const a = vLines[i].c + vLines[i].width / 2;
-        const b = vLines[i + 1].c - vLines[i + 1].width / 2;
+      for (const [a, b] of l.marks || []) {
         if (b < view.x - 20 || a > view.x + view.w + 20) continue;
         this.laneMarks(g, y, a, b, l, false);
       }
@@ -733,7 +866,10 @@ export class GroundRenderer {
   }
 
   drawBlock(g, b, tx, ty) {
-    const d = this.city.districtById?.[b.district] || DISTRICT_BY_ID[b.district];
+    // Gli id dei distretti sono gli stessi in tutte e tre le città: cercarli per
+    // chiave darebbe a un isolato di Haeundae i colori di Gangnam. Il riferimento
+    // diretto lo assegna `korea.js`, che sa in quale città sta l'isolato.
+    const d = b.districtRef || this.city.districtById?.[b.district] || DISTRICT_BY_ID[b.district];
 
     // Campagna: terra e campi. Niente marciapiedi, niente cordoli — è quello che
     // fa capire di essere usciti da Seoul molto prima del cartello del distretto.
