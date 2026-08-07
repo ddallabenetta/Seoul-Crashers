@@ -24,9 +24,18 @@ export const SLOTS = 3;
  */
 export const AUTO_SLOT = 3;
 export const ALL_SLOTS = 4;
+/**
+ * Quante generazioni tiene l'autosave. Una sola era una trappola al contrario:
+ * chi si accorgeva tardi di aver sbagliato strada trovava l'errore già salvato
+ * sopra il momento in cui non l'aveva ancora fatto. Tre costano 2 kB.
+ */
+export const AUTO_GENS = 3;
 const VERSION = 1;
 const SEED = 20260730;
-const KEY = (i) => (i === AUTO_SLOT ? 'seoul.save.auto' : `seoul.save.${i}`);
+// La generazione 0 tiene la chiave storica: chi aggiorna il gioco si ritrova il
+// suo autosave dov'era, non uno slot vuoto.
+const KEY = (i, gen = 0) =>
+  (i === AUTO_SLOT ? (gen ? `seoul.save.auto.${gen}` : 'seoul.save.auto') : `seoul.save.${i}`);
 const AUTO_KEY = 'seoul.autosave';
 // Ogni quanto scatta l'autosave a tempo, in secondi di gioco.
 const AUTO_EVERY = 240;
@@ -204,11 +213,11 @@ export function apply(game, data) {
 
 // --- slot ---------------------------------------------------------------------
 
-export function readSlot(i) {
+export function readSlot(i, gen = 0) {
   const ls = store();
   if (!ls) return null;
   try {
-    const raw = ls.getItem(KEY(i));
+    const raw = ls.getItem(KEY(i, gen));
     if (!raw) return null;
     const data = JSON.parse(raw);
     // Una seed diversa vuol dire un'altra Seoul: le coordinate salvate non
@@ -231,11 +240,11 @@ export function writeSlot(i, game) {
   }
 }
 
-export function clearSlot(i) {
+export function clearSlot(i, gen = 0) {
   const ls = store();
   if (!ls) return false;
   try {
-    ls.removeItem(KEY(i));
+    ls.removeItem(KEY(i, gen));
     return true;
   } catch {
     return false;
@@ -304,9 +313,29 @@ export function canAutosave(game) {
   return !(game.police && game.police.bustProgress > 0);
 }
 
+/**
+ * Fa scorrere lo storico: la generazione 0 diventa la 1, la 1 la 2, e la più
+ * vecchia se ne va. Si spostano le stringhe invece di tenere un cursore da
+ * qualche parte — due copie da 0,7 kB ogni quattro minuti — e in cambio la
+ * generazione 0 è **sempre** la più recente, senza un indice da salvare, da
+ * rileggere e da tenere allineato a quello che c'è davvero nel browser.
+ */
+function rotateAuto() {
+  const ls = store();
+  if (!ls) return;
+  try {
+    for (let g = AUTO_GENS - 1; g > 0; g--) {
+      const prev = ls.getItem(KEY(AUTO_SLOT, g - 1));
+      if (prev === null) ls.removeItem(KEY(AUTO_SLOT, g));
+      else ls.setItem(KEY(AUTO_SLOT, g), prev);
+    }
+  } catch { /* quota piena: si perde lo storico, non il salvataggio che segue */ }
+}
+
 /** Scrive lo slot automatico, se il momento è buono. `reason` finisce nel toast. */
 export function autosave(game, reason) {
   if (!canAutosave(game)) return false;
+  rotateAuto();
   const ok = writeSlot(AUTO_SLOT, game);
   game.autoT = AUTO_EVERY;
   if (ok) {
