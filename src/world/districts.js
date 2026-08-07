@@ -23,7 +23,7 @@ export const HILLS = [
  * urbano: una fascia larga a nord del Han (la città vecchia) e un lobo a sud
  * (Gangnam), con un cuneo di campagna che entra da ovest fra le due. Non coincide
  * con i centri dei distretti — un distretto è un'identità, questa è una superficie —
- * e sono queste otto macchie, non un rettangolo, a decidere dove finisce la città.
+ * e sono queste dodici macchie, non un rettangolo, a decidere dove finisce la città.
  */
 export const URBAN_BLOBS = [
   { x: 0.47, y: 0.20, r: 0.185 },
@@ -34,6 +34,12 @@ export const URBAN_BLOBS = [
   { x: 0.76, y: 0.80, r: 0.195 },
   { x: 0.59, y: 0.775, r: 0.14 },
   { x: 0.895, y: 0.635, r: 0.13 },
+  // Nuovi lobi della cintura metropolitana: restano leggibili come distretti
+  // periferici, ma ricevono la stessa maglia/edilizia delle macchie centrali.
+  { x: 0.28, y: 0.36, r: 0.12 },
+  { x: 0.935, y: 0.35, r: 0.13 },
+  { x: 0.90, y: 0.90, r: 0.12 },
+  { x: 0.35, y: 0.86, r: 0.11 },
 ];
 
 export const DISTRICTS = [

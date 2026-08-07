@@ -1151,6 +1151,39 @@ export function getPropSprite(p) {
         g.fillStyle = 'rgba(255,240,200,0.25)';
         g.fillRect(6, 16, w - 12, h - 22);
       });
+    case 'metro_entrance':
+      return sprite(key, 86, 58, (g, w, h) => {
+        // Vano della scala: profondo, a gradini, con parapetti azzurri e totem M.
+        g.fillStyle = 'rgba(7,13,18,0.92)';
+        roundRect(g, 5, 9, w - 18, h - 14, 5); g.fill();
+        const stair = g.createLinearGradient(0, 12, 0, h - 7);
+        stair.addColorStop(0, '#151c22');
+        stair.addColorStop(1, '#6c7983');
+        g.fillStyle = stair;
+        roundRect(g, 12, 14, w - 34, h - 24, 3); g.fill();
+        g.fillStyle = 'rgba(235,242,248,0.26)';
+        for (let y = 18; y < h - 11; y += 6) g.fillRect(15, y, w - 40, 2);
+        g.strokeStyle = p.accent || '#54d7ff';
+        g.lineWidth = 3;
+        g.beginPath();
+        g.moveTo(9, 10); g.lineTo(9, h - 6);
+        g.moveTo(w - 19, 10); g.lineTo(w - 19, h - 6);
+        g.stroke();
+        // Totem verticale, leggibile anche quando l'accesso è lontano.
+        g.fillStyle = '#176ca1';
+        roundRect(g, w - 18, 1, 17, 40, 4); g.fill();
+        g.strokeStyle = '#bfefff';
+        g.lineWidth = 1.4;
+        g.stroke();
+        g.fillStyle = '#ffffff';
+        g.font = '900 15px system-ui, sans-serif';
+        g.textAlign = 'center';
+        g.fillText('M', w - 9.5, 18);
+        g.font = '800 6px system-ui, sans-serif';
+        g.fillText('지하철', w - 9.5, 29);
+        g.fillStyle = '#ffd33f';
+        g.fillRect(w - 15, 33, 11, 3);
+      });
     case 'busstop':
       return sprite(key, 54, 22, (g, w, h) => {
         g.fillStyle = 'rgba(180,200,220,0.35)';

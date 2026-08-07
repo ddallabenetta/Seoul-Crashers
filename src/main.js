@@ -23,6 +23,7 @@ import { PoliceSystem } from './entities/police.js';
 import { ShopSystem, won } from './entities/shops.js';
 import { autosave, tickAutosave } from './core/save.js';
 import { InteriorScene } from './render/interiorscene.js';
+import { MetroScene } from './render/metroscene.js';
 import { Hud } from './ui/hud.js';
 import { MapView } from './ui/mapview.js';
 import { PauseMenu } from './ui/menu.js';
@@ -152,6 +153,7 @@ class Game {
     this.startMenu = new StartMenu();
     this.shopMenu = new ShopMenu();
     this.metro = new MetroSystem();
+    this.metroScene = new MetroScene(this.scene);
 
     // Riempie subito la scena, così il giocatore non parte in una città deserta.
     this.traffic.placeSpecialVehicles(this);
@@ -165,7 +167,21 @@ class Game {
     this.loop.start();
     // `?autostart` salta il menu iniziale: è come `probe.mjs` (§9) e le scene di
     // prova trovano il gioco in strada, esattamente come prima che il menu ci fosse.
-    if (new URLSearchParams(window.location.search).has('autostart')) this.start(false);
+    const probe = new URLSearchParams(window.location.search);
+    if (probe.has('autostart')) this.start(false);
+    // Hook di prova locale: porta direttamente alla banchina senza falsare il
+    // percorso normale, che resta ingresso in strada -> atrio -> tornelli. Serve
+    // al browser automatico, che può premere tasti ma non tenerli premuti a lungo.
+    if (probe.get('metrotest') === 'platform') {
+      if (!this.started) this.start(false);
+      const station = this.city.transitStations?.[0];
+      if (station && this.metro.enterStation(this, station)) {
+        this.player.x = this.metro.floor.trainDoor.x;
+        this.player.y = this.metro.floor.trainDoor.y - 24;
+        this.player.enterCooldown = 0;
+        this.camera.snapTo(this.metro.floor.w / 2, this.metro.floor.h / 2);
+      }
+    }
   }
 
   /**
@@ -233,7 +249,7 @@ class Game {
    */
   travelTo(regionId, stationId = null, opts = {}) {
     const oldId = this.city.region?.id || 'seoul';
-    if (this.indoors) this.shops.forceExit(this);
+    if (this.indoors) this.leaveInterior();
     if (!this.player.onFoot && this.player.vehicle) {
       const v = this.player.vehicle;
       v.driver = null;
@@ -264,6 +280,7 @@ class Game {
       this.police = new PoliceSystem(this.city, this.rng);
       this.shops = new ShopSystem(this.city);
       this.interiorScene = new InteriorScene(this.scene);
+      this.metroScene = new MetroScene(this.scene);
       this.hud = new Hud(this.city, this.mapTexture);
       this.mapView = new MapView(this.city, this.mapTexture);
       this.menu = new PauseMenu(this.mapView);
@@ -310,7 +327,7 @@ class Game {
    * un `location.reload()` travestito.
    */
   newGame() {
-    if (this.indoors) this.shops.forceExit(this);
+    if (this.indoors) this.leaveInterior();
     if ((this.city.region?.id || 'seoul') !== 'seoul') this.travelTo('seoul', null, { silent: true });
     this.clearWorld();
     this.player.reset(this.city.spawn.x, this.city.spawn.y);
@@ -359,9 +376,21 @@ class Game {
     // Il tema torna da solo: `music.direct` guarda `game.started` a ogni frame.
   }
 
-  /** True quando il giocatore è dentro un edificio: la città è ferma. */
+  /** True quando il giocatore è in un interno: negozio oppure stazione metro. */
   get indoors() {
-    return !!(this.shops && this.shops.active);
+    return !!((this.shops && this.shops.active) || (this.metro && this.metro.inside));
+  }
+
+  /** Pianta attiva condivisa da collisioni, camera e minimappa interna. */
+  get interiorFloor() {
+    if (this.metro?.inside) return this.metro.floor;
+    return this.shops?.floor || null;
+  }
+
+  /** Chiude in modo sicuro qualunque interno senza lasciare coordinate locali. */
+  leaveInterior() {
+    if (this.metro?.inside) this.metro.forceExit(this);
+    if (this.shops?.active) this.shops.forceExit(this);
   }
 
   /** Notte di gioco: la decide l'orologio, e da lì scendono fari, lampioni e insegne. */
@@ -376,7 +405,7 @@ class Game {
    */
   area() {
     if (this.indoors) {
-      const f = this.shops.floor;
+      const f = this.interiorFloor;
       return { grid: f.grid, x0: 10, y0: 10, x1: f.w - 10, y1: f.h - 10 };
     }
     return { grid: this.city.solidGrid, x0: 40, y0: 40, x1: this.city.w - 40, y1: this.city.h - 40 };
@@ -543,7 +572,8 @@ class Game {
 
   /** Uno sparo si sente: i pedoni nel raggio reagiscono — quelli del piano, se dentro. */
   alarm(x, y, r, source) {
-    if (this.indoors) this.shops.alarm(x, y, r, this, source);
+    if (this.shops?.active) this.shops.alarm(x, y, r, this, source);
+    else if (this.metro?.inside) return;
     else this.pedSystem.alarm(x, y, r, this, source);
   }
 
@@ -553,7 +583,7 @@ class Game {
     // Se si muore dentro un negozio la barella arriva lo stesso: l'interno si
     // chiude prima di spostare il giocatore, o resterebbe in un limbo con le
     // coordinate della pianta.
-    if (this.indoors) this.shops.forceExit(this);
+    if (this.indoors) this.leaveInterior();
     let best = this.city.hospitals[0];
     let bestD = Infinity;
     for (const h of this.city.hospitals) {
@@ -597,7 +627,7 @@ class Game {
    */
   bustPlayer() {
     const pl = this.player;
-    if (this.indoors) this.shops.forceExit(this);
+    if (this.indoors) this.leaveInterior();
     // In campagna e all'aeroporto non ci sono commissariati: lì ti portano
     // all'ospedale del distretto, che è l'unico edificio pubblico che c'è.
     const places = this.city.stations.length ? this.city.stations : this.city.hospitals;
@@ -696,7 +726,12 @@ class Game {
 
     // I negozi girano per primi: decidono se il frame si svolge in strada o dentro
     // un edificio, e il giocatore deve muoversi già nello spazio giusto.
-    this.shops.update(dt, this);
+    if (this.metro.inside) {
+      this.shops.actions.length = 0;
+      this.shops.near = null;
+    } else {
+      this.shops.update(dt, this);
+    }
     this.player.update(dt, this);
     // Dentro un edificio la città si ferma — traffico, pedoni, raccolte — e il
     // ricercato **resta congelato**: se si raffreddasse, la porta diventerebbe il
@@ -712,7 +747,7 @@ class Game {
       this.traffic.update(dt, this);
       this.pedSystem.update(dt, this);
       this.pickups.update(dt, this);
-    } else {
+    } else if (this.shops.active) {
       this.police.siege(dt, this);
     }
     // Gli esplosivi girano anche dentro: una granata in un 노래방 rimbalza sui
@@ -827,7 +862,8 @@ class Game {
 
   render() {
     const ctx = this.ctx;
-    if (this.indoors) this.interiorScene.render(ctx, this);
+    if (this.metro.inside) this.metroScene.render(ctx, this);
+    else if (this.indoors) this.interiorScene.render(ctx, this);
     else this.scene.render(ctx, this);
     this.camera.applyUI(ctx);
     if (!this.started) {

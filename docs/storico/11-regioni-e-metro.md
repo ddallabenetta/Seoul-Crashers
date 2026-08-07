@@ -1,6 +1,7 @@
 # Regioni e metro
 
 > §5.22 del progetto. Indice generale e mappa dei rimandi: [HANDOFF.md](../../HANDOFF.md).
+> Stato storico: topologie, dimensioni e metro sono stati sostituiti dal §5.23.
 
 ### 5.22 — Seoul estesa, Busan, Jeju e rete di viaggio
 

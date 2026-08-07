@@ -8,8 +8,9 @@
 (§5.11), i due giri di arretrati (§5.12 e §5.21), il salvataggio (§5.15), l'arresto (§5.16),
 il menu iniziale (§5.18), la musica (§5.19) e l'autosave (§5.20) sono fatti; la segnalazione
 sul traffico è chiusa (§5.10) e quella sulle auto attraversabili pure (§5.17, e dal §5.21 vale
-anche per i pedoni). Dal §5.22 sono fatti anche **Seoul estesa, Busan, Jeju, la rete metro e i
-collegamenti interurbani**, con mappe e salvataggi consapevoli della regione.
+anche per i pedoni). Dal §5.22-5.23 sono fatti anche **Seoul estesa, le geografie autonome di
+Busan e Jeju, gli interni metro e i collegamenti interurbani**, con mappe e salvataggi
+consapevoli della regione.
 **Restano le missioni**, che sono il lavoro grosso: impianto (attivazione sulla mappa,
 obiettivi, fallimento e ripetizione), cutscene a pannelli a fumetto, e i contenuti. **Le scelte
 di design vanno concordate con l'utente prima di scrivere codice** — è la prima cosa da chiedere
@@ -35,7 +36,7 @@ il §5.21 altre undici — fra cui le due che erano tornate in cima.
   anche se la telefonata era già partita.
 
 **Rimasto indietro dall'acustica** (§5.21):
-- **Manca lo spazio grande.** `SPACES` ha quattro voci perché le 114 piante del gioco sono
+- **Manca lo spazio grande.** `SPACES` ha quattro voci perché le 240 piante dei negozi sono
   tutte stanze (78k–117k px²): una `hall` la vorrà il primo interno grande, cioè il terminal
   dell'aeroporto quando ce l'avrà.
 - **Il riverbero non sa che piove né che è notte**: uno sparo in un vicolo sotto il temporale
@@ -86,11 +87,11 @@ il §5.21 altre undici — fra cui le due che erano tornate in cima.
 - **Dal retro non si entra e non si sale**: la porta di servizio è solo un'uscita.
 - **La folla non ricorda chi era lì**: due visite alla stessa ora hanno gli stessi posti ma
   persone nuove. Ricordarle vorrebbe dire una lista permanente per fascia oraria, e non si nota.
-- **Due distretti su sette non hanno nemmeno una vetrina.** Il §5.21 ha garantito un 전당포
-  ovunque *si potesse*, e si può in 5 distretti: a Gimpo ci sono cinque edifici e sono tutti
-  volumi dell'aeroporto, in campagna non ce n'è nessuno che regga una porta. Le righe `gimpo` e
-  `gyeonggi` di `shops.MARKETS` (munizioni 1,40!) restano raggiungibili solo attraverso il
-  prezzo dell'officina finché quei due distretti non avranno un edificio in cui entrare.
+- **Gimpo non ha ancora una vetrina.** Il §5.21 ha garantito un 전당포 ovunque *si potesse*;
+  l'espansione del §5.23 ha dato edifici e due negozi anche alla campagna di Gyeonggi, ma a
+  Gimpo i volumi restano infrastrutture aeroportuali senza una porta commerciale. La riga
+  `gimpo` di `shops.MARKETS` (munizioni 1,40!) si legge quindi soltanto nel prezzo
+  dell'officina finché il terminal non avrà un interno.
 
 **Rimasto indietro dalla polizia** (§5.5, §5.12, §5.16):
 - **Dalla cella non si esce a piedi con qualcosa da fare**: niente cauzione da pagare in
@@ -124,19 +125,16 @@ il §5.21 altre undici — fra cui le due che erano tornate in cima.
   meno (sono sagome della stessa taglia che si sovrappongono per un istante), ma è lo stesso
   steering e costerebbe una query in più per pedone per frame.
 
-**Rimasto indietro dalle regioni e dalla metro** (§5.22):
-- **Busan e Jeju non hanno ancora una topologia geografica scritta apposta.** Hanno lo stesso
-  livello sistemico di Seoul e landmark propri, ma costa, canale, aeroporto e porto adattano la
-  maglia procedurale comune. Una Jeju davvero insulare richiede un campo d'acqua chiuso su
-  quattro lati; una Busan riconoscibile richiede costa sud-orientale, Nakdong ed estuario.
+**Rimasto indietro dalle regioni e dalla metro** (§5.22-5.23):
 - **Lasciare una regione non conserva il suo stato locale.** Geometria e texture restano in
   cache, ma `ShopSystem` e gli interni vengono ricostruiti: casse svuotate, spese, vendite e
   personale di Busan non aspettano il giocatore dopo un viaggio a Jeju. Il salvataggio conserva
   correttamente la regione attiva, non una fotografia delle altre due.
-- **Il viaggio è ancora uno stacco funzionale.** Il tempo avanza e il personaggio arriva alla
-  fermata giusta, ma non ci sono tariffa, biglietto, animazione della linea né sequenza di KTX,
-  traghetto o aereo. Prima di aggiungerle va deciso quanto spesso il giocatore deve viaggiare:
-  una sequenza bella la prima volta può diventare un ostacolo alla decima.
+- **Il tratto interurbano è ancora uno stacco funzionale.** Ingresso, atrio, tornelli,
+  banchina e treno ora si vedono e si percorrono; dopo la scelta, però, il tempo avanza e il
+  personaggio arriva senza tariffa, biglietto né sequenza di KTX, traghetto o aereo. Prima di
+  aggiungerle va deciso quanto spesso il giocatore deve viaggiare: una sequenza bella la prima
+  volta può diventare un ostacolo alla decima.
 - **Le linee sono etichette, non un grafo.** Il pannello permette di scegliere ogni altra
   fermata; non calcola cambi, percorso, durata o fermate intermedie. Un vero grafo serve solo se
   il viaggio deve diventare gameplay invece di navigazione rapida.

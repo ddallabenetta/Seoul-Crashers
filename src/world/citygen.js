@@ -10,7 +10,12 @@ import {
 import { buildRoadGraph } from './roadgraph.js';
 import { BUSINESSES, DISTRICT_MIX } from './interiors.js';
 
-export const WORLD = { w: 5400, h: 5400, margin: 150 };
+// La Seoul allargata conserva le stesse distanze stradali in pixel, ma cresce in
+// entrambe le direzioni: 7200² è 1,78 volte la superficie della mappa originale
+// (5400²). Le coordinate normalizzate di distretti, Han e rilievi restano quindi
+// compatibili, mentre maglia, isolati e contenuto procedurale riempiono davvero
+// il territorio nuovo invece di lasciare una cornice vuota.
+export const WORLD = { w: 7200, h: 7200, margin: 200 };
 export const SIDEWALK = 20; // profondità marciapiede attorno a ogni isolato
 // Sotto questa "urbanità" (vedi `makeUrbanity`) non c'è più città: restano le
 // provinciali e i campi. È la soglia che dà la sagoma a Seoul.

@@ -2,8 +2,8 @@
 // può quindi essere applicato subito dopo `generateCity` senza creare cicli e
 // senza consumare lo stato del generatore pseudo-casuale.
 
-const DEFAULT_WORLD_W = 5400;
-const DEFAULT_WORLD_H = 5400;
+const DEFAULT_WORLD_W = 7200;
+const DEFAULT_WORLD_H = 7200;
 
 // I punti sono frazioni della mappa (ovest -> est, nord -> sud). Le coordinate
 // sono intenzionalmente lontane dal Han e dalla costa: i palazzi sono volumi
@@ -150,59 +150,138 @@ function pointIsSafe(city, x, y) {
   return typeof city.isWater !== 'function' || !city.isWater(x, y);
 }
 
+function rectsOverlap(a, b, pad = 0) {
+  return a.x < b.x + b.w + pad && a.x + a.w > b.x - pad
+    && a.y < b.y + b.h + pad && a.y + a.h > b.y - pad;
+}
+
+// Liang–Barsky segment clipping. Roadgraph edges are axis-aligned today, but
+// keeping this generic makes the placement rule safe for regional adapters too.
+function segmentIntersectsRect(edge, rect, pad = 0) {
+  const left = rect.x - pad;
+  const right = rect.x + rect.w + pad;
+  const top = rect.y - pad;
+  const bottom = rect.y + rect.h + pad;
+  const ax = Number(edge.ax), ay = Number(edge.ay);
+  const bx = Number(edge.bx), by = Number(edge.by);
+  if (![ax, ay, bx, by].every(Number.isFinite)) return false;
+  const dx = bx - ax;
+  const dy = by - ay;
+  let lo = 0;
+  let hi = 1;
+  const clip = (p, q) => {
+    if (Math.abs(p) < 1e-9) return q >= 0;
+    const t = q / p;
+    if (p < 0) {
+      if (t > hi) return false;
+      if (t > lo) lo = t;
+    } else {
+      if (t < lo) return false;
+      if (t < hi) hi = t;
+    }
+    return true;
+  };
+  return clip(-dx, ax - left) && clip(dx, right - ax)
+    && clip(-dy, ay - top) && clip(dy, bottom - ay);
+}
+
+function propRect(prop) {
+  const r = Number.isFinite(prop.r) ? Math.max(0, prop.r) : 0;
+  return { x: prop.x - r, y: prop.y - r, w: r * 2, h: r * 2 };
+}
+
+function nearbyEdges(city, cx, cy, radius) {
+  const graph = city.graph;
+  if (!graph) return [];
+  if (typeof graph.edgesNear === 'function') return graph.edgesNear(cx, cy, radius, []);
+  return graph.edges || [];
+}
+
 function rectIsSafe(city, x, y, w, h) {
-  const pad = 4;
-  const points = [
-    [x + pad, y + pad],
-    [x + w - pad, y + pad],
-    [x + pad, y + h - pad],
-    [x + w - pad, y + h - pad],
-    [x + w / 2, y + h / 2],
-  ];
-  return points.every(([px, py]) => pointIsSafe(city, px, py));
+  const rect = { x, y, w, h };
+  const edgePad = 6;
+  if (x < 10 || y < 10 || x + w > city.w - 10 || y + h > city.h - 10) return false;
+
+  // Sample the perimeter as well as the centre; this catches a landmark that
+  // straddles the Han/coast even when all four corners happen to be dry.
+  const samples = [];
+  for (const fy of [0.04, 0.5, 0.96]) {
+    for (const fx of [0.04, 0.5, 0.96]) samples.push([x + w * fx, y + h * fy]);
+  }
+  if (samples.some(([px, py]) => !pointIsSafe(city, px, py))) return false;
+
+  // Existing generated buildings and solid props are authoritative. The gap is
+  // intentional: a landmark must not touch another solid after broad-phase
+  // insertion, otherwise the player can still become wedged at its corner.
+  for (const building of city.buildings || []) {
+    if (building && building.solid !== false && rectsOverlap(rect, building, 6)) return false;
+  }
+  for (const prop of city.props || []) {
+    if (prop && prop.solid && rectsOverlap(rect, propRect(prop), 4)) return false;
+  }
+  for (const stair of city.stairs || []) {
+    if (stair && rectsOverlap(rect, stair, 4)) return false;
+  }
+
+  // Keep a small clearance from each navigable graph segment. The generated
+  // building lots already leave the road width outside the graph centreline;
+  // expanding by a few pixels prevents exact-touching edge cases without
+  // ejecting a landmark from its recognizable district.
+  const radius = Math.hypot(w, h) * 0.5 + 90;
+  for (const edge of nearbyEdges(city, x + w / 2, y + h / 2, radius)) {
+    if (segmentIntersectsRect(edge, rect, edgePad)) return false;
+  }
+  return true;
 }
 
 /**
  * Restituisce un rettangolo vicino all'ancora. Le alternative sono fisse, non
- * casuali: se una seed mette un isolato sull'acqua il landmark resta comunque
- * in terra senza rendere il risultato dipendente da Math.random().
+ * casuali: si preferisce il punto più vicino che non tocchi acqua, edifici,
+ * props solidi o il corridoio di un arco navigabile. Così le ancore restano
+ * riconoscibili senza lasciare volumi che tappano il grafo stradale.
  */
 function placeBuilding(city, def) {
   const w = finiteDimension(city.w, DEFAULT_WORLD_W);
   const h = finiteDimension(city.h, DEFAULT_WORLD_H);
   const wanted = worldPoint(def, w, h);
-  const offsets = [
-    [0, 0],
-    [-180, 0],
-    [180, 0],
-    [0, -180],
-    [0, 180],
-    [-180, -180],
-    [180, -180],
-    [-180, 180],
-    [180, 180],
-  ];
-  const margin = 8;
-  let chosen = null;
-  for (const [ox, oy] of offsets) {
-    const cx = wanted.x + ox;
-    const cy = wanted.y + oy;
-    const x = Math.max(margin, Math.min(w - def.w - margin, cx - def.w / 2));
-    const y = Math.max(margin, Math.min(h - def.h - margin, cy - def.h / 2));
-    if (rectIsSafe(city, x, y, def.w, def.h)) {
-      chosen = { x, y };
-      break;
+  const margin = 10;
+  const candidate = (cx, cy) => {
+    if (cx < margin + def.w / 2 || cy < margin + def.h / 2
+      || cx > w - margin - def.w / 2 || cy > h - margin - def.h / 2) return null;
+    const x = cx - def.w / 2;
+    const y = cy - def.h / 2;
+    return rectIsSafe(city, x, y, def.w, def.h) ? { x, y } : null;
+  };
+
+  // Rings are deterministic and ordered by distance, so equal seeds always
+  // choose exactly the same replacement. A 24 px radial step is finer than a
+  // player width while keeping the one-time bootstrap inexpensive.
+  for (let radius = 0; radius <= 1600; radius += 24) {
+    const count = radius === 0 ? 1 : Math.max(16, Math.ceil((Math.PI * 2 * radius) / 32));
+    for (let i = 0; i < count; i++) {
+      const angle = radius === 0 ? 0 : (Math.PI * 2 * i) / count;
+      const found = candidate(wanted.x + radius * Math.cos(angle), wanted.y + radius * Math.sin(angle));
+      if (found) return { ...def, ...found, cx: found.x + def.w / 2, cy: found.y + def.h / 2 };
     }
   }
-  // Le ancore sopra sono su terra nella mappa di Seoul; questo fallback serve
-  // solo a città mock prive di una funzione d'acqua o a rettangoli minuscoli.
-  if (!chosen) {
-    chosen = {
-      x: Math.max(margin, Math.min(w - def.w - margin, wanted.x - def.w / 2)),
-      y: Math.max(margin, Math.min(h - def.h - margin, wanted.y - def.h / 2)),
-    };
+
+  // Pathological/custom cities can fill the rings. A coarse deterministic scan
+  // is preferable to placing a solid landmark on a road; it is reached only if
+  // no nearby block has a legal footprint.
+  const step = 48;
+  for (let y = margin + def.h / 2; y <= h - margin - def.h / 2; y += step) {
+    for (let x = margin + def.w / 2; x <= w - margin - def.w / 2; x += step) {
+      const found = candidate(x, y);
+      if (found) return { ...def, ...found, cx: found.x + def.w / 2, cy: found.y + def.h / 2 };
+    }
   }
-  return { ...def, x: chosen.x, y: chosen.y, cx: chosen.x + def.w / 2, cy: chosen.y + def.h / 2 };
+
+  // A city with no graph/solids (e.g. a small unit-test fixture) still gets a
+  // useful landmark at its editorial anchor; generated Seoul takes one of the
+  // safe branches above.
+  const x = Math.max(margin, Math.min(w - def.w - margin, wanted.x - def.w / 2));
+  const y = Math.max(margin, Math.min(h - def.h - margin, wanted.y - def.h / 2));
+  return { ...def, x, y, cx: x + def.w / 2, cy: y + def.h / 2 };
 }
 
 function districtIdAt(city, x, y, hint) {
@@ -211,6 +290,19 @@ function districtIdAt(city, x, y, hint) {
     if (d && typeof d.id === 'string') return d.id;
   }
   return hint || 'myeongdong';
+}
+
+function nearestRoadPoint(city, x, y) {
+  const nodes = city.graph && city.graph.usableNodes;
+  if (!nodes || !nodes.length) return { x, y };
+  let best = null;
+  let bestD = Infinity;
+  for (const node of nodes) {
+    if (typeof city.isWater === 'function' && city.isWater(node.x, node.y)) continue;
+    const d = (node.x - x) ** 2 + (node.y - y) ** 2;
+    if (d < bestD) { bestD = d; best = node; }
+  }
+  return best ? { x: best.x, y: best.y } : { x, y };
 }
 
 function makeBuilding(city, placed, index) {
@@ -271,7 +363,16 @@ export function expandSeoul(city) {
     const placed = placeBuilding(city, def);
     city.buildings.push(makeBuilding(city, placed, i));
     buildingNames.add(def.name);
-    appendMarker(city, def);
+    // Keep the map label on the physical volume after a collision-avoidance
+    // offset; the landmark remains recognizable instead of leaving its marker
+    // on the road where the editorial anchor started.
+    const w = finiteDimension(city.w, DEFAULT_WORLD_W);
+    const h = finiteDimension(city.h, DEFAULT_WORLD_H);
+    appendMarker(city, {
+      ...def,
+      x: placed.cx / w,
+      y: placed.cy / h,
+    });
   }
 
   for (const marker of LANDMARK_MARKERS) appendMarker(city, marker);
@@ -301,15 +402,52 @@ export function expandSeoul(city) {
   for (const station of TRANSIT_STATIONS) {
     if (stationIds.has(station.id)) continue;
     const p = worldPoint(station, w, h);
+    const road = nearestRoadPoint(city, p.x, p.y);
     city.transitStations.push({
       id: station.id,
       name: station.name,
       hangul: station.hangul,
-      x: Math.max(0, Math.min(w, p.x)),
-      y: Math.max(0, Math.min(h, p.y)),
+      x: Math.max(0, Math.min(w, road.x)),
+      y: Math.max(0, Math.min(h, road.y)),
       lines: [...station.lines],
     });
     stationIds.add(station.id);
+  }
+
+  // Un piccolo elemento di arredo rende visibile l'accesso in strada senza
+  // introdurre una seconda collisione: il parent può reindicizzare i props e
+  // associare l'entrata al nodo metro attraverso `stationId`.
+  if (!Array.isArray(city.metroEntrances)) city.metroEntrances = [];
+  if (!Array.isArray(city.props)) city.props = [];
+  const entranceIds = new Set(city.metroEntrances.map((entry) => entry && entry.stationId).filter(Boolean));
+  for (const station of city.transitStations) {
+    if (entranceIds.has(station.id)) continue;
+    const entrance = {
+      id: `${station.id}-entrance`,
+      stationId: station.id,
+      x: station.x,
+      y: station.y,
+      w: 34,
+      h: 22,
+      kind: 'metro-entrance',
+      hangul: '지하철',
+      visible: true,
+    };
+    city.metroEntrances.push(entrance);
+    city.props.push({
+      type: 'kiosk',
+      x: station.x,
+      y: station.y,
+      rot: 0,
+      z: 40,
+      solid: false,
+      r: 18,
+      word: '지하철',
+      accent: '#54d7ff',
+      stationId: station.id,
+      metroEntrance: true,
+    });
+    entranceIds.add(station.id);
   }
 
   return city;

@@ -25,14 +25,10 @@ src/world/
   citygen.js          quota del terreno, campo di urbanità, maglia stradale, mare e costa,
                       isolati (urbani, rurali, aeroporto, porto), edifici, props, indici,
                       vetrine (`placeShops`), officine (`placeGarages`), bande (`placeTurfs`)
-  regions.js          registro Seoul/Busan/Jeju e reindicizzazione dei contenuti regionali
-  seoul_expansion.js  landmark aggiuntivi e rete metro della capitale
-  busan.js            adattamento costiero, quartieri, landmark e stazioni di Busan
-  jeju.js             adattamento insulare, landmark e stazioni di Jeju
-  regions.js          registro Seoul/Busan/Jeju e reindicizzazione dei contenuti regionali
-  seoul_expansion.js  landmark aggiuntivi e rete metro della capitale
-  busan.js            adattamento costiero, quartieri, landmark e stazioni di Busan
-  jeju.js             adattamento insulare, landmark e stazioni di Jeju
+  regions.js          registro delle città, ingressi metro e reindicizzazione comune
+  seoul_expansion.js  landmark reali, cintura metropolitana e 16 stazioni della capitale
+  busan.js            generatore autonomo: baia, Nakdong, ponti e tessuto urbano di Busan
+  jeju.js             generatore autonomo: profilo insulare, Hallasan, campagne e due città
   daycycle.js         orologio, tabella della luce ora per ora, meteo a catena di Markov
   interiors.js        catalogo delle attività (con gli orari) + pianta di ogni piano
   roadgraph.js        nodi/archi, corsie, semafori, prenotazione incrocio
@@ -46,6 +42,7 @@ src/render/
   scene.js            pass di rendering, estrusione, ordinamento radiale
   fx.js               decals (gomma, sangue, bruciature) e particelle
   interiorscene.js    disegno di un piano: pavimento, muri estrusi, arredo, scale
+  metroscene.js       interno stazione: atrio, tornelli, banchina, binari e convoglio
 
 src/entities/
   vehicle.js          fisica arcade, pendenza, collisioni a tre cerchi, gomme a terra,
@@ -68,8 +65,7 @@ src/ui/
   saveslots.js        le schede dei salvataggi, condivise fra i due menu
   mixer.js            il pannello dei volumi, condiviso fra i due menu
   shopmenu.js         pannello del listino (compra/vendi)
-  metro.js            fermate, selezione locale/interurbana e pannello di viaggio
-  metro.js            fermate, selezione locale/interurbana e pannello di viaggio
+  metro.js            ingresso/uscita, pianta fisica e rete locale/interurbana
 
 .claude/              strumenti per chi sviluppa (non fa parte del gioco), vedi §9
   tools/probe.mjs     avvia il gioco headless, esegue scene, misura, screenshot
@@ -136,7 +132,7 @@ davvero il terreno vorrebbe dire spostare ogni tile per la sua quota (scalini al
 o rinunciare alla cache: è una scelta consapevole, non una svista.
 
 **La forma della città è un campo, non un contorno.** `city.urbanAt(x, y)` vale 1 nel centro
-dei quartieri e 0 in campagna: è la somma di otto macchie scritte a mano (`URBAN_BLOBS` in
+dei quartieri e 0 in campagna: è la somma di dodici macchie scritte a mano (`URBAN_BLOBS` in
 `districts.js`) più un rumore che ne sfrangia il bordo. Sotto `RURAL_U` (0.26) la maglia fitta
 non esiste: restano **una arteria su due** e qualche strada bianca, e gli isolati diventano
 campi. È l'unico posto in cui è deciso *dove finisce Seoul* — a valle nessuno sa niente di
@@ -146,18 +142,24 @@ Gangnam: il bordo va sfrangiato, non bucato.
 **Una regione è sempre una `city`.** Seoul, Busan e Jeju espongono lo stesso contratto
 (`graph`, griglie, blocchi, negozi, acqua, distretti e spawn): al viaggio `Game.travelTo`
 ricostruisce insieme tutti i sistemi che trattengono un riferimento alla città. I contenuti
-regionali vengono aggiunti dopo il generatore, poi `regions.js` rifà una sola volta gli indici
-spaziali; aggiungere un landmark fisico senza quel passaggio lo renderebbe visibile ma non
-solido. La geometria e la texture della carta sono mantenute in cache per regione, mentre
+regionali vengono chiusi da `regions.js`, che valida ingressi/uscite della metro e rifà una sola
+volta gli indici spaziali; aggiungere un landmark fisico senza quel passaggio lo renderebbe
+visibile ma non solido. Il contratto non implica una topologia comune: solo Seoul passa da
+`generateCity`; Busan e Jeju costruiscono linee, blocchi, acqua, rilievo e grafo nei propri
+generatori. La geometria e la texture della carta sono mantenute in cache per regione, mentre
 traffico e pedoni restano streaming e ripartono all'arrivo.
 
-**Una regione è sempre una `city`.** Seoul, Busan e Jeju espongono lo stesso contratto
-(`graph`, griglie, blocchi, negozi, acqua, distretti e spawn): al viaggio `Game.travelTo`
-ricostruisce insieme tutti i sistemi che trattengono un riferimento alla città. I contenuti
-regionali vengono aggiunti dopo il generatore, poi `regions.js` rifà una sola volta gli indici
-spaziali; aggiungere un landmark fisico senza quel passaggio lo renderebbe visibile ma non
-solido. La geometria e la texture della carta sono mantenute in cache per regione, mentre
-traffico e pedoni restano streaming e ripartono all'arrivo.
+**L'acqua regionale è un campo autorevole.** Il renderer storico di Seoul conosce Han e mare
+occidentale; Busan e Jeju devono invece essere disegnate campionando `city.isWater(x, y)`, sia
+nei tile di `GroundRenderer` sia nella texture della carta. `maptexture.js` usa scale `kx` e
+`ky` separate: Busan non è quadrata e una scala unica deformerebbe costa, edifici e strade.
+
+**Un interno è una pianta, non necessariamente un negozio.** `Game.interiorFloor` restituisce
+la pianta attiva a camera, collisioni e minimappa. I negozi continuano a usare `InteriorScene`;
+la metro usa `MetroScene`, ma il giocatore attraversa la stessa `SpatialGrid`. `MetroSystem`
+salva l'ingresso esterno, sposta il giocatore nell'atrio 1080×720 e mostra la scelta della
+tratta solo vicino alla porta del treno. Uscita, morte, arresto, salvataggio e cambio regione
+passano tutti da `Game.leaveInterior`, così coordinate locali e cittadine non si mescolano.
 
 **Le arterie non sono più intoccabili.** Prima erano continue per definizione; adesso in
 campagna ne sopravvive una su due, altrimenti il reticolo arriva identico fino al bordo mappa

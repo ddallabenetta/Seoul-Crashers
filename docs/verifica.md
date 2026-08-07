@@ -99,30 +99,20 @@ game.city.elevationAt = window._elev;                                  // ripris
 Dopo aver toccato la generazione, controlla anche la salute della maglia:
 
 ```js
-// vicoli ciechi veri: devono essere ≤ 6 e solo sul bordo mappa (x o y ≈ 188)
+// vicoli ciechi veri: Seoul ne ha 16 e sono tutti sul bordo (x/y ≈ 238 o 6928)
 game.city.graph.usableNodes.filter(n => n.out.length === 1).map(n => [n.x | 0, n.y | 0])
 // quanta strada è stata tolta dai superblocchi, e quanti disassamenti sono nati
 game.city.stats // { buildings, props, blocks, nodes, edges, doglegs, stairs }
 ```
 
-Valori attesi con la seed attuale e l'espansione regionale: `buildings 424` (418 dal generatore
-base + 6 landmark), `props 1299`, `blocks 122`, `nodes 196`,
-`edges 279`, `doglegs 4`, `stairs 3`, `rural 5`, `piers 10`, `shops 114`, `venues 325`,
-`garages 7`, `turfs 6`, `landmarks 21`, `transitStations 16`, e 43 raccolte a terra
-(`game.pickups.items.length`) — erano 36 finché
-non si è aggiunta la campagna e non si è cominciato a scartare i punti murati (§5.12).
-`shops` e `venues` sono saliti di uno nel §5.21, quando `ensurePawnShops` ha aperto una vetrina
-al porto — il distretto che non ne aveva nessuna.
-Escluso `buildings`, aumentato intenzionalmente dopo `generateCity`, i contatori strutturali
-devono restare **identici** finché non si tocca l'ordine di consumo dell'rng in generazione:
-se cambiano, hai spostato una `rng.*` e la città non è più quella collaudata.
-`shops`/`venues`/`garages` e `turfs` nascono da rng **separati** (`placeShops`, `placeGarages`,
-`placeTurfs`): cambiano solo se tocchi quelle funzioni, e non trascinano con sé il resto.
+Valori attesi con le seed attuali (§5.23): Seoul `7200×7200`, 849 edifici, 1991 props,
+234 isolati e grafo `306/479`; Busan `6400×5600`, 757 edifici, 1455 props, 150 isolati e
+grafo `177/300`; Jeju `5400×5400`, 399 edifici, 1418 props, 226 isolati e grafo `294/425`.
+Sono tre generatori deterministici con firme topologiche distinte: Busan e Jeju non chiamano
+`generateCity`. Seoul ha 16 fermate; le altre due 7 ciascuna. Ogni fermata deve avere una
+`entrance.visible`, un prop `metro_entrance` e un arrivo asciutto e libero.
 
-`stairs` è sceso da 8 a 3 perché i vicoli passanti candidati sono meno: la città copre la
-stessa area di prima ma su una mappa più grande, e la campagna non ha vicoli.
-
-Per le regioni e la metro (§5.22):
+Per le regioni e la metro (§5.22-5.23):
 
 ```js
 // identità e consistenza della regione attiva
@@ -140,15 +130,27 @@ game.city.transitStations.filter((s) =>
     s.arrivalY > o.y - 12 && s.arrivalY < o.y + o.h + 12))
 // atteso: [] in tutte e tre le regioni
 
+// ogni fermata ha un ingresso fisico associato al marker della carta
+game.city.transitStations.filter((s) =>
+  !s.entrance?.visible ||
+  !game.city.props.some((p) => p.stationId === s.id && p.type === 'metro_entrance'))
+// atteso: []
+
 // cambio regione a freddo; conserva inventario e orologio, ricostruisce i sistemi cittadini
 game.travelTo('busan'); game.travelTo('jeju'); game.travelTo('seoul');
 ```
 
-Valori attesi: Seoul `424 / 122 / 196 / 114 / 21 / 16`, Busan
-`410 / 139 / 226 / 100 / 8 / 7`, Jeju `457 / 104 / 202 / 126 / 7 / 7` nell'ordine
-edifici / isolati / nodi / negozi / landmark / fermate. Verifica manuale minima: Hongik →
-Samseong (COEX), Seoul → Busan, aprire la carta, Busan → Jeju, aprire la carta. I tornelli
-devono rifiutare l'ingresso con almeno una stella.
+Valori attesi nell'ordine edifici / isolati / nodi / archi / negozi / landmark / fermate:
+Seoul `849 / 234 / 306 / 479 / 240 / 21 / 16`, Busan
+`757 / 150 / 177 / 300 / 139 / 6 / 7`, Jeju
+`399 / 226 / 294 / 425 / 129 / 8 / 7`.
+
+Verifica browser minima: a Seoul trovare il totem `M · 지하철`, premere `E`, camminare dalla
+scala attraverso i tornelli fino alla banchina e aprire il tabellone soltanto davanti al treno;
+poi viaggiare a Busan e Jeju e aprire le due carte. Busan deve mostrare baia/Nakdong e Jeju il
+mare su tutti e quattro i bordi. `?autostart&metrotest=platform` è il solo hook di prova per
+saltare il tratto a movimento continuo; non cambia il percorso normale. La console deve restare
+senza errori. I tornelli devono rifiutare l'ingresso con almeno una stella.
 
 Per il combattimento:
 
@@ -350,7 +352,7 @@ dc.light   // { amb:[r,g,b], k, warm:[r,g,b], w, sx, sy, shadow, lamps }
 // comandi: spostare l'ora, forzare il tempo, fermare l'orologio
 dc.hour = 21.5;  dc.setWeather('storm');  dc.paused = true;
 // negozi: chi è aperto adesso
-game.city.shops.filter((s) => game.shops.shopOpen(s, game)).length   // su 114
+game.city.shops.filter((s) => game.shops.shopOpen(s, game)).length   // su 240 a Seoul
 game.shops.isOpen('guns', game)          // un tipo di attività
 game.shops.nextOpening(s, game)          // { biz, at, wait } del piano che riapre prima
 ```

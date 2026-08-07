@@ -150,7 +150,8 @@ export class MapView {
     // Stazioni della rete passeggeri: il cerchio ciano è distinto dal quadrato
     // blu dei commissariati, che storicamente usano `city.stations`.
     for (const st of city.transitStations || []) {
-      const s2 = toScreen(st.x, st.y);
+      const at = st.entrance || st;
+      const s2 = toScreen(at.x, at.y);
       ctx.fillStyle = '#62c9ff';
       ctx.beginPath();
       ctx.arc(s2.x, s2.y, 6, 0, 6.2832);

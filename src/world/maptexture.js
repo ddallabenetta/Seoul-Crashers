@@ -10,15 +10,15 @@ export function buildMapTexture(city) {
   c.width = MAP_SIZE;
   c.height = MAP_SIZE;
   const g = c.getContext('2d');
-  const k = MAP_SIZE / city.w;
+  const kx = MAP_SIZE / city.w;
+  const ky = MAP_SIZE / city.h;
 
   // Terra
   g.fillStyle = '#191c21';
   g.fillRect(0, 0, MAP_SIZE, MAP_SIZE);
 
   // Tinta dei distretti (macchie morbide attorno ai centri)
-  for (const id of Object.keys(DISTRICT_BY_ID)) {
-    const d = DISTRICT_BY_ID[id];
+  for (const d of city.districts || Object.values(DISTRICT_BY_ID)) {
     const cx = d.seed.x * MAP_SIZE;
     const cy = d.seed.y * MAP_SIZE;
     const grad = g.createRadialGradient(cx, cy, 10, cx, cy, MAP_SIZE * 0.3);
@@ -52,32 +52,39 @@ export function buildMapTexture(city) {
   };
   for (const b of city.blocks) {
     g.fillStyle = BLOCK_FILL[b.type] || '#272b31';
-    g.fillRect(b.x * k, b.y * k, b.w * k, b.h * k);
+    g.fillRect(b.x * kx, b.y * ky, b.w * kx, b.h * ky);
     // I campi: le risaie a scacchiera sono il modo in cui la campagna si riconosce
     // su una mappa, esattamente come gli isolati riconoscono la città.
     if (!b.fields) continue;
     for (const f of b.fields) {
       g.fillStyle = f.wet ? '#35492c' : '#3d4426';
-      g.fillRect(f.x * k, f.y * k, f.w * k, f.h * k);
+      g.fillRect(f.x * kx, f.y * ky, f.w * kx, f.h * ky);
     }
   }
 
-  // Fiume Han
+  const seoulWater = (city.region?.id || 'seoul') === 'seoul';
+
+  // Seoul conserva il disegno editoriale di Han e costa; le regioni con una
+  // geografia propria usano direttamente il loro campo `isWater`.
   const r = city.river;
-  const rg = g.createLinearGradient(0, r.y0 * k, 0, r.y1 * k);
-  rg.addColorStop(0, '#1d4055');
-  rg.addColorStop(0.5, '#16303f');
-  rg.addColorStop(1, '#1d4055');
-  g.fillStyle = rg;
-  g.fillRect(0, r.y0 * k, MAP_SIZE, (r.y1 - r.y0) * k);
+  if (seoulWater) {
+    const rg = g.createLinearGradient(0, r.y0 * ky, 0, r.y1 * ky);
+    rg.addColorStop(0, '#1d4055');
+    rg.addColorStop(0.5, '#16303f');
+    rg.addColorStop(1, '#1d4055');
+    g.fillStyle = rg;
+    g.fillRect(0, r.y0 * ky, MAP_SIZE, (r.y1 - r.y0) * ky);
+  } else if (city.isWater) {
+    drawWaterMask(g, city);
+  }
 
   // Mare (서해): la costa segue `coastAt`, quindi il bordo ovest della mappa non
   // è una riga dritta — ed è metà del motivo per cui Seoul qui ha una sagoma.
-  if (city.waterX > 0) {
+  if (seoulWater && city.waterX > 0) {
     g.fillStyle = '#123043';
     g.beginPath();
     g.moveTo(0, 0);
-    for (let y = 0; y <= city.h; y += 40) g.lineTo(city.coastAt(y) * k, y * k);
+    for (let y = 0; y <= city.h; y += 40) g.lineTo(city.coastAt(y) * kx, y * ky);
     g.lineTo(0, MAP_SIZE);
     g.closePath();
     g.fill();
@@ -87,7 +94,7 @@ export function buildMapTexture(city) {
   }
   for (const p of city.piers) {
     g.fillStyle = '#4b5057';
-    g.fillRect(p.x * k, p.y * k, p.w * k, p.h * k);
+    g.fillRect(p.x * kx, p.y * ky, p.w * kx, p.h * ky);
   }
 
   // Strade. Fuori città la carreggiata si scurisce: una provinciale in mezzo alle
@@ -99,8 +106,8 @@ export function buildMapTexture(city) {
     g.fillStyle = u < 0.26
       ? (l.arterial ? '#5a6060' : '#4a5050')
       : (l.arterial ? '#79808c' : '#5d646e');
-    if (vertical) g.fillRect((l.c - l.width / 2) * k, a * k, l.width * k, (b - a) * k);
-    else g.fillRect(a * k, (l.c - l.width / 2) * k, (b - a) * k, l.width * k);
+    if (vertical) g.fillRect((l.c - l.width / 2) * kx, a * ky, l.width * kx, (b - a) * ky);
+    else g.fillRect(a * kx, (l.c - l.width / 2) * ky, (b - a) * kx, l.width * ky);
   };
   for (const l of city.hLines) for (const [a, b] of l.segments) road(l, a, b, false);
   for (const l of city.vLines) for (const [a, b] of l.segments) road(l, a, b, true);
@@ -109,31 +116,31 @@ export function buildMapTexture(city) {
   g.strokeStyle = 'rgba(230,220,190,0.5)';
   g.lineWidth = 1.5;
   for (const br of city.river.bridges) {
-    g.strokeRect((br.x - br.w / 2) * k, r.y0 * k, br.w * k, (r.y1 - r.y0) * k);
+    g.strokeRect((br.x - br.w / 2) * kx, r.y0 * ky, br.w * kx, (r.y1 - r.y0) * ky);
   }
 
   // Piste e piazzali: sulla mappa una pista è la cosa più riconoscibile che c'è.
   for (const a of city.aprons) {
     g.fillStyle = '#3a3f46';
-    g.fillRect(a.x * k, a.y * k, a.w * k, a.h * k);
+    g.fillRect(a.x * kx, a.y * ky, a.w * kx, a.h * ky);
   }
   for (const t of city.taxiways) {
     g.fillStyle = '#44494f';
-    g.fillRect(t.x * k, t.y * k, t.w * k, t.h * k);
+    g.fillRect(t.x * kx, t.y * ky, t.w * kx, t.h * ky);
   }
   for (const rw of city.runways) {
     g.fillStyle = '#5b626b';
-    g.fillRect(rw.x * k, rw.y * k, rw.w * k, rw.h * k);
+    g.fillRect(rw.x * kx, rw.y * ky, rw.w * kx, rw.h * ky);
     g.strokeStyle = 'rgba(240,244,250,0.7)';
     g.lineWidth = 1;
     g.setLineDash([4, 5]);
     g.beginPath();
     if (rw.horiz) {
-      g.moveTo(rw.x * k, (rw.y + rw.h / 2) * k);
-      g.lineTo((rw.x + rw.w) * k, (rw.y + rw.h / 2) * k);
+      g.moveTo(rw.x * kx, (rw.y + rw.h / 2) * ky);
+      g.lineTo((rw.x + rw.w) * kx, (rw.y + rw.h / 2) * ky);
     } else {
-      g.moveTo((rw.x + rw.w / 2) * k, rw.y * k);
-      g.lineTo((rw.x + rw.w / 2) * k, (rw.y + rw.h) * k);
+      g.moveTo((rw.x + rw.w / 2) * kx, rw.y * ky);
+      g.lineTo((rw.x + rw.w / 2) * kx, (rw.y + rw.h) * ky);
     }
     g.stroke();
     g.setLineDash([]);
@@ -143,7 +150,7 @@ export function buildMapTexture(city) {
   g.fillStyle = 'rgba(255,255,255,0.05)';
   for (const b of city.buildings) {
     if (b.isBelt || b.h3d < 110) continue;
-    g.fillRect(b.x * k, b.y * k, Math.max(1, b.w * k), Math.max(1, b.h * k));
+    g.fillRect(b.x * kx, b.y * ky, Math.max(1, b.w * kx), Math.max(1, b.h * ky));
   }
 
   // Ombreggiatura del rilievo: è quella che dà carattere geografico alla mappa
@@ -158,20 +165,48 @@ export function buildMapTexture(city) {
   return c;
 }
 
+/** Maschera geografica comune: rende baie, estuari e l'intero profilo di Jeju. */
+function drawWaterMask(g, city) {
+  const n = 240;
+  const cell = MAP_SIZE / n;
+  const sx = city.w / n;
+  const sy = city.h / n;
+  g.fillStyle = '#123447';
+  for (let j = 0; j < n; j++) {
+    let run = -1;
+    for (let i = 0; i <= n; i++) {
+      const wet = i < n && city.isWater((i + 0.5) * sx, (j + 0.5) * sy);
+      if (wet && run < 0) run = i;
+      if (!wet && run >= 0) {
+        g.fillRect(run * cell, j * cell, (i - run) * cell + 0.6, cell + 0.6);
+        run = -1;
+      }
+    }
+  }
+  // Riflessi sottili: spezzano la massa blu senza cambiare la silhouette.
+  g.fillStyle = 'rgba(145,200,226,0.07)';
+  for (let j = 5; j < n; j += 11) {
+    for (let i = (j * 7) % 17; i < n; i += 29) {
+      if (city.isWater((i + 0.5) * sx, (j + 0.5) * sy)) g.fillRect(i * cell, j * cell, cell * 8, 1.2);
+    }
+  }
+}
+
 /** Hillshade dell'intera mappa: stessa quota e stessa luce del terreno di gioco. */
 function drawRelief(g, city) {
   const el = city.elevationAt;
   if (!el) return;
   const n = 132;
-  const step = city.w / (n - 1);
+  const stepX = city.w / (n - 1);
+  const stepY = city.h / (n - 1);
   const img = new ImageData(n, n);
   const px = img.data;
   for (let j = 0; j < n; j++) {
     for (let i = 0; i < n; i++) {
-      const x = i * step;
-      const y = j * step;
-      const dzdx = (el(x + step, y) - el(x - step, y)) / (2 * step);
-      const dzdy = (el(x, y + step) - el(x, y - step)) / (2 * step);
+      const x = i * stepX;
+      const y = j * stepY;
+      const dzdx = (el(x + stepX, y) - el(x - stepX, y)) / (2 * stepX);
+      const dzdy = (el(x, y + stepY) - el(x, y - stepY)) / (2 * stepY);
       let lit = (dzdx * SUN.x + dzdy * SUN.y) / 0.07;
       if (lit > 1) lit = 1; else if (lit < -1) lit = -1;
       const o = (j * n + i) * 4;

@@ -70,13 +70,16 @@ export class GroundRenderer {
     g.translate(-ox, -oy);
 
     // --- Base: terra del distretto -------------------------------------------
-    const d = districtAtNorm((ox + TILE / 2) / city.w, (oy + TILE / 2) / city.h);
+    const d = city.districtAt
+      ? city.districtAt(ox + TILE / 2, oy + TILE / 2)
+      : districtAtNorm((ox + TILE / 2) / city.w, (oy + TILE / 2) / city.h);
     g.fillStyle = d.ground;
     g.fillRect(ox, oy, TILE, TILE);
 
     // --- Fiume Han ------------------------------------------------------------
     const r = city.river;
-    if (oy < r.y1 && oy + TILE > r.y0) {
+    const seoulWater = (city.region?.id || 'seoul') === 'seoul';
+    if (seoulWater && oy < r.y1 && oy + TILE > r.y0) {
       const grad = g.createLinearGradient(0, r.y0, 0, r.y1);
       grad.addColorStop(0, '#1b3a4a');
       grad.addColorStop(0.35, '#16303f');
@@ -136,7 +139,8 @@ export class GroundRenderer {
     }
 
     // --- Mare (서해), piana di marea e banchina --------------------------------
-    if (city.waterX > 0 && ox < city.quayX + TILE) this.drawSea(g, ox, oy);
+    if (seoulWater && city.waterX > 0 && ox < city.quayX + TILE) this.drawSea(g, ox, oy);
+    else if (!seoulWater && city.isWater) this.drawRegionalWater(g, ox, oy);
 
     // --- Asfalto --------------------------------------------------------------
     const noise = g.createPattern(noiseCanvas(), 'repeat');
@@ -204,6 +208,50 @@ export class GroundRenderer {
     g.restore();
     this.drawRelief(g, ox, oy);
     return c;
+  }
+
+  /**
+   * Acqua per le geografie regionali. Campiona il campo autorevole `isWater`
+   * invece di imporre la costa occidentale e il Han di Seoul: così Busan mostra
+   * baia ed estuario e Jeju resta davvero un'isola anche nella scena giocata.
+   */
+  drawRegionalWater(g, ox, oy) {
+    const city = this.city;
+    const step = 12;
+    const xEnd = ox + TILE;
+    const yEnd = oy + TILE;
+    g.fillStyle = '#123447';
+    for (let y = oy; y < yEnd; y += step) {
+      let run = null;
+      for (let x = ox; x <= xEnd + step; x += step) {
+        const wet = x <= xEnd && city.isWater(x + step / 2, y + step / 2);
+        if (wet && run === null) run = x;
+        if (!wet && run !== null) {
+          g.fillRect(run, y, x - run + 0.8, step + 0.8);
+          run = null;
+        }
+      }
+    }
+
+    // Riflessi deterministicamente sparsi, solo dove il centro resta acqua.
+    for (let i = 0; i < 26; i++) {
+      const x = ox + hash2(ox / TILE * 31 + i, oy / TILE * 17) * TILE;
+      const y = oy + hash2(i * 13, ox + oy) * TILE;
+      if (!city.isWater(x, y)) continue;
+      g.fillStyle = `rgba(155,205,228,${0.035 + hash2(i, i * 3) * 0.05})`;
+      g.fillRect(x, y, 22 + hash2(i * 5, oy) * 88, 2);
+    }
+
+    // I moli sono superfici calpestabili e devono tornare sopra la maschera.
+    for (const p of city.piers || []) {
+      if (p.x > xEnd || p.x + p.w < ox || p.y > yEnd || p.y + p.h < oy) continue;
+      g.fillStyle = '#4e535a';
+      g.fillRect(p.x, p.y, p.w, p.h);
+      g.fillStyle = 'rgba(255,255,255,0.08)';
+      g.fillRect(p.x, p.y, p.w, 3);
+      g.fillStyle = 'rgba(0,0,0,0.28)';
+      g.fillRect(p.x, p.y + p.h - 4, p.w, 4);
+    }
   }
 
   /**
@@ -567,7 +615,7 @@ export class GroundRenderer {
   }
 
   drawBlock(g, b, tx, ty) {
-    const d = DISTRICT_BY_ID[b.district];
+    const d = this.city.districtById?.[b.district] || DISTRICT_BY_ID[b.district];
 
     // Campagna: terra e campi. Niente marciapiedi, niente cordoli — è quello che
     // fa capire di essere usciti da Seoul molto prima del cartello del distretto.

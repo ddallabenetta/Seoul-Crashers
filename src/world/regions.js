@@ -22,6 +22,67 @@ function reindex(city) {
     if (best) { station.x = best.x; station.y = best.y; }
   }
 
+  // L'icona sulla mappa non basta: ogni fermata riceve un accesso fisico sul
+  // marciapiede, spostato dal centro dell'incrocio e lontano dai volumi solidi.
+  // Gli adattatori regionali possono proporre una posizione; qui viene validata
+  // con lo stesso criterio per tutte le città e resa nel formato comune.
+  if (!Array.isArray(city.metroEntrances)) city.metroEntrances = [];
+  if (!Array.isArray(city.props)) city.props = [];
+  const overlapsBuilding = (x, y, w, h) => city.buildings.some((b) =>
+    b.solid !== false && x < b.x + b.w + 8 && x + w > b.x - 8
+      && y < b.y + b.h + 8 && y + h > b.y - 8);
+  const dryRect = (x, y, w, h) => {
+    if (x < 28 || y < 28 || x + w > city.w - 28 || y + h > city.h - 28) return false;
+    for (const [px, py] of [[x, y], [x + w, y], [x, y + h], [x + w, y + h], [x + w / 2, y + h / 2]]) {
+      if (city.isWater(px, py)) return false;
+    }
+    return !overlapsBuilding(x, y, w, h);
+  };
+  const entranceSpot = (station) => {
+    const W = 72, H = 46;
+    const supplied = city.metroEntrances.find((e) => e.stationId === station.id);
+    const tries = [];
+    if (supplied) tries.push({ x: supplied.x, y: supplied.y });
+    for (const r of [54, 76, 98, 122]) {
+      for (let i = 0; i < 8; i++) {
+        const a = Math.PI / 4 * i;
+        tries.push({ x: station.x + Math.cos(a) * r, y: station.y + Math.sin(a) * r });
+      }
+    }
+    for (const p of tries) {
+      const x = p.x - W / 2;
+      const y = p.y - H / 2;
+      if (dryRect(x, y, W, H)) return { x: p.x, y: p.y, w: W, h: H };
+    }
+    return { x: station.x, y: station.y, w: W, h: H };
+  };
+  for (const station of city.transitStations || []) {
+    const spot = entranceSpot(station);
+    let entrance = city.metroEntrances.find((e) => e.stationId === station.id);
+    if (!entrance) {
+      entrance = { id: `${station.id}-entrance`, stationId: station.id };
+      city.metroEntrances.push(entrance);
+    }
+    Object.assign(entrance, spot, {
+      kind: 'metro-entrance', hangul: '지하철', visible: true,
+      angle: Math.atan2(station.y - spot.y, station.x - spot.x),
+    });
+    station.entrance = entrance;
+    let prop = city.props.find((p) => p.stationId === station.id);
+    if (!prop) {
+      prop = { stationId: station.id, metroEntrance: true };
+      city.props.push(prop);
+    }
+    Object.assign(prop, {
+      type: 'metro_entrance', x: spot.x, y: spot.y, rot: entrance.angle,
+      z: 44, solid: false, r: 38, word: 'M', accent: '#54d7ff',
+      metroEntrance: true,
+    });
+  }
+  // Alias regionale storico: da qui in poi entrambi i nomi indicano gli stessi
+  // oggetti, così mappa e interazione non possono divergere.
+  city.transitEntrances = city.metroEntrances;
+
   // Gli adattatori regionali aggiungono volumi dopo `generateCity`. Un solo
   // rebuild qui evita indici parziali e rende subito solidi tutti i landmark.
   city.buildingGrid = new SpatialGrid(city.w, city.h, 300);
@@ -59,7 +120,7 @@ function reindex(city) {
     return { x: station.x, y: station.y };
   };
   for (const station of city.transitStations || []) {
-    const p = freeArrival(station);
+    const p = freeArrival(station.entrance || station);
     station.arrivalX = p.x;
     station.arrivalY = p.y;
   }

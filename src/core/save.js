@@ -69,8 +69,9 @@ export function snapshot(game) {
   const pl = game.player;
   const dc = game.dayCycle;
   const door = game.indoors && game.shops.active ? game.shops.active.shop : null;
-  const x = door ? door.x : pl.x;
-  const y = door ? door.y : pl.y;
+  const metroExit = game.metro?.inside ? game.metro.outside : null;
+  const x = door ? door.x : metroExit ? metroExit.x : pl.x;
+  const y = door ? door.y : metroExit ? metroExit.y : pl.y;
   const v = pl.vehicle;
   return {
     v: VERSION,
@@ -134,7 +135,7 @@ export function describe(data, game) {
  */
 export function apply(game, data) {
   const pl = game.player;
-  if (game.indoors) game.shops.forceExit(game);
+  if (game.indoors) game.leaveInterior();
   const regionId = data.region || 'seoul';
   if ((game.city.region?.id || 'seoul') !== regionId) game.travelTo(regionId, null, { silent: true });
 

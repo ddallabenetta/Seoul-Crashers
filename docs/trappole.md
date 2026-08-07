@@ -122,6 +122,10 @@ codice spiega il perché nel punto giusto.
 | A Busan continua a spawnare la polizia di Seoul | `PoliceSystem`, `TrafficSystem`, `ShopSystem`, renderer, HUD e griglie trattengono tutti un riferimento alla città del costruttore | `Game.travelTo` ricostruisce **insieme** tutti i sistemi city-bound; non cambiare solo `game.city` |
 | La N Seoul Tower scompare con una seed valida | il parco la generava solo se un isolato cadeva entro il 45% del raggio del Namsan; alcune maglie non ne producono nessuno | `seoul_expansion` la garantisce per nome ed è idempotente se `citygen` l'ha già piazzata |
 | Il pannello metro di Seoul ha righe sovrapposte | 17 destinazioni in una colonna riducono la riga a 25 px, ma titolo e dettaglio ne usano 39 | sopra nove opzioni `MetroSystem.draw` usa due colonne e calcola l'altezza sul numero di righe |
+| Busan o Jeju sembrano ancora Seoul | `GroundRenderer` e `maptexture` conoscevano soltanto Han e mare occidentale, quindi una nuova topologia dati non bastava | per le regioni non-Seoul entrambi campionano `city.isWater`; non aggiungere un altro caso geografico hardcoded |
+| Busan si deforma sulla carta | una scala sola ricavata da `city.w` funziona soltanto per mondi quadrati; Busan è 6400×5600 | `maptexture` mantiene `kx` e `ky` separate per ogni geometria |
+| L'ingresso metro si vede ma nasce in acqua o dentro un landmark | la coordinata della stazione è editoriale e può coincidere con un incrocio, un edificio o la costa | `regions.reindex` cerca una scala 72×46 asciutta e libera, associa `station.entrance`, poi cerca `arrivalX/Y` attorno a quella scala |
+| Entrando in metro il giocatore viene espulso di lato | `entry` cade dentro un pilastro/arredo e il primo frame di collisione corregge il punto iniziale | ogni cambio alla pianta 1080×720 va verificato con raggio giocatore: ingresso, uscita e porta del treno liberi e percorso connesso |
 
 Regola generale emersa: **prima di dare la colpa all'AI, verifica la geometria.** Quasi tutti
 gli "stalli dell'AI" erano problemi di ingombri, corsie o posizionamento.
