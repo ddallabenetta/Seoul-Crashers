@@ -53,6 +53,46 @@ const GUN_TONE = {
 const DEFAULT_MIX = { master: 0.7, sfx: 1, ambient: 0.8, music: 0.7, ui: 0.75, radio: 0.8 };
 const MIX_KEY = 'seoul.audio';
 
+// Gli spazi in cui Seoul può suonare. Prima erano uno solo: un vicolo, un 노래방
+// e il piazzale di Gimpo avevano tutti la stessa acustica, cioè nessuna.
+//
+// Le due metà di una risposta all'impulso dicono cose diverse e vanno lette
+// separate: le **prime riflessioni** (`early`, echi discreti in ms) dicono
+// *quanto è grande* lo spazio, la **coda** (`sec`, `decay`, `damp`) dice quanto è
+// vivo. Un vicolo ha riflessioni fittissime e vicine e una coda corta; un hangar
+// ha poche riflessioni lontane e una coda lunga. Invertirle fa suonare la
+// cabina di un 노래방 come una cattedrale, che è l'errore classico.
+//
+// `wet` è quanto ritorno si manda in mezzo alla scena. Le code sono normalizzate
+// a energia uno (vedi `makeImpulse`), quindi questi numeri si confrontano fra
+// loro: senza normalizzare, una coda da 2,4 s uscirebbe dieci volte più forte di
+// una da 0,4 s e la tabella non vorrebbe dire niente.
+export const SPACES = {
+  // Campagna, mare, pista: niente da cui rimbalzare, solo un'aria.
+  open:   { sec: 0.7, decay: 3.6, damp: 0.66, wet: 0.07, early: [] },
+  // La strada normale: due file di palazzi larghe una carreggiata.
+  street: { sec: 1.2, decay: 2.6, damp: 0.52, wet: 0.17, early: [[0.018, 0.5], [0.033, 0.32]] },
+  // Vicolo o cortile: muri a due metri, riflessioni fitte, niente respiro.
+  alley:  { sec: 1.0, decay: 1.8, damp: 0.34, wet: 0.36, early: [[0.005, 0.9], [0.011, 0.66], [0.018, 0.48], [0.026, 0.3]] },
+  // Una stanza: 노래방, 편의점, retro di un'officina. **È l'unico spazio interno**,
+  // e non è una semplificazione: le piante del gioco vanno da 78k a 117k px²
+  // (misurate su tutte e 113 le vetrine), cioè sono tutte stanze. Una «sala» qui
+  // non avrebbe niente da rappresentare — la vorrà il primo interno grande, che
+  // sarà il terminal dell'aeroporto quando ce l'avrà (§6).
+  room:   { sec: 0.4, decay: 2.2, damp: 0.56, wet: 0.28, early: [[0.004, 0.85], [0.009, 0.55], [0.014, 0.32]] },
+};
+// Ogni quanto si guarda dove si è. Lo spazio non cambia in un frame, e la query
+// sugli edifici attorno all'ascoltatore non vale la pena sessanta volte al secondo.
+const SPACE_EVERY = 0.3;
+// Entro quanti pixel un muro conta come muro.
+const SPACE_NEAR = 115;
+// Da quanti **lati** devono arrivare i muri perché un posto sia un vicolo. Non
+// quanti muri: un marciapiede qualunque ha tre palazzi a novanta pixel, ma tutti
+// dalla stessa parte, e con un conteggio semplice metà Myeongdong risultava un
+// vicolo (misurato: 45% dei marciapiedi). Quello che fa un vicolo è essere *in
+// mezzo*, e la differenza si legge solo guardando da dove vengono.
+const ALLEY_SIDES = 3;
+
 export class AudioSystem {
   constructor() {
     this.ctx = null;
@@ -67,8 +107,15 @@ export class AudioSystem {
     this._flash = 0;      // fronte del lampo, per far partire il tuono
     this._crackle = 0;    // prossimo scoppiettio del fuoco
     this._q = [];         // buffer riusato dalle query sulla griglia dei veicoli
+    this._bq = [];        // idem, per gli edifici attorno all'ascoltatore
     this.beds = null;
     this.music = null;    // esiste solo a contesto acceso, come i letti
+    // Riverbero: lo spazio che il convolutore ha adesso, quello che vorrebbe
+    // avere, e il guadagno del ritorno.
+    this.space = null;
+    this.wantSpace = 'street';
+    this._spaceT = 0;
+    this._revG = 0;
   }
 
   /**
@@ -99,6 +146,7 @@ export class AudioSystem {
         sirena: +b.siren.g.toFixed(2), rotore: +b.rotor.g.toFixed(2), fuoco: +b.fire.g.toFixed(2),
         gomme: +b.skid.g.toFixed(2), canne: +b.spin.g.toFixed(2),
       } : null,
+      spazio: this.space, verso: this.wantSpace, riverbero: +this._revG.toFixed(3),
       musica: this.music ? this.music.stats : null,
     };
   }
@@ -164,6 +212,22 @@ export class AudioSystem {
     this.uiBus.gain.value = this.mix.ui;
     this.uiBus.connect(this.master);
 
+    // Riverbero: una mandata parallela dal bus degli effetti. Solo da lì — la
+    // pioggia e il brontolio della città passati per una coda diventano fango, e
+    // l'interfaccia non sta in nessuno spazio. Il secco continua ad arrivare al
+    // compressore per conto suo: qui si aggiunge il bagnato, non lo si sostituisce.
+    this.rev = ctx.createConvolver();
+    this.rev.normalize = false;   // le code sono già normalizzate a energia uno
+    this.revOut = ctx.createGain();
+    this.revOut.gain.value = 0;
+    this.sfx.connect(this.rev);
+    this.rev.connect(this.revOut);
+    this.revOut.connect(this.comp);
+    this.impulses = {};
+    for (const [id, s] of Object.entries(SPACES)) this.impulses[id] = this.makeImpulse(s);
+    this.space = this.wantSpace;
+    this.rev.buffer = this.impulses[this.space];
+
     this.white = this.makeNoise(2.4, false);
     this.pink = this.makeNoise(2.4, true);
     this.buildBeds();
@@ -193,6 +257,52 @@ export class AudioSystem {
       } else {
         d[i] = w;
       }
+    }
+    return buf;
+  }
+
+  /**
+   * Una risposta all'impulso generata: prime riflessioni più rumore che decade.
+   * È l'unico modo di avere un riverbero senza un file — un `ConvolverNode` vuole
+   * una coda registrata, e in questo progetto i file non esistono (§7).
+   *
+   * Tre cose che non sono ovvie e che sono costate un tentativo ciascuna:
+   *
+   * - **I due canali sono rumore diverso.** Con lo stesso rumore a destra e a
+   *   sinistra la coda collassa al centro e lo spazio scompare: si sente più
+   *   forte, non più largo.
+   * - **La coda va filtrata mentre decade**, non dopo: un muro mangia gli acuti
+   *   prima dei bassi, e un rumore bianco che si spegne senza perdere brillantezza
+   *   suona come un riverbero a molla, non come una stanza.
+   * - **Va normalizzata a energia uno.** L'energia di una coda cresce con la sua
+   *   durata: senza normalizzare, passare da una stanza a un capannone alzerebbe
+   *   il volume di dieci volte invece di allargare lo spazio.
+   */
+  makeImpulse(spec) {
+    const ctx = this.ctx;
+    const rate = ctx.sampleRate;
+    const n = Math.max(1, Math.floor(rate * spec.sec));
+    const buf = ctx.createBuffer(2, n, rate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      let lp = 0;
+      let energy = 0;
+      for (let i = 0; i < n; i++) {
+        const t = i / n;
+        const env = Math.pow(1 - t, spec.decay);
+        lp = lp * spec.damp + (Math.random() * 2 - 1) * (1 - spec.damp);
+        d[i] = lp * env;
+      }
+      // Le prime riflessioni si sommano sopra la coda, sfasate fra i due canali:
+      // sono l'unica parte che il timpano legge come «distanza da un muro».
+      for (const [at, amp] of spec.early) {
+        const i = Math.floor(at * rate);
+        if (i >= n) continue;
+        d[i] += (ch ? -amp : amp) * (0.75 + Math.random() * 0.5);
+      }
+      for (let i = 0; i < n; i++) energy += d[i] * d[i];
+      const norm = energy > 0 ? 1 / Math.sqrt(energy) : 0;
+      for (let i = 0; i < n; i++) d[i] *= norm;
     }
     return buf;
   }
@@ -631,6 +741,7 @@ export class AudioSystem {
     this.ly = cam.cy;
 
     this.updateBeds(dt, game);
+    this.updateSpace(dt, game);
     for (const b of this._bedList) {
       b.g = damp(b.g, b.target, b.smooth, dt);
       b.node.gain.value = b.g;
@@ -638,6 +749,64 @@ export class AudioSystem {
     // La musica gira anche in pausa e anche a menu aperto: è l'unica cosa che non
     // ha un `duck`, perché in quei due momenti è la sola cosa che si sente.
     this.music.update(dt, game);
+  }
+
+  /**
+   * In che spazio si sta suonando. La coda del convolutore non si può cambiare a
+   * caldo senza che si senta, quindi si usa lo stesso trucco della musica (§5.19):
+   * si sfuma il ritorno fino a zero e **solo lì** si mette la risposta nuova. Il
+   * secco non si interrompe mai, quindi il passaggio si sente come una stanza che
+   * si apre, non come un taglio.
+   */
+  updateSpace(dt, game) {
+    this._spaceT -= dt;
+    if (this._spaceT <= 0) {
+      this._spaceT = SPACE_EVERY;
+      this.wantSpace = this.pickSpace(game);
+    }
+    // Nessun `duck` in pausa, al contrario dei letti: la mandata è una frazione
+    // del secco, e il secco non è ducckato (il bus `sfx` resta pieno). Abbassare
+    // solo il bagnato cambierebbe la stanza a menu aperto invece di abbassare il
+    // mondo, che è tutta un'altra cosa.
+    const want = this.space === this.wantSpace ? SPACES[this.space].wet : 0;
+    this._revG = damp(this._revG, want, 0.22, dt);
+    this.revOut.gain.value = this._revG;
+    if (this.space !== this.wantSpace && this._revG < 0.004) {
+      this.space = this.wantSpace;
+      this.rev.buffer = this.impulses[this.space];
+    }
+  }
+
+  /**
+   * Dove si è, in termini di muri. Dentro decide la pianta; fuori si contano gli
+   * edifici attorno all'ascoltatore, che è il modo più economico di distinguere un
+   * vicolo da un viale: in un vicolo i palazzi sono *tutti* a meno di cento pixel,
+   * su un viale ce ne sono due dall'altra parte della carreggiata, in campagna
+   * nessuno. Nessun dato nuovo in `citygen`: la griglia degli edifici c'è già.
+   */
+  pickSpace(game) {
+    if (game.indoors) return 'room';
+    // Sopra i tetti non rimbalza niente: in volo si è nel posto più aperto che c'è.
+    const v = game.player.vehicle;
+    if (v && !game.player.onFoot && v.z > 30) return 'open';
+    // Da che parte stanno i muri: nord, est, sud, ovest come quattro bit.
+    let sides = 0;
+    const near2 = SPACE_NEAR * SPACE_NEAR;
+    for (const b of game.city.buildingGrid.queryRect(
+      this.lx - SPACE_NEAR, this.ly - SPACE_NEAR, SPACE_NEAR * 2, SPACE_NEAR * 2, this._bq)) {
+      const dx = clamp(this.lx, b.x, b.x + b.w) - this.lx;
+      const dy = clamp(this.ly, b.y, b.y + b.h) - this.ly;
+      const d2 = dx * dx + dy * dy;
+      if (d2 > near2) continue;
+      // Dentro la sagoma di un palazzo (capita alla camera, non al giocatore):
+      // è chiuso da tutte le parti per definizione.
+      if (d2 < 1) return 'alley';
+      sides |= Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 2) : (dy > 0 ? 4 : 8);
+    }
+    let n = 0;
+    for (let m = sides; m; m >>= 1) n += m & 1;
+    if (n >= ALLEY_SIDES) return 'alley';
+    return n > 0 ? 'street' : 'open';
   }
 
   updateBeds(dt, game) {
