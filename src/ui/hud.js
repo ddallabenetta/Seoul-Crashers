@@ -605,6 +605,20 @@ export class Hud {
       ctx.strokeRect(a.x, a.y, Math.max(4, b.x - a.x), Math.max(4, b.y - a.y));
       ctx.restore();
     }
+    // Fermate metro e nodi interurbani: restano visibili anche senza aprire la
+    // mappa completa, perché è lì che il giocatore cambia quartiere o città.
+    for (const st of this.city.transitStations || []) {
+      const m = toMap(st.x, st.y);
+      if (m.x < x || m.x > x + MINIMAP || m.y < y || m.y > y + MINIMAP) continue;
+      ctx.fillStyle = '#62c9ff';
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, 4.2, 0, 6.2832);
+      ctx.fill();
+      ctx.fillStyle = '#10202a';
+      ctx.font = '900 6px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('M', m.x, m.y + 2.1);
+    }
     // Eliporti: un velivolo si posa solo dove c'è la H dipinta.
     for (const pad of this.city.helipads || []) {
       const m = toMap(pad.x, pad.y);
@@ -903,6 +917,8 @@ export class Hud {
     const p = game.player;
     const lines = [];
     for (const a of game.shops ? game.shops.actions : []) lines.push(`${a.key}  —  ${a.text}`);
+    const metroHint = game.metro?.hint(game);
+    if (metroHint) lines.push(metroHint);
     if (!game.indoors) {
       if (p.onFoot) {
         const v = p.findNearbyVehicle(game);

@@ -25,6 +25,14 @@ src/world/
   citygen.js          quota del terreno, campo di urbanità, maglia stradale, mare e costa,
                       isolati (urbani, rurali, aeroporto, porto), edifici, props, indici,
                       vetrine (`placeShops`), officine (`placeGarages`), bande (`placeTurfs`)
+  regions.js          registro Seoul/Busan/Jeju e reindicizzazione dei contenuti regionali
+  seoul_expansion.js  landmark aggiuntivi e rete metro della capitale
+  busan.js            adattamento costiero, quartieri, landmark e stazioni di Busan
+  jeju.js             adattamento insulare, landmark e stazioni di Jeju
+  regions.js          registro Seoul/Busan/Jeju e reindicizzazione dei contenuti regionali
+  seoul_expansion.js  landmark aggiuntivi e rete metro della capitale
+  busan.js            adattamento costiero, quartieri, landmark e stazioni di Busan
+  jeju.js             adattamento insulare, landmark e stazioni di Jeju
   daycycle.js         orologio, tabella della luce ora per ora, meteo a catena di Markov
   interiors.js        catalogo delle attività (con gli orari) + pianta di ogni piano
   roadgraph.js        nodi/archi, corsie, semafori, prenotazione incrocio
@@ -60,6 +68,8 @@ src/ui/
   saveslots.js        le schede dei salvataggi, condivise fra i due menu
   mixer.js            il pannello dei volumi, condiviso fra i due menu
   shopmenu.js         pannello del listino (compra/vendi)
+  metro.js            fermate, selezione locale/interurbana e pannello di viaggio
+  metro.js            fermate, selezione locale/interurbana e pannello di viaggio
 
 .claude/              strumenti per chi sviluppa (non fa parte del gioco), vedi §9
   tools/probe.mjs     avvia il gioco headless, esegue scene, misura, screenshot
@@ -132,6 +142,22 @@ non esiste: restano **una arteria su due** e qualche strada bianca, e gli isolat
 campi. È l'unico posto in cui è deciso *dove finisce Seoul* — a valle nessuno sa niente di
 forme, si legge solo questo campo. Alzare l'ampiezza del rumore fa nascere risaie in mezzo a
 Gangnam: il bordo va sfrangiato, non bucato.
+
+**Una regione è sempre una `city`.** Seoul, Busan e Jeju espongono lo stesso contratto
+(`graph`, griglie, blocchi, negozi, acqua, distretti e spawn): al viaggio `Game.travelTo`
+ricostruisce insieme tutti i sistemi che trattengono un riferimento alla città. I contenuti
+regionali vengono aggiunti dopo il generatore, poi `regions.js` rifà una sola volta gli indici
+spaziali; aggiungere un landmark fisico senza quel passaggio lo renderebbe visibile ma non
+solido. La geometria e la texture della carta sono mantenute in cache per regione, mentre
+traffico e pedoni restano streaming e ripartono all'arrivo.
+
+**Una regione è sempre una `city`.** Seoul, Busan e Jeju espongono lo stesso contratto
+(`graph`, griglie, blocchi, negozi, acqua, distretti e spawn): al viaggio `Game.travelTo`
+ricostruisce insieme tutti i sistemi che trattengono un riferimento alla città. I contenuti
+regionali vengono aggiunti dopo il generatore, poi `regions.js` rifà una sola volta gli indici
+spaziali; aggiungere un landmark fisico senza quel passaggio lo renderebbe visibile ma non
+solido. La geometria e la texture della carta sono mantenute in cache per regione, mentre
+traffico e pedoni restano streaming e ripartono all'arrivo.
 
 **Le arterie non sono più intoccabili.** Prima erano continue per definizione; adesso in
 campagna ne sopravvive una su due, altrimenti il reticolo arriva identico fino al bordo mappa

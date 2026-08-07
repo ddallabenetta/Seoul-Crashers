@@ -20,7 +20,7 @@ Poi apri <http://localhost:8123>.
 | `W A S D` / frecce | muoversi a piedi · guidare |
 | `Shift` | correre · **in volo**: scendere di quota |
 | `Spazio` | freno a mano (drift) · **in volo**: salire di quota |
-| `E` | salire / scendere dal veicolo · entrare in un negozio · scale · listino |
+| `E` | salire / scendere dal veicolo · entrare in un negozio · scale · listino · usare la metro |
 | `F` | svuotare la cassa di un negozio (rapina) |
 | `H` | clacson |
 | **mouse** | mirare (a piedi si guarda sempre il cursore) |
@@ -197,6 +197,18 @@ con la battigia irregolare, la piana di marea e il **porto** dove si prendono le
 a nord l'**aeroporto di Gimpo**, con la pista, il piazzale e i velivoli parcheggiati. In mezzo
 la **campagna**: risaie, serre e capannoni, dove restano solo le provinciali. Fuori dall'acqua
 si annega, e un'auto che finisce nel Han affonda.
+
+## Metro e regioni
+
+Le fermate della metro sono segnate con una **M ciano** sulla minimappa e sulla carta. Vai a
+piedi all'ingresso e premi `E`: dalla rete puoi raggiungere altre stazioni della stessa città
+oppure prendere un collegamento interurbano. Con le stelle di ricercato attive i tornelli
+restano chiusi.
+
+Oltre alla Seoul estesa — COEX Mall, Gyeongbokgung, Lotte World Tower, Dongdaemun e la cintura
+metropolitana — sono giocabili **Busan** (`부산`) e **Jeju** (`제주`). Ognuna conserva strade,
+traffico, negozi, interni, polizia, rilievo e landmark allo stesso livello della città
+principale. Il viaggio mantiene personaggio, inventario, denaro e ora del giorno.
 
 Sparsi per la mappa ci sono i **territori delle bande** (백호파, 흑사파, 철마파, 황소파): un
 cortile, un piazzale di container o un capannone, con il tag dipinto a terra e i loro uomini

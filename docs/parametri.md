@@ -7,6 +7,12 @@
 | Cosa | Dove | Valore attuale |
 | --- | --- | --- |
 | Dimensione mondo | `citygen.WORLD` | 5400 × 5400, margine 150 |
+| Regioni giocabili · seed | `regions.createRegion` · `busan.BUSAN_SEED` · `jeju.JEJU_SEED` | Seoul 20260730 · Busan 20260807 · Jeju 20260808 |
+| Cache regionale | `main.regionCache` | geometria + texture, create alla prima visita |
+| Fermate passeggeri | `city.transitStations` | Seoul 16 · Busan 7 · Jeju 7 |
+| Raggio d'uso della metro | `metro.REACH` | 82 px, solo a piedi e fuori dagli interni |
+| Ricerca uscita libera | `regions.freeArrival` | anelli ogni 24 px, 8 direzioni, fino a 120 px |
+| Tempo di viaggio interurbano | `main.travelTo` | Seoul↔Busan 1,25 h · ogni tratta con Jeju 2 h |
 | Sagoma della città | `districts.URBAN_BLOBS` | 8 macchie, raggio 0.13–0.205 della larghezza |
 | Soglia città/campagna | `citygen.RURAL_U` | 0.26 (sotto: solo una arteria su due) |
 | Strade bianche in campagna | `citygen.carveMesh` | 6% dei tratti non arteriali |
@@ -53,6 +59,7 @@
 | Musica: anticipo e dissolvenza | `music.LOOKAHEAD` / `damp` in `update` | 0,25 s di note programmate · mezza vita 0,3 s (~1,9 s per cambiare pezzo) |
 | Autosave: periodo e ritenta | `save.AUTO_EVERY` / `AUTO_RETRY` | 240 s · 20 s se il momento non è buono |
 | Autosave: quando si rifiuta | `save.canAutosave` | stelle > 0 · HP ≤ 25 · morente · manette in corso |
+| Regione nel salvataggio | `save.snapshot` / `apply` | `seoul` di default per gli slot storici; ripristino sincrono prima delle coordinate |
 | Menu iniziale: giro di camera | `main.updateAttract` | raggio 250 × 170 px, un giro ogni ~40 s, zoom 0.92 |
 | Innesco della mina | `projectiles.updateMines` | veicolo 32 px · piedi 18 px, si arma a 62 px da chi l'ha posata |
 | Tick di danno del fuoco | `projectiles.FIRE_TICK` | 0.34 s |

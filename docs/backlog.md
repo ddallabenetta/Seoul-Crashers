@@ -8,7 +8,8 @@
 (§5.11), i due giri di arretrati (§5.12 e §5.21), il salvataggio (§5.15), l'arresto (§5.16),
 il menu iniziale (§5.18), la musica (§5.19) e l'autosave (§5.20) sono fatti; la segnalazione
 sul traffico è chiusa (§5.10) e quella sulle auto attraversabili pure (§5.17, e dal §5.21 vale
-anche per i pedoni).
+anche per i pedoni). Dal §5.22 sono fatti anche **Seoul estesa, Busan, Jeju, la rete metro e i
+collegamenti interurbani**, con mappe e salvataggi consapevoli della regione.
 **Restano le missioni**, che sono il lavoro grosso: impianto (attivazione sulla mappa,
 obiettivi, fallimento e ripetizione), cutscene a pannelli a fumetto, e i contenuti. **Le scelte
 di design vanno concordate con l'utente prima di scrivere codice** — è la prima cosa da chiedere
@@ -123,6 +124,27 @@ il §5.21 altre undici — fra cui le due che erano tornate in cima.
   meno (sono sagome della stessa taglia che si sovrappongono per un istante), ma è lo stesso
   steering e costerebbe una query in più per pedone per frame.
 
+**Rimasto indietro dalle regioni e dalla metro** (§5.22):
+- **Busan e Jeju non hanno ancora una topologia geografica scritta apposta.** Hanno lo stesso
+  livello sistemico di Seoul e landmark propri, ma costa, canale, aeroporto e porto adattano la
+  maglia procedurale comune. Una Jeju davvero insulare richiede un campo d'acqua chiuso su
+  quattro lati; una Busan riconoscibile richiede costa sud-orientale, Nakdong ed estuario.
+- **Lasciare una regione non conserva il suo stato locale.** Geometria e texture restano in
+  cache, ma `ShopSystem` e gli interni vengono ricostruiti: casse svuotate, spese, vendite e
+  personale di Busan non aspettano il giocatore dopo un viaggio a Jeju. Il salvataggio conserva
+  correttamente la regione attiva, non una fotografia delle altre due.
+- **Il viaggio è ancora uno stacco funzionale.** Il tempo avanza e il personaggio arriva alla
+  fermata giusta, ma non ci sono tariffa, biglietto, animazione della linea né sequenza di KTX,
+  traghetto o aereo. Prima di aggiungerle va deciso quanto spesso il giocatore deve viaggiare:
+  una sequenza bella la prima volta può diventare un ostacolo alla decima.
+- **Le linee sono etichette, non un grafo.** Il pannello permette di scegliere ogni altra
+  fermata; non calcola cambi, percorso, durata o fermate intermedie. Un vero grafo serve solo se
+  il viaggio deve diventare gameplay invece di navigazione rapida.
+- **Mercati e mix di popolazione riusano le chiavi canoniche di Seoul.** I nomi e l'identità
+  visiva sono regionali, ma `hongdae`/`gangnam` restano gli id letti da negozi e traffico. Un
+  bilanciamento economico davvero diverso per città richiede chiavi `region:id` o un secondo
+  livello di configurazione.
+
 **Rimasto indietro dalla mappa** (§5.9) e dagli esplosivi (§5.7):
 - **Nessun traffico aereo o navale**: aerei e barche civili sono tutti fermi. Un paio di battelli
   che fanno la spola sul Han costerebbe un `ai` semplice — il fiume è una linea, non serve grafo.
@@ -140,7 +162,8 @@ il §5.21 altre undici — fra cui le due che erano tornate in cima.
 12 missioni in 3 atti con cutscene a **pannelli a fumetto** (gli interni sono anche il posto
 dove ambientarne metà: un incontro in un 노래방 non ha bisogno di niente di nuovo, un
 appuntamento può avere un'ora, e adesso una banda ha anche un motivo per parlarti); attività
-secondarie (taxi, consegne, salti). **Restano solo quelle.** Le missioni avranno bisogno di
+secondarie (taxi, consegne, salti). **Sono il prossimo lavoro grosso**; i debiti tecnici e di
+rifinitura restano elencati sopra. Le missioni avranno bisogno di
 cinque cose che adesso ci sono e prima no — un posto da cui cominciare la partita (§5.18), un
 posto in cui riprenderla (§5.15), una sconfitta che non sia solo la morte (§5.16), un sistema
 musicale a cui aggiungere una riga per far partire un pezzo (§5.19: si tocca `music.direct` e

@@ -105,19 +105,50 @@ game.city.graph.usableNodes.filter(n => n.out.length === 1).map(n => [n.x | 0, n
 game.city.stats // { buildings, props, blocks, nodes, edges, doglegs, stairs }
 ```
 
-Valori attesi con la seed attuale: `buildings 418`, `props 1299`, `blocks 122`, `nodes 196`,
+Valori attesi con la seed attuale e l'espansione regionale: `buildings 424` (418 dal generatore
+base + 6 landmark), `props 1299`, `blocks 122`, `nodes 196`,
 `edges 279`, `doglegs 4`, `stairs 3`, `rural 5`, `piers 10`, `shops 114`, `venues 325`,
-`garages 7`, `turfs 6`, e 43 raccolte a terra (`game.pickups.items.length`) — erano 36 finché
+`garages 7`, `turfs 6`, `landmarks 21`, `transitStations 16`, e 43 raccolte a terra
+(`game.pickups.items.length`) — erano 36 finché
 non si è aggiunta la campagna e non si è cominciato a scartare i punti murati (§5.12).
 `shops` e `venues` sono saliti di uno nel §5.21, quando `ensurePawnShops` ha aperto una vetrina
 al porto — il distretto che non ne aveva nessuna.
-I primi nove devono restare **identici** finché non si tocca l'ordine di consumo dell'rng in
-generazione: se cambiano, hai spostato una `rng.*` e la città non è più quella collaudata.
+Escluso `buildings`, aumentato intenzionalmente dopo `generateCity`, i contatori strutturali
+devono restare **identici** finché non si tocca l'ordine di consumo dell'rng in generazione:
+se cambiano, hai spostato una `rng.*` e la città non è più quella collaudata.
 `shops`/`venues`/`garages` e `turfs` nascono da rng **separati** (`placeShops`, `placeGarages`,
 `placeTurfs`): cambiano solo se tocchi quelle funzioni, e non trascinano con sé il resto.
 
 `stairs` è sceso da 8 a 3 perché i vicoli passanti candidati sono meno: la città copre la
 stessa area di prima ma su una mappa più grande, e la campagna non ha vicoli.
+
+Per le regioni e la metro (§5.22):
+
+```js
+// identità e consistenza della regione attiva
+({ regione: game.city.region, edifici: game.city.buildings.length,
+   isolati: game.city.blocks.length, nodi: game.city.graph.usableNodes.length,
+   negozi: game.city.shops.length, landmark: game.city.landmarks.length,
+   fermate: game.city.transitStations.length })
+
+// ogni uscita deve essere entro i confini, asciutta e fuori dai solidi
+game.city.transitStations.filter((s) =>
+  s.arrivalX < 0 || s.arrivalY < 0 || s.arrivalX > game.city.w || s.arrivalY > game.city.h ||
+  game.city.isWater(s.arrivalX, s.arrivalY) ||
+  game.city.solidGrid.queryCircle(s.arrivalX, s.arrivalY, 12).some((o) =>
+    s.arrivalX > o.x - 12 && s.arrivalX < o.x + o.w + 12 &&
+    s.arrivalY > o.y - 12 && s.arrivalY < o.y + o.h + 12))
+// atteso: [] in tutte e tre le regioni
+
+// cambio regione a freddo; conserva inventario e orologio, ricostruisce i sistemi cittadini
+game.travelTo('busan'); game.travelTo('jeju'); game.travelTo('seoul');
+```
+
+Valori attesi: Seoul `424 / 122 / 196 / 114 / 21 / 16`, Busan
+`410 / 139 / 226 / 100 / 8 / 7`, Jeju `457 / 104 / 202 / 126 / 7 / 7` nell'ordine
+edifici / isolati / nodi / negozi / landmark / fermate. Verifica manuale minima: Hongik →
+Samseong (COEX), Seoul → Busan, aprire la carta, Busan → Jeju, aprire la carta. I tornelli
+devono rifiutare l'ingresso con almeno una stella.
 
 Per il combattimento:
 
