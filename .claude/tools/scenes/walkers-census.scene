@@ -1,0 +1,104 @@
+// Censimento dei pedoni: quanto camminano davvero, quanti restano piantati, e
+// quante volte un passante finisce **dentro** una lamiera in sosta. È la misura
+// con cui si giudica lo steering dei marciapiedi (§5.21): a occhio un pedone che
+// attraversa un'auto parcheggiata si vede solo se si sta guardando quel pixel.
+//
+//   node .claude/tools/probe.mjs --seconds 0 --quiet \
+//     --script .claude/tools/scenes/walkers-census.scene
+//
+// Valgono le stesse due avvertenze del censimento del traffico: si misura su più
+// zone perché una sola non fa statistica, e il confronto onesto è fianco a fianco
+// (`git worktree add /tmp/base origin/main`). Qui però una cifra è assoluta e non
+// va interpretata: **`dentroLamiera` deve essere 0**. Non è una taratura, è un
+// invariante — un pedone dentro un'auto è un pedone che l'ha attraversata.
+//
+// Estensione `.scene` e non `.js` perché è il corpo di una funzione async, non un
+// modulo: `node --check` (l'hook su Write/Edit) lo rifiuterebbe.
+const { VEHICLE_TYPES } = await import('/src/render/sprites.js');
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Le stesse zone del censimento del traffico: marciapiedi di quartieri diversi.
+const spots = [
+  { x: game.player.x, y: game.player.y },
+  ...game.city.hospitals.slice(0, 3).map((h) => ({ x: h.x, y: h.y })),
+];
+
+const SAMPLE = 100;   // ms fra due campioni
+const ZONE = 22000;   // ms per zona: il primo terzo se ne va a riempire i marciapiedi
+const SETTLE = 7000;
+
+let inside = 0;       // campioni con almeno un pedone dentro una carrozzeria
+let insidePeds = 0;   // pedoni-campione dentro una carrozzeria
+let samples = 0;
+let stuckSum = 0;     // pedoni che vogliono muoversi e non si muovono
+let pedSum = 0;
+const travel = new Map();   // id -> px percorsi
+const last = new Map();
+
+/** True se il pedone compenetra la terna di cerchi di un veicolo senza guidatore. */
+function insideBody(p, v) {
+  const spec = VEHICLE_TYPES[v.kind];
+  if (!spec) return false;
+  const r = spec.wid * 0.46;
+  const half = spec.len * 0.5 - r * 0.75;
+  const cos = Math.cos(v.angle), sin = Math.sin(v.angle);
+  const minD = r + 6;
+  for (let k = -1; k <= 1; k++) {
+    const dx = p.x - (v.x + cos * half * k);
+    const dy = p.y - (v.y + sin * half * k);
+    // Un pelo di tolleranza: la spinta risolve la compenetrazione, non la previene,
+    // quindi un contatto radente non è un attraversamento.
+    if (dx * dx + dy * dy < (minD - 1.5) ** 2) return true;
+  }
+  return false;
+}
+
+function sample() {
+  samples++;
+  let hit = 0;
+  let stuck = 0;
+  let alive = 0;
+  for (const p of game.peds) {
+    if (p.dead) continue;
+    alive++;
+    if (p.stuckT > 1) stuck++;
+    const prev = last.get(p.id);
+    if (prev) travel.set(p.id, (travel.get(p.id) || 0) + Math.hypot(p.x - prev.x, p.y - prev.y));
+    last.set(p.id, { x: p.x, y: p.y });
+    for (const v of game.vehicleGrid.queryCircle(p.x, p.y, 90)) {
+      if (v.driver || v.z > 6) continue;
+      if (insideBody(p, v)) { hit++; break; }
+    }
+  }
+  pedSum += alive;
+  stuckSum += stuck;
+  insidePeds += hit;
+  if (hit) inside++;
+}
+
+for (const s of spots) {
+  game.player.x = s.x; game.player.y = s.y;
+  game.camera.snapTo(s.x, s.y);
+  last.clear();
+  await wait(SETTLE);
+  for (let t = 0; t < ZONE; t += SAMPLE) {
+    sample();
+    await wait(SAMPLE);
+  }
+}
+
+const walked = [...travel.values()].sort((a, b) => a - b);
+const still = walked.filter((d) => d < 60).length;
+return {
+  campioni: samples,
+  pedoniMedi: Math.round(pedSum / samples),
+  // L'invariante: quante volte, su tutti i campioni, un pedone era dentro un'auto.
+  dentroLamiera: insidePeds,
+  campioniConUnDentro: inside,
+  piantati: +(stuckSum / samples).toFixed(2),
+  // Strada percorsa: la mediana dice se il quartiere cammina, la coda bassa se
+  // qualcuno è rimasto fermo per tutta la zona.
+  passiMediani: Math.round(walked[walked.length >> 1] || 0),
+  fermiPerTutta: still,
+  tracciati: walked.length,
+};
