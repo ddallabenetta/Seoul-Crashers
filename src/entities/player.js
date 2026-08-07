@@ -43,6 +43,20 @@ const WET_SLIDE = 0.6;
 
 export class Player {
   constructor(x, y) {
+    this.kind = 'player';
+    this.maxHp = 100;
+    this.colorIndex = 0;
+    this.reset(x, y);
+  }
+
+  /**
+   * Lo stato con cui comincia una partita. Sta in un metodo e non nel costruttore
+   * perché «Nuova partita» e «Esci al titolo» (§5.21) devono rimettere Jae-min
+   * com'era al boot **senza ricostruirlo**: scena, HUD, polizia e salvataggio
+   * tengono tutti un riferimento a *questo* giocatore, e sostituirlo lascerebbe
+   * in giro un protagonista fantasma che nessuno disegna più.
+   */
+  reset(x, y) {
     this.x = x;
     this.y = y;
     this.angle = 0;
@@ -51,10 +65,7 @@ export class Player {
     this.onFoot = true;
     this.vehicle = null;
     this.animT = 0;
-    this.colorIndex = 0;
-    this.kind = 'player';
-    this.hp = 100;
-    this.maxHp = 100;
+    this.hp = this.maxHp;
     this.enterCooldown = 0;
     this.stamina = 1;
     this.district = null;

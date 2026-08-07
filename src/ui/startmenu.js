@@ -12,17 +12,19 @@
 import { roundPath } from './hud.js';
 import { panelCard, drawControlsList } from './menu.js';
 import { SaveSlots } from './saveslots.js';
+import { Mixer } from './mixer.js';
 import { latestSlot, readSlot, describe, apply } from '../core/save.js';
 
 export class StartMenu {
   constructor() {
     this.open = true;
     this.index = 0;
-    this.tab = null;          // null | 'load' | 'controls'
+    this.tab = null;          // null | 'load' | 'audio' | 'controls'
     this.focus = 'items';
     this.hover = -1;
     this.items = [];
     this.saves = new SaveSlots({ canSave: false });
+    this.mixer = new Mixer();
     this.latest = null;
     this.refresh();
   }
@@ -40,6 +42,7 @@ export class StartMenu {
     if (this.latest) this.items.push({ id: 'continue', label: 'Continua' });
     this.items.push({ id: 'new', label: 'Nuova partita' });
     this.items.push({ id: 'load', label: 'Carica partita' });
+    this.items.push({ id: 'audio', label: 'Audio' });
     this.items.push({ id: 'controls', label: 'Comandi' });
     this.index = 0;
   }
@@ -51,6 +54,7 @@ export class StartMenu {
     }
     if (item.id === 'new') return 'Seoul, un funerale e nessun piano';
     if (item.id === 'load') return 'Tre slot più il salvataggio automatico';
+    if (item.id === 'audio') return 'Volumi · F4 per il muto';
     return 'Tastiera e mouse';
   }
 
@@ -64,6 +68,10 @@ export class StartMenu {
     }
     if (this.focus === 'load') {
       if (this.saves.update(game) === 'loaded') game.start(true);
+      return;
+    }
+    if (this.focus === 'audio') {
+      this.mixer.update(game);
       return;
     }
     const was = this.index;
@@ -82,13 +90,17 @@ export class StartMenu {
 
   activate(game) {
     const item = this.items[this.index];
-    game.audio?.ui(item.id === 'controls' || item.id === 'load' ? 'ok' : 'close');
+    game.audio?.ui(item.id === 'new' || item.id === 'continue' ? 'close' : 'ok');
     switch (item.id) {
       case 'continue':
         apply(game, this.latest.data);
         game.start(true);
         break;
       case 'new':
+        // Da capo davvero: chi arriva qui può aver caricato un salvataggio un
+        // minuto fa (dal titolo si può, e dal menu di pausa ci si torna), e senza
+        // `newGame` «Nuova partita» proseguiva quella.
+        game.newGame();
         game.start(false);
         break;
       case 'load':
@@ -97,8 +109,13 @@ export class StartMenu {
         this.saves.refresh();
         this.saves.confirm = -1;
         break;
+      case 'audio':
+        this.tab = 'audio';
+        this.focus = 'audio';
+        break;
       case 'controls':
         this.tab = 'controls';
+        this.focus = 'items';
         break;
     }
   }
@@ -170,7 +187,8 @@ export class StartMenu {
     ctx.font = '500 12px system-ui, sans-serif';
     const legend = this.focus === 'load'
       ? 'W/S per lo slot · A/D per l\'azione · Invio conferma · F autosave · ESC per tornare'
-      : 'W/S per navigare · Invio per confermare · F4 muto';
+      : this.focus === 'audio' ? Mixer.LEGEND
+        : 'W/S per navigare · Invio per confermare · F4 muto';
     ctx.fillText(legend, 60, h - bar - 26);
 
     if (this.tab) {
@@ -180,6 +198,9 @@ export class StartMenu {
       if (this.tab === 'controls') {
         panelCard(ctx, px, py, size, size, 'Comandi');
         drawControlsList(ctx, px + 24, py + 80);
+      } else if (this.tab === 'audio') {
+        panelCard(ctx, px, py, size, size, 'Audio');
+        this.mixer.draw(ctx, game, px + 28, py + 92, size - 90, this.focus === 'audio');
       } else {
         panelCard(ctx, px, py, size, size, 'Salvataggi');
         ctx.fillStyle = 'rgba(235,240,250,0.4)';

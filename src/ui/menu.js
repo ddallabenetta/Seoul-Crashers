@@ -2,6 +2,7 @@
 import { roundPath } from './hud.js';
 import { KMH } from '../core/math.js';
 import { SaveSlots } from './saveslots.js';
+import { Mixer } from './mixer.js';
 
 // Esportata perché la usa anche il menu iniziale (§5.18): i comandi sono uno solo,
 // e una seconda copia sarebbe una copia che invecchia.
@@ -24,16 +25,6 @@ export const CONTROLS = [
   ['Shift + R', 'radio: spegni'],
 ];
 
-// Righe del pannello audio: la chiave è il bus in `AudioSystem.mix`.
-const MIXER = [
-  ['master', 'Generale'],
-  ['sfx', 'Effetti'],
-  ['ambient', 'Ambiente'],
-  ['music', 'Musica'],
-  ['ui', 'Interfaccia'],
-  ['radio', 'Radio'],
-];
-
 export class PauseMenu {
   constructor(mapView) {
     this.mapView = mapView;
@@ -47,14 +38,17 @@ export class PauseMenu {
       { id: 'audio', label: 'Audio', hint: 'Volumi · F4 per il muto' },
       { id: 'controls', label: 'Comandi', hint: 'Tastiera e mouse' },
       { id: 'stats', label: 'Statistiche', hint: 'La tua corsa finora' },
+      { id: 'title', label: 'Esci al titolo', hint: 'Quello che non hai salvato lo perdi' },
     ];
     this.hover = -1;
+    // Uscire al titolo butta via la partita: la seconda pressione è l'unica cosa
+    // che sta fra un dito scivolato sull'ultima voce e mezz'ora di gioco.
+    this.quitConfirm = false;
     // Audio e salvataggi sono i due pannelli che si *usano* invece di leggersi:
     // quando sono attivi i tasti di navigazione passano a loro, e ESC torna alle
     // voci invece di chiudere il menu.
     this.focus = 'items';
-    this.mixIndex = 0;
-    this.bars = [];
+    this.mixer = new Mixer();
     this.saves = new SaveSlots({ canSave: true });
   }
 
@@ -63,11 +57,15 @@ export class PauseMenu {
     this.index = 0;
     this.tab = 'map';
     this.focus = 'items';
+    this.quitConfirm = false;
   }
 
   /** ESC dentro un pannello che si usa torna alle voci invece di chiudere il menu. */
   backOut() {
-    if (!this.open || this.focus === 'items') return false;
+    if (!this.open) return false;
+    // La conferma d'uscita si annulla per prima: ESC lì sopra vuol dire «no».
+    if (this.quitConfirm) { this.quitConfirm = false; return true; }
+    if (this.focus === 'items') return false;
     this.focus = 'items';
     this.saves.confirm = -1;
     return true;
@@ -76,7 +74,7 @@ export class PauseMenu {
   update(dt, game) {
     if (!this.open) return;
     if (this.focus === 'audio') {
-      this.updateMixer(game);
+      this.mixer.update(game);
       return;
     }
     if (this.focus === 'saves') {
@@ -97,48 +95,11 @@ export class PauseMenu {
       this.index = (this.index + 1) % this.items.length;
     }
     if (this.hover >= 0 && input.mouse.pressed) this.index = this.hover;
-    if (this.index !== was) game.audio?.ui('move');
+    // Spostarsi altrove è già una risposta: la conferma d'uscita non resta armata
+    // alle spalle di chi è andato a guardare le statistiche.
+    if (this.index !== was) { game.audio?.ui('move'); this.quitConfirm = false; }
     if (input.wasPressed('Space') || input.wasPressed('Enter') || (this.hover >= 0 && input.mouse.pressed)) {
       this.activate(game);
-    }
-  }
-
-  /** W/S scelgono la riga, A/D spostano il volume, Invio accende e spegne tutto. */
-  updateMixer(game) {
-    const input = game.input;
-    const audio = game.audio;
-    const was = this.mixIndex;
-    if (input.wasPressed('KeyW') || input.wasPressed('ArrowUp')) {
-      this.mixIndex = (this.mixIndex - 1 + MIXER.length) % MIXER.length;
-    }
-    if (input.wasPressed('KeyS') || input.wasPressed('ArrowDown')) {
-      this.mixIndex = (this.mixIndex + 1) % MIXER.length;
-    }
-    if (this.mixIndex !== was) audio?.ui('move');
-    const step = (input.wasPressed('KeyD') || input.wasPressed('ArrowRight') ? 1 : 0)
-      - (input.wasPressed('KeyA') || input.wasPressed('ArrowLeft') ? 1 : 0);
-    const bus = MIXER[this.mixIndex][0];
-    if (step && audio) {
-      audio.setVolume(bus, audio.mix[bus] + step * 0.1);
-      // La radio non ha bisogno di un campione: o sta già suonando, o non c'è
-      // niente da provare.
-      if (bus !== 'radio') audio.preview(bus);
-    }
-    if (input.wasPressed('Space') || input.wasPressed('Enter')) {
-      audio?.toggleMute();
-      audio?.ui('ok');
-    }
-    // Trascinamento col mouse: la barra si prende dove la si clicca.
-    if (input.mouse.down && audio) {
-      const mx = input.mouse.x;
-      const my = input.mouse.y;
-      for (let i = 0; i < this.bars.length; i++) {
-        const b = this.bars[i];
-        if (mx < b.x - 6 || mx > b.x + b.w + 6 || my < b.y - 10 || my > b.y + b.h + 10) continue;
-        this.mixIndex = i;
-        audio.setVolume(MIXER[i][0], (mx - b.x) / b.w);
-        if (input.mouse.pressed && MIXER[i][0] !== 'radio') audio.preview(MIXER[i][0]);
-      }
     }
   }
 
@@ -168,6 +129,19 @@ export class PauseMenu {
         break;
       case 'stats':
         this.tab = 'stats';
+        break;
+      case 'title':
+        // La scheda dei salvataggi resta a fianco mentre si chiede conferma: chi
+        // si accorge adesso di non aver salvato ha il posto dove farlo sott'occhio.
+        if (!this.quitConfirm) {
+          this.quitConfirm = true;
+          this.tab = 'saves';
+          this.saves.refresh();
+          break;
+        }
+        this.quitConfirm = false;
+        this.open = false;
+        game.toTitle();
         break;
     }
   }
@@ -201,29 +175,35 @@ export class PauseMenu {
       const inside = mx >= boxX && mx <= boxX + boxW && my >= boxY && my <= boxY + boxH;
       if (inside) this.hover = i;
       const active = i === this.index;
+      // La voce armata si tinge d'ambra: la conferma si deve vedere prima di
+      // premere, non leggere in fondo allo schermo.
+      const arming = active && item.id === 'title' && this.quitConfirm;
       if (active) {
-        ctx.fillStyle = 'rgba(255,95,162,0.14)';
+        ctx.fillStyle = arming ? 'rgba(255,210,63,0.16)' : 'rgba(255,95,162,0.14)';
         roundPath(ctx, boxX, boxY, boxW, boxH, 8);
         ctx.fill();
-        ctx.fillStyle = '#ff5fa2';
+        ctx.fillStyle = arming ? '#ffd23f' : '#ff5fa2';
         ctx.fillRect(boxX, boxY, 3, boxH);
       }
-      ctx.fillStyle = active ? '#ffffff' : 'rgba(235,240,250,0.62)';
+      ctx.fillStyle = arming ? '#ffd23f' : (active ? '#ffffff' : 'rgba(235,240,250,0.62)');
       ctx.font = `${active ? '700' : '600'} 20px system-ui, sans-serif`;
-      ctx.fillText(item.label, boxX + 20, y);
+      ctx.fillText(arming ? 'Uscire? Invio conferma' : item.label, boxX + 20, y);
       y += 54;
     });
 
     // Descrizione della voce selezionata, su una riga sua: dentro il box si
     // sovrapponeva all'etichetta.
-    ctx.fillStyle = 'rgba(235,240,250,0.45)';
+    ctx.fillStyle = this.quitConfirm ? 'rgba(255,210,63,0.7)' : 'rgba(235,240,250,0.45)';
     ctx.font = '500 13px system-ui, sans-serif';
-    ctx.fillText(this.items[this.index].hint, 76, y + 6);
+    ctx.fillText(
+      this.quitConfirm ? 'Torni al titolo e la partita ricomincia · ESC annulla' : this.items[this.index].hint,
+      76, y + 6
+    );
 
     ctx.fillStyle = 'rgba(235,240,250,0.32)';
     ctx.font = '500 12px system-ui, sans-serif';
     const legend = {
-      audio: 'W/S per la riga · A/D per il volume · Invio per il muto · ESC per tornare',
+      audio: Mixer.LEGEND,
       saves: 'W/S per lo slot · A/D per l\'azione · Invio conferma · F autosave · ESC per tornare',
       items: 'W/S per navigare · Invio per confermare · ESC per riprendere',
     };
@@ -249,43 +229,7 @@ export class PauseMenu {
 
   drawAudio(ctx, game, x, y, size) {
     panelCard(ctx, x, y, size, size, 'Audio');
-    const audio = game.audio;
-    const muted = audio ? audio.muted : true;
-    ctx.font = '600 12px system-ui, sans-serif';
-    ctx.fillStyle = muted ? '#ff5fa2' : 'rgba(90,220,150,0.9)';
-    ctx.fillText(muted ? 'MUTO' : 'ACCESO', x + size - 96, y + 44);
-
-    this.bars.length = 0;
-    const bw = size - 90;
-    MIXER.forEach(([bus, label], i) => {
-      const ly = y + 92 + i * 58;
-      const sel = i === this.mixIndex && this.focus === 'audio';
-      const v = audio ? audio.mix[bus] : 0;
-      ctx.fillStyle = sel ? '#ffffff' : 'rgba(235,240,250,0.55)';
-      ctx.font = `${sel ? '700' : '600'} 12px system-ui, sans-serif`;
-      ctx.fillText(label.toUpperCase(), x + 28, ly);
-      ctx.textAlign = 'right';
-      ctx.fillStyle = 'rgba(235,240,250,0.45)';
-      ctx.fillText(`${Math.round(v * 100)}%`, x + 28 + bw, ly);
-      ctx.textAlign = 'left';
-      const by = ly + 10;
-      this.bars.push({ x: x + 28, y: by, w: bw, h: 8 });
-      ctx.fillStyle = 'rgba(255,255,255,0.12)';
-      roundPath(ctx, x + 28, by, bw, 8, 4);
-      ctx.fill();
-      ctx.fillStyle = muted ? 'rgba(235,240,250,0.28)' : (sel ? '#ff5fa2' : 'rgba(56,214,255,0.8)');
-      roundPath(ctx, x + 28, by, Math.max(4, bw * v), 8, 4);
-      ctx.fill();
-    });
-
-    // Il browser non lascia partire l'audio finché non si tocca qualcosa: senza
-    // dirlo, un giocatore che apre il menu per primo pensa che sia rotto.
-    ctx.fillStyle = 'rgba(235,240,250,0.4)';
-    ctx.font = '500 12px system-ui, sans-serif';
-    const info = !audio || !audio.ready
-      ? 'Il browser accende l\'audio al primo clic o tasto premuto.'
-      : 'Tutto sintetizzato, nessun file audio. La radio no: è in streaming (R in macchina).';
-    ctx.fillText(info, x + 28, y + 92 + MIXER.length * 58 + 12);
+    this.mixer.draw(ctx, game, x + 28, y + 92, size - 90, this.focus === 'audio');
   }
 
   /** Quattro schede: i tre slot manuali e quello dell'autosave. */

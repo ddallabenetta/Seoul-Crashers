@@ -93,18 +93,29 @@ export class DayCycle {
   /** @param rng generatore deterministico: il meteo della partita è ripetibile. */
   constructor(rng, startHour = 8.4) {
     this.rng = rng;
-    this.t = (startHour / 24) * DAY_SECONDS;   // secondi dall'inizio del giorno
-    this.day = 1;
+    this.startHour = startHour;
     this.paused = false;                        // fermare il tempo è utile in una prova
-    this.weather = WEATHERS.clear;              // la condizione da cui si viene
-    this.next = WEATHERS.cloudy;                // quella verso cui si sta andando
-    this.weatherT = 60;                         // secondi al prossimo cambio
-    this.blend = 1;                             // 0 = tutto `weather`, 1 = tutto `next`
     // Valori derivati, riscritti ogni frame: nessuna allocazione nel loop.
     this.light = {
       amb: [255, 255, 255], k: 0, warm: [255, 255, 255], w: 0,
       sx: 0.25, sy: 0.33, shadow: 0.34, lamps: 0,
     };
+    this.reset();
+  }
+
+  /**
+   * L'orologio come al boot. Serve alla partita nuova (§5.21): un giocatore che
+   * ricomincia deve ritrovare la stessa mattina, non l'ora e il temporale della
+   * partita che ha appena abbandonato. Il `light` non si ricostruisce — è letto
+   * per riferimento dalla scena — ma `apply` lo riscrive tutto.
+   */
+  reset() {
+    this.t = (this.startHour / 24) * DAY_SECONDS;   // secondi dall'inizio del giorno
+    this.day = 1;
+    this.weather = WEATHERS.clear;              // la condizione da cui si viene
+    this.next = WEATHERS.cloudy;                // quella verso cui si sta andando
+    this.weatherT = 60;                         // secondi al prossimo cambio
+    this.blend = 1;                             // 0 = tutto `weather`, 1 = tutto `next`
     this.rain = 0;
     this.wet = 0;      // l'asfalto resta bagnato dopo che ha smesso: si asciuga piano
     this.wind = 0.1;

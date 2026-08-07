@@ -184,6 +184,89 @@ class Game {
     this.hud.toast('E sulla porta di un negozio per entrare · F svuota la cassa', 8);
   }
 
+  /**
+   * Svuota il mondo attorno al giocatore. Lo usano il caricamento di un
+   * salvataggio e la partita nuova, che hanno lo stesso problema: quello che c'è
+   * in strada adesso appartiene a una partita che fra un istante non esiste più.
+   * Velivoli e imbarcazioni restano dove sono — nascono al boot e non passano
+   * dallo streaming (§3), quindi nessuno li rifarebbe.
+   */
+  clearWorld() {
+    for (let i = this.vehicles.length - 1; i >= 0; i--) {
+      const v = this.vehicles[i];
+      if (v.protect && v.moored) continue;
+      // Liberare lo stallo di sosta è obbligatorio, o resta occupato da un
+      // fantasma per il resto della partita (§4).
+      if (v.spot) v.spot.taken = false;
+      this.vehicles.splice(i, 1);
+    }
+    // `gone` serve a chi tiene riferimenti ai pedoni: senza, la polizia
+    // continuerebbe la caccia con degli agenti che non sono più in nessuna lista.
+    for (const p of this.peds) p.gone = true;
+    this.peds.length = 0;
+    this.police.standDown(this, true);
+    this.projectiles.clear();
+    this.fx.clear();
+    this.pickups.reset();
+  }
+
+  /**
+   * Da capo, senza ricaricare la pagina. La città non c'entra: nasce da una seed
+   * fissa e non è mai cambiata. Quello che va rimesso a posto è tutto il resto —
+   * Jae-min, l'orologio, il ricercato, le statistiche e quel poco che gli interni
+   * ricordano. Senza questo metodo «Nuova partita» dopo aver caricato un
+   * salvataggio proseguiva la partita caricata, e «Esci al titolo» sarebbe stato
+   * un `location.reload()` travestito.
+   */
+  newGame() {
+    if (this.indoors) this.shops.forceExit(this);
+    this.clearWorld();
+    this.player.reset(this.city.spawn.x, this.city.spawn.y);
+    this.player.district = this.city.districtAt(this.player.x, this.player.y);
+    this.wanted.reset();
+    this.shops.reset();
+    this.dayCycle.reset();
+    this.radio.off(this);
+    this.time = 0;
+    this.attractT = 0;
+    this.autoT = undefined;
+    Object.assign(this.stats, {
+      distance: 0, topSpeed: 0, stolen: 0, crashes: 0, pedsHit: 0, kills: 0,
+      deaths: 0, busted: 0, copsKilled: 0, maxWanted: 0, choppers: 0, blasts: 0,
+      robberies: 0, visits: 0, districts: new Set([this.player.district.id]),
+    });
+    this.traffic.prewarm(this, 40, 18);
+    this.pedSystem.prewarm(this, 40);
+    // Le griglie si rifanno a ogni frame, ma il primo dopo la partita nuova
+    // arriva *dopo* le collisioni del giocatore: senza questo si può nascere
+    // dentro un'auto appena immessa (§4).
+    this.vehicleGrid.rebuild(this.vehicles);
+    this.pedGrid.rebuild(this.peds);
+    this.camera.snapTo(this.player.x, this.player.y);
+  }
+
+  /**
+   * Ritorno al titolo. È una partita nuova più il menu iniziale davanti: la
+   * differenza con `newGame` è solo chi sta guardando, e infatti l'attract mode
+   * riparte esattamente come al boot.
+   */
+  toTitle() {
+    this.newGame();
+    this.started = false;
+    this.paused = false;
+    this.menu.open = false;
+    this.mapView.open = false;
+    this.shopMenu.open = false;
+    this.startMenu.open = true;
+    this.startMenu.focus = 'items';
+    this.startMenu.tab = null;
+    // L'elenco delle voci dipende da cosa c'è nel browser, e nel frattempo può
+    // essere cambiato: chi è appena passato dal menu di pausa ha quasi sempre
+    // salvato qualcosa.
+    this.startMenu.refresh();
+    // Il tema torna da solo: `music.direct` guarda `game.started` a ogni frame.
+  }
+
   /** True quando il giocatore è dentro un edificio: la città è ferma. */
   get indoors() {
     return !!(this.shops && this.shops.active);

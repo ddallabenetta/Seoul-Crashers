@@ -123,20 +123,9 @@ export function apply(game, data) {
   const pl = game.player;
   if (game.indoors) game.shops.forceExit(game);
 
-  // Il mondo attorno: quello che non è protetto se ne va. Liberare lo stallo di
-  // sosta è obbligatorio, altrimenti resta occupato da un fantasma (§4).
-  for (let i = game.vehicles.length - 1; i >= 0; i--) {
-    const v = game.vehicles[i];
-    if (v.protect && v.moored) continue;
-    if (v.spot) v.spot.taken = false;
-    game.vehicles.splice(i, 1);
-  }
-  for (const p of game.peds) p.gone = true;
-  game.peds.length = 0;
-  game.police.standDown(game, true);
-  game.projectiles.clear();
-  game.fx.clear();
-  game.pickups.reset?.();
+  // Il mondo attorno: quello che non è protetto se ne va. È lo stesso svuotamento
+  // che fa la partita nuova, e sta in `Game` perché il mondo è suo (§5.21).
+  game.clearWorld();
 
   pl.vehicle = null;
   pl.onFoot = true;

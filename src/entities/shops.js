@@ -436,6 +436,29 @@ export class ShopSystem {
     this.near = null;
   }
 
+  /**
+   * Tutte le vetrine come al primo giorno: casse piene, personale in piedi,
+   * nessuna pianta in cache. Serve alla partita nuova (§5.21) — `restore` fa la
+   * stessa cosa per un salvataggio, ma partendo da un elenco di cose da ricordare
+   * invece che da niente.
+   */
+  reset() {
+    this.cache.clear();
+    this.pending = null;
+    this.active = null;
+    this.outside = null;
+    this.backSpot = null;
+    this.actions.length = 0;
+    this.fade = 0;
+    this.garageT = 0;
+    this.robbed = 0;
+    this.spent = 0;
+    this.sold = 0;
+    this.alarmT = 0;
+    this.alarmCaller = null;
+    this.near = null;
+  }
+
   get floor() {
     return this.active ? this.active.floors[this.active.cur] : null;
   }
