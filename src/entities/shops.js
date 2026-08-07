@@ -910,6 +910,10 @@ export class ShopSystem {
       f.people.splice(i, 1);
       drop(f.staff, p);
       drop(f.crowd, p);
+      // …e adesso è in strada. Si fa **qui** e non dove viene alzato `gone`: la
+      // rimozione dalla sala deve venire prima, o si ritrova in due liste, e nella
+      // sala ci resterebbe con le coordinate della città addosso.
+      this.spillOutside(p, game);
     }
 
     // Azioni contestuali: scala, porta, bancone, cassa.
@@ -1320,6 +1324,49 @@ export class ShopSystem {
     }
   }
 
+  /**
+   * Chi scappa dalla porta finisce **in strada**, non nel nulla. Prima spariva
+   * sulla soglia e fuori non se ne accorgeva nessuno: una rapina restava una cosa
+   * privata fra te e una stanza, e il commesso in fuga non portava con sé niente
+   * (§6). Adesso esce davvero, in mezzo al marciapiede, e chi è là fuori se ne
+   * accorge — la divisa compresa, che è un pedone come gli altri (§3).
+   *
+   * È **lo stesso individuo**, spostato di lista: ricrearne uno nuovo romperebbe
+   * il riferimento di `alarmCaller`, e inseguire fuori chi sta telefonando è
+   * proprio la cosa che questa uscita rende possibile.
+   */
+  spillOutside(p, game) {
+    const shop = this.active && this.active.shop;
+    if (!shop || p.dead) return;
+    const list = game.pedSystem?.peds;
+    if (!list || list.includes(p)) return;
+    // Un passo oltre la soglia, non sullo zerbino: dentro il muro non ci si sta.
+    // Sfalsati di lato, o due che scappano insieme escono nello stesso pixel.
+    const off = ((p.id % 5) - 2) * 12;
+    p.x = shop.x + shop.nx * 30 - shop.ny * off;
+    p.y = shop.y + shop.ny * 30 + shop.nx * off;
+    p.gone = false;
+    p.indoor = false;
+    p.home = null;
+    p.role = null;
+    p.staff = false;
+    p.block = null;      // se lo trova da solo al primo passo (vedi `updatePed`)
+    p.state = 'flee';
+    p.panic = 6;
+    p.fleeFromX = shop.x;
+    p.fleeFromY = shop.y;
+    p.vx = shop.nx * 40;
+    p.vy = shop.ny * 40;
+    list.push(p);
+    // L'urlo va **dopo** lo spostamento: un suono generato prima di uno snap
+    // risulta a mezza Seoul di distanza e viene scartato (§3).
+    game.audio?.scream(p.x, p.y, p.voice);
+    // Chi è in strada lo vede e si spaventa. `source` nullo apposta: uno che
+    // scappa non è un aggressore, e passarci il giocatore renderebbe ostile ogni
+    // teppista dell'isolato per una cassa svuotata a due porte di distanza.
+    game.pedSystem.alarm(p.x, p.y, 300, game, null);
+  }
+
   /** Uno sparo (o una rapina) dentro: chi può scappa, chi è armato reagisce. */
   alarm(x, y, r, game, source) {
     const f = this.floor;
@@ -1369,8 +1416,10 @@ export class ShopSystem {
   /**
    * Il conto alla rovescia gira **anche fuori**: uscire dalla porta non ferma una
    * telefonata già partita, e il negozio alle spalle non è un rifugio. Si ferma in
-   * un modo solo, stendendo chi sta chiamando prima che esca — e se in sala c'è
-   * qualcun altro in piedi, tocca a lui.
+   * un modo solo, stendendo chi sta chiamando — e se in sala c'è qualcun altro in
+   * piedi, tocca a lui. Da quando chi scappa esce davvero in strada
+   * (`spillOutside`), quel «stendendo» vale anche sul marciapiede: si può
+   * inseguire il testimone fuori dalla porta, ed è la scena che mancava.
    */
   updateAlarm(dt, game) {
     if (this.alarmT <= 0) return;
@@ -1382,9 +1431,13 @@ export class ShopSystem {
       return;
     }
     const caller = this.alarmCaller;
-    if (caller && caller.dead && this.active) {
-      const other = this.floor.people.find((p) => !p.dead && !p.hostile && p !== caller);
+    if (caller && caller.dead) {
       caller.calling = false;
+      // Il rimpiazzo lo può dare solo una sala: se il testimone è stato raggiunto
+      // in strada, o il negozio è alle spalle, non c'è nessun altro al banco.
+      const other = this.active
+        ? this.floor.people.find((p) => !p.dead && !p.hostile && p !== caller)
+        : null;
       if (!other) {
         this.alarmT = 0;
         this.alarmCaller = null;
