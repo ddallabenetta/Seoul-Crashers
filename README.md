@@ -8,7 +8,7 @@ Canvas 2D puro, moduli ES, zero dipendenze: tutta la grafica è generata da codi
 Serve un server statico (i moduli ES non funzionano da `file://`):
 
 ```bash
-python3 -m http.server 8123 --directory /Users/danieldallabenetta/Documents/seoul_crashers
+python3 -m http.server 8123 --directory /Users/danieldallabenetta/Documents/Seoul-Crashers
 ```
 
 Poi apri <http://localhost:8123>.
@@ -20,7 +20,7 @@ Poi apri <http://localhost:8123>.
 | `W A S D` / frecce | muoversi a piedi · guidare |
 | `Shift` | correre · **in volo**: scendere di quota |
 | `Spazio` | freno a mano (drift) · **in volo**: salire di quota |
-| `E` | salire / scendere dal veicolo · entrare in un negozio · scale · listino |
+| `E` | salire / scendere dal veicolo · entrare in un negozio · scale · listino · usare la metro |
 | `F` | svuotare la cassa di un negozio (rapina) |
 | `H` | clacson |
 | **mouse** | mirare (a piedi si guarda sempre il cursore) |
@@ -198,6 +198,24 @@ a nord l'**aeroporto di Gimpo**, con la pista, il piazzale e i velivoli parchegg
 la **campagna**: risaie, serre e capannoni, dove restano solo le provinciali. Fuori dall'acqua
 si annega, e un'auto che finisce nel Han affonda.
 
+## Metro e regioni
+
+Le fermate della metro sono segnate con una **M ciano** sulla minimappa e sulla carta, e in
+strada hanno una scala solida con totem `M · 지하철`, sempre appoggiata al marciapiede invece
+che alle corsie. Vai a piedi all'ingresso e premi `E`: entri in un vero interno, percorri
+l'atrio insieme ai passeggeri, puoi comprare 김밥 e caffè al chiosco, attraversi i tornelli e
+raggiungi la banchina. Il tabellone delle destinazioni compare soltanto davanti alle porte del
+treno; da lì puoi viaggiare nella stessa città o prendere un collegamento interurbano. Con le
+stelle di ricercato attive i tornelli restano chiusi.
+
+**Seoul** ora misura 7200×7200: COEX Mall, Gyeongbokgung, Lotte World Tower, Dongdaemun,
+N Seoul Tower e la cintura metropolitana stanno dentro un tessuto urbano sensibilmente più
+esteso, non in una cornice vuota. Sono giocabili anche **Busan** (`부산`), una mappa autonoma
+6400×5600 con baia, estuario del Nakdong, Gwangan Bridge, Jagalchi, Haeundae e Gwangalli, e
+**Jeju** (`제주`), un'isola autonoma 5400×5400 con costa su quattro lati, Hallasan, campagne,
+Jeju City e Seogwipo. Tutte conservano traffico, negozi, interni, polizia e rilievo; il viaggio
+mantiene personaggio, inventario, denaro e ora del giorno.
+
 Sparsi per la mappa ci sono i **territori delle bande** (백호파, 흑사파, 철마파, 황소파): un
 cortile, un piazzale di container o un capannone, con il tag dipinto a terra e i loro uomini
 di guardia. Passarci disarmati si può; entrarci con un ferro in pugno, no.
@@ -208,10 +226,10 @@ di guardia. Passarci disarmati si può; entrarci con un ferro in pugno, no.
 index.html
 src/
   core/      loop a passo fisso, input, audio sintetizzato, RNG deterministico, griglie
-  world/     generazione città, grafo stradale, distretti, texture mappa
-  render/    camera 2.5D, sprite vettoriali, facciate, terreno a tile, effetti
+  world/     generatori Seoul/Busan/Jeju, registro regioni, grafo e texture mappa
+  render/    camera 2.5D, sprite, facciate, terreno a tile, interni e stazioni metro
   entities/  giocatore, fisica veicoli, traffico, pedoni, polizia, negozi
-  ui/        HUD e minimappa, mappa a tutto schermo, menu di pausa
+  ui/        HUD, minimappa, carta, menu, negozi e navigazione metro
 ```
 
 Alcune scelte tecniche che spiegano il risultato a schermo:
@@ -223,7 +241,7 @@ Alcune scelte tecniche che spiegano il risultato a schermo:
   tutte le tinte. Gli oggetti alti vengono ordinati per distanza radiale dal centro camera e
   disegnati dal più lontano al più vicino.
 - **Terreno a tile.** Asfalto, marciapiedi, segnaletica e fiume sono pre-renderizzati in
-  riquadri da 512 px con cache LRU: una mappa 5400×5400 non si ridisegna ogni frame.
+  riquadri da 512 px con cache LRU: nemmeno una mappa 7200×7200 si ridisegna ogni frame.
 - **Maglia stradale irregolare.** Le vie non sono una scacchiera: ogni linea esiste o no
   cella per cella, e da quel dato solo derivano superblocchi (isolati fusi), disassamenti
   (una via si interrompe su un'arteria e riprende spostata) e l'interruzione sul fiume.
@@ -325,15 +343,16 @@ miccia, mina di prossimità. Onda d'urto condivisa che fa saltare anche i veicol
 esplosioni), barra armi a sei file, mirino che mostra il raggio dello scoppio, SWAT passata
 al fucile d'assalto.
 
-**Fase 3, negozi e interni — completata.** 113 vetrine e 324 attività su più piani in tutta
-Seoul, dodici tipi di locale con pianta, arredo e gente propri; denaro, listini, banco dei
+**Fase 3, negozi e interni — completata.** 240 vetrine e 658 attività su più piani nella Seoul
+estesa, dodici tipi di locale con pianta, arredo e gente propri; denaro, listini, banco dei
 pegni che ricompra, cambio d'abito che toglie una stella, casse da svuotare, officine di
 verniciatura che azzerano il ricercato.
 
-**Fase 3, la mappa — completata.** Mondo 5400×5400 che la città non riempie: il mare a ovest
-con l'aeroporto di Gimpo e il porto di Incheon, la campagna in mezzo, le colline attorno. Si
-vola (elicottero, turboelica) e si naviga (motoscafo, battello); in acqua si annega e le auto
-affondano. Sei territori di bande.
+**Fase 3, la mappa — completata.** Seoul 7200×7200 con mare a ovest, Gimpo, Incheon e cintura
+urbana; Busan 6400×5600 con baia ed estuario; Jeju 5400×5400 con profilo insulare completo.
+Le coste hanno battigia, rocce e schiuma, mentre i bordi terrestri proseguono in una fascia
+verde protetta da guardrail e collisione. Si vola (elicottero, turboelica) e si naviga
+(motoscafo, battello); in acqua si annega e le auto affondano. Sei territori di bande.
 
 **Fase 3, il tempo — completata.** Un giro di ventiquattr'ore ogni ventiquattro minuti, quattro
 condizioni di tempo legate in catena, le finestre che si accendono la sera, la pioggia che si

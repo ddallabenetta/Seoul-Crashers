@@ -304,8 +304,11 @@ export class Player {
       this.attack(game, spec);
     }
 
-    // Dentro un negozio l'inquadratura è la stanza intera, non il personaggio.
-    const base = game.indoors ? game.shops.roomZoom(game.camera) : 1.12;
+    // In ogni interno l'inquadratura contiene tutta la pianta: negozi e stazioni
+    // hanno dimensioni diverse, quindi ciascun sistema calcola il proprio zoom.
+    const base = game.metro?.inside
+      ? game.metro.roomZoom(game.camera)
+      : game.indoors ? game.shops.roomZoom(game.camera) : 1.12;
     game.camera.setZoomTarget(this.scoping ? base / spec.scope : base);
   }
 
@@ -319,7 +322,7 @@ export class Player {
     // gli interni dall'alto, e qui serve anche a non far scorrere i muri sotto il
     // naso ogni volta che si fa un passo.
     if (game && game.indoors) {
-      const f = game.shops.floor;
+      const f = game.interiorFloor;
       return { x: f.w / 2, y: f.h / 2, vx: 0, vy: 0 };
     }
     if (!this.onFoot) {

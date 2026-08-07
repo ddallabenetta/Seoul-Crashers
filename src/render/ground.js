@@ -17,6 +17,10 @@ function hash2(x, y) {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
+function clampWorld(value, max) {
+  return Math.max(8, Math.min(max - 8, value));
+}
+
 const ROAD_WORDS = ['버스', '천천히', '어린이보호'];
 
 export class GroundRenderer {
@@ -70,13 +74,16 @@ export class GroundRenderer {
     g.translate(-ox, -oy);
 
     // --- Base: terra del distretto -------------------------------------------
-    const d = districtAtNorm((ox + TILE / 2) / city.w, (oy + TILE / 2) / city.h);
+    const d = city.districtAt
+      ? city.districtAt(ox + TILE / 2, oy + TILE / 2)
+      : districtAtNorm((ox + TILE / 2) / city.w, (oy + TILE / 2) / city.h);
     g.fillStyle = d.ground;
     g.fillRect(ox, oy, TILE, TILE);
 
     // --- Fiume Han ------------------------------------------------------------
     const r = city.river;
-    if (oy < r.y1 && oy + TILE > r.y0) {
+    const seoulWater = (city.region?.id || 'seoul') === 'seoul';
+    if (seoulWater && oy < r.y1 && oy + TILE > r.y0) {
       const grad = g.createLinearGradient(0, r.y0, 0, r.y1);
       grad.addColorStop(0, '#1b3a4a');
       grad.addColorStop(0.35, '#16303f');
@@ -136,7 +143,8 @@ export class GroundRenderer {
     }
 
     // --- Mare (서해), piana di marea e banchina --------------------------------
-    if (city.waterX > 0 && ox < city.quayX + TILE) this.drawSea(g, ox, oy);
+    if (seoulWater && city.waterX > 0 && ox < city.quayX + TILE) this.drawSea(g, ox, oy);
+    else if (!seoulWater && city.isWater) this.drawRegionalWater(g, ox, oy);
 
     // --- Asfalto --------------------------------------------------------------
     const noise = g.createPattern(noiseCanvas(), 'repeat');
@@ -200,10 +208,168 @@ export class GroundRenderer {
       this.drawTurf(g, t);
     }
 
+    // Il limite giocabile è una fascia leggibile (scogliera, bosco o barriera),
+    // non il punto in cui le tile semplicemente finiscono.
+    this.drawWorldBoundary(g, view);
+
     // --- Rilievo: ombreggiatura in base alla pendenza ------------------------
     g.restore();
     this.drawRelief(g, ox, oy);
     return c;
+  }
+
+  drawWorldBoundary(g, view) {
+    const city = this.city;
+    const region = city.region?.id || 'seoul';
+    const depth = 64;
+    const wetAt = (x, y) => region !== 'seoul' && typeof city.isWater === 'function' && city.isWater(x, y);
+    const fillOutside = (x, y, w, h, wet) => {
+      if (w <= 0 || h <= 0) return;
+      g.fillStyle = wet ? '#0d2a3b' : '#17251b';
+      g.fillRect(x, y, w, h);
+      for (let i = 0; i < 16; i++) {
+        const px = x + hash2((x | 0) + i * 17, y | 0) * w;
+        const py = y + hash2(x | 0, (y | 0) + i * 23) * h;
+        if (wet) {
+          g.fillStyle = `rgba(145,195,220,${0.025 + hash2(i, x + y) * 0.045})`;
+          g.fillRect(px, py, 18 + hash2(i * 7, y) * 72, 2);
+        } else {
+          g.fillStyle = `rgba(55,92,53,${0.14 + hash2(i, y) * 0.18})`;
+          g.beginPath();
+          g.ellipse(px, py, 22 + hash2(i, x) * 42, 12 + hash2(y, i) * 28, 0, 0, 6.2832);
+          g.fill();
+        }
+      }
+    };
+
+    const vx0 = view.x;
+    const vy0 = view.y;
+    const vx1 = view.x + view.w;
+    const vy1 = view.y + view.h;
+    if (vx0 < 0) fillOutside(vx0, vy0, Math.min(vx1, 0) - vx0, view.h, wetAt(8, clampWorld(vy0 + view.h / 2, city.h)));
+    if (vx1 > city.w) fillOutside(Math.max(vx0, city.w), vy0, vx1 - Math.max(vx0, city.w), view.h, wetAt(city.w - 8, clampWorld(vy0 + view.h / 2, city.h)));
+    if (vy0 < 0) fillOutside(Math.max(0, vx0), vy0, Math.min(city.w, vx1) - Math.max(0, vx0), Math.min(vy1, 0) - vy0, wetAt(clampWorld(vx0 + view.w / 2, city.w), 8));
+    if (vy1 > city.h) fillOutside(Math.max(0, vx0), Math.max(vy0, city.h), Math.min(city.w, vx1) - Math.max(0, vx0), vy1 - Math.max(vy0, city.h), wetAt(clampWorld(vx0 + view.w / 2, city.w), city.h - 8));
+
+    const landStrip = (x, y, w, h, vertical, inner) => {
+      const length = vertical ? h : w;
+      const start = vertical ? y : x;
+      const stop = start + length;
+      for (let p = Math.floor(start / 56) * 56; p < stop; p += 56) {
+        const mid = p + 28;
+        const sx = vertical ? (inner < city.w / 2 ? depth / 2 : city.w - depth / 2) : mid;
+        const sy = vertical ? mid : (inner < city.h / 2 ? depth / 2 : city.h - depth / 2);
+        if (wetAt(sx, sy)) continue;
+        const rx = vertical ? x : p;
+        const ry = vertical ? p : y;
+        const rw = vertical ? w : 57;
+        const rh = vertical ? 57 : h;
+        g.fillStyle = '#263a29';
+        g.fillRect(rx, ry, rw, rh);
+        const rv = hash2(p | 0, vertical ? x : y);
+        g.fillStyle = `rgba(49,83,48,${0.35 + rv * 0.24})`;
+        g.beginPath();
+        g.ellipse(rx + rw * (0.25 + rv * 0.5), ry + rh * (0.3 + hash2(p, 7) * 0.4), 16 + rv * 17, 12 + rv * 13, 0, 0, 6.2832);
+        g.fill();
+        g.strokeStyle = 'rgba(195,205,202,0.72)';
+        g.lineWidth = 4;
+        g.setLineDash([26, 10]);
+        g.beginPath();
+        if (vertical) { g.moveTo(inner, Math.max(y, p)); g.lineTo(inner, Math.min(y + h, p + 57)); }
+        else { g.moveTo(Math.max(x, p), inner); g.lineTo(Math.min(x + w, p + 57), inner); }
+        g.stroke();
+        g.setLineDash([]);
+      }
+    };
+
+    if (view.y < depth && view.y + view.h > 0) landStrip(Math.max(0, view.x), 0, Math.min(city.w, view.x + view.w) - Math.max(0, view.x), depth, false, depth);
+    if (view.y < city.h && view.y + view.h > city.h - depth) landStrip(Math.max(0, view.x), city.h - depth, Math.min(city.w, view.x + view.w) - Math.max(0, view.x), depth, false, city.h - depth);
+    if (view.x < depth && view.x + view.w > 0) landStrip(0, Math.max(0, view.y), depth, Math.min(city.h, view.y + view.h) - Math.max(0, view.y), true, depth);
+    if (view.x < city.w && view.x + view.w > city.w - depth) landStrip(city.w - depth, Math.max(0, view.y), depth, Math.min(city.h, view.y + view.h) - Math.max(0, view.y), true, city.w - depth);
+  }
+
+  /**
+   * Acqua per le geografie regionali. Campiona il campo autorevole `isWater`
+   * invece di imporre la costa occidentale e il Han di Seoul: così Busan mostra
+   * baia ed estuario e Jeju resta davvero un'isola anche nella scena giocata.
+   */
+  drawRegionalWater(g, ox, oy) {
+    const city = this.city;
+    const step = 12;
+    const xEnd = ox + TILE;
+    const yEnd = oy + TILE;
+    g.fillStyle = '#123447';
+    for (let y = oy; y < yEnd; y += step) {
+      let run = null;
+      for (let x = ox; x <= xEnd + step; x += step) {
+        const wet = x <= xEnd && city.isWater(x + step / 2, y + step / 2);
+        if (wet && run === null) run = x;
+        if (!wet && run !== null) {
+          g.fillRect(run, y, x - run + 0.8, step + 0.8);
+          run = null;
+        }
+      }
+    }
+
+    // Battigia locale: la maschera geografica decide terra/acqua, questa fascia
+    // le dà spessore visivo con rocce, sabbia scura e schiuma. Senza, soprattutto
+    // sul lato est di Jeju, la costa sembrava il taglio verticale di una tile.
+    for (let y = oy; y < yEnd; y += step) {
+      let prevWet = city.isWater(ox - step / 2, y + step / 2);
+      for (let x = ox; x <= xEnd; x += step) {
+        const wet = city.isWater(x + step / 2, y + step / 2);
+        if (wet !== prevWet) {
+          const shoreX = x;
+          const landSide = wet ? -1 : 1;
+          g.fillStyle = 'rgba(102,91,67,0.72)';
+          g.fillRect(shoreX + (landSide < 0 ? -10 : 0), y, 10, step + 1);
+          g.fillStyle = 'rgba(204,225,229,0.55)';
+          g.fillRect(shoreX - 2, y + 1 + hash2(shoreX, y) * 4, 3, step - 3);
+          if (hash2(shoreX + y, y) > 0.46) {
+            g.fillStyle = 'rgba(45,54,51,0.8)';
+            g.beginPath();
+            g.ellipse(shoreX + landSide * 7, y + step * 0.5, 4 + hash2(y, shoreX) * 5, 3 + hash2(shoreX, 9) * 3, 0, 0, 6.2832);
+            g.fill();
+          }
+        }
+        prevWet = wet;
+      }
+    }
+    for (let x = ox; x < xEnd; x += step) {
+      let prevWet = city.isWater(x + step / 2, oy - step / 2);
+      for (let y = oy; y <= yEnd; y += step) {
+        const wet = city.isWater(x + step / 2, y + step / 2);
+        if (wet !== prevWet) {
+          const shoreY = y;
+          const landSide = wet ? -1 : 1;
+          g.fillStyle = 'rgba(102,91,67,0.62)';
+          g.fillRect(x, shoreY + (landSide < 0 ? -10 : 0), step + 1, 10);
+          g.fillStyle = 'rgba(204,225,229,0.5)';
+          g.fillRect(x + 1 + hash2(x, shoreY) * 4, shoreY - 2, step - 3, 3);
+        }
+        prevWet = wet;
+      }
+    }
+
+    // Riflessi deterministicamente sparsi, solo dove il centro resta acqua.
+    for (let i = 0; i < 26; i++) {
+      const x = ox + hash2(ox / TILE * 31 + i, oy / TILE * 17) * TILE;
+      const y = oy + hash2(i * 13, ox + oy) * TILE;
+      if (!city.isWater(x, y)) continue;
+      g.fillStyle = `rgba(155,205,228,${0.035 + hash2(i, i * 3) * 0.05})`;
+      g.fillRect(x, y, 22 + hash2(i * 5, oy) * 88, 2);
+    }
+
+    // I moli sono superfici calpestabili e devono tornare sopra la maschera.
+    for (const p of city.piers || []) {
+      if (p.x > xEnd || p.x + p.w < ox || p.y > yEnd || p.y + p.h < oy) continue;
+      g.fillStyle = '#4e535a';
+      g.fillRect(p.x, p.y, p.w, p.h);
+      g.fillStyle = 'rgba(255,255,255,0.08)';
+      g.fillRect(p.x, p.y, p.w, 3);
+      g.fillStyle = 'rgba(0,0,0,0.28)';
+      g.fillRect(p.x, p.y + p.h - 4, p.w, 4);
+    }
   }
 
   /**
@@ -567,7 +733,7 @@ export class GroundRenderer {
   }
 
   drawBlock(g, b, tx, ty) {
-    const d = DISTRICT_BY_ID[b.district];
+    const d = this.city.districtById?.[b.district] || DISTRICT_BY_ID[b.district];
 
     // Campagna: terra e campi. Niente marciapiedi, niente cordoli — è quello che
     // fa capire di essere usciti da Seoul molto prima del cartello del distretto.

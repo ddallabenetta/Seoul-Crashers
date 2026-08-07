@@ -69,12 +69,14 @@ export function snapshot(game) {
   const pl = game.player;
   const dc = game.dayCycle;
   const door = game.indoors && game.shops.active ? game.shops.active.shop : null;
-  const x = door ? door.x : pl.x;
-  const y = door ? door.y : pl.y;
+  const metroExit = game.metro?.inside ? game.metro.outside : null;
+  const x = door ? door.x : metroExit ? metroExit.x : pl.x;
+  const y = door ? door.y : metroExit ? metroExit.y : pl.y;
   const v = pl.vehicle;
   return {
     v: VERSION,
     seed: SEED,
+    region: game.city.region?.id || 'seoul',
     at: Date.now(),
     time: game.time,
     player: {
@@ -107,12 +109,15 @@ export function snapshot(game) {
 
 /** Le due righe che la lista degli slot mostra senza caricare niente. */
 export function describe(data, game) {
-  const d = game.city.districtAt(data.player.x, data.player.y);
+  const regionId = data.region || 'seoul';
+  const sameRegion = (game.city.region?.id || 'seoul') === regionId;
+  const d = sameRegion ? game.city.districtAt(data.player.x, data.player.y) : null;
+  const regionNames = { seoul: '서울 Seoul', busan: '부산 Busan', jeju: '제주 Jeju' };
   const h = data.clock.t / (24 * 60) * 24;
   const hh = Math.floor(h);
   const mm = Math.floor((h - hh) * 60);
   return {
-    place: d ? `${d.hangul} ${d.name}` : 'Seoul',
+    place: d ? `${d.hangul} ${d.name}` : (regionNames[regionId] || '서울 Seoul'),
     clock: `Giorno ${data.clock.day} · ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`,
     money: data.player.money,
     stars: data.wanted.level,
@@ -130,7 +135,9 @@ export function describe(data, game) {
  */
 export function apply(game, data) {
   const pl = game.player;
-  if (game.indoors) game.shops.forceExit(game);
+  if (game.indoors) game.leaveInterior();
+  const regionId = data.region || 'seoul';
+  if ((game.city.region?.id || 'seoul') !== regionId) game.travelTo(regionId, null, { silent: true });
 
   // Il mondo attorno: quello che non è protetto se ne va. È lo stesso svuotamento
   // che fa la partita nuova, e sta in `Game` perché il mondo è suo (§5.21).

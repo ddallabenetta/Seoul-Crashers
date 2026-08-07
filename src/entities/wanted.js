@@ -97,8 +97,9 @@ export class WantedSystem {
     // polizia. Una cassa svuotata al terzo piano la denunciano comunque, e
     // l'indirizzo che danno è quello della vetrina.
     const door = game.indoors && game.shops.active ? game.shops.active.shop : null;
-    this.lastX = door ? door.x : game.player.x;
-    this.lastY = door ? door.y : game.player.y;
+    const metroExit = game.metro?.inside ? game.metro.outside : null;
+    this.lastX = door ? door.x : metroExit ? metroExit.x : game.player.x;
+    this.lastY = door ? door.y : metroExit ? metroExit.y : game.player.y;
     if (this.level > before) {
       game.hud.toast(`수배 ${this.stars}`, 2.2);
       game.audio?.star(true);

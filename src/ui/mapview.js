@@ -95,7 +95,7 @@ export class MapView {
 
     // Etichette dei distretti
     ctx.textAlign = 'center';
-    for (const d of DISTRICTS) {
+    for (const d of city.districts || DISTRICTS) {
       const s = toScreen(d.seed.x * city.w, d.seed.y * city.h);
       ctx.save();
       ctx.shadowColor = 'rgba(0,0,0,0.9)';
@@ -139,9 +139,32 @@ export class MapView {
       ctx.lineTo(s.x - 5, s.y + 4);
       ctx.closePath();
       ctx.fill();
-      ctx.fillStyle = 'rgba(240,244,250,0.75)';
-      ctx.font = '600 9px system-ui, sans-serif';
-      ctx.fillText(lm.hangul, s.x, s.y + 15);
+      const major = /N Seoul Tower|COEX Mall|Gyeongbokgung|Lotte World Tower|Bukhansan|Incheon Chinatown|Suwon Hwaseong/.test(lm.name);
+      if (city.landmarks.length <= 12 || zoom > 1.25 || major) {
+        ctx.fillStyle = 'rgba(240,244,250,0.75)';
+        ctx.font = '600 9px system-ui, sans-serif';
+        ctx.fillText(lm.hangul, s.x, s.y + 15);
+      }
+    }
+
+    // Stazioni della rete passeggeri: il cerchio ciano è distinto dal quadrato
+    // blu dei commissariati, che storicamente usano `city.stations`.
+    for (const st of city.transitStations || []) {
+      const at = st.entrance || st;
+      const s2 = toScreen(at.x, at.y);
+      ctx.fillStyle = '#62c9ff';
+      ctx.beginPath();
+      ctx.arc(s2.x, s2.y, 6, 0, 6.2832);
+      ctx.fill();
+      ctx.fillStyle = '#11202a';
+      ctx.font = '900 8px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('M', s2.x, s2.y + 2.8);
+      if (zoom > 1.35) {
+        ctx.fillStyle = 'rgba(235,245,252,0.9)';
+        ctx.font = '600 9px system-ui, "Apple SD Gothic Neo", sans-serif';
+        ctx.fillText(st.hangul, s2.x, s2.y + 17);
+      }
     }
 
     // Ospedali
@@ -293,10 +316,11 @@ export class MapView {
     ctx.textAlign = 'left';
     ctx.fillStyle = '#f2f5fa';
     ctx.font = '800 26px system-ui, sans-serif';
-    ctx.fillText('SEOUL', px, y + 30);
+    const region = game.city.region || { name: 'Seoul', hangul: '서울' };
+    ctx.fillText(region.name.toUpperCase(), px, y + 30);
     ctx.fillStyle = '#ff5fa2';
     ctx.font = '700 18px system-ui, "Apple SD Gothic Neo", sans-serif';
-    ctx.fillText('서울 — 지도', px, y + 54);
+    ctx.fillText(`${region.hangul} — 지도`, px, y + 54);
 
     const d = game.player.district;
     let ly = y + 96;

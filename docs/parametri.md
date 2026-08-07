@@ -6,13 +6,23 @@
 
 | Cosa | Dove | Valore attuale |
 | --- | --- | --- |
-| Dimensione mondo | `citygen.WORLD` | 5400 × 5400, margine 150 |
-| Sagoma della città | `districts.URBAN_BLOBS` | 8 macchie, raggio 0.13–0.205 della larghezza |
+| Dimensioni delle regioni | `citygen.WORLD` · `busan` · `jeju` | Seoul 7200×7200 (margine 200) · Busan 6400×5600 · Jeju 5400×5400 |
+| Regioni giocabili · seed | `regions.createRegion` · `busan.BUSAN_SEED` · `jeju.JEJU_SEED` | Seoul 20260730 · Busan 20260807 · Jeju 20260808 |
+| Cache regionale | `main.regionCache` | geometria + texture, create alla prima visita |
+| Fermate passeggeri | `city.transitStations` | Seoul 16 · Busan 7 · Jeju 7 |
+| Ingresso metro · raggio d'uso | `regions.ENTRANCE_W/H` · `metro.ENTRANCE_REACH` | scala 86×58 px, ruotata col fronte stradale e solida · uso entro 72 px, solo a piedi |
+| Interno metro · azione | `metro.buildStationFloor` · `ACTION_REACH` | 1080×720 px · uscita/tabellone entro 48 px (porta treno +14) |
+| Folla e chiosco metro | `metro.buildPeople` · `KIOSK_PRICE` | 10 passeggeri mobili + 1 negoziante · 김밥 e caffè ₩2.500, +22 HP e stamina piena |
+| Ricerca uscita libera | `regions.freeArrival` | anelli ogni 16 px, 16 direzioni, 56–144 px; ripiego fino a 168 px |
+| Fascia di collisione del confine | `regions.BOUNDARY_DEPTH` | 64 px su tutti e quattro i lati |
+| Tempo di viaggio interurbano | `main.travelTo` | Seoul↔Busan 1,25 h · ogni tratta con Jeju 2 h |
+| Sagoma di Seoul | `districts.URBAN_BLOBS` | 12 macchie, raggio 0.11–0.195 della larghezza |
+| Acqua regionale | `ground.drawRegionalWater` · `maptexture.drawWaterMask` | campione ogni 12 px nei tile · griglia 240×240 sulla carta |
 | Soglia città/campagna | `citygen.RURAL_U` | 0.26 (sotto: solo una arteria su due) |
 | Strade bianche in campagna | `citygen.carveMesh` | 6% dei tratti non arteriali |
 | Mare: limite di maglia / battigia | `districts.SEA.x1`, `citygen.QUAY_W`, `coastAt` | 0.185 · banchina 128 px · battigia fino a 560 px più a ovest |
 | Piattaforme (aeroporto, porto) | `citygen.planPlatform` | campate fra arterie: 2 bande in y l'aeroporto, 1 il porto |
-| Aeroporto e porto (seed attuale) | `city.airport` / `city.port` | 1039 × 1530 · 1039 × 775 |
+| Aeroporto e porto di Seoul (seed attuale) | `city.airport` / `city.port` | 563×1514 · 563×1293 px |
 | Moli e ormeggi | `citygen`, sezione costa | 4 al porto + 6 sul Han · 14 imbarcazioni |
 | Velivoli parcheggiati | `city.airSpots` | 3 turboelica + 3 elicotteri |
 | Territori delle bande | `citygen.TURF_ANCHORS` | 6, su cortili e piazzali già esistenti |
@@ -38,7 +48,7 @@
 | Fermo troppo a lungo → manovra | `driveAI` `ai.stallT` | 9 s (il rosso più lungo dura 7,7 s) |
 | Ciclo del semaforo | `roadgraph.SIGNAL_CYCLE` / `YELLOW` | 15,5 s (verde 6,75 per asse, giallo 1) — misurato in §5.12: 19 s è peggio, 12 s è indistinguibile |
 | Pedoni | `pedestrians.BASE_MAX` | 62 (× densità distretto) |
-| Pendenza minima per una scalinata | `citygen.STAIR_GRADE` | 0.018 (→ 8 scalinate su 14 vicoli passanti) |
+| Pendenza minima per una scalinata | `citygen.STAIR_GRADE` | 0.018 (→ 4 scalinate con la seed attuale) |
 | Danno / cadenza delle armi | `weapons.WEAPONS` | pugni 15·0.34 · mazza 46·0.52 · katana 92·0.4 · pistola 27·0.22 · pompa 13×8·0.84 · SMG 15·0.075 · fucile 24·0.105 · sniper 145·1.35 · minigun 12·0.045 |
 | File della barra armi (tasti 1-6) | `weapons.WEAPON_SLOTS` | mischia · pistola · pompa · SMG+fucile · sniper+minigun · esplosivi |
 | Perforazione del sniper | `weapons.WEAPONS.sniper.pierce` | 2 bersagli oltre il primo (solo pedoni) |
@@ -53,6 +63,7 @@
 | Musica: anticipo e dissolvenza | `music.LOOKAHEAD` / `damp` in `update` | 0,25 s di note programmate · mezza vita 0,3 s (~1,9 s per cambiare pezzo) |
 | Autosave: periodo e ritenta | `save.AUTO_EVERY` / `AUTO_RETRY` | 240 s · 20 s se il momento non è buono |
 | Autosave: quando si rifiuta | `save.canAutosave` | stelle > 0 · HP ≤ 25 · morente · manette in corso |
+| Regione nel salvataggio | `save.snapshot` / `apply` | `seoul` di default per gli slot storici; ripristino sincrono prima delle coordinate |
 | Menu iniziale: giro di camera | `main.updateAttract` | raggio 250 × 170 px, un giro ogni ~40 s, zoom 0.92 |
 | Innesco della mina | `projectiles.updateMines` | veicolo 32 px · piedi 18 px, si arma a 62 px da chi l'ha posata |
 | Tick di danno del fuoco | `projectiles.FIRE_TICK` | 0.34 s |
@@ -71,8 +82,8 @@
 | Riflettore e quota dell'elicottero | `police.BEAM_R` / `CHOPPER_Z` / `CHOPPER_HP` | 118 px / 210 / 260 |
 | Gomme a terra | `vehicle` `flatTires` | velocità × 0.6, grip × 0.72, tiraggio `flatPull` |
 | Ritmo di posa di blocchi e chiodi | `police.manageObstacles` | uno ogni 7 s, alternati |
-| Raccolte a terra | `pickups` densità / `RESPAWN` | 0.4 per cortile (43 totali) / 55 s |
-| Densità delle vetrine | `citygen.placeShops` | `signDensity × 0.55` (114 negozi, 325 locali), una porta ogni 80 px |
+| Raccolte a terra | `pickups` densità / `RESPAWN` | 0.4 per cortile (87 totali a Seoul) / 55 s |
+| Densità delle vetrine | `citygen.placeShops` | `signDensity × 0.55` (240 negozi, 658 locali a Seoul), una porta ogni 80 px |
 | Attività per edificio | `citygen.makeShop` | `1 + (h3d − 30) / 46`, massimo 4 |
 | Taglia di un interno | `interiors.buildInterior` | footprint × 1.8, limitato a 300-470 × 260-390 |
 | Muri e vani scala | `interiors` `WALL` / `STAIR_W×H` / `DOOR_W` | 12 · 58×78 · 54 |
@@ -132,10 +143,10 @@
 | Rimpiazzo del 거래책 | `pedestrians.DEALER_WAIT` · `canDeal` | 18 s se lo hai steso, subito se l'ha portato via lo streaming · recinto + 80 px |
 | Allarme silenzioso | `shops.ALARM_DELAY` · `updateAlarm` | 17 s · `rob × 0.55` ≈ 12 di heat (22 + 12 = seconda stella) |
 | Gente di passaggio, ora per ora | `interiors.RUSH` · `crowd()` | frazione di `biz.crowd` per fasce, 13 tipi di locale · `crowd + 2` posti |
-| Varco sul retro | `interiors.BACK_W` · `shops.backDoorSpot` / `SIDE_SCAN` | 44 px all'estremo del muro di fondo · fuori 18-60 px, di lato fino a ±124 (43 negozi su 114) |
+| Varco sul retro | `interiors.BACK_W` · `shops.backDoorSpot` / `SIDE_SCAN` | 44 px all'estremo del muro di fondo · fuori 18-60 px, di lato fino a ±124 (61 negozi su 240) |
 | Sonno | `shops.sleepTarget` · `sleep` · `daycycle.advance` | 06:30 o 20:00 · vietato da 3 stelle · passi di 5 s reali |
 | Luce dalla porta di un interno | `interiorscene.drawDoorLight` | profondità `34 + 78 × (1 − lamps)` px |
-| Raccolte in campagna e sui moli | `pickups.RURAL_TABLE` / `PIER_TABLE` / `placeRural` | 32% dei campi · 85% dei moli del porto, 30% degli scali sul Han (43 raccolte in tutto) |
+| Raccolte in campagna e sui moli | `pickups.RURAL_TABLE` / `PIER_TABLE` / `placeRural` | 32% dei campi · 85% dei moli del porto, 30% degli scali sul Han (87 raccolte totali a Seoul) |
 | Limite pixel canvas | `main.MAX_PIXELS` | 2.9 M (scala il DPR) |
 | **— audio (§5.13) —** | | |
 | Portata dell'ascolto · panorama stereo | `audio.HEAR` / `PAN_W` | 1500 px (oltre non si costruisce) · 760 px di scarto = tutto da un lato |
@@ -176,6 +187,6 @@
 | Resistenza all'arresto con un'arma da mischia | `player.SWING_RESIST` | 1,4 s dopo ogni colpo (la mazza ha cadenza 0,52 s); i pugni non contano |
 | Uscita di chi scappa da un negozio | `shops.spillOutside` | 30 px oltre la soglia, sfalsati di ±24 px · panico entro 300 px |
 | Quanto cura il riposo | `shops.REST_CAP` / `REST_PER_HOUR` | fino al 70% della salute · 9 punti per ora dormita |
-| Banchi dei pegni garantiti | `citygen.ensurePawnShops` | uno per distretto **che abbia edifici da vetrina** (5 su 7: Gimpo e la campagna non ne hanno) |
+| Banchi dei pegni garantiti | `citygen.ensurePawnShops` | uno per distretto **che abbia edifici da vetrina** (6 su 7; manca soltanto Gimpo) |
 
 ---

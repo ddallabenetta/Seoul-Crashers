@@ -64,7 +64,7 @@ export class Hud {
     this.drawMoney(ctx, game, 22, 88);
     if (game.wanted) this.drawWanted(ctx, game, 22, 124);
     this.drawClock(ctx, game, w - CLOCK_W - 22, 22);
-    this.drawDistrictToast(ctx, game, w, h);
+    if (!game.indoors) this.drawDistrictToast(ctx, game, w, h);
     this.drawVenueToast(ctx, game, w, h);
     this.drawHints(ctx, game, w, h);
     this.drawMessages(ctx, w, h);
@@ -183,7 +183,7 @@ export class Hud {
    * città non dice niente, e senza un riferimento non si trova più la porta.
    */
   drawFloorPlan(ctx, game, x, y) {
-    const f = game.shops.floor;
+    const f = game.interiorFloor;
     const pl = game.player;
     const pal = f.biz.pal;
     const k = Math.min(MINIMAP / f.w, MINIMAP / f.h) * 0.86;
@@ -223,6 +223,11 @@ export class Hud {
       ctx.arc(t.x, t.y, 3, 0, 6.2832);
       ctx.fill();
     }
+    if (f.trainDoor) {
+      const t = to(f.trainDoor.x, f.trainDoor.y);
+      ctx.fillStyle = '#48c8ff';
+      ctx.fillRect(t.x - 7, t.y - 2, 14, 4);
+    }
     for (const p of f.people) {
       if (p.dead) continue;
       const m = to(p.x, p.y);
@@ -257,13 +262,15 @@ export class Hud {
     ctx.font = '600 12px system-ui, "Apple SD Gothic Neo", sans-serif';
     ctx.fillStyle = pal.accent;
     ctx.textAlign = 'left';
-    const it = game.shops.active;
-    ctx.fillText(`${f.biz.hangul}  ${f.idx === 0 ? 'PIANO TERRA' : `${f.idx + 1}° PIANO`} / ${it.floors.length}`, x + 2, y - 12);
+    const suffix = game.metro?.inside
+      ? `${f.label} · BANCHINA`
+      : `${f.idx === 0 ? 'PIANO TERRA' : `${f.idx + 1}° PIANO`} / ${game.shops.active.floors.length}`;
+    ctx.fillText(`${f.biz.hangul}  ${suffix}`, x + 2, y - 12);
   }
 
   /** Il nero fra una porta e l'altra: una scala senza stacco è un teletrasporto. */
   drawFade(ctx, game, w, h) {
-    const a = game.shops ? game.shops.fade : 0;
+    const a = Math.max(game.shops?.fade || 0, game.metro?.fade || 0);
     if (a <= 0.01) return;
     ctx.save();
     ctx.fillStyle = `rgba(4,5,7,${Math.min(1, a)})`;
@@ -605,6 +612,21 @@ export class Hud {
       ctx.strokeRect(a.x, a.y, Math.max(4, b.x - a.x), Math.max(4, b.y - a.y));
       ctx.restore();
     }
+    // Fermate metro e nodi interurbani: restano visibili anche senza aprire la
+    // mappa completa, perché è lì che il giocatore cambia quartiere o città.
+    for (const st of this.city.transitStations || []) {
+      const at = st.entrance || st;
+      const m = toMap(at.x, at.y);
+      if (m.x < x || m.x > x + MINIMAP || m.y < y || m.y > y + MINIMAP) continue;
+      ctx.fillStyle = '#62c9ff';
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, 4.2, 0, 6.2832);
+      ctx.fill();
+      ctx.fillStyle = '#10202a';
+      ctx.font = '900 6px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('M', m.x, m.y + 2.1);
+    }
     // Eliporti: un velivolo si posa solo dove c'è la H dipinta.
     for (const pad of this.city.helipads || []) {
       const m = toMap(pad.x, pad.y);
@@ -903,6 +925,8 @@ export class Hud {
     const p = game.player;
     const lines = [];
     for (const a of game.shops ? game.shops.actions : []) lines.push(`${a.key}  —  ${a.text}`);
+    const metroHint = game.metro?.hint(game);
+    if (metroHint) lines.push(metroHint);
     if (!game.indoors) {
       if (p.onFoot) {
         const v = p.findNearbyVehicle(game);
@@ -966,7 +990,9 @@ export class Hud {
       `polizia ${game.police.cops.length}p ${game.police.cars.length}v  blocchi ${game.police.blocks.length}`,
       `esplosivi ${game.projectiles.items.length}v ${game.projectiles.mines.length}m ${game.projectiles.fires.length}f  scoppi ${game.stats.blasts || 0}`,
       game.indoors
-        ? `dentro ${game.shops.floor.biz.id} piano ${game.shops.active.cur + 1}/${game.shops.active.floors.length}  gente ${game.shops.floor.people.length}`
+        ? game.metro?.inside
+          ? `metro ${game.metro.station?.id}  banchina  gente ${game.metro.floor.people.length}`
+          : `dentro ${game.shops.floor.biz.id} piano ${game.shops.active.cur + 1}/${game.shops.active.floors.length}  gente ${game.shops.floor.people.length}`
         : `negozi ${this.city.stats.shops} locali ${this.city.stats.venues}  ₩${game.player.money}`,
       `pos ${Math.round(game.player.x)}, ${Math.round(game.player.y)}`,
       `zoom ${game.camera.zoom.toFixed(2)}`,

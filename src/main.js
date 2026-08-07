@@ -6,7 +6,7 @@ import { AudioSystem } from './core/audio.js';
 import { Radio } from './core/radio.js';
 import { DynamicGrid } from './core/spatial.js';
 import { KMH, clamp, dist } from './core/math.js';
-import { generateCity } from './world/citygen.js';
+import { createRegion } from './world/regions.js';
 import { buildMapTexture } from './world/maptexture.js';
 import { DayCycle } from './world/daycycle.js';
 import { Camera } from './render/camera.js';
@@ -23,11 +23,13 @@ import { PoliceSystem } from './entities/police.js';
 import { ShopSystem, won } from './entities/shops.js';
 import { autosave, tickAutosave } from './core/save.js';
 import { InteriorScene } from './render/interiorscene.js';
+import { MetroScene } from './render/metroscene.js';
 import { Hud } from './ui/hud.js';
 import { MapView } from './ui/mapview.js';
 import { PauseMenu } from './ui/menu.js';
 import { StartMenu } from './ui/startmenu.js';
 import { ShopMenu } from './ui/shopmenu.js';
+import { MetroSystem } from './ui/metro.js';
 
 const MAX_PIXELS = 2_900_000;
 // Dentro un edificio non c'è traffico: la griglia dei veicoli si ricostruisce vuota
@@ -80,6 +82,7 @@ class Game {
       districts: new Set(),
     };
     this._skidT = 0;
+    this.regionCache = new Map();
     window.addEventListener('resize', () => this.resize());
     this.armAudio();
   }
@@ -120,13 +123,14 @@ class Game {
   async boot(onProgress) {
     this.resize();
     await onProgress('Disegno le strade di Seoul…', 0.05);
-    this.city = generateCity(20260730);
+    this.city = createRegion('seoul');
 
     await onProgress('Verniciano le carrozzerie…', 0.45);
     preloadSprites();
 
     await onProgress('Stampo le mappe turistiche…', 0.72);
     this.mapTexture = buildMapTexture(this.city);
+    this.regionCache.set('seoul', { city: this.city, mapTexture: this.mapTexture });
 
     await onProgress('Accendo i semafori…', 0.88);
     this.scene = new Scene(this.city);
@@ -148,6 +152,8 @@ class Game {
     this.menu = new PauseMenu(this.mapView);
     this.startMenu = new StartMenu();
     this.shopMenu = new ShopMenu();
+    this.metro = new MetroSystem();
+    this.metroScene = new MetroScene(this.scene);
 
     // Riempie subito la scena, così il giocatore non parte in una città deserta.
     this.traffic.placeSpecialVehicles(this);
@@ -161,7 +167,43 @@ class Game {
     this.loop.start();
     // `?autostart` salta il menu iniziale: è come `probe.mjs` (§9) e le scene di
     // prova trovano il gioco in strada, esattamente come prima che il menu ci fosse.
-    if (new URLSearchParams(window.location.search).has('autostart')) this.start(false);
+    const probe = new URLSearchParams(window.location.search);
+    if (probe.has('autostart')) this.start(false);
+    // Hook di prova locale: mette il browser in scene ripetibili senza falsare il
+    // percorso normale ingresso -> atrio -> tornelli. Il controllo automatico
+    // può premere tasti ma non tenerli premuti per attraversare mezza città.
+    const regionProbe = probe.get('regiontest');
+    if (['seoul', 'busan', 'jeju'].includes(regionProbe) && regionProbe !== 'seoul') {
+      if (!this.started) this.start(false);
+      this.travelTo(regionProbe, null, { silent: true });
+    }
+    const metroProbe = probe.get('metrotest');
+    if (['entrance', 'kiosk', 'platform'].includes(metroProbe)) {
+      if (!this.started) this.start(false);
+      const station = this.city.transitStations?.[0];
+      if (station && metroProbe === 'entrance') {
+        this.player.x = station.arrivalX;
+        this.player.y = station.arrivalY;
+        this.player.district = this.city.districtAt(this.player.x, this.player.y);
+        this.player.enterCooldown = 0;
+        this.camera.snapTo(this.player.x, this.player.y);
+      } else if (station && this.metro.enterStation(this, station)) {
+        const target = metroProbe === 'kiosk' ? this.metro.floor.kiosk : this.metro.floor.trainDoor;
+        this.player.x = target.x;
+        this.player.y = target.y + (metroProbe === 'kiosk' ? 0 : -24);
+        this.player.enterCooldown = 0;
+        this.camera.snapTo(this.metro.floor.w / 2, this.metro.floor.h / 2);
+      }
+    }
+    if (probe.get('edgetest') === 'east') {
+      if (!this.started) this.start(false);
+      let edgeX = this.city.w - 78;
+      while (edgeX > 96 && this.city.isWater(edgeX, this.city.h * 0.5)) edgeX -= 32;
+      this.player.x = edgeX;
+      this.player.y = this.city.h * 0.5;
+      this.player.district = this.city.districtAt(this.player.x, this.player.y);
+      this.camera.snapTo(this.player.x, this.player.y);
+    }
   }
 
   /**
@@ -210,6 +252,94 @@ class Game {
     this.pickups.reset();
   }
 
+  /** Genera una regione una volta sola; le visite successive riusano la stessa
+   * geometria e la stessa carta, mentre traffico e pedoni restano streaming. */
+  region(id) {
+    let cached = this.regionCache.get(id);
+    if (cached) return cached;
+    const city = createRegion(id);
+    cached = { city, mapTexture: buildMapTexture(city) };
+    this.regionCache.set(id, cached);
+    return cached;
+  }
+
+  /**
+   * Cambia stazione o città conservando Jae-min, inventario e orologio. Tutti i
+   * sistemi che tengono un riferimento alla città vengono ricostruiti insieme:
+   * lasciarne anche uno indietro significherebbe collisioni o spawn a Seoul dopo
+   * essere arrivati a Busan.
+   */
+  travelTo(regionId, stationId = null, opts = {}) {
+    const oldId = this.city.region?.id || 'seoul';
+    if (this.indoors) this.leaveInterior();
+    if (!this.player.onFoot && this.player.vehicle) {
+      const v = this.player.vehicle;
+      v.driver = null;
+      this.player.vehicle = null;
+      this.player.onFoot = true;
+    }
+    this.clearWorld();
+
+    if (regionId !== oldId) {
+      // Anche i mezzi speciali protetti appartengono alla vecchia regione.
+      this.vehicles.length = 0;
+      for (const p of this.peds) p.gone = true;
+      this.peds.length = 0;
+
+      const bundle = this.region(regionId);
+      this.city = bundle.city;
+      this.mapTexture = bundle.mapTexture;
+      const seed = regionId === 'busan' ? 20260807 : regionId === 'jeju' ? 20260808 : 20260730;
+      this.rng = new Rng(seed);
+      this.scene = new Scene(this.city);
+      this.vehicleGrid = new DynamicGrid(this.city.w, this.city.h, 150);
+      this.pedGrid = new DynamicGrid(this.city.w, this.city.h, 120);
+      this.traffic = new TrafficSystem(this.city, this.rng, this.vehicles);
+      this.pedSystem = new PedestrianSystem(this.city, this.rng, this.peds);
+      this.pickups = new PickupSystem(this.city, this.rng);
+      this.projectiles = new ProjectileSystem();
+      this.wanted = new WantedSystem();
+      this.police = new PoliceSystem(this.city, this.rng);
+      this.shops = new ShopSystem(this.city);
+      this.interiorScene = new InteriorScene(this.scene);
+      this.metroScene = new MetroScene(this.scene);
+      this.hud = new Hud(this.city, this.mapTexture);
+      this.mapView = new MapView(this.city, this.mapTexture);
+      this.menu = new PauseMenu(this.mapView);
+      this.traffic.placeSpecialVehicles(this);
+    }
+
+    const stations = this.city.transitStations || [];
+    const station = stations.find((s) => s.id === stationId) || stations[0];
+    const target = station || this.city.spawn;
+    this.player.x = station ? station.arrivalX : target.x;
+    this.player.y = station ? station.arrivalY : target.y;
+    this.player.vx = 0;
+    this.player.vy = 0;
+    this.player.enterCooldown = 0.5;
+    this.player.district = this.city.districtAt(this.player.x, this.player.y);
+    const districtKey = regionId === 'seoul' ? this.player.district.id : `${regionId}:${this.player.district.id}`;
+    this.stats.districts.add(districtKey);
+    this.camera.snapTo(this.player.x, this.player.y);
+    this.vehicleGrid.rebuild(this.vehicles);
+    this.pedGrid.rebuild(this.peds);
+    this.traffic.prewarm(this, 44, 20);
+    this.pedSystem.prewarm(this, 48);
+    this.mapView.open = false;
+    this.menu.open = false;
+    this.metro.open = false;
+    this.paused = false;
+    this.hud.showDistrict(this.player.district);
+    if (!opts.silent) {
+      if (regionId !== oldId) {
+        this.dayCycle.advance(regionId === 'jeju' || oldId === 'jeju' ? 2 : 1.25);
+        const region = this.city.region;
+        this.hud.toast(`Arrivo a ${region.hangul} ${region.name}`, 3.4);
+      }
+      if (station) this.hud.toast(`${station.hangul} · ${station.name}`, 2.4);
+    }
+  }
+
   /**
    * Da capo, senza ricaricare la pagina. La città non c'entra: nasce da una seed
    * fissa e non è mai cambiata. Quello che va rimesso a posto è tutto il resto —
@@ -219,7 +349,8 @@ class Game {
    * un `location.reload()` travestito.
    */
   newGame() {
-    if (this.indoors) this.shops.forceExit(this);
+    if (this.indoors) this.leaveInterior();
+    if ((this.city.region?.id || 'seoul') !== 'seoul') this.travelTo('seoul', null, { silent: true });
     this.clearWorld();
     this.player.reset(this.city.spawn.x, this.city.spawn.y);
     this.player.district = this.city.districtAt(this.player.x, this.player.y);
@@ -267,9 +398,21 @@ class Game {
     // Il tema torna da solo: `music.direct` guarda `game.started` a ogni frame.
   }
 
-  /** True quando il giocatore è dentro un edificio: la città è ferma. */
+  /** True quando il giocatore è in un interno: negozio oppure stazione metro. */
   get indoors() {
-    return !!(this.shops && this.shops.active);
+    return !!((this.shops && this.shops.active) || (this.metro && this.metro.inside));
+  }
+
+  /** Pianta attiva condivisa da collisioni, camera e minimappa interna. */
+  get interiorFloor() {
+    if (this.metro?.inside) return this.metro.floor;
+    return this.shops?.floor || null;
+  }
+
+  /** Chiude in modo sicuro qualunque interno senza lasciare coordinate locali. */
+  leaveInterior() {
+    if (this.metro?.inside) this.metro.forceExit(this);
+    if (this.shops?.active) this.shops.forceExit(this);
   }
 
   /** Notte di gioco: la decide l'orologio, e da lì scendono fari, lampioni e insegne. */
@@ -284,7 +427,7 @@ class Game {
    */
   area() {
     if (this.indoors) {
-      const f = this.shops.floor;
+      const f = this.interiorFloor;
       return { grid: f.grid, x0: 10, y0: 10, x1: f.w - 10, y1: f.h - 10 };
     }
     return { grid: this.city.solidGrid, x0: 40, y0: 40, x1: this.city.w - 40, y1: this.city.h - 40 };
@@ -293,7 +436,8 @@ class Game {
   // --- callback dal mondo ----------------------------------------------------
   onDistrictChange(d) {
     this.hud.showDistrict(d);
-    this.stats.districts.add(d.id);
+    const regionId = this.city.region?.id || 'seoul';
+    this.stats.districts.add(regionId === 'seoul' ? d.id : `${regionId}:${d.id}`);
   }
 
   onEnterVehicle(v) {
@@ -450,7 +594,8 @@ class Game {
 
   /** Uno sparo si sente: i pedoni nel raggio reagiscono — quelli del piano, se dentro. */
   alarm(x, y, r, source) {
-    if (this.indoors) this.shops.alarm(x, y, r, this, source);
+    if (this.shops?.active) this.shops.alarm(x, y, r, this, source);
+    else if (this.metro?.inside) return;
     else this.pedSystem.alarm(x, y, r, this, source);
   }
 
@@ -460,7 +605,7 @@ class Game {
     // Se si muore dentro un negozio la barella arriva lo stesso: l'interno si
     // chiude prima di spostare il giocatore, o resterebbe in un limbo con le
     // coordinate della pianta.
-    if (this.indoors) this.shops.forceExit(this);
+    if (this.indoors) this.leaveInterior();
     let best = this.city.hospitals[0];
     let bestD = Infinity;
     for (const h of this.city.hospitals) {
@@ -504,7 +649,7 @@ class Game {
    */
   bustPlayer() {
     const pl = this.player;
-    if (this.indoors) this.shops.forceExit(this);
+    if (this.indoors) this.leaveInterior();
     // In campagna e all'aeroporto non ci sono commissariati: lì ti portano
     // all'ospedale del distretto, che è l'unico edificio pubblico che c'è.
     const places = this.city.stations.length ? this.city.stations : this.city.hospitals;
@@ -548,14 +693,15 @@ class Game {
     if (input.wasPressed('Escape')) {
       // `backOut` è il pannello audio del menu: ESC lì dentro torna alle voci
       // invece di chiudere tutto.
-      if (this.shopMenu.open) this.shopMenu.close(this);
+      if (this.metro.open) this.metro.close(this);
+      else if (this.shopMenu.open) this.shopMenu.close(this);
       else if (this.mapView.open) { this.mapView.open = false; this.audio.ui('close'); }
       else if (!this.menu.backOut()) { this.menu.toggle(); this.audio.ui(this.menu.open ? 'open' : 'close'); }
       else this.audio.ui('close');
     }
     // La mappa della città non serve dentro un negozio: le coordinate sono quelle
     // della pianta, e il puntino finirebbe in un angolo di Seoul a caso.
-    if (input.wasPressed('KeyM') && !this.shopMenu.open && !this.indoors) {
+    if (input.wasPressed('KeyM') && !this.shopMenu.open && !this.metro.open && !this.indoors) {
       if (this.menu.open) this.menu.open = false;
       this.mapView.toggle();
       this.audio.ui(this.mapView.open ? 'open' : 'close');
@@ -565,7 +711,9 @@ class Game {
       this.hud.toast(this.audio.toggleMute() ? 'Audio: muto' : 'Audio: acceso', 1.6);
     }
 
-    this.paused = this.menu.open || this.mapView.open || this.shopMenu.open;
+    const canUseMetro = this.metro.open || (!this.menu.open && !this.mapView.open && !this.shopMenu.open);
+    const metroUsed = canUseMetro ? this.metro.update(dt, this) : false;
+    this.paused = this.menu.open || this.mapView.open || this.shopMenu.open || this.metro.open;
     this.updateRadioKeys();
     // L'audio gira anche in pausa: i letti si abbassano invece di spegnersi (uno
     // stacco netto suona come un guasto) e i suoni dei menu restano a volume pieno.
@@ -574,7 +722,7 @@ class Game {
     const cursor = this.paused ? 'default' : 'none';
     if (this.canvas.style.cursor !== cursor) this.canvas.style.cursor = cursor;
 
-    if (this.paused) {
+    if (this.paused || metroUsed) {
       this.menu.update(dt, this);
       this.mapView.update(dt, this);
       this.shopMenu.update(dt, this);
@@ -600,7 +748,12 @@ class Game {
 
     // I negozi girano per primi: decidono se il frame si svolge in strada o dentro
     // un edificio, e il giocatore deve muoversi già nello spazio giusto.
-    this.shops.update(dt, this);
+    if (this.metro.inside) {
+      this.shops.actions.length = 0;
+      this.shops.near = null;
+    } else {
+      this.shops.update(dt, this);
+    }
     this.player.update(dt, this);
     // Dentro un edificio la città si ferma — traffico, pedoni, raccolte — e il
     // ricercato **resta congelato**: se si raffreddasse, la porta diventerebbe il
@@ -616,7 +769,7 @@ class Game {
       this.traffic.update(dt, this);
       this.pedSystem.update(dt, this);
       this.pickups.update(dt, this);
-    } else {
+    } else if (this.shops.active) {
       this.police.siege(dt, this);
     }
     // Gli esplosivi girano anche dentro: una granata in un 노래방 rimbalza sui
@@ -690,7 +843,8 @@ class Game {
     for (const v of this.vehicles) {
       if (v.driver !== 'player') v.lightsOn = this._wasNight;
     }
-    this.hud.toast(this._wasNight ? 'Cala la sera su Seoul' : 'Sorge il sole', 3);
+    const place = this.city.region?.name || 'Seoul';
+    this.hud.toast(this._wasNight ? `Cala la sera su ${place}` : `Sorge il sole su ${place}`, 3);
   }
 
   /** Tracce di gomma per i veicoli che slittano nei paraggi. */
@@ -730,7 +884,8 @@ class Game {
 
   render() {
     const ctx = this.ctx;
-    if (this.indoors) this.interiorScene.render(ctx, this);
+    if (this.metro.inside) this.metroScene.render(ctx, this);
+    else if (this.indoors) this.interiorScene.render(ctx, this);
     else this.scene.render(ctx, this);
     this.camera.applyUI(ctx);
     if (!this.started) {
@@ -741,6 +896,7 @@ class Game {
     this.mapView.draw(ctx, this);
     this.menu.draw(ctx, this);
     this.shopMenu.draw(ctx, this);
+    this.metro.draw(ctx, this);
   }
 }
 

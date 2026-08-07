@@ -99,25 +99,72 @@ game.city.elevationAt = window._elev;                                  // ripris
 Dopo aver toccato la generazione, controlla anche la salute della maglia:
 
 ```js
-// vicoli ciechi veri: devono essere ≤ 6 e solo sul bordo mappa (x o y ≈ 188)
+// vicoli ciechi veri: Seoul ne ha 16 e sono tutti sul bordo (x/y ≈ 238 o 6928)
 game.city.graph.usableNodes.filter(n => n.out.length === 1).map(n => [n.x | 0, n.y | 0])
 // quanta strada è stata tolta dai superblocchi, e quanti disassamenti sono nati
 game.city.stats // { buildings, props, blocks, nodes, edges, doglegs, stairs }
 ```
 
-Valori attesi con la seed attuale: `buildings 418`, `props 1299`, `blocks 122`, `nodes 196`,
-`edges 279`, `doglegs 4`, `stairs 3`, `rural 5`, `piers 10`, `shops 114`, `venues 325`,
-`garages 7`, `turfs 6`, e 43 raccolte a terra (`game.pickups.items.length`) — erano 36 finché
-non si è aggiunta la campagna e non si è cominciato a scartare i punti murati (§5.12).
-`shops` e `venues` sono saliti di uno nel §5.21, quando `ensurePawnShops` ha aperto una vetrina
-al porto — il distretto che non ne aveva nessuna.
-I primi nove devono restare **identici** finché non si tocca l'ordine di consumo dell'rng in
-generazione: se cambiano, hai spostato una `rng.*` e la città non è più quella collaudata.
-`shops`/`venues`/`garages` e `turfs` nascono da rng **separati** (`placeShops`, `placeGarages`,
-`placeTurfs`): cambiano solo se tocchi quelle funzioni, e non trascinano con sé il resto.
+Valori attesi con le seed attuali (§5.24): Seoul `7200×7200`, 842 edifici, 1987 props,
+234 isolati e grafo `306/479`; Busan `6400×5600`, 741 edifici, 1456 props, 150 isolati e
+grafo `177/300`; Jeju `5400×5400`, 377 edifici, 1376 props, 226 isolati e grafo `294/425`.
+Sono tre generatori deterministici con firme topologiche distinte: Busan e Jeju non chiamano
+`generateCity`. Seoul ha 16 fermate; le altre due 7 ciascuna. Ogni fermata deve avere una
+`entrance.visible`, un prop `metro_entrance` solido e un arrivo asciutto, libero e fuori strada.
 
-`stairs` è sceso da 8 a 3 perché i vicoli passanti candidati sono meno: la città copre la
-stessa area di prima ma su una mappa più grande, e la campagna non ha vicoli.
+Per le regioni e la metro (§5.22-5.24):
+
+```js
+// identità e consistenza della regione attiva
+({ regione: game.city.region, edifici: game.city.buildings.length,
+   isolati: game.city.blocks.length, nodi: game.city.graph.usableNodes.length,
+   negozi: game.city.shops.length, landmark: game.city.landmarks.length,
+   fermate: game.city.transitStations.length })
+
+// ogni uscita deve essere entro i confini, asciutta, fuori strada e fuori dai solidi
+game.city.transitStations.filter((s) =>
+  s.arrivalX < 0 || s.arrivalY < 0 || s.arrivalX > game.city.w || s.arrivalY > game.city.h ||
+  game.city.isWater(s.arrivalX, s.arrivalY) || game.city.isOnRoad(s.arrivalX, s.arrivalY) ||
+  game.city.solidGrid.queryCircle(s.arrivalX, s.arrivalY, 12).some((o) =>
+    s.arrivalX > o.x - 12 && s.arrivalX < o.x + o.w + 12 &&
+    s.arrivalY > o.y - 12 && s.arrivalY < o.y + o.h + 12))
+// atteso: [] in tutte e tre le regioni
+
+// ogni fermata ha un ingresso fisico associato al marker della carta
+game.city.transitStations.filter((s) =>
+  !s.entrance?.visible ||
+  !game.city.props.some((p) => p.stationId === s.id && p.type === 'metro_entrance' &&
+    p.solid && p.collisionW === s.entrance.w && p.collisionH === s.entrance.h))
+// atteso: []
+
+// il bordo fisico deve esistere su tutti e quattro gli angoli
+[[1, 1], [game.city.w - 1, 1], [1, game.city.h - 1],
+ [game.city.w - 1, game.city.h - 1]].filter(([x, y]) =>
+  !game.city.solidGrid.queryCircle(x, y, 1).some((o) => o.isBoundary))
+// atteso: []
+
+// cambio regione a freddo; conserva inventario e orologio, ricostruisce i sistemi cittadini
+game.travelTo('busan'); game.travelTo('jeju'); game.travelTo('seoul');
+```
+
+Valori attesi nell'ordine edifici / isolati / nodi / archi / negozi / landmark / fermate:
+Seoul `842 / 234 / 306 / 479 / 240 / 21 / 16`, Busan
+`741 / 150 / 177 / 300 / 140 / 6 / 7`, Jeju
+`377 / 226 / 294 / 425 / 129 / 8 / 7`.
+
+Verifica browser minima: a Seoul trovare il totem `M · 지하철` fuori dalle corsie, provare che
+non sia attraversabile, premere `E`, osservare i passeggeri muoversi, comprare al chiosco e
+camminare attraverso i tornelli fino alla banchina. Il tabellone si apre soltanto davanti al
+treno. Poi viaggiare a Busan e Jeju e aprire le due carte: Busan mostra baia/Nakdong e Jeju il
+mare su tutti e quattro i bordi. Gli hook locali sono `?regiontest=busan|jeju`,
+`?metrotest=entrance|kiosk|platform` e `?edgetest=east`; servono solo alle prove e non cambiano
+il percorso normale. La console deve restare senza errori. I tornelli devono rifiutare
+l'ingresso con almeno una stella.
+
+Dopo qualunque modifica a generatori, landmark o arredo, la sola query `isOnRoad` non basta:
+va eseguito un audit rettangolare con `roadclearance.rectIntersectsRoad`, includendo larghezza
+e rotazione di ogni volume. Il risultato atteso è zero per edifici ordinari, props solidi e
+30 ingressi metro in tutte e tre le regioni.
 
 Per il combattimento:
 
@@ -319,7 +366,7 @@ dc.light   // { amb:[r,g,b], k, warm:[r,g,b], w, sx, sy, shadow, lamps }
 // comandi: spostare l'ora, forzare il tempo, fermare l'orologio
 dc.hour = 21.5;  dc.setWeather('storm');  dc.paused = true;
 // negozi: chi è aperto adesso
-game.city.shops.filter((s) => game.shops.shopOpen(s, game)).length   // su 114
+game.city.shops.filter((s) => game.shops.shopOpen(s, game)).length   // su 240 a Seoul
 game.shops.isOpen('guns', game)          // un tipo di attività
 game.shops.nextOpening(s, game)          // { biz, at, wait } del piano che riapre prima
 ```
