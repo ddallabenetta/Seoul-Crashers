@@ -40,6 +40,10 @@ const HEAT_GRACE = 0.35;
 // combattimento a piedi è mira col mouse più passo laterale, e un protagonista
 // che pattina lo cancella. A 0.8 lo spazio d'arresto raddoppiava e si sentiva.
 const WET_SLIDE = 0.6;
+// Quanto dura, dopo una mazzata, l'essere «uno che sta menando» invece di «uno
+// che ha una mazza». Poco più di una cadenza (0,52 s per la mazza): chi continua
+// a colpire resta in resistenza, chi si ferma torna ammanettabile in un secondo.
+const SWING_RESIST = 1.4;
 
 export class Player {
   constructor(x, y) {
@@ -87,6 +91,8 @@ export class Player {
     this.dying = false;
     this.deathT = 0;
     this.carHitT = 0;
+    // Da quanto si sta menando con un ferro in mano: lo legge `police.updateArrest`.
+    this.swingT = 0;
     // Tappa C: rotazione delle canne della minigun, mirino del fucile di precisione,
     // e il lampo della barra armi quando si cambia arma.
     this.spin = 0;
@@ -118,6 +124,7 @@ export class Player {
     this.fireCd = Math.max(0, this.fireCd - dt);
     this.hurtT = Math.max(0, this.hurtT - dt);
     this.weaponT = Math.max(0, this.weaponT - dt);
+    this.swingT = Math.max(0, this.swingT - dt);
     this.updateHeat(dt, game);
 
     // Il puntatore vale sempre: da fermo, in corsa e al volante.
@@ -331,6 +338,10 @@ export class Player {
   attack(game, spec) {
     if (spec.melee) {
       this.fireCd = spec.rate;
+      // Con un ferro in mano *e in movimento* non ti si ammanetta: la divisa
+      // legge questo cronometro (§5.21). Coi pugni no — chi tira cazzotti resta
+      // uno da portare in centrale, non uno a cui sparare.
+      if (spec.id !== 'fists') this.swingT = SWING_RESIST;
       // Una mazzata a vuoto non è un reato: la centrale se ne accorge solo se
       // qualcosa (o qualcuno) l'ha incassata.
       if (meleeSwing(game, this, spec, this.x, this.y, this.angle)) {

@@ -58,6 +58,13 @@ const OUTFIT_PRICE = 40000;
 const SELL_REACH = 108;
 const ALARM_DELAY = 17;  // secondi fra il testimone che vede e la centrale che sa
 const DEAL_REACH = 54;   // quanto ci si avvicina al 거래책 di un territorio
+// Fin dove arriva il riposo. Il futon era gratis e curava del tutto, e questo
+// toglieva il mestiere al 병원 e alla farmacia: nessuno compra una medicazione da
+// 14.000₩ potendo dormire. Sopra questa frazione di salute il letto non serve più.
+const REST_CAP = 0.7;
+// Quanta salute vale un'ora di sonno. Una notte piena (8 h) riempie da zero fino
+// al tetto, un pisolino di due ore no: è la differenza fra dormire e riposare.
+const REST_PER_HOUR = 9;
 
 /** ₩ con i punti delle migliaia: un prezzo a sei cifre senza va solo letto male. */
 export function won(n) {
@@ -975,6 +982,12 @@ export class ShopSystem {
    * finirebbe con «entro in casa e vado a nanna». Sotto le tre stelle un sonnellino
    * si concede — le stelle le ritrovi tali e quali quando esci, perché il ricercato
    * dentro un edificio è congelato, non spento.
+   *
+   * **E non cura del tutto.** Il futon era gratis e rimetteva a nuovo, il che
+   * lasciava il 병원 e la farmacia senza un mestiere: chi comprerebbe una
+   * medicazione da 14.000₩ potendo dormire (§6). Adesso il riposo arriva fino a
+   * `REST_CAP` e non oltre — l'ultimo terzo di salute si paga, ed è l'unica cosa
+   * che dà un senso alla clinica.
    */
   sleep(game) {
     const dc = game.dayCycle;
@@ -986,13 +999,18 @@ export class ShopSystem {
     }
     const to = sleepTarget(dc.hour);
     dc.advance(to.wait);
-    pl.heal(pl.maxHp);
+    const cap = pl.maxHp * REST_CAP;
+    if (pl.hp < cap) pl.hp = Math.min(cap, pl.hp + to.wait * REST_PER_HOUR);
     game.audio?.ui('open');
     // Nero pieno per mezzo secondo: uno stacco da porta (fade 1) non basta a dire
     // che sono passate otto ore.
     this.fade = 2.4;
     pl.enterCooldown = 0.5;
     game.hud.toast(`Hai dormito ${to.wait.toFixed(0)} ore · ${clockLabel(dc.hour)}`, 3);
+    // Svegliarsi ancora malmessi va detto, o sembra che il letto sia rotto.
+    if (pl.hp < pl.maxHp - 1) {
+      game.hud.toast('Il riposo arriva fin qui: il resto lo rimette a posto un 병원', 3.4);
+    }
     // L'ora è un'altra: il piano va riletto come se ci si fosse appena arrivati —
     // aperture, luci e gente di passaggio.
     this.showFloor(game, this.floor);
