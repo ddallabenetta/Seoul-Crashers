@@ -1,0 +1,97 @@
+// Censimento del riverbero: quanto dura e quanto pesa la coda di uno sparo in
+// ognuno degli spazi di `SPACES` (§5.21). Serve a rispondere con dei numeri a
+// «il riverbero c'è?» e soprattutto a «i cinque spazi suonano diversi?», che a
+// orecchio si giudica solo avendo un orecchio.
+//
+//   node .claude/tools/probe.mjs --seconds 2 --quiet \
+//     --script .claude/tools/scenes/reverb-census.scene
+//
+// Si misura il **decadimento**: dopo lo sparo si campiona il valore efficace a
+// finestre di 40 ms e si prende quanto ci mette a scendere sotto un millesimo del
+// picco. Il colpo secco è identico in tutti e cinque i casi, quindi la differenza
+// fra le righe è tutta riverbero.
+//
+// Cosa deve venire fuori: le code in ordine `open` < `room` < `street` < `alley`,
+// e `alley` col ritorno più alto di tutti. I valori assoluti dipendono dalla
+// macchina e dal mix: **si leggono in colonna, non in assoluto.** Riferimento
+// (Chromium headless in container, mix di fabbrica): 190 · 250 · 460 · 630 ms.
+//
+// Estensione `.scene` e non `.js` perché è il corpo di una funzione async, non un
+// modulo: `node --check` (l'hook su Write/Edit) lo rifiuterebbe.
+const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
+const A = game.audio;
+A.unlock();
+await wait(1.5);
+if (!A.ready) return { errore: 'contesto audio non partito' };
+
+const { SPACES } = await import('/src/core/audio.js');
+const W = await import('/src/entities/weapons.js');
+const ctx = A.ctx;
+const an = ctx.createAnalyser();
+an.fftSize = 2048;
+A.master.connect(an);
+const buf = new Float32Array(an.fftSize);
+
+const rms = () => {
+  an.getFloatTimeDomainData(buf);
+  let s = 0;
+  for (let i = 0; i < buf.length; i++) s += buf[i] * buf[i];
+  return Math.sqrt(s / buf.length);
+};
+
+// Il mondo va fermato, o quello che si misura è la città: un tamponamento a due
+// isolati e un clacson finiscono sullo stesso bus del colpo di prova, e la coda
+// risulta lunga tre secondi anche in mezzo a un campo. Si ferma come lo
+// fermerebbe il giocatore, con il menu di pausa — `game.paused` da solo non
+// basta, `main.update` lo ricalcola a ogni frame dai pannelli aperti.
+game.menu.open = true;
+// I letti vanno spenti a parte, e non basta azzerarli una volta: `updateBeds` li
+// riscrive a ogni frame, e in pausa si abbassano ma non tacciono.
+A.updateBeds = () => { for (const b of A._bedList) b.target = 0; };
+// `updateSpace` non deve riscegliere da solo mentre si misura: il conto alla
+// rovescia si manda avanti di un'era.
+const freeze = () => { A._spaceT = 1e9; };
+await wait(1.2);
+freeze();
+const fondo = rms();
+
+const spazi = {};
+for (const id of Object.keys(SPACES)) {
+  A.wantSpace = id;
+  freeze();
+  // Il cambio passa da una dissolvenza a zero e non è immediato: si aspetta che
+  // il convolutore abbia davvero la coda nuova, e poi che il ritorno sia risalito.
+  for (let i = 0; i < 300 && A.space !== id; i++) { await wait(0.02); freeze(); }
+  for (let i = 0; i < 300 && A._revG < SPACES[id].wet * 0.9; i++) { await wait(0.02); freeze(); }
+  await wait(0.4);
+  freeze();
+
+  A.shot(W.WEAPONS.pistol, game.camera.cx, game.camera.cy, true);
+  const serie = [];
+  let picco = 0;
+  const t0 = performance.now();
+  while (performance.now() - t0 < 3200) {
+    const v = rms();
+    if (v > picco) picco = v;
+    serie.push([performance.now() - t0, v]);
+    await wait(0.04);
+    freeze();
+  }
+  // La coda finisce dove il livello resta sotto soglia per tre finestre di fila.
+  // Cercare invece l'ultimo campione sopra soglia partendo dal fondo è fragile:
+  // basta un singolo picco tardivo — e ce n'è sempre uno — per misurare tre
+  // secondi di coda dove non ce n'era.
+  const iPicco = serie.findIndex(([, v]) => v === picco);
+  const soglia = Math.max(picco / 1000, fondo * 1.5);
+  let fine = serie.length - 1;
+  for (let i = iPicco + 1; i < serie.length - 3; i++) {
+    if (serie[i][1] <= soglia && serie[i + 1][1] <= soglia && serie[i + 2][1] <= soglia) { fine = i; break; }
+  }
+  spazi[id] = {
+    ritorno: +A._revG.toFixed(3),
+    picco: +picco.toFixed(4),
+    codaMs: Math.round(serie[fine][0] - serie[iPicco][0]),
+  };
+}
+
+return { fondo: +fondo.toFixed(5), spazi };

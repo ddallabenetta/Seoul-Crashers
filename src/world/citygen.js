@@ -1067,18 +1067,66 @@ function placeShops(city) {
     }
     if (!best) continue;
     const mix = DISTRICT_MIX[best.district] || DISTRICT_MIX.hongdae;
-    if (best.shop) {
-      best.shop.biz[0] = 'clinic';
-      best.shop.name = BUSINESSES.clinic.label;
-      best.shop.hangul = BUSINESSES.clinic.hangul;
-      best.shop.blip = BUSINESSES.clinic.blip;
-    } else {
-      makeShop(city, rng, best, rng.pick(best.edges), 'clinic', mix);
-    }
+    if (best.shop) retitle(best.shop, 'clinic');
+    else makeShop(city, rng, best, rng.pick(best.edges), 'clinic', mix);
     // Il blip (e il risveglio dopo la morte) si spostano sulla porta.
     hsp.x = best.shop.x;
     hsp.y = best.shop.y;
     hsp.shop = best.shop;
+  }
+
+  ensurePawnShops(city, rng);
+}
+
+/** Cambia il mestiere del piano terra di una vetrina già piazzata. */
+function retitle(shop, id) {
+  const biz = BUSINESSES[id];
+  shop.biz[0] = id;
+  shop.name = biz.label;
+  shop.hangul = biz.hangul;
+  shop.blip = biz.blip || null;
+}
+
+/**
+ * Un banco dei pegni per distretto. `shops.MARKETS` dà a ognuno dei sette
+ * quartieri una percentuale di ricompra sua — 0,34 al porto, 0,50 a Gangnam — ma
+ * `pawn` era una voce del mix come le altre e il caso ne lasciava tre distretti
+ * senza. Le tre righe più caratterizzate della tabella (armi a 0,68 e auto a 1,35
+ * al porto, munizioni a 1,40 in campagna) si potevano toccare solo attraverso il
+ * prezzo dell'officina, e il mercato non si vedeva tutto (§6).
+ *
+ * Stessa forma delle officine e della clinica: si guarda cosa è già uscito dal
+ * caso e **si riempie solo il buco**, così un distretto che ne ha già tre resta
+ * com'è. Prima si prova a cambiare mestiere a una vetrina esistente: una porta in
+ * più vuol dire un'insegna in più su una facciata che ne aveva già la sua.
+ * Cliniche e 총포상 sono intoccabili — sono le due attività di cui il distretto
+ * non può restare senza.
+ */
+function ensurePawnShops(city, rng) {
+  const have = new Set();
+  for (const s of city.shops) if (s.biz[0] === 'pawn') have.add(s.district);
+  for (const d of DISTRICTS) {
+    if (have.has(d.id)) continue;
+    const dx = d.seed.x * city.w;
+    const dy = d.seed.y * city.h;
+    let shop = null;
+    let bestD = Infinity;
+    for (const s of city.shops) {
+      if (s.district !== d.id || s.biz[0] === 'clinic' || s.biz[0] === 'guns') continue;
+      const dd = (s.x - dx) ** 2 + (s.y - dy) ** 2;
+      if (dd < bestD) { bestD = dd; shop = s; }
+    }
+    if (shop) { retitle(shop, 'pawn'); continue; }
+    // Nessuna vetrina convertibile in tutto il distretto (succede in campagna e
+    // all'aeroporto, dove le case sono poche): se ne apre una.
+    let b = null;
+    bestD = Infinity;
+    for (const q of city.buildings) {
+      if (q.district !== d.id || !shopCandidate(q) || q.shop || q.garage) continue;
+      const dd = (q.x + q.w / 2 - dx) ** 2 + (q.y + q.h / 2 - dy) ** 2;
+      if (dd < bestD) { bestD = dd; b = q; }
+    }
+    if (b) makeShop(city, rng, b, rng.pick(b.edges), 'pawn', DISTRICT_MIX[d.id] || DISTRICT_MIX.hongdae);
   }
 }
 

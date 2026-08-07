@@ -55,9 +55,10 @@ src/entities/
 src/ui/
   hud.js              minimappa, tachimetro, barra armi, cartello distretto, toast, debug
   mapview.js          mappa a tutto schermo (pannello riusato dal menu)
-  menu.js             menu di pausa, con il pannello dei volumi (tab `audio`)
+  menu.js             menu di pausa (mappa, salvataggi, audio, comandi, statistiche, titolo)
   startmenu.js        menu iniziale sopra la città che gira (attract mode)
   saveslots.js        le schede dei salvataggi, condivise fra i due menu
+  mixer.js            il pannello dei volumi, condiviso fra i due menu
   shopmenu.js         pannello del listino (compra/vendi)
 
 .claude/              strumenti per chi sviluppa (non fa parte del gioco), vedi §9
@@ -412,5 +413,27 @@ secondo pezzo che va in rete, la stessa disciplina o niente.
 tiene fermo, e un contesto fermo ha l'orologio fermo: tutto quello che ci si programma dentro
 resta in coda e si accumula. Per questo `audio.ready` guarda `ctx.state === 'running'` e non
 "l'ho costruito", e finché è falso ogni chiamata di `audio.js` non fa niente.
+
+**Lo spazio è un terzo bus, non una proprietà dei suoni.** Il riverbero (§5.21) è **una
+mandata parallela dal solo bus `sfx`**: il secco continua ad arrivare al compressore per conto
+suo e il convolutore ci aggiunge il bagnato. Da qui tre conseguenze che vale la pena sapere
+prima di toccarlo. La prima: i letti agganciati a `sfx` (motore, sirena, rotore, gomme) ci
+passano dentro e **questo è voluto** — un motore che rimbomba in un vicolo è metà dell'effetto;
+quelli agganciati a `amb` (pioggia, città, vento, mare) no, e passati per una coda sarebbero
+fango. La seconda: **la coda di un `ConvolverNode` non si cambia a caldo**, quindi lo spazio si
+commuta come il pezzo musicale — si sfuma il ritorno a zero e solo lì si sostituisce il buffer.
+La terza: le quattro risposte all'impulso sono **normalizzate a energia uno**, così i `wet` di
+`SPACES` si confrontano fra loro; senza, la durata della coda diventerebbe un volume.
+
+**Una partita si può ricominciare senza ricaricare la pagina.** La città non c'entra: nasce da
+una seed fissa e non cambia mai. Quello che ha un ciclo di vita è tutto il resto, e sta in tre
+metodi di `Game` (§5.21): `clearWorld` svuota quello che è streaming (traffico, pedoni,
+polizia, esplosivi, effetti) lasciando stare velivoli e imbarcazioni, che nascono al boot e non
+passerebbero da nessuno; `newGame` ci aggiunge il ripristino di chi ha uno stato — `Player.reset`,
+`DayCycle.reset`, `ShopSystem.reset`, `wanted`, `stats` — e ripopola; `toTitle` è `newGame` più
+il menu iniziale davanti. **`save.apply` condivide `clearWorld`**: caricare e ricominciare hanno
+lo stesso problema, cioè che quello che c'è in strada appartiene a una partita che sta per non
+esistere più. E i sistemi si **ripuliscono**, non si ricostruiscono: scena, HUD, polizia e
+salvataggio tengono riferimenti diretti al giocatore e ai suoi sistemi.
 
 ---

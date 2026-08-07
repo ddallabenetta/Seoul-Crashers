@@ -28,7 +28,7 @@ Poi apri <http://localhost:8123>.
 | **click destro** | mirino del fucile di precisione (allarga il campo) |
 | `1` … `6` | barra armi: una fila per tasto, ripremi per scorrere la fila (rotella = tutto l'arsenale) |
 | `M` | mappa a tutto schermo (rotella = zoom, trascina = sposta) |
-| `ESC` | menu di pausa (mappa, **salvataggi**, audio, comandi, statistiche) |
+| `ESC` | menu di pausa (mappa, **salvataggi**, audio, comandi, statistiche, esci al titolo) |
 | `F` (nei salvataggi) | accende e sospende il salvataggio automatico |
 | `F3` | pannello tecnico (fps, entità, posizione) |
 | `F4` | audio muto |
@@ -41,14 +41,19 @@ con la salute piena, senza più un'arma, senza più nessuno alle costole e con u
 contanti in meno: la clinica presenta il conto.
 
 Le auto sono solide anche quando sei a piedi: non ci si passa attraverso e non ci si cammina
-sopra. Una che ti arriva addosso a velocità ti stende, una ferma ti sposta e basta.
+sopra. Una che ti arriva addosso a velocità ti stende, una ferma ti sposta e basta. Vale anche
+per i passanti, che le auto in sosta le **aggirano** invece di attraversarle.
 
 ## Il menu iniziale
 
 Il gioco si apre su un titolo con Seoul che gira dietro — traffico, pedoni e luci sono già
 quelli veri, non un'immagine. In cima c'è **Continua** se hai qualcosa da riprendere (ti dice
-dove eri e che ora era), poi *Nuova partita*, *Carica partita* e *Comandi*. `W`/`S` per
-scegliere, `Invio` per confermare.
+dove eri e che ora era), poi *Nuova partita*, *Carica partita*, *Audio* e *Comandi*. `W`/`S`
+per scegliere, `Invio` per confermare. I volumi si regolano da qui, senza dover cominciare una
+partita per abbassarli — ed è lo stesso pannello che trovi in pausa.
+
+Dal menu di pausa si torna al titolo (l'ultima voce, e chiede conferma): quello che non hai
+salvato lo perdi, e la partita ricomincia davvero — stessa Seoul, tutto il resto da capo.
 
 ## Salvataggi
 
@@ -60,6 +65,10 @@ Il quarto slot lo scrive il gioco: **quando dormi**, quando esci dall'ospedale o
 ogni quattro minuti in strada — ma **solo se sei in un punto da cui si può ripartire**: con le
 stelle addosso, quasi morto o mentre ti stanno ammanettando non salva, e riprova più tardi. I
 tuoi tre slot non li tocca mai. Se non lo vuoi, `F` su quel pannello lo sospende.
+
+Di automatici però ne tiene **tre**, non uno: il pulsante `PRECEDENTE` su quella scheda scorre
+all'indietro fino a due salvataggi più vecchi. Serve a chi si accorge tardi di aver sbagliato
+strada e non vuole trovarsi l'errore già scritto sopra il momento in cui non l'aveva fatto.
 
 Dentro c'è solo quello che Seoul non sa rifare da sola: la città nasce sempre uguale da una
 seed, quindi si salvano tu, il mezzo che stavi guidando, l'orologio col suo tempo, le stelle,
@@ -263,7 +272,17 @@ Alcune scelte tecniche che spiegano il risultato a schermo:
   la pioggia dentro un negozio è la stessa pioggia con il filtro spostato — quello che si
   sente è il muro. L'ascoltatore non è il personaggio ma **la camera**, così col mirino del
   fucile di precisione si sente quello che si vede. L'audio parte al primo clic (lo impongono
-  i browser); i volumi stanno nel menu di pausa, `F4` è il muto.
+  i browser); i volumi stanno nel menu iniziale e in quello di pausa, `F4` è il muto.
+
+- **E Seoul ha un'acustica.** La coda di un riverbero è un file per definizione: qui si genera
+  a runtime come tutto il resto, e sono quattro spazi — in mezzo ai campi, su una strada, in un
+  vicolo, dentro una stanza. Quale sia lo decide **da quanti lati arrivano i muri**, che è la
+  differenza fra stare accanto a una fila di palazzi e starci in mezzo: il piazzale di Gimpo è
+  aperto al 100%, in campagna un vicolo capita una volta su cento, a Gangnam una su tre. Sulla
+  stessa strada, uno sparo lontano non è uno sparo piano — è uno sparo **senza schiocco**, che
+  è quello che distingue «ti stanno sparando addosso» da «si spara da qualche parte». E i
+  passanti hanno quattro timbri di voce, con due formanti ciascuno, invece di uno solo con
+  l'altezza spostata a caso.
 
 - **La musica sa quando tacere.** È sintetizzata come tutto il resto e suona in due momenti
   soli: il **tema** sul menu iniziale e l'**inseguimento** quando ti stanno addosso — con gli
@@ -349,5 +368,15 @@ città che gira davvero; la musica del gioco, generata come il resto dell'audio 
 titolo e un inseguimento che cresce con le stelle, e silenzio dove Seoul si sente già da sola;
 un quarto slot che il gioco scrive da solo dormendo, uscendo dall'ospedale o dalla cella e
 ogni quattro minuti in strada, ma soltanto dove si può davvero ripartire.
+
+**Fase 3, secondo giro di arretrati — completata.** Undici voci del backlog in una sessione:
+i passanti che aggirano le auto in sosta invece di attraversarle, il ritorno al titolo con una
+partita che ricomincia davvero, i volumi anche prima di giocare, tre generazioni di autosave,
+**il riverbero generato a runtime** con i suoi quattro spazi, gli spari lontani che perdono lo
+schiocco, quattro timbri di voce, il commesso che scappando da una rapina finisce davvero in
+strada (e la sua telefonata si può fermare sul marciapiede), la mazza che ti fa ammanettare
+solo se non la stai usando, un banco dei pegni in ogni distretto che possa averne uno — il
+porto ha così il suo primo negozio in assoluto — e il futon che cura fino al 70% e non oltre,
+così l'ospedale ha di nuovo un mestiere.
 
 **Fase 3, il resto — da fare.** Le 12 missioni con cutscene a fumetti e le attività secondarie.

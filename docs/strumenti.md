@@ -56,6 +56,8 @@ e un `return` a livello di file lo farebbe fallire.
 | `daylight-sweep.scene` | la luce ora per ora su tutto il giro, più quattro campioni col temporale. Serve a vedere in una tabella quello che altrimenti vuole ventiquattro screenshot: tinta, velo caldo, lampioni, ombre, popolamento |
 | `audio-census.scene` | **livelli veri dell'audio**: un analizzatore sul master dà rms e picco di ogni scenario (ambiente, temporale, motore, caccia) e il picco di ogni arma, più voci vive e costo in ms. È l'unico modo di bilanciare senza una cassa, ed è quello che ha trovato l'ambiente tarato tre volte troppo alto (§5.13) |
 | `music-census.scene` | **livello e regia della musica** (§5.19): rms e picco del tema e della caccia ai due gradini di stelle, e la verifica che il pezzo *taccia* dove deve — in strada da puliti e con la radio accesa. Va lanciata con `--menu`, o il tema non suona |
+| `walkers-census.scene` | **i pedoni contro le lamiere ferme** (§5.21): quanti passanti finiscono *dentro* una carrozzeria, quanti restano piantati, e quanta strada fanno, su quattro zone. Una delle sue cifre non si interpreta — `dentroLamiera` è un invariante e **deve essere 0** |
+| `reverb-census.scene` | **le code del riverbero** (§5.21): quanto dura e quanto pesa la coda dello stesso sparo in ognuno dei quattro spazi. Ferma il mondo col menu di pausa e azzera i letti, o quello che misura è la città |
 
 ⚠️ **Una misura alla volta.** La scena cambia zona a tempo di *orologio*, non di simulazione:
 due censimenti che girano insieme sulla stessa macchina si rubano la CPU e i teletrasporti

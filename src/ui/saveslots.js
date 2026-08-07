@@ -8,7 +8,7 @@
 import { roundPath } from './hud.js';
 import { won } from '../entities/shops.js';
 import {
-  ALL_SLOTS, AUTO_SLOT, readSlot, writeSlot, clearSlot, describe, apply,
+  ALL_SLOTS, AUTO_SLOT, AUTO_GENS, readSlot, writeSlot, clearSlot, describe, apply,
   slotLabel, autosaveOn, toggleAutosave,
 } from '../core/save.js';
 
@@ -16,6 +16,16 @@ import {
 // occupato: A/D scelgono la colonna, W/S la riga, Invio conferma.
 const ACTIONS = [
   { id: 'save', label: 'Salva' },
+  { id: 'load', label: 'Carica' },
+  { id: 'wipe', label: 'Cancella' },
+];
+
+// Sulla scheda dell'autosave `Salva` era un pulsante spento per definizione — lo
+// scrive il gioco — e adesso che l'autosave tiene tre generazioni (§5.21) quel
+// posto serve a scorrerle. Stessa lunghezza dell'altra fila: passando da uno
+// slot manuale a questo la colonna scelta resta valida.
+const AUTO_ACTIONS = [
+  { id: 'older', label: 'Precedente' },
   { id: 'load', label: 'Carica' },
   { id: 'wipe', label: 'Cancella' },
 ];
@@ -34,16 +44,35 @@ export class SaveSlots {
     // volte per sessanta frame al secondo per disegnare quattro schede ferme è
     // sprecato.
     this.slots = [];
+    this.autos = [];   // le generazioni dell'autosave, la 0 è la più recente
+    this.gen = 0;      // quella che la scheda `AUTO` sta mostrando
   }
 
   refresh() {
     this.slots = [];
     for (let i = 0; i < ALL_SLOTS; i++) this.slots.push(readSlot(i));
+    this.autos = [];
+    for (let g = 0; g < AUTO_GENS; g++) this.autos.push(readSlot(AUTO_SLOT, g));
+    if (!this.autos[this.gen]) this.gen = 0;
+  }
+
+  /** Quante generazioni dell'autosave esistono davvero. */
+  get autoCount() {
+    return this.autos.filter(Boolean).length;
+  }
+
+  /** Il salvataggio di una scheda: per l'autosave è la generazione mostrata. */
+  data(i) {
+    return i === AUTO_SLOT ? this.autos[this.gen] : this.slots[i];
+  }
+
+  actions(i) {
+    return i === AUTO_SLOT ? AUTO_ACTIONS : ACTIONS;
   }
 
   /** Vero se c'è almeno un salvataggio da riaprire. */
   get any() {
-    return this.slots.some(Boolean);
+    return this.slots.some(Boolean) || this.autos.some(Boolean);
   }
 
   /**
@@ -61,11 +90,12 @@ export class SaveSlots {
     if (input.wasPressed('KeyS') || input.wasPressed('ArrowDown')) {
       this.slot = (this.slot + 1) % ALL_SLOTS;
     }
+    const cols = this.actions(this.slot).length;
     if (input.wasPressed('KeyD') || input.wasPressed('ArrowRight')) {
-      this.action = (this.action + 1) % ACTIONS.length;
+      this.action = (this.action + 1) % cols;
     }
     if (input.wasPressed('KeyA') || input.wasPressed('ArrowLeft')) {
-      this.action = (this.action - 1 + ACTIONS.length) % ACTIONS.length;
+      this.action = (this.action - 1 + cols) % cols;
     }
     if (this.hover && input.mouse.pressed) {
       this.slot = this.hover.slot;
@@ -89,19 +119,39 @@ export class SaveSlots {
   /** Se un'azione è possibile su uno slot. La scheda `AUTO` la scrive il gioco. */
   enabled(i, action) {
     if (action === 'save') return this.canSave && i !== AUTO_SLOT;
-    return !!this.slots[i];
+    if (action === 'older') return this.autoCount > 1;
+    return !!this.data(i);
+  }
+
+  /** Nome di una scheda nei messaggi: l'autosave dice anche quale generazione. */
+  label(i) {
+    if (i !== AUTO_SLOT || this.autoCount < 2) return slotLabel(i);
+    return `${slotLabel(i)} ${this.gen + 1}/${this.autoCount}`;
   }
 
   run(game) {
     const i = this.slot;
-    const action = ACTIONS[this.action].id;
+    const action = this.actions(i)[this.action].id;
     const audio = game.audio;
     if (!this.enabled(i, action)) {
-      const why = action === 'save'
-        ? (i === AUTO_SLOT ? 'lo scrive il gioco da solo' : 'non c\'è ancora niente da salvare')
-        : 'è vuoto';
-      game.hud.toast(`${slotLabel(i)}: ${why}`, 1.8);
+      const why = action === 'save' ? 'non c\'è ancora niente da salvare'
+        : action === 'older' ? 'ne ha ancora una sola'
+          : 'è vuoto';
+      game.hud.toast(`${this.label(i)}: ${why}`, 1.8);
       audio?.ui('deny');
+      return null;
+    }
+    // Scorrere lo storico non perde niente e non chiede conferma: si salta alla
+    // generazione occupata dopo, che è sempre più vecchia di quella mostrata.
+    if (action === 'older') {
+      for (let n = 1; n <= AUTO_GENS; n++) {
+        const g = (this.gen + n) % AUTO_GENS;
+        if (!this.autos[g]) continue;
+        this.gen = g;
+        break;
+      }
+      this.confirm = -1;
+      audio?.ui('move');
       return null;
     }
     // Conferma solo dove si perde qualcosa: salvare su uno slot vuoto no.
@@ -119,15 +169,16 @@ export class SaveSlots {
       return null;
     }
     if (action === 'wipe') {
-      clearSlot(i);
+      const what = this.label(i);
+      clearSlot(i, i === AUTO_SLOT ? this.gen : 0);
       this.refresh();
-      game.hud.toast(`${slotLabel(i)} cancellato`, 2);
+      game.hud.toast(`${what} cancellato`, 2);
       audio?.ui('ok');
       return null;
     }
-    apply(game, this.slots[i]);
+    apply(game, this.data(i));
     audio?.ui('ok');
-    game.hud.toast(`${slotLabel(i)} caricato`, 2.6);
+    game.hud.toast(`${this.label(i)} caricato`, 2.6);
     return 'loaded';
   }
 
@@ -154,15 +205,19 @@ export class SaveSlots {
         ctx.fillRect(x, cy, 3, cardH);
       }
 
-      const data = this.slots[i];
+      const data = this.data(i);
       ctx.fillStyle = sel ? '#ffffff' : 'rgba(235,240,250,0.6)';
       ctx.font = '700 13px system-ui, sans-serif';
-      ctx.fillText(slotLabel(i), x + 18, cy + 24);
+      const name = this.label(i);
+      ctx.fillText(name, x + 18, cy + 24);
       if (i === AUTO_SLOT) {
+        // L'etichetta cambia larghezza con la generazione mostrata: la si misura
+        // col font con cui è stata scritta, non con quello che viene dopo.
+        const after = x + 30 + ctx.measureText(name).width;
         const on = autosaveOn();
         ctx.fillStyle = on ? 'rgba(90,220,150,0.9)' : 'rgba(235,240,250,0.3)';
         ctx.font = '600 11px system-ui, sans-serif';
-        ctx.fillText(on ? '· ACCESO  (F)' : '· SOSPESO  (F)', x + 74, cy + 24);
+        ctx.fillText(on ? '· ACCESO  (F)' : '· SOSPESO  (F)', after, cy + 24);
       }
 
       if (!data) {
@@ -195,9 +250,10 @@ export class SaveSlots {
 
       // Pulsanti: sempre tutti e tre, ma spenti dove non hanno senso. Nasconderli
       // farebbe ballare la riga fra uno slot pieno e uno vuoto.
+      const acts = this.actions(i);
       let bx = x + w - 16;
-      for (let a = ACTIONS.length - 1; a >= 0; a--) {
-        const act = ACTIONS[a];
+      for (let a = acts.length - 1; a >= 0; a--) {
+        const act = acts[a];
         const on = this.enabled(i, act.id);
         ctx.font = '700 12px system-ui, sans-serif';
         const bw = ctx.measureText(act.label.toUpperCase()).width + 22;
@@ -230,9 +286,9 @@ export class SaveSlots {
     if (this.confirm >= 0 && active) {
       ctx.fillStyle = '#ff5fa2';
       ctx.font = '700 12px system-ui, sans-serif';
-      const what = ACTIONS[this.confirm].id === 'save' ? 'sovrascrivere' : 'cancellare';
+      const what = this.actions(this.slot)[this.confirm].id === 'save' ? 'sovrascrivere' : 'cancellare';
       ctx.fillText(
-        `Invio di nuovo per ${what} ${slotLabel(this.slot).toLowerCase()}`,
+        `Invio di nuovo per ${what} ${this.label(this.slot).toLowerCase()}`,
         x, y + ALL_SLOTS * (cardH + gap) + 8
       );
     }

@@ -58,6 +58,13 @@ const OUTFIT_PRICE = 40000;
 const SELL_REACH = 108;
 const ALARM_DELAY = 17;  // secondi fra il testimone che vede e la centrale che sa
 const DEAL_REACH = 54;   // quanto ci si avvicina al 거래책 di un territorio
+// Fin dove arriva il riposo. Il futon era gratis e curava del tutto, e questo
+// toglieva il mestiere al 병원 e alla farmacia: nessuno compra una medicazione da
+// 14.000₩ potendo dormire. Sopra questa frazione di salute il letto non serve più.
+const REST_CAP = 0.7;
+// Quanta salute vale un'ora di sonno. Una notte piena (8 h) riempie da zero fino
+// al tetto, un pisolino di due ore no: è la differenza fra dormire e riposare.
+const REST_PER_HOUR = 9;
 
 /** ₩ con i punti delle migliaia: un prezzo a sei cifre senza va solo letto male. */
 export function won(n) {
@@ -433,6 +440,29 @@ export class ShopSystem {
     // Porta a portata di mano: la calcola `updateOutside` e la legge anche il
     // giocatore, perché `E` sulla soglia di un negozio non deve rubare l'auto
     // parcheggiata dietro di lui.
+    this.near = null;
+  }
+
+  /**
+   * Tutte le vetrine come al primo giorno: casse piene, personale in piedi,
+   * nessuna pianta in cache. Serve alla partita nuova (§5.21) — `restore` fa la
+   * stessa cosa per un salvataggio, ma partendo da un elenco di cose da ricordare
+   * invece che da niente.
+   */
+  reset() {
+    this.cache.clear();
+    this.pending = null;
+    this.active = null;
+    this.outside = null;
+    this.backSpot = null;
+    this.actions.length = 0;
+    this.fade = 0;
+    this.garageT = 0;
+    this.robbed = 0;
+    this.spent = 0;
+    this.sold = 0;
+    this.alarmT = 0;
+    this.alarmCaller = null;
     this.near = null;
   }
 
@@ -887,6 +917,10 @@ export class ShopSystem {
       f.people.splice(i, 1);
       drop(f.staff, p);
       drop(f.crowd, p);
+      // …e adesso è in strada. Si fa **qui** e non dove viene alzato `gone`: la
+      // rimozione dalla sala deve venire prima, o si ritrova in due liste, e nella
+      // sala ci resterebbe con le coordinate della città addosso.
+      this.spillOutside(p, game);
     }
 
     // Azioni contestuali: scala, porta, bancone, cassa.
@@ -948,6 +982,12 @@ export class ShopSystem {
    * finirebbe con «entro in casa e vado a nanna». Sotto le tre stelle un sonnellino
    * si concede — le stelle le ritrovi tali e quali quando esci, perché il ricercato
    * dentro un edificio è congelato, non spento.
+   *
+   * **E non cura del tutto.** Il futon era gratis e rimetteva a nuovo, il che
+   * lasciava il 병원 e la farmacia senza un mestiere: chi comprerebbe una
+   * medicazione da 14.000₩ potendo dormire (§6). Adesso il riposo arriva fino a
+   * `REST_CAP` e non oltre — l'ultimo terzo di salute si paga, ed è l'unica cosa
+   * che dà un senso alla clinica.
    */
   sleep(game) {
     const dc = game.dayCycle;
@@ -959,13 +999,18 @@ export class ShopSystem {
     }
     const to = sleepTarget(dc.hour);
     dc.advance(to.wait);
-    pl.heal(pl.maxHp);
+    const cap = pl.maxHp * REST_CAP;
+    if (pl.hp < cap) pl.hp = Math.min(cap, pl.hp + to.wait * REST_PER_HOUR);
     game.audio?.ui('open');
     // Nero pieno per mezzo secondo: uno stacco da porta (fade 1) non basta a dire
     // che sono passate otto ore.
     this.fade = 2.4;
     pl.enterCooldown = 0.5;
     game.hud.toast(`Hai dormito ${to.wait.toFixed(0)} ore · ${clockLabel(dc.hour)}`, 3);
+    // Svegliarsi ancora malmessi va detto, o sembra che il letto sia rotto.
+    if (pl.hp < pl.maxHp - 1) {
+      game.hud.toast('Il riposo arriva fin qui: il resto lo rimette a posto un 병원', 3.4);
+    }
     // L'ora è un'altra: il piano va riletto come se ci si fosse appena arrivati —
     // aperture, luci e gente di passaggio.
     this.showFloor(game, this.floor);
@@ -1297,6 +1342,49 @@ export class ShopSystem {
     }
   }
 
+  /**
+   * Chi scappa dalla porta finisce **in strada**, non nel nulla. Prima spariva
+   * sulla soglia e fuori non se ne accorgeva nessuno: una rapina restava una cosa
+   * privata fra te e una stanza, e il commesso in fuga non portava con sé niente
+   * (§6). Adesso esce davvero, in mezzo al marciapiede, e chi è là fuori se ne
+   * accorge — la divisa compresa, che è un pedone come gli altri (§3).
+   *
+   * È **lo stesso individuo**, spostato di lista: ricrearne uno nuovo romperebbe
+   * il riferimento di `alarmCaller`, e inseguire fuori chi sta telefonando è
+   * proprio la cosa che questa uscita rende possibile.
+   */
+  spillOutside(p, game) {
+    const shop = this.active && this.active.shop;
+    if (!shop || p.dead) return;
+    const list = game.pedSystem?.peds;
+    if (!list || list.includes(p)) return;
+    // Un passo oltre la soglia, non sullo zerbino: dentro il muro non ci si sta.
+    // Sfalsati di lato, o due che scappano insieme escono nello stesso pixel.
+    const off = ((p.id % 5) - 2) * 12;
+    p.x = shop.x + shop.nx * 30 - shop.ny * off;
+    p.y = shop.y + shop.ny * 30 + shop.nx * off;
+    p.gone = false;
+    p.indoor = false;
+    p.home = null;
+    p.role = null;
+    p.staff = false;
+    p.block = null;      // se lo trova da solo al primo passo (vedi `updatePed`)
+    p.state = 'flee';
+    p.panic = 6;
+    p.fleeFromX = shop.x;
+    p.fleeFromY = shop.y;
+    p.vx = shop.nx * 40;
+    p.vy = shop.ny * 40;
+    list.push(p);
+    // L'urlo va **dopo** lo spostamento: un suono generato prima di uno snap
+    // risulta a mezza Seoul di distanza e viene scartato (§3).
+    game.audio?.scream(p.x, p.y, p.voice);
+    // Chi è in strada lo vede e si spaventa. `source` nullo apposta: uno che
+    // scappa non è un aggressore, e passarci il giocatore renderebbe ostile ogni
+    // teppista dell'isolato per una cassa svuotata a due porte di distanza.
+    game.pedSystem.alarm(p.x, p.y, 300, game, null);
+  }
+
   /** Uno sparo (o una rapina) dentro: chi può scappa, chi è armato reagisce. */
   alarm(x, y, r, game, source) {
     const f = this.floor;
@@ -1346,8 +1434,10 @@ export class ShopSystem {
   /**
    * Il conto alla rovescia gira **anche fuori**: uscire dalla porta non ferma una
    * telefonata già partita, e il negozio alle spalle non è un rifugio. Si ferma in
-   * un modo solo, stendendo chi sta chiamando prima che esca — e se in sala c'è
-   * qualcun altro in piedi, tocca a lui.
+   * un modo solo, stendendo chi sta chiamando — e se in sala c'è qualcun altro in
+   * piedi, tocca a lui. Da quando chi scappa esce davvero in strada
+   * (`spillOutside`), quel «stendendo» vale anche sul marciapiede: si può
+   * inseguire il testimone fuori dalla porta, ed è la scena che mancava.
    */
   updateAlarm(dt, game) {
     if (this.alarmT <= 0) return;
@@ -1359,9 +1449,13 @@ export class ShopSystem {
       return;
     }
     const caller = this.alarmCaller;
-    if (caller && caller.dead && this.active) {
-      const other = this.floor.people.find((p) => !p.dead && !p.hostile && p !== caller);
+    if (caller && caller.dead) {
       caller.calling = false;
+      // Il rimpiazzo lo può dare solo una sala: se il testimone è stato raggiunto
+      // in strada, o il negozio è alle spalle, non c'è nessun altro al banco.
+      const other = this.active
+        ? this.floor.people.find((p) => !p.dead && !p.hostile && p !== caller)
+        : null;
       if (!other) {
         this.alarmT = 0;
         this.alarmCaller = null;

@@ -106,9 +106,11 @@ game.city.stats // { buildings, props, blocks, nodes, edges, doglegs, stairs }
 ```
 
 Valori attesi con la seed attuale: `buildings 418`, `props 1299`, `blocks 122`, `nodes 196`,
-`edges 279`, `doglegs 4`, `stairs 3`, `rural 5`, `piers 10`, `shops 113`, `venues 324`,
+`edges 279`, `doglegs 4`, `stairs 3`, `rural 5`, `piers 10`, `shops 114`, `venues 325`,
 `garages 7`, `turfs 6`, e 43 raccolte a terra (`game.pickups.items.length`) — erano 36 finché
 non si è aggiunta la campagna e non si è cominciato a scartare i punti murati (§5.12).
+`shops` e `venues` sono saliti di uno nel §5.21, quando `ensurePawnShops` ha aperto una vetrina
+al porto — il distretto che non ne aveva nessuna.
 I primi nove devono restare **identici** finché non si tocca l'ordine di consumo dell'rng in
 generazione: se cambiano, hai spostato una `rng.*` e la città non è più quella collaudata.
 `shops`/`venues`/`garages` e `turfs` nascono da rng **separati** (`placeShops`, `placeGarages`,
@@ -195,12 +197,62 @@ const dp = (o) => Math.round(Math.hypot(o.x - game.player.x, o.y - game.player.y
    motovedette: game.police.boats.length })
 ```
 
+Per i pedoni contro le lamiere ferme (§5.21):
+
+```js
+// nessuno deve essere piantato, e nessuno dentro un'auto
+({ piantati: game.peds.filter((p) => p.stuckT > 1).length,
+   dentroUnAuto: game.peds.filter((p) => !p.dead && game.vehicleGrid
+     .queryCircle(p.x, p.y, 60).some((v) => !v.driver && Math.hypot(p.x - v.x, p.y - v.y) < 14)).length })
+```
+
+`dentroUnAuto` **deve essere 0**: non è una taratura, è un invariante. Per la misura vera, su
+880 campioni in quattro zone, c'è `.claude/tools/scenes/walkers-census.scene` (§9).
+
+Per gli spazi acustici e le voci (§5.21):
+
+```js
+// in che spazio si sta suonando, e quanto ritorno c'è in mezzo alla scena
+game.audio.unlock();
+game.audio.stats     // { …, spazio, verso, riverbero }
+// dove si è, senza aspettare la lettura periodica (una ogni 0,3 s)
+game.audio.pickSpace(game)
+// forzarne uno: il cambio passa da una dissolvenza, non è immediato
+game.audio.wantSpace = 'alley';
+// le quattro voci, e chi ce l'ha
+(async () => { const A = await import('/src/core/audio.js'); return Object.keys(A.SPACES); })()
+game.peds.reduce((a, p) => (a[p.voice] = (a[p.voice] || 0) + 1, a), {})
+game.audio.scream(game.camera.cx, game.camera.cy, 'anziano');
+```
+
+`spazio: null` vuol dire che il contesto audio non è mai partito (`updateSpace` gira solo a
+contesto acceso): serve `unlock()`. `verso` diverso da `spazio` vuol dire che è in mezzo al
+cambio. Per le code misurate c'è `.claude/tools/scenes/reverb-census.scene` (§9).
+
+Per la partita nuova e il ritorno al titolo (§5.21):
+
+```js
+// da capo senza ricaricare la pagina; `toTitle` è `newGame` più il menu davanti
+game.newGame();   game.toTitle();
+// cosa deve tornare com'era
+({ soldi: game.player.money, armi: game.player.owned.size, hp: game.player.hp,
+   ora: +game.dayCycle.hour.toFixed(1), meteo: game.dayCycle.weather.id,
+   stelle: game.wanted.level, km: Math.round(game.stats.distance),
+   avviato: game.started, veicoli: game.vehicles.length, pedoni: game.peds.length })
+```
+
+Attesi dopo `newGame`: ₩60.000, 2 armi, 100 HP, le 8:24, `clear`, 0 stelle, 0 km, e la città
+ripopolata (~60 veicoli, ~40 pedoni). `avviato` resta vero con `newGame` e diventa falso con
+`toTitle`.
+
 Per il salvataggio (§5.15) e l'arresto (§5.16):
 
 ```js
 // cosa c'è nei tre slot, senza caricarli
 const S = await import('/src/core/save.js');
 [0, 1, 2].map((i) => { const d = S.readSlot(i); return d && S.describe(d, game); })
+// le tre generazioni dell'autosave: la 0 è la più recente (§5.21)
+[0, 1, 2].map((g) => { const d = S.readSlot(S.AUTO_SLOT, g); return d && S.describe(d, game); })
 // scrivi, ricarica, cancella (nel gioco: ESC → Salvataggi)
 S.writeSlot(0, game);   S.apply(game, S.readSlot(0));   S.clearSlot(0);
 // quanto pesa davvero, e cosa c'è dentro
@@ -214,9 +266,11 @@ game.player.setWeapon('fists'); game.wanted.add(30, game);
 game.police.cops[0] && Object.assign(game.police.cops[0], { x: game.player.x + 30, y: game.player.y });
 ```
 
-`arresting` falso con una pattuglia addosso ha tre spiegazioni e sono tutte volute: hai una
-bocca da fuoco in pugno, sei sopra le tre stelle, o l'agente è della SWAT. **Il cronometro sta
-sul sistema e non sull'agente**: la condizione è del giocatore, non di chi gli è addosso.
+`arresting` falso con una pattuglia addosso ha **quattro** spiegazioni e sono tutte volute: hai
+una bocca da fuoco in pugno, sei sopra le tre stelle, l'agente è della SWAT, oppure stai
+menando (`player.swingT > 0`, §5.21 — la mazza *in mano* si lascia ammanettare, la mazza *in
+movimento* no). **Il cronometro sta sul sistema e non sull'agente**: la condizione è del
+giocatore, non di chi gli è addosso.
 
 Per il menu iniziale (§5.18) e l'autosave (§5.20):
 
@@ -265,7 +319,7 @@ dc.light   // { amb:[r,g,b], k, warm:[r,g,b], w, sx, sy, shadow, lamps }
 // comandi: spostare l'ora, forzare il tempo, fermare l'orologio
 dc.hour = 21.5;  dc.setWeather('storm');  dc.paused = true;
 // negozi: chi è aperto adesso
-game.city.shops.filter((s) => game.shops.shopOpen(s, game)).length   // su 113
+game.city.shops.filter((s) => game.shops.shopOpen(s, game)).length   // su 114
 game.shops.isOpen('guns', game)          // un tipo di attività
 game.shops.nextOpening(s, game)          // { biz, at, wait } del piano che riapre prima
 ```

@@ -187,16 +187,23 @@ export class PoliceSystem {
    * sta qui e non sull'agente perché la condizione è del giocatore — che si
    * arrenda o no non dipende da *quale* pattuglia gli è addosso.
    *
-   * Si spezza in quattro modi, e sono tutti azioni: allontanarsi, salire in
-   * macchina, tirare fuori una bocca da fuoco, stendere l'agente. È quello che
-   * rende il fermo una scelta e non un incidente.
+   * Si spezza in cinque modi, e sono tutti azioni: allontanarsi, salire in
+   * macchina, tirare fuori una bocca da fuoco, stendere l'agente, **o menare**.
+   * È quello che rende il fermo una scelta e non un incidente.
+   *
+   * L'ultimo è arrivato dopo (§5.21): `WEAPONS[].melee` non distingue fra *avere*
+   * una mazza e *usarla*, e la divisa provava ad ammanettare anche chi gliela
+   * stava tirando in testa. La differenza sta in `player.swingT` — un cronometro
+   * che dura poco più di una mazzata: chi continua a colpire resta uno a cui
+   * sparare, chi si ferma torna uno da portare in centrale in un secondo. I pugni
+   * non contano, perché chi tira cazzotti è comunque disarmato.
    */
   updateArrest(dt, game) {
     const pl = game.player;
     const w = game.wanted;
     this._bustCd = Math.max(0, this._bustCd - dt);
     this.arresting = w.level > 0 && w.level <= ARREST_LEVEL && pl.onFoot && !pl.dying
-      && !game.indoors && (WEAPONS[pl.weapon].melee || pl.hp <= BUST_HP);
+      && !game.indoors && pl.swingT <= 0 && (WEAPONS[pl.weapon].melee || pl.hp <= BUST_HP);
     if (!this.arresting) {
       this.bustT = 0;
       return;

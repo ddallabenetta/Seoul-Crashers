@@ -1,12 +1,27 @@
 // Pedoni: camminano sull'anello di marciapiede degli isolati, attraversano sulle
 // strisce, entrano in panico se un'auto li sfiora e vengono investiti se non fanno in tempo.
-import { PED_KINDS } from '../render/sprites.js';
+import { PED_KINDS, VEHICLE_TYPES } from '../render/sprites.js';
 import { SIDEWALK } from '../world/citygen.js';
 import { DISTRICT_BY_ID } from '../world/districts.js';
 import { angleDiff, approachAngle, clamp, dist, damp, circleRectPush } from '../core/math.js';
+import { airborne } from './vehicle.js';
 import { WEAPONS, shoot, meleeSwing, hasLineOfSight } from './weapons.js';
 
 const BASE_MAX = 62;
+// Raggio del pedone quando urta una lamiera. Un filo più stretto di quello del
+// giocatore (7): un passante che sfiora uno specchietto non deve rimbalzare.
+const PED_R = 6;
+// Quanto avanti si guarda per scartare attorno a un'auto ferma. Più in là si
+// comincia a scansare lamiere che non sono sulla strada e il marciapiede
+// diventa uno slalom.
+const CAR_LOOK = 66;
+// Quanto si passa larghi dalla carrozzeria.
+const CAR_CLEAR = 6;
+// Chi vuole camminare e per questo tempo non si muove davvero cambia idea. È la
+// valvola che impedisce a un incastro di durare per sempre — e siccome il
+// traffico frena per i pedoni (`senseAhead`), un pedone piantato in carreggiata
+// non è solo brutto: è una corsia chiusa.
+const STUCK_TIME = 2.2;
 // Distanza a cui un teppista armato apre il fuoco, e quella a cui uno disarmato
 // smette di correre e comincia a menare.
 const GUN_RANGE = 330;
@@ -29,6 +44,22 @@ const RAIN_HURRY = 0.12;
 
 /** Tinte degli ombrelli. La trasparente è quella coreana per eccellenza. */
 export const UMBRELLAS = ['#1c2029', '#2f4f7a', '#8c2f3c', '#3f6b4a', '#d9dde4', '#b8b0d8'];
+
+// Chi ha che voce (i timbri stanno in `audio.VOICES`). Non è un dato del
+// personaggio e non si vede da nessuna parte: l'unica cosa che il giocatore ne
+// sente è un grido ogni tanto, e basta una probabilità per tipo. Le ripetizioni
+// sono il peso — in un ufficio ci sono più uomini che donne, in un cantiere quasi
+// solo uomini, e i vecchi stanno dove sta la gente qualunque.
+const VOICE_MIX = {
+  civil:    ['uomo', 'donna', 'anziano', 'giovane', 'donna'],
+  office:   ['uomo', 'uomo', 'donna'],
+  student:  ['giovane', 'giovane', 'donna'],
+  tourist:  ['donna', 'uomo', 'anziano'],
+  worker:   ['uomo', 'uomo', 'anziano'],
+  gangster: ['uomo'],
+  cop:      ['uomo', 'uomo', 'donna'],
+  swat:     ['uomo'],
+};
 
 /** Anello di streaming: i pedoni nascono appena oltre il bordo dello schermo. */
 function ringFor(game) {
@@ -59,6 +90,7 @@ export function createPed(kind, x, y, rng) {
     vx: 0, vy: 0,
     animT: rng.range(0, 8),
     colorIndex: rng.int(0, k.coats.length - 1),
+    voice: rng.pick(VOICE_MIX[kind] || VOICE_MIX.civil),
     baseSpeed: k.speed * rng.range(0.85, 1.15),
     state: 'walk',
     block: null,
@@ -81,6 +113,7 @@ export function createPed(kind, x, y, rng) {
     gone: false,      // despawnato dallo streaming (vedi `stream`)
     fireT: 0,
     bleedT: 0,
+    stuckT: 0,        // da quanto vuole muoversi senza riuscirci (vedi `unstick`)
     crossX: 0,
     crossY: 0,
     // Chi si porta dietro l'ombrello. Si decide alla nascita e non quando
@@ -165,7 +198,9 @@ export class PedestrianSystem {
     this.peds = peds;
     this.tmp = {};
     this.spawnTimer = 0;
-    this._sq = [];   // scratch per la ricerca dei portoni
+    this._sq = [];     // scratch per la ricerca dei portoni
+    this._cars = [];   // scratch: le lamiere ferme attorno al pedone in esame
+    this._goal = { x: 0, y: 0 };
   }
 
   /**
@@ -330,10 +365,19 @@ export class PedestrianSystem {
       if (Math.random() < 0.25) game.fx.addBlood(p.x, p.y, 0.25);
     }
 
-    // Pericolo: veicoli veloci nei paraggi
+    // Pericolo: veicoli veloci nei paraggi. La stessa query serve anche alle
+    // lamiere ferme, che sono l'opposto — un muro invece di una minaccia — e
+    // rifarla per loro sarebbe la seconda query per pedone per frame.
+    const cars = this._cars;
+    cars.length = 0;
     const threats = game.vehicleGrid.queryCircle(p.x, p.y, 130);
     for (const v of threats) {
       const sp = Math.hypot(v.vx, v.vy);
+      // Solida solo la lamiera senza nessuno al volante: è quella in sosta, quella
+      // abbandonata e quella che il giocatore ha appena lasciato lì. Rendere solide
+      // anche le auto guidate chiuderebbe una corsia — il traffico frena per i
+      // pedoni, e un pedone incastrato davanti a un muso non se ne va più.
+      if (!v.driver && !airborne(v) && sp < 12) cars.push(v);
       if (sp < 70) continue;
       const dx = p.x - v.x;
       const dy = p.y - v.y;
@@ -570,6 +614,15 @@ export class PedestrianSystem {
       targetSpeed *= 1 + rain * RAIN_HURRY;
     }
 
+    // Le auto in sosta si aggirano, non si prendono in pieno: la meta viene
+    // spostata di lato quanto basta a passare e il resto lo fa lo steering. Chi
+    // sta sotto una tettoia o davanti al suo banco è arrivato e non deve
+    // scansare niente.
+    if (cars.length && targetSpeed > 1) {
+      const goal = this.deflectAroundCars(p, tx, ty, cars);
+      if (goal) { tx = goal.x; ty = goal.y; }
+    }
+
     // Steering verso il punto obiettivo
     const dx = tx - p.x;
     const dy = ty - p.y;
@@ -614,6 +667,130 @@ export class PedestrianSystem {
         p.x += push.nx * push.depth;
         p.y += push.ny * push.depth;
       }
+    }
+    // Le lamiere per ultime, al contrario del giocatore (§5.17): lì un'auto che
+    // ti stringe contro una vetrina deve poterti spingere *fuori* dalla vetrina,
+    // qui l'auto è ferma per definizione e l'unico modo di finire dentro un muro
+    // è essere spinti dalla lamiera.
+    if (cars.length) this.pushOutOfCars(p, cars);
+
+    // Valvola anti-incastro: chi vuole muoversi e non ci riesce cambia idea. Nasce
+    // per le auto in sosta — aggirare non riesce sempre, per esempio in mezzo a
+    // due parcheggiate — ma vale per qualunque stallo.
+    if (targetSpeed > 10 && Math.hypot(p.vx, p.vy) < targetSpeed * 0.28) {
+      p.stuckT += dt;
+      if (p.stuckT > STUCK_TIME) this.unstick(p, game);
+    } else if (p.stuckT > 0) {
+      p.stuckT = 0;
+    }
+  }
+
+  /**
+   * Sposta la meta di lato per passare accanto a una lamiera ferma. Si guarda solo
+   * la prima che si incontra lungo la direzione di marcia: scansarle tutte insieme
+   * dà una risultante che punta dentro il mucchio, ed è il classico steering che
+   * sembra ragionato e va a sbattere.
+   */
+  deflectAroundCars(p, tx, ty, cars) {
+    const gx = tx - p.x;
+    const gy = ty - p.y;
+    const gd = Math.hypot(gx, gy);
+    if (gd < 1) return null;
+    const ux = gx / gd, uy = gy / gd;
+    const look = Math.min(gd, CAR_LOOK);
+    let bestF = Infinity, bestLat = 0, bestNeed = 0;
+    for (const v of cars) {
+      const spec = VEHICLE_TYPES[v.kind];
+      if (!spec) continue;
+      const r = spec.wid * 0.46;
+      const half = spec.len * 0.5 - r * 0.75;
+      const cos = Math.cos(v.angle), sin = Math.sin(v.angle);
+      // Gli stessi tre cerchi della fisica: l'ingombro rettangolare farebbe
+      // scartare per gli angoli di una berlina messa in diagonale.
+      for (let k = -1; k <= 1; k++) {
+        const rx = v.x + cos * half * k - p.x;
+        const ry = v.y + sin * half * k - p.y;
+        const f = rx * ux + ry * uy;
+        if (f < -r || f > look) continue;
+        const lat = -rx * uy + ry * ux;
+        const need = r + PED_R + CAR_CLEAR;
+        if (Math.abs(lat) > need) continue;
+        if (f < bestF) { bestF = f; bestLat = lat; bestNeed = need; }
+      }
+    }
+    if (bestF === Infinity) return null;
+    // Si passa dal lato da cui si è già più vicini a essere fuori.
+    const lat = bestLat + (bestLat > 0 ? -bestNeed : bestNeed);
+    const fwd = Math.max(bestF, 14);
+    const goal = this._goal;
+    goal.x = p.x + ux * fwd - uy * lat;
+    goal.y = p.y + uy * fwd + ux * lat;
+    return goal;
+  }
+
+  /** La carrozzeria ferma è solida: stessa risoluzione del giocatore (§5.17). */
+  pushOutOfCars(p, cars) {
+    for (const v of cars) {
+      const spec = VEHICLE_TYPES[v.kind];
+      if (!spec) continue;
+      const r = spec.wid * 0.46;
+      const half = spec.len * 0.5 - r * 0.75;
+      const cos = Math.cos(v.angle), sin = Math.sin(v.angle);
+      const minD = r + PED_R;
+      // Solo il cerchio più compenetrato: sommare i tre spara via il pedone.
+      let bx = 0, by = 0, best = 0;
+      for (let k = -1; k <= 1; k++) {
+        const dx = p.x - (v.x + cos * half * k);
+        const dy = p.y - (v.y + sin * half * k);
+        const d2 = dx * dx + dy * dy;
+        if (d2 > minD * minD) continue;
+        const d = Math.sqrt(d2);
+        const overlap = minD - d;
+        if (overlap <= best) continue;
+        best = overlap;
+        // Piedi sull'asse esatto del veicolo: la normale sarebbe lunga zero. Da
+        // sotto un'auto si esce di fianco, che è il lato corto.
+        bx = d > 0.01 ? dx / d : -sin;
+        by = d > 0.01 ? dy / d : cos;
+      }
+      if (best > 0) {
+        p.x += bx * best;
+        p.y += by * best;
+      }
+    }
+  }
+
+  /**
+   * Piantato. Non si teletrasporta nessuno: si cambia obiettivo, che è quello che
+   * farebbe uno che trova la strada sbarrata.
+   */
+  unstick(p, game) {
+    p.stuckT = 0;
+    switch (p.state) {
+      case 'crossing': {
+        // Torna sul marciapiede da cui è sceso invece di insistere: la carreggiata
+        // è il posto peggiore in cui aspettare.
+        p.state = 'walk';
+        p.dirSign *= -1;
+        break;
+      }
+      case 'shelter':
+        p.state = 'walk';
+        p.shelterCd = 6 + this.rng.range(0, 6);
+        break;
+      case 'guard':
+        p.postX = 0;    // si sceglie un altro posto dove ciondolare
+        p.idleT = 0;
+        break;
+      case 'flee':
+        // Con le spalle al muro non si scappa: ci si ferma e si ricomincia.
+        p.panic = 0;
+        p.state = 'walk';
+        break;
+      default:
+        p.dirSign *= -1;
+        p.t = clamp(p.t + p.dirSign * 0.05, 0, 1);
+        break;
     }
   }
 
@@ -661,7 +838,7 @@ export class PedestrianSystem {
       return;
     }
     p.bleedT = 0.4;
-    game.audio?.hurt(p.x, p.y, false);
+    game.audio?.hurt(p.x, p.y, false, p.voice);
     if (p.cop) {
       // Un agente ferito non scappa e non cambia stato: resta in servizio, e la
       // centrale se lo segna.
@@ -716,7 +893,7 @@ export class PedestrianSystem {
       p.state = 'flee';
       if (!voiced) {
         voiced = true;
-        game.audio?.scream(p.x, p.y);
+        game.audio?.scream(p.x, p.y, p.voice);
       }
     }
   }
