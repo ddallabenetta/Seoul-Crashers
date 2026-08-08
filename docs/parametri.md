@@ -188,5 +188,16 @@
 | Uscita di chi scappa da un negozio | `shops.spillOutside` | 30 px oltre la soglia, sfalsati di ±24 px · panico entro 300 px |
 | Quanto cura il riposo | `shops.REST_CAP` / `REST_PER_HOUR` | fino al 70% della salute · 9 punti per ora dormita |
 | Banchi dei pegni garantiti | `citygen.ensurePawnShops` | uno per distretto **che abbia edifici da vetrina** (6 su 7; manca soltanto Gimpo) |
+| **— mappa unica della Corea (§5.25) —** | | |
+| Dimensione del mondo | `korea.KOREA` | 16.800 × 24.000 px (le tre città conservano la loro taglia) |
+| Origini delle tre città | `korea.AREAS` | Seoul `(0, 0)` · Busan `(9600, 10400)` · Jeju `(3200, 17800)` |
+| Autostrada Gyeongbu: quota e carreggiata | `korea.EXPRESSWAY_Y` / `EXPRESSWAY_W` | `y = 9200` · 144 px (arteria, due corsie per senso) |
+| Finestra d'innesto dell'autostrada | `korea.addExpressway` | Seoul `x` 3400-6200 · Busan `x` 1500-4600 (locali); un landmark sullo stub sposta l'innesto |
+| Aree di servizio | `korea.addRestStops` | due, al 30% e al 68% del rettilineo · 600×220 px a 150 px dal bordo strada |
+| Raccordo del rilievo ai bordi città | `korea.createKorea` | 560 px di miscelazione fra campo di campagna e campo regionale |
+| Sfumatura della campagna dipinta | `ground.drawCountryside` | celle da 128 px · 320 px di diradamento vicino a una città |
+| Carta del mondo | `maptexture.MAP_W` / `MAP_H` | 1200 × 1714 px (conserva il rapporto della penisola) |
+| Indice delle carreggiate | `korea.roadIndex` | `SpatialGrid` a 420 px; `roadclearance` lo usa se c'è |
+| Griglie dinamiche | `main` · `DynamicGrid` | veicoli 150 px, pedoni 120 px — si svuotano per cella toccata, non riallocando |
 
 ---

@@ -166,3 +166,43 @@ già toccando. Metà degli urti erano tamponamenti, e il 78% dei veicoli coinvol
    caso. Su cinque zone il rumore si media.
 
 ---
+
+## 4ter. Trappole della mappa unica (§5.25)
+
+**Traslare `piers`, `river` o `coastAt` di una regione la rende cieca.** `isWater` di Seoul,
+Busan e Jeju rilegge quei campi *dal `city`* a ogni chiamata: se li si sposta nello spazio di
+mondo, la funzione — che riceve coordinate locali — li confronta con numeri che stanno seimila
+pixel più in là e comincia a dire che il porto è asciutto e che la strada è mare. Vanno lasciati
+locali, e al mondo si danno delle copie. Lo stesso vale per `w`/`h`: `districtAt` di Jeju li usa
+per normalizzare.
+
+**Un alias spostato due volte finisce altrove.** Il cortile di un isolato è anche uno dei suoi
+`yards`, il territorio di una banda è il cortile su cui è dipinto, la porta di un'officina è il
+`doorPoint` che ha generato il negozio. Una traslazione che percorra tutte le liste senza
+ricordarsi cosa ha già visto raddoppia l'offset su quegli oggetti. Il `WeakSet` in
+`korea.shiftCity` è lì per questo.
+
+**`l.on[j]` non significa più niente dopo la fusione.** L'indice `j` individua la *j*-esima
+perpendicolare della **stessa** maglia: con le linee di tre città in un array solo punta a una
+strada di un'altra provincia. Chiunque abbia bisogno dei tratti fra due incroci deve usare
+`l.marks`, precalcolato mentre gli indici erano ancora buoni.
+
+**Gli id dei distretti si ripetono in tutte e tre le città.** `gangnam` a Seoul e `gangnam` a
+Busan (Haeundae) sono lo stesso id — è quello che tiene in piedi mercati, mix di popolazione e
+salvataggi. Cercare un distretto per chiave dà quindi a un isolato di Haeundae i colori di
+Gangnam: dove serve l'oggetto giusto si usa `b.districtRef`, che `korea.js` aggancia sapendo in
+quale città sta l'isolato, oppure `city.districtAt(x, y)`.
+
+**Una griglia dinamica che si rialloca ogni frame smette di essere gratis.** `DynamicGrid.clear`
+costruiva un array nuovo di `cols × rows`: su Seoul erano 2.400 celle, sul mondo unificato sono
+28.000, due volte per frame. Il frame rate è caduto del 60% senza che nessun sistema di gioco
+fosse cambiato. Adesso si svuotano solo le celle toccate l'ultima volta.
+
+**Uno slot salvato prima della mappa unica ha coordinate di un'altra mappa.** `3000/2000`
+significava «Busan, Seomyeon» e nel mondo nuovo è un cortile di Seoul. Il campo `world`
+distingue i due formati: senza, il caricamento riesce e il giocatore ricompare nel posto
+sbagliato, che è il modo peggiore di rompersi.
+
+**Il rettangolo di una città non è più un muro.** I collider di confine stanno ai limiti del
+mondo, non a quelli di ogni città: si esce da Seoul guidando. Chi assume che il giocatore sia
+sempre dentro una regione (`areaAt` può restituire `null`) va corretto, non aggirato.

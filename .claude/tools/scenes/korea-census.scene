@@ -1,0 +1,58 @@
+// Censimento della mappa unica (§5.25): dove si arriva guidando e dove no.
+// Una visita in ampiezza sul grafo, partendo da un nodo di Seoul, dice quanti
+// nodi di ogni città sono raggiungibili su gomma. L'invariante da difendere è
+// che Seoul e Busan siano interamente raggiungibili e che **Jeju sia zero**:
+// è un'isola per geografia, e un arco di troppo la trasformerebbe in una
+// penisola senza che nessuno se ne accorga guardando lo schermo.
+//
+//   node .claude/tools/probe.mjs --seconds 0 --quiet \
+//     --script .claude/tools/scenes/korea-census.scene
+const city = game.city;
+const graph = city.graph;
+const areaOf = (n) => city.areaAt(n.x, n.y)?.id || 'campagna';
+
+const start = graph.usableNodes.find((n) => areaOf(n) === 'seoul');
+const seen = new Set([start]);
+const queue = [start];
+while (queue.length) {
+  const node = queue.shift();
+  for (const out of node.out) {
+    const next = graph.nodeById(out.dir > 0 ? out.edge.b : out.edge.a);
+    if (next && !seen.has(next)) { seen.add(next); queue.push(next); }
+  }
+}
+
+const roads = {};
+for (const n of graph.usableNodes) {
+  const key = areaOf(n);
+  roads[key] = roads[key] || { nodi: 0, raggiungibili: 0 };
+  roads[key].nodi++;
+  if (seen.has(n)) roads[key].raggiungibili++;
+}
+
+// La maschera dell'acqua nei punti che devono restare asciutti o bagnati: una
+// costa che sconfina si vede subito qui, molto prima che a schermo.
+const busan = city.areas.find((a) => a.id === 'busan');
+const jeju = city.areas.find((a) => a.id === 'jeju');
+const acqua = {
+  corridoio: city.isWater(6000, 8200),
+  autostrada: city.isWater(city.expressway.exit.x, city.expressway.y),
+  mareDelSud: city.isWater(6000, 15400),
+  canaleJeju: city.isWater(busan.x0 - 900, jeju.y0 - 900),
+  centroJeju: city.isWater((jeju.x0 + jeju.x1) / 2, (jeju.y0 + jeju.y1) / 2),
+  aEstDiBusan: city.isWater(city.w - 200, (busan.y0 + busan.y1) / 2),
+};
+
+return {
+  mondo: `${city.w} × ${city.h}`,
+  aree: city.areas.map((a) => `${a.id} ${a.x0},${a.y0} → ${a.x1},${a.y1}`),
+  autostrada: {
+    quota: city.expressway.y,
+    innestoSeoul: [Math.round(city.expressway.exit.x), Math.round(city.expressway.exit.y)],
+    innestoBusan: [Math.round(city.expressway.entry.x), Math.round(city.expressway.entry.y)],
+  },
+  strade: roads,
+  acqua,
+  fermate: city.transitStations.length,
+  stats: city.stats,
+};

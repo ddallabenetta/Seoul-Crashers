@@ -25,7 +25,9 @@ src/world/
   citygen.js          quota del terreno, campo di urbanità, maglia stradale, mare e costa,
                       isolati (urbani, rurali, aeroporto, porto), edifici, props, indici,
                       vetrine (`placeShops`), officine (`placeGarages`), bande (`placeTurfs`)
-  regions.js          registro delle città, ingressi metro e reindicizzazione comune
+  korea.js            la mappa unica: trasla e fonde le tre regioni, coste e campagna
+                      del corridoio, autostrada Gyeongbu, aree di servizio
+  regions.js          chiusura comune: carreggiata, ingressi metro, indici, limiti
   seoul_expansion.js  landmark reali, cintura metropolitana e 16 stazioni della capitale
   busan.js            generatore autonomo: baia, Nakdong, ponti e tessuto urbano di Busan
   jeju.js             generatore autonomo: profilo insulare, Hallasan, campagne e due città
@@ -140,25 +142,51 @@ campi. È l'unico posto in cui è deciso *dove finisce Seoul* — a valle nessun
 forme, si legge solo questo campo. Alzare l'ampiezza del rumore fa nascere risaie in mezzo a
 Gangnam: il bordo va sfrangiato, non bucato.
 
-**Una regione è sempre una `city`.** Seoul, Busan e Jeju espongono lo stesso contratto
-(`graph`, griglie, blocchi, negozi, acqua, distretti e spawn): al viaggio `Game.travelTo`
-ricostruisce insieme tutti i sistemi che trattengono un riferimento alla città. I contenuti
-regionali vengono chiusi da `regions.js`, che valida l'intero ingombro delle strade, colloca e
-indicizza gli ingressi metro solidi e rifà una sola volta gli indici spaziali; aggiungere un
-landmark fisico senza quel passaggio lo renderebbe visibile ma non solido. `roadclearance.js`
-è l'autorità condivisa per la larghezza delle carreggiate: il solo asse del grafo non basta a
-decidere se un volume invade una corsia. Il contratto non implica una topologia comune: solo
-Seoul passa da
-`generateCity`; Busan e Jeju costruiscono linee, blocchi, acqua, rilievo e grafo nei propri
-generatori. La geometria e la texture della carta sono mantenute in cache per regione, mentre
-traffico e pedoni restano streaming e ripartono all'arrivo.
+**C'è una `city` sola, e dentro ci sono tre città.** Dal §5.25 Seoul, Busan e Jeju stanno nello
+stesso spazio di coordinate (16.800×24.000). I tre generatori non sono cambiati e continuano a
+produrre mondi locali: `korea.js` li **trasla** nello spazio comune e ne fonde i dati. La regola
+da conoscere prima di toccarlo è quale metà si sposta e quale no. Si traslano i dati che il
+gioco disegna e interroga — edifici, isolati, props, maglia, grafo, negozi, fermate. **Non** si
+traslano `piers`, `river`, `coastAt`, `waterX`/`quayX`, `w`/`h`: sono i campi che le closure
+geografiche della regione (`isWater`, `elevationAt`) rileggono *dal `city` a ogni chiamata*, e
+spostarli le romperebbe senza un errore. Le funzioni composte convertono mondo → locale e
+delegano; al mondo servono invece delle **copie** già traslate di quei pochi campi. Il grafo di
+oggetti è pieno di alias — il cortile di un isolato è anche uno dei suoi `yards` — quindi la
+traslazione passa da un `WeakSet`: spostare due volte lo stesso rettangolo lo manderebbe altrove.
 
-**L'acqua regionale è un campo autorevole.** Il renderer storico di Seoul conosce Han e mare
-occidentale; Busan e Jeju devono invece essere disegnate campionando `city.isWater(x, y)`, sia
-nei tile di `GroundRenderer` sia nella texture della carta. `maptexture.js` usa scale `kx` e
-`ky` separate: Busan non è quadrata e una scala unica deformerebbe costa, edifici e strade.
-La stessa maschera genera battigia e schiuma; ai quattro limiti giocabili `regions.js` inserisce
-collider larghi 64 px e `GroundRenderer` continua il paesaggio con mare o vegetazione.
+**`city.areaAt(x, y)`** dice in quale delle tre città cade un punto, oppure `null` per campagna
+e mare, ed è il ramo su cui si appoggiano `isWater`, `elevationAt`, `urbanAt` e `districtAt`.
+Fuori dai rettangoli rispondono la maschera delle coste e il rilievo di campagna scritti in
+`korea.js`. Le curve sono scelte perché **combacino con il bordo delle città**: la costa
+occidentale riprende la battigia di Seoul dove la sua mappa finisce, la baia di Jinhae prolunga
+l'acqua che Busan ha già sul proprio bordo, il Han si assottiglia invece di interrompersi su un
+lato. Vale la regola della sagoma di Seoul: a valle nessuno sa niente di forme, si legge solo
+il campo.
+
+**L'autostrada è un arco, non una scorciatoia.** La Gyeongbu collega Seoul e Busan con nodi e
+archi normali del grafo, quindi ci passano traffico civile, volanti e inseguimenti. È fatta di
+tre rettilinei ortogonali perché tutta la geometria del gioco lo è: una diagonale non avrebbe né
+carreggiata (`vLines`/`hLines` sono assi) né corsie. **Jeju non ha nessun arco che la
+raggiunga**: è un'isola per geografia, non per divieto, e ci si arriva via mare o in volo.
+
+**`regions.js` resta la chiusura comune**: valida l'intero ingombro delle strade, colloca e
+indicizza gli ingressi metro solidi, rifà una sola volta gli indici spaziali e mette i collider
+ai limiti del **mondo** (non più a quelli di ogni città, che adesso si attraversano guidando).
+Aggiungere un landmark fisico senza quel passaggio lo renderebbe visibile ma non solido.
+`roadclearance.js` è l'autorità condivisa per la larghezza delle carreggiate: il solo asse del
+grafo non basta a decidere se un volume invade una corsia, e su tre maglie sovrapposte passa da
+`city.roadIndex` invece di scandire tutte le linee.
+
+**L'acqua è un campo solo.** `GroundRenderer` e `maptexture.js` campionano `city.isWater(x, y)`
+per tutto il mondo — Han, mare occidentale, baia di Busan, Mar dell'Est, canale di Jeju. Il
+disegno editoriale del Han e della costa di Seoul (lungofiume, piana di marea, banchina) non è
+sparito: passa **sopra**, ritagliato su `city.seoulArea`, perché fuori da quel rettangolo quelle
+coordinate non vogliono dire niente. `maptexture.js` usa `MAP_W`/`MAP_H` separate e scale `kx`,
+`ky` distinte: la penisola non è quadrata e una scala unica la schiaccerebbe.
+
+**La segnaletica viaggia con la linea.** I tratti da segnare stanno in `l.marks`, calcolati alla
+fusione. Ricavarli da `l.on[j]` significava indicizzare la perpendicolare, e con tre maglie
+nello stesso array quell'indice non individua più niente.
 
 **Un interno è una pianta, non necessariamente un negozio.** `Game.interiorFloor` restituisce
 la pianta attiva a camera, collisioni e minimappa. I negozi continuano a usare `InteriorScene`;
