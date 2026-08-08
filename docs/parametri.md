@@ -217,3 +217,8 @@
 | Arresto di un NPC | `life.orderLawman` | sotto il 45% della salute, a meno di 30 px, per 1,4 s |
 
 ---
+| **— impianto della campagna (§5.27) —** | | |
+| Abbassamento dell'audio per modalità | `modes.MODES` | menu 0,22 · gioco 1 — e la radio ha il suo (`radioDuck`: menu 0,4), perché è la musica che ha scelto il giocatore |
+| Versione del formato di salvataggio | `save.VERSION` | 2. Si alza quando cambia la **forma** dei dati, e ogni scalino vuole una riga in `MIGRATIONS` |
+| Tetto delle migrazioni in fila | `save.migrate` | 32 scalini: è una rete contro una catena scritta male, non un limite di progetto |
+| Raggio di comparsa di un attore | `actors.SPAWN_R` | 1400 px. L'anello di despawn dello streaming è più largo (`ring.despawn × 1,8`), e la differenza è l'isteresi che gli impedisce di lampeggiare |

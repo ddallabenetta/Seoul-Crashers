@@ -1,0 +1,134 @@
+// Impianto della campagna (§5.27): le cinque cose provate sul gioco vero.
+//
+// Non misura niente — **asserisce**. Ogni voce `false` è un difetto, e le voci sono
+// scelte perché ognuna corrisponde a un modo in cui l'impianto può marcire in
+// silenzio: un salvataggio che si rifiuta invece di migrare, un attore che
+// resuscita, una porta sigillata che riapre da sola.
+//
+//   node .claude/tools/probe.mjs --seconds 1 --quiet \
+//     --script .claude/tools/scenes/impianto-campagna.scene \
+//     --eval "Object.entries(window.__OUT).filter(([k,v]) => v===false).map(([k])=>k)"
+//
+// La riga sopra stampa **solo quello che è rotto**: `[]` vuol dire tutto a posto.
+// Per vedere anche i valori, `--eval "window.__OUT"`.
+//
+// Due asserzioni non si interpretano, sono invarianti:
+//   · `attoreNonRisorge` — un attore morto non deve tornare dietro il suo banco
+//   · `slotDalFuturoRifiutato` — indovinare un formato che non si conosce è peggio
+//     che dire «non lo so leggere»
+const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
+const S = await import('/src/core/save.js');
+const out = {};
+const pl = game.player;
+
+// ---- 1. SALVATAGGIO: round-trip -------------------------------------------
+pl.money = 12345;
+pl.hp = 71;
+pl.owned = new Set(['fists', 'pistol', 'smg']);
+game.dayCycle.hour = 21.5;
+game.wanted.heat = 40;
+game.wanted.level = 2;
+game.shops.robbed = 7;
+game.shops.seal('__prova__', 'Serranda con il sigillo di perizia');
+
+const snap = S.snapshot(game);
+out.formato = snap.v;
+out.pesoByte = JSON.stringify(snap).length;
+out.chiavi = Object.keys(snap).sort().join(',');
+out.negoziSiSerializzanoDaSe = 'sealed' in snap.shops && 'interiors' in snap.shops;
+
+// Si sporca tutto, poi si ricarica.
+game.newGame();
+out.dopoNuovaPartita = { soldi: pl.money, sigilli: game.shops.sealed.size };
+S.apply(game, JSON.parse(JSON.stringify(snap)));
+await wait(0.2);
+out.dopoRicarica = {
+  soldi: pl.money,
+  hp: pl.hp,
+  armi: [...pl.owned].sort().join(','),
+  ora: Number(game.dayCycle.hour.toFixed(2)),
+  stelle: game.wanted.level,
+  casseSvuotate: game.shops.robbed,
+  sigillo: game.shops.isSealed('__prova__'),
+};
+
+// ---- 2. MIGRAZIONE da un salvataggio v1 -------------------------------------
+// Uno slot scritto **prima** di questa revisione: `interiors` fuori, niente
+// `sealed`, niente `actors`. Prima veniva rifiutato e la partita andava persa.
+const v1 = JSON.parse(JSON.stringify(snap));
+v1.v = 1;
+v1.interiors = { 42: { robbed: [0], dead: [] } };
+v1.shops = { robbed: 3, spent: 900, sold: 100 };
+delete v1.actors;
+localStorage.setItem('seoul.save.0', JSON.stringify(v1));
+const letto = S.readSlot(0);
+out.v1Migrato = letto ? {
+  versione: letto.v,
+  casse: letto.shops.robbed,
+  internoConservato: !!letto.shops.interiors['42'],
+  sealedCreato: !!letto.shops.sealed,
+  actorsCreato: !!letto.actors,
+} : 'RIFIUTATO';
+
+// E uno slot dal futuro non si tocca.
+const v99 = JSON.parse(JSON.stringify(snap));
+v99.v = 99;
+localStorage.setItem('seoul.save.1', JSON.stringify(v99));
+out.slotDalFuturoRifiutato = S.readSlot(1) === null;
+localStorage.removeItem('seoul.save.0');
+localStorage.removeItem('seoul.save.1');
+
+// ---- 3. ATTORI PERSISTENTI ---------------------------------------------------
+game.newGame();
+await wait(0.1);
+game.actors.define('prova', {
+  x: pl.x + 120, y: pl.y + 60, kind: 'gangster', name: 'Prova', angle: 1,
+});
+await wait(2);          // due secondi: il tempo in cui un idle sarebbe scappato
+const a1 = game.actors.get('prova');
+out.attoreComparso = !!a1 && game.peds.includes(a1);
+
+// Sopravvive a clearWorld e **torna al posto suo** — non dove aveva camminato:
+// la posizione sta nella definizione, ed è tutto il punto del sistema.
+const casa = game.actors.defs.get('prova');
+// Il vero invariante: **non se ne va**. Prima di `post` questo era falso — un
+// attore nasceva `idle`, la sosta scadeva, e dopo un secondo era per strada.
+out.attoreRestaAlSuoPosto = !!a1 && Math.hypot(a1.x - casa.x, a1.y - casa.y) < 24;
+game.clearWorld();
+await wait(0.3);
+const a2 = game.actors.get('prova');
+out.attoreTornatoAlSuoPosto = !!a2 && Math.hypot(a2.x - casa.x, a2.y - casa.y) < 24;
+
+// Se muore, resta morto — e la notizia arriva dal bus, non da un controllo.
+game.pedSystem.hurt(a2, 999, 0, 0, game, game.player, 0);
+await wait(0.3);
+out.attoreMorto = game.actors.isDead('prova');
+out.attoreNonRisorge = game.actors.get('prova') === null;
+
+// ...e la morte entra nel salvataggio.
+const snap2 = S.snapshot(game);
+out.morteSalvata = snap2.actors.prova === 1;
+game.actors.reset();
+out.resetLoRimetteVivo = !game.actors.isDead('prova');
+S.apply(game, JSON.parse(JSON.stringify(snap2)));
+out.ricaricaLoRimetteMorto = game.actors.isDead('prova');
+
+// ---- 4. PORTA SIGILLATA ------------------------------------------------------
+const shop = game.city.shops[0];
+game.dayCycle.hour = 13;      // ora di apertura piena
+out.apertaPrima = game.shops.shopOpen(shop, game);
+game.shops.seal(shop.id, 'Sigillo di perizia 한성개발');
+out.chiusaDopoSigillo = !game.shops.shopOpen(shop, game);
+out.entrataRifiutata = game.shops.enter(shop, game) === false;
+out.messaggioSigillo = game.hud.messages.some((m) => String(m.text).includes('perizia'));
+game.shops.unseal(shop.id);
+out.riapreTolto = game.shops.shopOpen(shop, game);
+
+// ---- 5. MARCATORI ------------------------------------------------------------
+game.setMarker('missione', 1000, 2000, { color: '#ff5fa2' });
+game.setMarker('missione', 3000, 4000);       // stesso id: sposta, non accumula
+out.unSoloBlip = game.markers.length === 1 && game.markers[0].x === 3000;
+game.clearMarker('missione');
+out.blipTolto = game.markers.length === 0;
+
+window.__OUT = out;

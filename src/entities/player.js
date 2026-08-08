@@ -706,6 +706,49 @@ export class Player {
   }
 
   /** Risveglio all'ospedale: HP pieni, arsenale perso. */
+  /**
+   * Quello che di Jae-min non si sa rifare da soli. Le coordinate le decide chi
+   * salva (dentro un negozio si registra la porta, non la pianta — vedi `save.js`),
+   * qui c'è solo lo stato del personaggio.
+   */
+  snapshot() {
+    return {
+      x: this.x, y: this.y, angle: this.angle,
+      hp: this.hp, money: this.money, outfit: this.outfit,
+      weapon: this.weapon, owned: [...this.owned], ammo: { ...this.ammo },
+    };
+  }
+
+  /**
+   * Rimette Jae-min com'era. Azzera anche tutto quello che è *in corso* — la
+   * morte a metà, il rinculo, il mirino, la corsa — perché si ricarica da fermi:
+   * senza, si riparte con l'arma surriscaldata di venti minuti fa.
+   */
+  restore(d) {
+    this.x = d.x;
+    this.y = d.y;
+    this.angle = d.angle;
+    this.hp = d.hp;
+    this.money = d.money;
+    this.outfit = d.outfit;
+    this.owned = new Set(d.owned);
+    this.ammo = { ...d.ammo };
+    this.weapon = d.weapon;
+    this.vehicle = null;
+    this.onFoot = true;
+    this.dying = false;
+    this.deathT = 0;
+    this.hurtT = 0;
+    this.carHitT = 0;
+    this.vx = 0;
+    this.vy = 0;
+    this.spin = 0;
+    this.scoping = false;
+    this.heat = 0;
+    this.overheated = false;
+    this.stamina = 1;
+  }
+
   revive(x, y) {
     this.x = x;
     this.y = y;

@@ -425,6 +425,9 @@ export class ShopSystem {
     this.city = city;
     this.cache = new Map();   // interni già visitati, con le loro casse svuotate
     this.pending = null;      // quello che un salvataggio ricorda e la cache non ha ancora
+    // Vetrine chiuse **non dall'orario**: una serranda con il sigillo di perizia
+    // non riapre domani mattina. Id della vetrina -> motivo da mostrare (o `true`).
+    this.sealed = new Map();
     this.active = null;
     this.outside = null;      // dove si torna uscendo
     this.backSpot = null;     // dove si sbuca dal retro, se là dietro c'è posto
@@ -452,6 +455,7 @@ export class ShopSystem {
   reset() {
     this.cache.clear();
     this.pending = null;
+    this.sealed.clear();
     this.active = null;
     this.outside = null;
     this.backSpot = null;
@@ -540,8 +544,14 @@ export class ShopSystem {
    * ogni visita dall'ora che è, quindi un indice su quella lista non
    * significherebbe niente al caricamento.
    */
+  /**
+   * Quello che una partita ha cambiato nei locali. Dalla revisione del salvataggio
+   * ci sta **tutto** quello che è di questo sistema — contatori, sigilli e casse —
+   * invece di lasciare che `save.js` peschi i campi uno per uno: chi aggiunge uno
+   * stato qui non deve più andare a cercare gli altri due posti che lo scrivono.
+   */
   snapshot() {
-    const out = {};
+    const interiors = {};
     const record = (it) => {
       const robbed = [];
       const dead = [];
@@ -553,22 +563,34 @@ export class ShopSystem {
     };
     for (const [id, it] of this.cache) {
       const rec = record(it);
-      if (rec) out[id] = rec;
+      if (rec) interiors[id] = rec;
     }
     // Un negozio caricato da un salvataggio e non ancora rivisitato è ancora in
     // `pending`, non in `cache`: senza questa riga risalvare subito dopo aver
     // caricato dimenticherebbe tutto quello che non si è passato a rivedere.
-    if (this.pending) for (const [id, rec] of this.pending) if (!(id in out)) out[id] = rec;
-    return out;
+    if (this.pending) for (const [id, rec] of this.pending) if (!(id in interiors)) interiors[id] = rec;
+    return {
+      robbed: this.robbed,
+      spent: this.spent,
+      sold: this.sold,
+      sealed: Object.fromEntries(this.sealed),
+      interiors,
+    };
   }
 
   restore(data) {
+    const d = data || {};
+    this.robbed = d.robbed || 0;
+    this.spent = d.spent || 0;
+    this.sold = d.sold || 0;
+    this.sealed = new Map(Object.entries(d.sealed || {}));
     // Le piante già in cache sono quelle della partita che si sta abbandonando:
     // vanno buttate, o la cassa svuotata di *prima* si sovrapporrebbe a quella
     // del salvataggio.
     this.cache.clear();
-    this.pending = new Map(Object.entries(data || {}));
+    this.pending = new Map(Object.entries(d.interiors || {}));
   }
+
 
   /** Un pedone da interno: al suo posto, senza marciapiedi da navigare. */
   hirePed(d, rng, f, staff) {
@@ -631,7 +653,29 @@ export class ShopSystem {
 
   /** Vetrina aperta = **almeno un piano** aperto: la scala è del palazzo, non del negozio. */
   shopOpen(shop, game) {
+    if (this.sealed.has(shop.id)) return false;
     return shop.biz.some((id) => this.isOpen(id, game));
+  }
+
+  /**
+   * Chiudere una porta **per sempre**, o finché non la si riapre. Non è l'orario:
+   * l'orario dice «apre alle sette» e domani riapre da solo, questo dice «qui non
+   * si entra più», ed è la serranda con il sigillo di perizia.
+   *
+   * Sta qui e non in `interiors.js` perché non è una proprietà dell'attività (un
+   * 술집 resta un 술집): è un fatto capitato a **quella** vetrina, e per questo
+   * entra nel salvataggio.
+   */
+  seal(shopId, reason = null) {
+    this.sealed.set(shopId, reason || true);
+  }
+
+  unseal(shopId) {
+    this.sealed.delete(shopId);
+  }
+
+  isSealed(shopId) {
+    return this.sealed.has(shopId);
   }
 
   /** Il piano che riapre prima: è l'unica cosa utile da leggere su una porta chiusa. */
@@ -648,8 +692,15 @@ export class ShopSystem {
 
   /** Bussare a una porta chiusa: si ottiene il cartello con l'orario, e basta. */
   knock(shop, game) {
-    const n = this.nextOpening(shop, game);
-    game.hud.toast(`${n.biz.hangul} — apre alle ${clockLabel(n.at)}`, 2.4);
+    const seal = this.sealed.get(shop.id);
+    if (seal) {
+      // Una porta sigillata non ha un'ora di apertura da dire: dirne una sarebbe
+      // una bugia, e il giocatore tornerebbe domani per niente.
+      game.hud.toast(typeof seal === 'string' ? seal : 'Serranda abbassata e sigillata', 2.8);
+    } else {
+      const n = this.nextOpening(shop, game);
+      game.hud.toast(`${n.biz.hangul} — apre alle ${clockLabel(n.at)}`, 2.4);
+    }
     game.audio?.doorClose(game.player.x, game.player.y);
   }
 

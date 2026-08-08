@@ -832,8 +832,10 @@ export class AudioSystem {
     const beds = this.beds;
     for (const b of this._bedList) b.target = 0;
     // In pausa il mondo si abbassa ma non si spegne: uno stacco netto sui letti
-    // suona come un guasto. L'interfaccia resta piena, ha un bus suo.
-    const duck = game.paused ? 0.22 : 1;
+    // suona come un guasto. L'interfaccia resta piena, ha un bus suo. Quanto si
+    // abbassa lo dice la modalità (`core/modes.js`): un menu 0,22, i pannelli
+    // molto di più, perché lì il mondo non c'è proprio.
+    const duck = game.mode.duck;
     const pl = game.player;
     const dc = game.dayCycle;
     const indoors = game.indoors;

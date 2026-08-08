@@ -11,6 +11,8 @@ src/main.js           classe Game: boot, loop, callback del mondo, statistiche
 src/core/
   loop.js             passo fisso 1/60 con accumulatore, render libero
   input.js            tastiera/mouse, stato continuo + fronti (wasPressed)
+  events.js           il bus: `game.on/once/off/emit`, da cui passano i fatti del mondo
+  modes.js            in che modalità gira il gioco e cosa concede (`game.mode`, `paused`)
   audio.js            sintetizzatore WebAudio: colpi secchi + letti continui, mix, muto
   music.js            musica generata: tema del menu, caccia, stacchi — e la regia
   radio.js            stazioni coreane in streaming (`<audio>`, fuori dal grafo audio)
@@ -61,6 +63,7 @@ src/entities/
   shops.js            interni: entrata/uscita, piani, gente dentro, casse, listini, officine
   life.js             la vita degli altri: voli e navigazione con un pilota, campagna che
                       lavora e rincasa, capannelli che parlano, rapine e guerre fra bande
+  actors.js           i personaggi nominati: definizione che sopravvive allo streaming
 
 src/ui/
   hud.js              minimappa, tachimetro, barra armi, cartello distretto, toast, debug
@@ -71,6 +74,7 @@ src/ui/
   mixer.js            il pannello dei volumi, condiviso fra i due menu
   shopmenu.js         pannello del listino (compra/vendi)
   metro.js            ingresso/uscita, pianta fisica e rete locale/interurbana
+  text.js             a capo automatico e paragrafi: corpo fisso, misura condivisa
 
 .claude/              strumenti per chi sviluppa (non fa parte del gioco), vedi §9
   tools/probe.mjs     avvia il gioco headless, esegue scene, misura, screenshot
@@ -346,6 +350,52 @@ queste due regole un evento si scioglieva alla prima pallottola. E **le volanti 
 non sono `police.cars`**: quella lista è la caccia al giocatore, con dentro ricercato, assedio e
 arresto; qui si riusa solo ciò che è già generico (`followRoads`, `snapToRoad`) e si tiene una
 lista a parte, `life.units`, che l'audio legge per la sirena.
+
+**I fatti del mondo si dicono una volta e li ascolta chi vuole** (§5.27). Gli otto callback su
+`Game` — `onPedKilled`, `onVehicleDestroyed`, `onEnterVehicle`, … — ci sono ancora e i loro
+tredici chiamanti non sono cambiati: quello che è cambiato è che ognuno **finisce con un
+`emit`**. Chi vuole *osservare* si iscrive (`game.on`), invece di farsi aggiungere un `if`
+dentro `main.js`. Serve alle missioni e alla tabella di Kkachi, che hanno bisogno degli stessi
+eventi per ragioni diverse. Due regole del bus non sono decorative: si itera su una **copia**
+della lista (un iscritto che si disiscrive mentre viene chiamato è il caso normale) e
+l'eccezione di un iscritto **non ferma il frame**.
+
+**In che modalità gira il gioco lo dice una tabella, non dieci booleani** (§5.27). `core/modes.js`
+elenca le modalità in ordine di priorità e ognuna **dichiara cosa concede**: se il mondo avanza
+(`worldRuns`), se il giocatore risponde (`playerRuns`), quanto si abbassa l'audio (`duck`, e la
+radio ha il suo `radioDuck` perché è la musica che ha scelto il giocatore), se si vede il
+puntatore. **`game.paused` è derivato** da `worldRuns`, quindi tutti i posti che lo leggevano
+funzionano senza sapere che è cambiato qualcosa — ma **non si può più assegnare** (§4). Aggiungere
+una modalità (un dialogo di missione: mondo fermo, giocatore fermo, ma qualcosa che anima) è una
+riga in quel file, invece di una condizione in più qui e di un ramo in ognuno dei posti che
+leggono `game.paused`. Non è una pila, ed è scritto lì perché il giorno che due modalità si
+sovrappongono davvero si cambia quel file e nient'altro.
+
+**Un salvataggio si migra, non si rifiuta** (§5.27). Prima uno slot con `v` diverso da `VERSION`
+veniva buttato: il primo campo nuovo che qualcuno avesse aggiunto avrebbe cancellato la partita
+di chiunque. Adesso `readSlot` passa da `migrate`, che applica in fila gli scalini di `MIGRATIONS`
+— per un formato nuovo si scrive **solo l'ultimo scalino**, chi arriva da tre versioni fa ci passa
+da solo. Uno slot *dal futuro* resta rifiutato (indovinare è peggio che dire «non lo so leggere»),
+e la **seed** resta l'unica ragione per buttarne uno davvero: una Seoul diversa rende le coordinate
+salvate prive di significato. Insieme è cambiato **chi possiede cosa**: ogni sistema ha il suo
+`snapshot()`/`restore()` — `Player`, `DayCycle`, `WantedSystem`, `ShopSystem`, `ActorSystem` — e
+`save.js` non sa più che campi abbiano, sa dove metterli. Chi aggiunge uno stato lo aggiunge nel
+proprio sistema e non tocca `save.js`.
+
+**Un personaggio nominato è un pedone con una definizione che gli sopravvive** (§5.27). Vale la
+stessa regola della polizia e della vita degli NPC: nessuna entità nuova, un pedone di `game.peds`
+con `p.actor`. Quello che `entities/actors.js` possiede non è il pedone — è la **definizione**, e
+la differenza è tutta lì: il pedone viene despawnato come tutti (con l'anello largo di chi è dentro
+un fatto) e **ricreato al suo posto** quando si torna, perché la posizione sta nella definizione;
+quello che non si ricrea è la **morte**, che sta anch'essa nella definizione, arriva dal bus
+(`pedKilled`) e finisce nel salvataggio. Non gira dentro un edificio, dove `game.peds` è scambiato
+con la gente del piano.
+
+**Una porta può essere chiusa senza che sia l'orario.** `shops.sealed` è un fatto capitato a
+*quella* vetrina — la serranda col sigillo di perizia — e non una proprietà dell'attività: un 술집
+resta un 술집. Passa da `shopOpen`, che era già l'unico varco, e sta nel salvataggio. `game.markers`
+invece esisteva da sempre ed era letto da HUD e mappa senza che nessuno lo scrivesse: adesso c'è
+`setMarker(id, …)`, con l'`id` perché il caso normale è **spostare** il blip, non accumularne.
 
 **La polizia non ha entità sue.** Un agente è un pedone di `game.peds` con `p.cop = true` e
 stato `duty`: `pedestrians.updatePed` gli chiede dove andare a `police.copBehavior` e poi usa

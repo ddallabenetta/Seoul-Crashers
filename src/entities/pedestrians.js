@@ -106,6 +106,7 @@ export function createPed(kind, x, y, rng) {
     spin: 0,
     hostile: false,
     armed,
+    actor: null,      // personaggio nominato: lo possiede `entities/actors.js`
     turf: null,       // territorio presidiato: lo guida lo stato `guard`
     dealer: false,    // 거래책: l'uomo con cui si tratta (vedi `spawnTurf`)
     cop: false,       // in servizio: lo stato lo guida `police.copBehavior`
@@ -278,7 +279,10 @@ export class PedestrianSystem {
       // rapina che comincia al bordo dell'anello perdeva il rapinatore a metà
       // scena, e l'evento si chiudeva da solo senza che fosse successo niente.
       // Il margine sta sotto i 3000 px oltre i quali `life` chiude l'evento.
-      if (dist(p.x, p.y, pl.x, pl.y) > (p.ev ? ring.despawn * 1.8 : ring.despawn)) {
+      // Un attore (`entities/actors.js`) resiste quanto chi è dentro un fatto, e per
+      // la stessa ragione: chi ti aspetta dietro un banco non deve sparire perché sei
+      // andato a prendere l'auto. Quando cade, `ActorSystem` lo rimette al suo posto.
+      if (dist(p.x, p.y, pl.x, pl.y) > (p.ev || p.actor ? ring.despawn * 1.8 : ring.despawn)) {
         p.gone = true;
         this.peds.splice(i, 1);
       }
@@ -452,6 +456,27 @@ export class PedestrianSystem {
         p.idleT -= dt;
         targetSpeed = 0;
         if (p.idleT <= 0) p.state = 'walk';
+        break;
+      }
+      case 'post': {
+        // Sta al suo posto. `idle` non serviva: è una **sosta**, scade da sola e
+        // rimette a camminare — chi sta dietro un banco se ne andava a spasso dopo
+        // un secondo. Qui invece si torna a `home` se ci si allontana (un urto, la
+        // folla) e si guarda dove si deve guardare. È lo stato in cui nasce un
+        // attore (`entities/actors.js`); se ne esce solo da panico, ostilità o un
+        // ordine, che riscrivono `state` da soli senza un caso apposta.
+        const home = p.home || p;
+        const away = Math.hypot(home.x - p.x, home.y - p.y);
+        if (away > 8) {
+          tx = home.x;
+          ty = home.y;
+          targetSpeed = p.baseSpeed * 0.55;
+        } else {
+          targetSpeed = 0;
+          // `approachAngle` e non `damp`: un angolo interpolato per differenza si
+          // gira dalla parte lunga quando i due stanno a cavallo di ±π.
+          p.angle = approachAngle(p.angle, p.faceA, dt * 3);
+        }
         break;
       }
       case 'flee': {

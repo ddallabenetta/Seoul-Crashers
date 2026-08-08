@@ -2,6 +2,43 @@
 
 > §6 del progetto. Indice generale e mappa dei rimandi: [HANDOFF.md](../HANDOFF.md).
 
+## 6.0 — MASSIMA PRIORITÀ: le tappe della campagna
+
+**Questo elenco viene prima di tutto il resto di questo file.** L'impianto è pronto (§5.27: bus
+di eventi, tabella delle modalità, migrazioni del salvataggio, personaggi nominati, porte
+sigillate, marcatori, testo su più righe). Quello che resta è **contenuto**, in quest'ordine e
+**una consegna per volta**. Le decisioni d'impianto stanno in
+[`storia/08-domande-aperte.md`](storia/08-domande-aperte.md) e non vanno ricavate dal copione.
+
+| # | Tappa | Cosa contiene | Si prova così |
+| --- | --- | --- | --- |
+| 1 | **A** | primitive dei pannelli + **la cutscene iniziale** (28 pannelli, saltabile) | si avvia il gioco e si guarda |
+| 2 | **B** | impianto missioni: blip singolo, fasi, ripresa dall'ultima fase + **M1 e M2** | due missioni intere, una in strada e una in un interno |
+| 3 | **C** | **cortili persistenti** (nel salvataggio, con effetto sul commercio) | si prende un cortile, si esce, si ricarica, è ancora tuo |
+| 4 | **D** | Kkachi: stazione `91.45`, tabella con predicato, le otto chiamate dell'Atto I | si gira per Seoul con la radio accesa |
+| 5 | **E** | Atto I completo (M3, M4) + R1 | il primo ribaltamento in mano al giocatore |
+| 6 | **F** | Atto II (M5-M8) + R2, R3 + le otto chiamate dell'Atto II | l'atto che chiede più cose nuove al motore |
+| 7 | **G** | Atto III (M9-M12) + R4 + le otto chiamate dell'Atto III | il viaggio: ha bisogno di tutto quello di prima |
+| 8 | **H** | i tre finali, i titoli di coda, la scena dopo | e a quel punto la Fase 3 è chiusa |
+
+**Cosa l'impianto del §5.27 ha già tolto di mezzo**, e che quindi nessuna di queste tappe deve
+più affrontare: gli inneschi delle missioni (bus, `game.on('pedKilled', …)`), una modalità nuova
+per un dialogo (una riga in `core/modes.js`), lo stato nuovo nel salvataggio (il proprio
+`snapshot()` e uno scalino in `MIGRATIONS`, senza buttare gli slot di nessuno), i personaggi che
+devono stare in un posto (`game.actors.define(...)` — Chun-sik al 당구장 e Jo Ok-bun al 전당포
+di M1 e M2), il blip sulla mappa (`game.setMarker(...)`), e la porta sigillata su cui M1 si
+sarebbe fermata al punto 4 su 5 (`game.shops.seal(...)`).
+
+**Due cose da tenere presenti quando si farà la tappa A.** La prima: il copione decide *cosa*
+c'è in un pannello, non *come si disegna* — la resa grafica si concorda a vista prima di
+disegnare ventotto tavole, perché in questo stile la differenza fra una sagoma leggibile e una
+macchia è tutta nel contrasto di valore col fondo, e nel sorgente non si vede. La seconda: la
+cutscene ha bisogno di una **regia sonora** (fruscio di banda, la voce che conta, il cane, la
+sirena lontana) che conviene fare **insieme alla tappa D**, dove nasce la stazione `91.45` e
+quindi il timbro del fruscio di Kkachi.
+
+---
+
 ## 6. Backlog successivo (già concordato con l'utente)
 
 **Fase 3 — contenuti.** Negozi e interni (§5.8), la mappa (§5.9), il ciclo giorno-notte
@@ -20,8 +57,9 @@ finali e ventiquattro chiamate radio — sta in [`storia/`](storia/), scritto e 
 sulla missione attiva, fallimento che riparte dall'ultima fase, un pannello = una funzione,
 cortili persistenti, tre finali, Kkachi come tabella con predicato, storia prima delle attività
 secondarie. Le decisioni e le **otto tappe** di lavoro stanno in
-[`storia/08-domande-aperte.md`](storia/08-domande-aperte.md); si comincia dalla **A** (primitive
-dei pannelli + cutscene iniziale). Resta aperta una domanda sola: se le missioni si rigiocano.
+[`storia/08-domande-aperte.md`](storia/08-domande-aperte.md); l'**impianto è pronto** (§5.27) e
+l'ordine delle tappe è quello del §6.0, qui sopra. Resta aperta una domanda sola: se le missioni
+si rigiocano.
 
 Quello che segue è quanto resta indietro, in ordine di quanto si sente. È molto più corto di
 prima: il §5.12 ha pagato diciannove voci di questo elenco, il §5.13 ha chiuso l'audio, il
