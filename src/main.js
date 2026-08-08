@@ -16,6 +16,7 @@ import { preloadSprites, VEHICLE_TYPES } from './render/sprites.js';
 import { Player } from './entities/player.js';
 import { TrafficSystem } from './entities/traffic.js';
 import { PedestrianSystem } from './entities/pedestrians.js';
+import { LifeSystem } from './entities/life.js';
 import { PickupSystem } from './entities/pickups.js';
 import { ProjectileSystem } from './entities/projectiles.js';
 import { WantedSystem } from './entities/wanted.js';
@@ -139,6 +140,10 @@ class Game {
     this.pedGrid = new DynamicGrid(this.city.w, this.city.h, 120);
     this.traffic = new TrafficSystem(this.city, this.rng, this.vehicles);
     this.pedSystem = new PedestrianSystem(this.city, this.rng, this.peds);
+    // La vita degli altri: voli, navigazione, campagna, raduni e cronaca nera.
+    // Ha un rng suo — pescare da `this.rng` sposterebbe lo streaming di traffico
+    // e pedoni ogni volta che decolla un aereo.
+    this.life = new LifeSystem(this.city, new Rng(20260808));
     this.pickups = new PickupSystem(this.city, this.rng);
     this.projectiles = new ProjectileSystem();
     this.wanted = new WantedSystem();
@@ -232,6 +237,9 @@ class Game {
    * dallo streaming (§3), quindi nessuno li rifarebbe.
    */
   clearWorld() {
+    // Prima `life`: tiene riferimenti a veicoli e pedoni che stanno per sparire, e
+    // un evento sopravvissuto continuerebbe a dare ordini a dei fantasmi.
+    this.life.clear(this);
     for (let i = this.vehicles.length - 1; i >= 0; i--) {
       const v = this.vehicles[i];
       if (v.protect && v.moored) continue;
@@ -741,6 +749,10 @@ class Game {
       // che deve girare dopo.
       this.wanted.update(dt, this);
       this.police.update(dt, this);
+      // Come la polizia: `life` scrive gas e sterzo dei mezzi che pilota (aerei,
+      // barche, trattori, l'auto della fuga e le volanti di quartiere), e la
+      // fisica gliela integra `traffic` — che quindi deve girare dopo.
+      this.life.update(dt, this);
       this.traffic.update(dt, this);
       this.pedSystem.update(dt, this);
       this.pickups.update(dt, this);
@@ -792,6 +804,9 @@ class Game {
 
     this.vehicleGrid.rebuild(this.vehicles);
     this.pedGrid.rebuild(this.peds);
+    // Anche dietro al titolo la gente vive: un aereo che passa e un capannello
+    // sull'angolo sono metà di quello che si vede da qui.
+    this.life.update(dt, this);
     this.traffic.update(dt, this);
     this.pedSystem.update(dt, this);
     this.fx.update(dt, this);

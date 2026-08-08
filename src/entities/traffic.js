@@ -120,9 +120,14 @@ export class TrafficSystem {
     }
   }
 
+  /**
+   * Quante auto in circolazione. Un pilota di `life.js` ha `ai.mode` e non è
+   * traffico: contarlo vorrebbe dire che ogni aereo che passa toglie una berlina
+   * dalla strada sotto.
+   */
   countTraffic() {
     let n = 0;
-    for (const v of this.vehicles) if (v.driver === 'ai') n++;
+    for (const v of this.vehicles) if (v.driver === 'ai' && !(v.ai && v.ai.mode)) n++;
     return n;
   }
 
@@ -317,6 +322,13 @@ export class TrafficSystem {
   driveAI(v, dt, game) {
     const ai = v.ai;
     if (!ai) return;
+    // Chi ha un `mode` non guida su questa maglia: vola, naviga, ara un campo o
+    // sta scappando. La fisica resta questa, a cambiare è solo chi scrive gas e
+    // sterzo (vedi `life.js`).
+    if (ai.mode) {
+      if (game.life) game.life.drive(v, dt, game);
+      return;
+    }
     const graph = this.city.graph;
     const spec = VEHICLE_TYPES[v.kind];
 

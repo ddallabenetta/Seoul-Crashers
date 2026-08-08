@@ -156,13 +156,18 @@ il §5.21 altre undici — fra cui le due che erano tornate in cima.
   livello di configurazione.
 
 **Rimasto indietro dalla mappa** (§5.9) e dagli esplosivi (§5.7):
-- **Nessun traffico aereo o navale**: aerei e barche civili sono tutti fermi. Un paio di battelli
-  che fanno la spola sul Han costerebbe un `ai` semplice — il fiume è una linea, non serve grafo.
-- **Le bande non si fanno la guerra e non si conquistano.** Adesso commerciano (§5.12), ma
-  restano quattro banchi: niente faide, niente territori che cambiano padrone. È materia della
-  storia.
-- **In campagna c'è da raccogliere ma non da fare**: le attività secondarie (consegne, salti,
-  corse) sono ancora la superficie migliore su cui metterle.
+- ~~Nessun traffico aereo o navale~~ · ~~le bande non si fanno la guerra~~ · ~~in campagna non
+  c'è nessuno~~ — **fatte con il §5.26**, con quattro cose ancora aperte:
+  - **un territorio non cambia mai padrone.** Una guerra fra bande adesso si vede e fa dei
+    morti, ma il cortile resta di chi era: conquistarlo vuol dire uno stato persistente sul
+    turf (e quindi nel salvataggio) e un effetto sul commercio. È materia della storia;
+  - **le rapine non riguardano il giocatore.** Passare di lì mentre succede è uno spettacolo,
+    non un'occasione: non si può derubare il rapinatore, denunciarlo o farsi assumere. La
+    superficie naturale sono le attività secondarie;
+  - **nessuna linea di traghetto o volo di linea.** I mezzi pilotati sono traffico, non
+    servizio: partono e arrivano dove capita, non c'è un orario né una tratta;
+  - **in campagna c'è da lavorare ma non da fare**: le attività secondarie (consegne, salti,
+    corse) restano la superficie migliore su cui metterle, e adesso hanno delle comparse.
 - **L'aeroporto non ha interni**: terminal e hangar sono volumi chiusi. Adesso ne dipendono due
   cose in più — lo spazio acustico grande e le due righe di `MARKETS` senza vetrina.
 - **Il fuoco non attacca gli edifici**: lambisce le facciate e si ferma. Bruciare un palazzo

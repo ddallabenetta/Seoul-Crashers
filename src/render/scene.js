@@ -907,6 +907,15 @@ export class Scene {
     if (p.armed && !p.dead) drawHeldWeapon(ctx, p.copWeapon || 'pistol');
     ctx.restore();
 
+    // Chi sta parlando. Dall'alto una conversazione non si vede: due sagome ferme
+    // una di fronte all'altra sono indistinguibili da due sagome ferme e basta, e
+    // la nuvoletta è l'unico segno che le distingue. Si stacca in proiezione per
+    // la stessa ragione dell'ombrello: è una cosa che sta sopra la testa.
+    if (p.talkT > 0 && !p.dead) {
+      const tf = 40 / PROJ;
+      this.drawBubble(ctx, p, (p.x - cam.cx) * tf, (p.y - cam.cy) * tf, game);
+    }
+
     // Ombrello: da sopra copre la persona, ed è il modo in cui una folla dice
     // "sta piovendo" senza una sola particella addosso. Chi è a terra, in
     // panico, in servizio o di guardia a un territorio non ce l'ha aperto.
@@ -919,6 +928,47 @@ export class Scene {
       const uf = 34 / PROJ;
       this.drawUmbrella(ctx, p, (p.x - cam.cx) * uf, (p.y - cam.cy) * uf, rain);
     }
+  }
+
+  /**
+   * La nuvoletta di chi parla. Tre puntini e nessun testo: una battuta scritta
+   * andrebbe letta, e in una visuale dall'alto durante il traffico non si legge
+   * niente. I puntini pulsano a tempo di sillaba, che è la sola cosa che serve —
+   * dire *che* si sta parlando, non *cosa*.
+   *
+   * Si spegne in dissolvenza sull'ultimo mezzo secondo: comparire e sparire di
+   * netto la farebbe sembrare un difetto di disegno.
+   */
+  drawBubble(ctx, p, ox, oy, game) {
+    const w = 15;
+    const h = 9.5;
+    ctx.save();
+    // Rialzo fisso, come per il rombo del 거래책: al centro camera la parallasse
+    // vale zero, e senza questo la nuvoletta finirebbe esattamente sulla testa di
+    // chi parla — cioè addosso alla sola cosa che doveva far vedere.
+    ctx.translate(p.x + ox, p.y + oy - 12);
+    ctx.globalAlpha = Math.min(1, p.talkT * 2) * 0.92;
+    ctx.fillStyle = 'rgba(244,246,250,0.94)';
+    ctx.strokeStyle = 'rgba(18,20,26,0.5)';
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, w / 2, h / 2, 0, 0, 6.2832);
+    ctx.fill();
+    ctx.stroke();
+    // La codina verso la testa: senza, la nuvoletta è un sassolino che vola.
+    ctx.beginPath();
+    ctx.ellipse(-w * 0.34, h * 0.5, 2.2, 1.8, 0, 0, 6.2832);
+    ctx.fill();
+    ctx.fillStyle = '#2a2f3a';
+    for (let i = 0; i < 3; i++) {
+      // Ogni puntino sfasato dal precedente: è l'onda che fa "sta dicendo qualcosa".
+      const a = 0.35 + 0.65 * Math.max(0, Math.sin(game.time * 7 - i * 0.9));
+      ctx.globalAlpha = a * Math.min(1, p.talkT * 2);
+      ctx.beginPath();
+      ctx.arc((i - 1) * 4.6, 0, 1.5, 0, 6.2832);
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
   /**

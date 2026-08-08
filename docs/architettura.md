@@ -59,6 +59,8 @@ src/entities/
   police.js           pattuglie, volanti, sbarchi, posti di blocco, chiodi, SWAT, elicottero
   projectiles.js      esplosivi con proiettili veri: granate, molotov, mine, onda d'urto
   shops.js            interni: entrata/uscita, piani, gente dentro, casse, listini, officine
+  life.js             la vita degli altri: voli e navigazione con un pilota, campagna che
+                      lavora e rincasa, capannelli che parlano, rapine e guerre fra bande
 
 src/ui/
   hud.js              minimappa, tachimetro, barra armi, cartello distretto, toast, debug
@@ -330,6 +332,20 @@ una camera che scivola dietro al giocatore in uno spazio di 300 px dà solo il m
 attività dall'**altezza del volume** (`1 + (h3d-30)/46`, max 4) e `drawBuilding` disegna la
 colonna di insegne più il portone sulla facciata del lato giusto. È il modo in cui a Seoul si
 capisce cosa c'è al terzo piano, ed è l'unica informazione che il giocatore ha prima di entrare.
+
+**La vita degli NPC non ha entità sue, e non ha nemmeno un motore suo** (§5.26). `life.js`
+pilota aerei, barche e trattori scrivendo `ai.mode` su veicoli normali — `traffic.driveAI` ha
+una riga in testa che gli passa la mano e la fisica resta la stessa — e muove rapinatori,
+incursori, difensori e agenti di quartiere con **un solo stato di pedone**, `errand`, che
+chiede a `life.order` dove andare esattamente come `duty` lo chiede a `police.copBehavior`. Da
+qui tre conseguenze che vale la pena sapere prima di toccarlo. **`life.update` va fra
+`police.update` e `traffic.update`**, per la stessa ragione della polizia: scrive gas e sterzo,
+la fisica la integra il traffico. **Chi è in `errand` non entra in panico** (né per gli spari né
+per le auto) e **chi lo colpisce diventa il suo bersaglio** invece del suo spavento: senza
+queste due regole un evento si scioglieva alla prima pallottola. E **le volanti di quartiere
+non sono `police.cars`**: quella lista è la caccia al giocatore, con dentro ricercato, assedio e
+arresto; qui si riusa solo ciò che è già generico (`followRoads`, `snapToRoad`) e si tiene una
+lista a parte, `life.units`, che l'audio legge per la sirena.
 
 **La polizia non ha entità sue.** Un agente è un pedone di `game.peds` con `p.cop = true` e
 stato `duty`: `pedestrians.updatePed` gli chiede dove andare a `police.copBehavior` e poi usa

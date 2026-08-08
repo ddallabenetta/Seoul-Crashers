@@ -225,3 +225,38 @@ sbagliato, che è il modo peggiore di rompersi.
 **Il rettangolo di una città non è più un muro.** I collider di confine stanno ai limiti del
 mondo, non a quelli di ogni città: si esce da Seoul guidando. Chi assume che il giocatore sia
 sempre dentro una regione (`areaAt` può restituire `null`) va corretto, non aggirato.
+
+**Un NPC dentro un fatto non deve spaventarsi.** Ogni sparo chiama `game.alarm`, e `alarm`
+mette in fuga chiunque nel raggio: senza saltare chi è in stato `errand` (§5.26), la prima
+pallottola di una rapina scioglieva la rapina. Vale anche per il traffico — `p.panic` viene
+azzerato per chi ha un compito, come già per la divisa — o un'auto che passa vicino a un
+cortile chiudeva una guerra fra bande.
+
+**Chi viene colpito da un NPC scappa; chi viene colpito da te reagisce.** Sono due rami diversi
+di `pedestrians.hurt` e vanno tenuti in quest'ordine: prima il giocatore (che rende `hostile`),
+poi `errand` (che scrive `p.aggro` e resta nel fatto), poi il panico. Invertendoli, sparare a un
+rapinatore non lo faceva più venire verso di te.
+
+**Un sensore lungo il doppio non vede meglio, vede sempre.** Il tastatore di riva delle
+imbarcazioni guarda avanti `130 + 0.35 × v` px. A `170 + 0.55 × v` trovava l'altra sponda del
+Han — che è largo 300 px — praticamente sempre, e le barche navigavano al 54% della velocità di
+crociera scansando una riva che non stava per toccare. La stessa trappola vale per qualunque
+raggio di percezione tarato senza guardare quanto è largo lo spazio in cui vive.
+
+**Un veicolo di `life.js` va tolto da chi lo possiede, non solo dalla lista.** `protect = true`
+lo salva dallo streaming del traffico, quindi se `life` non lo rimuove da `game.vehicles` resta
+lì per il resto della partita. Vale al contrario per il giocatore: se se l'è preso lui
+(`driver === 'player'`), non si cancella e non gli si scrive addosso freno a mano e gas — un
+frame di volante piantata si sente.
+
+**`this.tmp` non è un posto solo.** `lanePoint` scrive nell'oggetto che gli passi: chi lo usa
+come scratch (`roadPointNear`) e chi ci restituisce un punto (`suspectPoint`) devono avere due
+oggetti diversi, o il secondo si ritrova le coordinate di una corsia.
+
+**Una lamiera ferma in carreggiata è una corsia chiusa, e la coda arriva a mezzo quartiere.**
+L'auto della fuga di una rapina (§5.26) nasceva su un punto di corsia qualunque: il traffico
+civile le frena dietro (`senseAhead` non sa che quella non riparte più) e in venti secondi
+l'incrocio a monte è bloccato. Adesso si cerca prima uno **stallo vero** fra quelli che il
+traffico usa già (`traffic.parkingSpots`, cortili e vicoli — fuori carreggiata per costruzione)
+e solo in mancanza di quello si ripiega su un **boulevard**, dove restano tre corsie. Vale per
+qualunque cosa si voglia lasciare ferma in strada.

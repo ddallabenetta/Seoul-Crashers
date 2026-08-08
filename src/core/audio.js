@@ -934,6 +934,10 @@ export class AudioSystem {
     };
     scan(P.cars);
     scan(P.boats);
+    // Anche le volanti di quartiere (`life.js`) hanno la sirena accesa: sono
+    // veicoli come gli altri, e senza questa riga un inseguimento che non
+    // riguarda il giocatore sarebbe muto.
+    if (game.life) scan(game.life.units);
     if (best) {
       const f = 1 - bestD / 1400;
       beds.siren.target = duck * (0.022 + 0.04 * f) * Math.min(1.6, 0.7 + count * 0.3);
@@ -1206,6 +1210,28 @@ export class AudioSystem {
     const form = this._filter(out, 'bandpass', isPlayer ? f0 * 3 : v.f1, 3);
     this._tone(form, { type: 'sawtooth', f0, f1: f0 * 0.7, dur: 0.2, peak: 0.4, attack: 0.01 });
     this._noise(this._filter(out, 'bandpass', 700, 1.5), { dur: 0.09, peak: 0.25, attack: 0.002 });
+  }
+
+  /**
+   * Due parole in un capannello. Non è un grido a volume basso: è la stessa gola
+   * a volume di conversazione — fondamentale più bassa, formante sola, niente
+   * vibrato. Due sillabe e non una, perché una sillaba sola si sente come un
+   * verso; e non tre, perché tre sillabe sono una frase, e una frase vorrebbe
+   * delle parole.
+   */
+  chatter(x, y, voice = 'uomo') {
+    const v = VOICES[voice] || VOICES.uomo;
+    const out = this._at(x, y, v.gain * 0.34, 0.5);
+    if (!out) return;
+    const f0 = (v.f0[0] + Math.random() * (v.f0[1] - v.f0[0])) * 0.6;
+    const form = this._filter(out, 'bandpass', v.f1 * 0.9, 2.6);
+    for (let i = 0; i < 2; i++) {
+      const f = f0 * (i ? 0.86 : 1);
+      this._tone(form, {
+        type: 'sawtooth', f0: f, f1: f * 0.92, dur: 0.13,
+        peak: i ? 0.24 : 0.32, attack: 0.025, t: i * (0.15 + Math.random() * 0.06),
+      });
+    }
   }
 
   /** Corpo che cade. La carne non risuona: tonfo basso e niente coda. */

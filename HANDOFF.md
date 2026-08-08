@@ -5,10 +5,11 @@ resta corto apposta.** Il contenuto vero sta in `docs/`, e si apre un documento 
 non tutti. Il `README.md` descrive il gioco e i comandi; qui c'è quello che serve a
 *sviluppare*. Avvio e vincoli stanno in `CLAUDE.md`, che si carica da solo.
 
-Ultimo aggiornamento: **una mappa sola** (§5.25) — Seoul, Busan e Jeju non sono più tre mondi
-che si escludono: stanno nello stesso spazio di coordinate, disposte come stanno davvero, e
-l'autostrada Gyeongbu collega su gomma le due città della terraferma. Jeju resta un'isola, e ci
-si arriva solo via mare o in volo. Le tappe precedenti sono §5.8-5.24.
+Ultimo aggiornamento: **la vita degli NPC** (§5.26) — la Corea adesso ha dei *fatti* e non solo
+delle cose. Aerei e barche hanno qualcuno a bordo, la campagna lavora e rincasa, la gente si
+raduna e parla, e c'è chi rapina un negozio o si prende a fucilate per un cortile con la volante
+che arriva. Tutto in un modulo solo (`life.js`) e senza un'entità nuova. Le tappe precedenti
+sono §5.8-5.25.
 
 > 📌 **Da concordare con l'utente prima di scrivere codice:** della Fase 3 restano le
 > **missioni**, che sono il lavoro grosso e pieno di scelte di design (quante, come si
@@ -60,6 +61,7 @@ commenti resta valido: si risolve qui.
 | §5.23 Geografie dedicate e metro fisica | `docs/storico/12-geografie-dedicate-e-metro-fisica.md` |
 | §5.24 Strade libere, metro viva e confini | `docs/storico/13-strade-metro-confini.md` |
 | §5.25 Mappa unica della Corea | `docs/storico/14-mappa-unica-corea.md` |
+| §5.26 Vita degli NPC | `docs/storico/15-vita-degli-npc.md` |
 | §6 Backlog | `docs/backlog.md` |
 | §8 Parametri | `docs/parametri.md` |
 | §9 Strumenti (`.claude/`) | `docs/strumenti.md` |
@@ -125,6 +127,13 @@ traffico civile e le volanti. **A Jeju no**: nessun nodo stradale la raggiunge, 
 mare o in volo. Ogni fermata ha una scala solida sul marciapiede e si attraversano atrio,
 tornelli e banchina a piedi; la tratta interurbana adesso è una comodità, non l'unica via.
 Traffico e pedoni restano streaming.
+
+**E la Corea ha dei fatti, non solo delle cose** (§5.26). All'aeroporto si decolla e si atterra,
+sul fiume c'è chi naviga, nei campi si lavora fino a sera e poi si rincasa, sui marciapiedi si
+formano capannelli in cui uno parla per volta — e ogni tanto qualcuno rapina una vetrina o porta
+la sua banda nel cortile di un'altra, con la volante che arriva a rovinare la festa a tutti. Un
+modulo solo (`entities/life.js`) e **nessuna entità nuova**: un pilota è un veicolo con un
+`ai.mode`, un rapinatore è un pedone con lo stato `errand`. La caccia a *te* resta un altro file.
 
 La Fase 2 era divisa in tre tappe, concordate con l'utente: **A** combattimento base,
 **B** polizia e ricercato a 5 livelli, **C** armi pesanti ed esplosivi. **Sono tutte fatte.**
