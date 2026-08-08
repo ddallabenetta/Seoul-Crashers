@@ -199,5 +199,21 @@
 | Carta del mondo | `maptexture.MAP_W` / `MAP_H` | 1200 × 1714 px (conserva il rapporto della penisola) |
 | Indice delle carreggiate | `korea.roadIndex` | `SpatialGrid` a 420 px; `roadclearance` lo usa se c'è |
 | Griglie dinamiche | `main` · `DynamicGrid` | veicoli 150 px, pedoni 120 px — si svuotano per cella toccata, non riallocando |
+| **— vita degli NPC (§5.26) —** | | |
+| Tetti dei mezzi pilotati | `life.MAX_AIR` / `MAX_BOATS` | 2 velivoli · 3 imbarcazioni attorno al giocatore |
+| Quote di crociera | `life.PLANE_Z` / `HELI_Z` | ala 300-400 px · rotore 165-235 px (chi decolla ci sale, non si ferma a 250) |
+| Ogni quanto un volo e una barca | `life.airT` / `boatT` | 14-34 s · 6-16 s; il movimento d'aeroporto vince sul sorvolo (65%) se una pista è entro 3000 px |
+| Tastatore di riva delle barche | `life.driveMarine` | `130 + 0.35 × v` px avanti alla prua — vedi la trappola: più lungo e il Han diventa un budello |
+| Crociera e virata di una barca | `life.driveMarine` | 62% della velocità massima · 30% se lo scarto di prua supera 0,8 rad |
+| Turno dei braccianti | `life.workHours` · `MAX_FARMERS` | 6:00-19:00 · 8 in tutto, max 3 per isolato rurale · 1 trattore |
+| Raduni | `life.MAX_CROWDS` · `startCrowd` | 2 alla volta · 3-6 persone reclutate entro 300 px · durata 28-70 s · 40% file davanti a una vetrina |
+| Chi parla, e ogni quanto | `life.chatter` | uno per volta, 1,1-2,2 s di nuvoletta, cambio ogni 1,6-3,4 s; suono solo entro 620 px e non più di uno ogni 1,5-4 s |
+| Fatti di cronaca | `life.MAX_EVENTS` · `eventT` · `EVENT_MIN`/`EVENT_MAX` | 2 alla volta · uno ogni 26-55 s · fra 420 e 1200 px dal giocatore, fuori inquadratura |
+| Durata di una rapina alla vetrina | `life.robTime` | 5-9 s; la volante parte 2 s dopo l'inizio del colpo, la fuga scade a 40 s |
+| Dove aspetta l'auto della fuga | `life.getawaySpot` | stallo vero entro 340 px dalla vetrina, altrimenti un boulevard entro 340 px; si provano le sei vetrine più vicine |
+| Chiamata alla polizia in una guerra fra bande | `life.updateWar` | dopo 7 s di fuoco; l'evento si scioglie 5 s dopo l'ultimo caduto (16 s se una volante è in arrivo) |
+| Fine di un fatto | `life.updateEvents` | oltre 3000 px dal giocatore, oppure 150 s (60 dopo l'inizio di una fuga in auto) |
+| Streaming di chi è dentro un fatto | `pedestrians.stream` | `ring.despawn × 1,8`: un rapinatore non svanisce a metà scena |
+| Arresto di un NPC | `life.orderLawman` | sotto il 45% della salute, a meno di 30 px, per 1,4 s |
 
 ---

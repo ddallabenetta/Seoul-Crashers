@@ -992,6 +992,7 @@ export class Hud {
       `scalinate ${this.city.stats.stairs}  ostili ${game.peds.filter((p) => p.hostile).length}`,
       `wanted ${game.wanted.level}  heat ${game.wanted.heat.toFixed(0)}  ${game.wanted.seen ? 'visto' : `fuga ${game.wanted.unseenT.toFixed(1)}s`}`,
       `polizia ${game.police.cops.length}p ${game.police.cars.length}v  blocchi ${game.police.blocks.length}`,
+      game.life.info,
       `esplosivi ${game.projectiles.items.length}v ${game.projectiles.mines.length}m ${game.projectiles.fires.length}f  scoppi ${game.stats.blasts || 0}`,
       game.indoors
         ? game.metro?.inside

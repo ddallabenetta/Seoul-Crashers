@@ -220,6 +220,33 @@ Sparsi per la mappa ci sono i **territori delle bande** (백호파, 흑사파, �
 cortile, un piazzale di container o un capannone, con il tag dipinto a terra e i loro uomini
 di guardia. Passarci disarmati si può; entrarci con un ferro in pugno, no.
 
+## La città vive per conto suo
+
+Non tutto quello che succede lo fai succedere tu.
+
+**In cielo e in acqua c'è qualcuno ai comandi.** Passano aerei ed elicotteri in quota, e se sei
+vicino a una pista vedi un turboelica prendere velocità e staccare, oppure scendere sull'asse,
+frenare e rullare al piazzale — dove poi resta parcheggiato, e a quel punto è tuo se lo vuoi.
+Sul Han e in mare navigano motoscafi e battelli con un timoniere vero, che la riva la evita.
+
+**La campagna lavora.** Nelle risaie e fra le serre di Gyeonggi ci sono braccianti che si
+spostano fra i filari con lunghe pause, un trattore che fa i solchi avanti e indietro, e due
+che ogni tanto si fermano a scambiarsi una parola. Alle sette di sera smontano tutti e
+rincasano: dopo il tramonto i campi sono vuoti davvero.
+
+**La gente si raduna e parla.** Sui marciapiedi si formano capannelli — un cerchio in cui tutti
+guardano al centro, o una fila davanti a una vetrina — e chi parla ha una nuvoletta sopra la
+testa. Ne parla uno per volta, e ogni tanto lo senti.
+
+**E c'è la cronaca nera.** Ogni tanto qualcuno rapina un negozio: senti il colpo sparato in aria
+da due isolati, vedi la strada svuotarsi, e mentre sono ancora dentro arriva la volante. Se
+fanno in tempo salgono in macchina e comincia un inseguimento che non riguarda te. Altre volte
+è una banda che entra nel cortile di un'altra, e allora è una sparatoria vera — con la polizia
+che arriva a rovinare la festa a tutti e si porta via chi resta in piedi a fatica.
+
+Puoi guardare, puoi passare oltre, oppure puoi metterti in mezzo. Ma se spari a un agente
+mentre lavora, quello che succede dopo riguarda te.
+
 ## Come è fatto
 
 ```
@@ -228,7 +255,7 @@ src/
   core/      loop a passo fisso, input, audio sintetizzato, RNG deterministico, griglie
   world/     generatori Seoul/Busan/Jeju, registro regioni, grafo e texture mappa
   render/    camera 2.5D, sprite, facciate, terreno a tile, interni e stazioni metro
-  entities/  giocatore, fisica veicoli, traffico, pedoni, polizia, negozi
+  entities/  giocatore, fisica veicoli, traffico, pedoni, polizia, negozi, vita degli NPC
   ui/        HUD, minimappa, carta, menu, negozi e navigazione metro
 ```
 
@@ -397,5 +424,11 @@ strada (e la sua telefonata si può fermare sul marciapiede), la mazza che ti fa
 solo se non la stai usando, un banco dei pegni in ogni distretto che possa averne uno — il
 porto ha così il suo primo negozio in assoluto — e il futon che cura fino al 70% e non oltre,
 così l'ospedale ha di nuovo un mestiere.
+
+**Fase 3, la vita degli NPC — completata.** La Corea ha dei fatti e non solo delle cose: aerei
+che decollano e atterrano davvero e barche con un timoniere, la campagna che lavora dalle sei
+alle sette e poi rincasa, capannelli di gente che parla, rapine con la volante che arriva
+mentre sono ancora dentro e guerre fra bande nei cortili. Un modulo solo e nessuna entità
+nuova — un pilota è un veicolo, un rapinatore è un pedone.
 
 **Fase 3, il resto — da fare.** Le 12 missioni con cutscene a fumetti e le attività secondarie.

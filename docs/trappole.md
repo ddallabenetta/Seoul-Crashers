@@ -225,3 +225,55 @@ sbagliato, che è il modo peggiore di rompersi.
 **Il rettangolo di una città non è più un muro.** I collider di confine stanno ai limiti del
 mondo, non a quelli di ogni città: si esce da Seoul guidando. Chi assume che il giocatore sia
 sempre dentro una regione (`areaAt` può restituire `null`) va corretto, non aggirato.
+
+**Un NPC dentro un fatto non deve spaventarsi.** Ogni sparo chiama `game.alarm`, e `alarm`
+mette in fuga chiunque nel raggio: senza saltare chi è in stato `errand` (§5.26), la prima
+pallottola di una rapina scioglieva la rapina. Vale anche per il traffico — `p.panic` viene
+azzerato per chi ha un compito, come già per la divisa — o un'auto che passa vicino a un
+cortile chiudeva una guerra fra bande.
+
+**Chi viene colpito da un NPC scappa; chi viene colpito da te reagisce.** Sono due rami diversi
+di `pedestrians.hurt` e vanno tenuti in quest'ordine: prima il giocatore (che rende `hostile`),
+poi `errand` (che scrive `p.aggro` e resta nel fatto), poi il panico. Invertendoli, sparare a un
+rapinatore non lo faceva più venire verso di te.
+
+**Un sensore lungo il doppio non vede meglio, vede sempre.** Il tastatore di riva delle
+imbarcazioni guarda avanti `130 + 0.35 × v` px. A `170 + 0.55 × v` trovava l'altra sponda del
+Han — che è largo 300 px — praticamente sempre, e le barche navigavano al 54% della velocità di
+crociera scansando una riva che non stava per toccare. La stessa trappola vale per qualunque
+raggio di percezione tarato senza guardare quanto è largo lo spazio in cui vive.
+
+**Un veicolo di `life.js` va tolto da chi lo possiede, non solo dalla lista.** `protect = true`
+lo salva dallo streaming del traffico, quindi se `life` non lo rimuove da `game.vehicles` resta
+lì per il resto della partita. Vale al contrario per il giocatore: se se l'è preso lui
+(`driver === 'player'`), non si cancella e non gli si scrive addosso freno a mano e gas — un
+frame di volante piantata si sente.
+
+**`this.tmp` non è un posto solo.** `lanePoint` scrive nell'oggetto che gli passi: chi lo usa
+come scratch (`roadPointNear`) e chi ci restituisce un punto (`suspectPoint`) devono avere due
+oggetti diversi, o il secondo si ritrova le coordinate di una corsia.
+
+**Una lamiera ferma in carreggiata è una corsia chiusa, e la coda arriva a mezzo quartiere.**
+L'auto della fuga di una rapina (§5.26) nasceva su un punto di corsia qualunque: il traffico
+civile le frena dietro (`senseAhead` non sa che quella non riparte più) e in venti secondi
+l'incrocio a monte è bloccato. Adesso si cerca prima uno **stallo vero** fra quelli che il
+traffico usa già (`traffic.parkingSpots`, cortili e vicoli — fuori carreggiata per costruzione)
+e solo in mancanza di quello si ripiega su un **boulevard**, dove restano tre corsie. Vale per
+qualunque cosa si voglia lasciare ferma in strada.
+
+**«Tutti tranne i miei» non è l'elenco dei nemici.** In `life.foes` l'insieme dei bersagli
+scritto per esclusione funzionava per l'incursore e per il difensore, e in una rapina — dove il
+proprio gruppo *è* `ev.crew` — metteva il complice fra i nemici: con un uomo solo in squadra,
+sé stesso. Il sorgente si legge come corretto perché il ramo sbagliato è quello che **manca**.
+L'elenco va scritto per ruolo, non per differenza, e chi cerca un bersaglio scarta sé stesso.
+
+**Chi non ha paura delle auto si fa investire.** Azzerare `p.panic` per chi è in `errand` è
+obbligatorio (senza, il traffico scioglie ogni evento), ma toglie anche l'unico riflesso che
+un pedone ha davanti a una macchina: un rapinatore che attraversa due carreggiate per arrivare
+alla vetrina finisce sotto una berlina una volta su tre. La cura non è ridargli il panico, è
+**accorciare la strada**: l'auto della fuga si cerca entro 340 px dal negozio, non 520.
+
+**Uno stato non è un posto, nemmeno per le guardie di un territorio.** `startWar` pretendeva
+`state === 'guard'` e falliva a caso: basta un'auto che accosta per mandare in `flee` mezzo
+cortile, e il ritorno alla ronda è di qualche secondo. È la stessa lezione già pagata da
+`canDeal` col 거래책 (§3): si guarda **dov'è**, non come si sente.

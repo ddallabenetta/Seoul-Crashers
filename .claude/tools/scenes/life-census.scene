@@ -1,0 +1,209 @@
+// Censimento della vita degli NPC (§5.26): le cinque cose di `life.js` messe una
+// dopo l'altra, ognuna nel posto in cui può succedere davvero. È l'unico modo di
+// giudicarle senza uno schermo — un aereo che decolla, un campo che si popola e
+// una rapina che arriva in fondo sono tutti fatti che durano decine di secondi e
+// che a occhio si vedono solo se si sta guardando quel pixel in quel momento.
+//
+//   node .claude/tools/probe.mjs --seconds 0 --quiet \
+//     --script .claude/tools/scenes/life-census.scene
+//
+// Tre cifre non si interpretano, sono invarianti:
+//   · `voloQuota` > 0        — un velivolo con un pilota deve staccare da terra
+//   · `rapina.fasi` finisce con 'chase' o 'escape' — la rapina deve arrivare in fondo
+//   · `guerra.morti` > 0     — una guerra fra bande in cui non cade nessuno non è una guerra
+//
+// Estensione `.scene` e non `.js` perché è il corpo di una funzione async.
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const life = game.life;
+const city = game.city;
+
+function jump(x, y) {
+  game.player.x = x;
+  game.player.y = y;
+  game.player.district = city.districtAt(x, y);
+  game.camera.snapTo(x, y);
+}
+
+const out = {};
+
+// --- 1. cielo ---------------------------------------------------------------
+// Vicino a una pista, così si pesca anche il movimento d'aeroporto e non solo il
+// sorvolo: sono le due metà del traffico aereo e hanno due macchine a stati diverse.
+{
+  const rw = city.runways[0];
+  jump(rw.x + rw.w / 2 + 700, rw.y + rw.h / 2 + 700);
+  await wait(1500);
+  let maxZ = 0;
+  let seen = 0;
+  const phases = new Set();
+  for (let i = 0; i < 90; i++) {
+    life.airT = Math.min(life.airT, 0.2);
+    for (const v of life.air) {
+      maxZ = Math.max(maxZ, v.z);
+      if (v.ai) phases.add(v.ai.phase);
+    }
+    seen = Math.max(seen, life.air.length);
+    await wait(300);
+  }
+  // Decollo e atterraggio si tirano a sorte: per vedere anche il secondo lo si
+  // chiede finché non capita, o metà del traffico d'aeroporto resta non provata.
+  let land = null;
+  for (let i = 0; i < 14 && !land; i++) {
+    const v = life.spawnAirportMove(game, life.nearestRunway(rw.x, rw.y));
+    if (v && v.ai.phase === 'final') land = v;
+    else if (v) { life.air.splice(life.air.indexOf(v), 1); life.removeVehicle(v, game); }
+  }
+  if (land) {
+    // Il rullaggio al piazzale è lungo davvero (70 px/s): con una finestra da
+    // mezzo minuto si vede la fase `taxi` ma non la fine, e `atterrato` risulta
+    // falso su un atterraggio perfettamente riuscito.
+    for (let i = 0; i < 320; i++) {
+      if (land.ai) phases.add(land.ai.phase);
+      if (!land.ai) break;   // parcheggiato: non è più roba di `life`
+      await wait(200);
+    }
+    out.atterrato = !land.ai && !!land.moored;
+  }
+  out.voloQuota = Math.round(maxZ);
+  out.voloMezzi = seen;
+  out.voloFasi = [...phases].join(',');
+}
+
+// --- 2. acqua ---------------------------------------------------------------
+{
+  // Il primo molo del porto: acqua vera, larga, con la riva a due passi — è lì
+  // che si vede se il timoniere sa evitarla o ci si pianta contro.
+  const pier = city.piers[0];
+  jump(pier.x - 500, pier.y + pier.h / 2);
+  life.boatT = 0;
+  await wait(3000);
+  // Si misura la **strada fatta**, non lo spostamento netto: una barca che gira
+  // di bordo torna dove era, e con la distanza in linea d'aria un timoniere che
+  // naviga benissimo risulterebbe fermo.
+  const last = new Map();
+  let stuck = 0;
+  let travel = 0;
+  let vsum = 0;
+  let vn = 0;
+  for (let i = 0; i < 60; i++) {
+    life.boatT = Math.min(life.boatT, 0.2);
+    for (const v of life.boats) {
+      const l = last.get(v.id);
+      if (l) travel += Math.hypot(v.x - l.x, v.y - l.y);
+      last.set(v.id, { x: v.x, y: v.y });
+      if (Math.abs(v.speed) < 8) stuck++;
+      vsum += Math.abs(v.speed);
+      vn++;
+    }
+    await wait(300);
+  }
+  out.barche = life.boats.length;
+  out.barcheFerme = stuck;          // campioni con uno scafo praticamente immobile
+  out.barchePercorso = Math.round(travel);
+  out.barcheVelMedia = Math.round(vsum / Math.max(1, vn));
+}
+
+// --- 3. campagna ------------------------------------------------------------
+{
+  const rural = city.blocks.filter((b) => b.type === 'rural' && b.fields && b.fields.length > 3);
+  const b = rural[Math.floor(rural.length / 2)];
+  jump(b.x + b.w / 2, b.y + b.h / 2);
+  game.dayCycle.hour = 10;
+  game.dayCycle.paused = true;
+  await wait(14000);
+  out.braccianti = life.farmers.length;
+  out.trattori = life.tractors.length;
+  out.alCampo = game.peds.filter((p) => p.state === 'work').length;
+  // Cala la sera: il turno finisce e si rincasa. Se `commute` non porta a niente,
+  // i braccianti restano nei campi al buio per il resto della partita.
+  game.dayCycle.hour = 20;
+  await wait(1000);
+  out.inRientro = game.peds.filter((p) => p.state === 'commute').length;
+  await wait(20000);
+  out.rimastiAlCampo = game.peds.filter((p) => p.state === 'work').length;
+  game.dayCycle.hour = 13;
+  game.dayCycle.paused = false;
+}
+
+// --- 4. raduni --------------------------------------------------------------
+{
+  // Myeongdong: il marciapiede più pieno che ci sia, quindi il posto in cui un
+  // capannello trova davvero della gente da reclutare.
+  jump(city.spawn.x, city.spawn.y);
+  await wait(6000);
+  let best = 0;
+  let talked = 0;
+  for (let i = 0; i < 70; i++) {
+    life.crowdT = Math.min(life.crowdT, 0.2);
+    for (const c of life.crowds) best = Math.max(best, c.members.length);
+    if (game.peds.some((p) => p.talkT > 0)) talked++;
+    await wait(300);
+  }
+  out.raduni = life.crowds.length;
+  out.radunoMax = best;
+  out.campioniConParlato = talked;
+}
+
+// --- 5. rapina --------------------------------------------------------------
+{
+  jump(game.city.spawn.x, game.city.spawn.y);
+  await wait(2000);
+  let ev = null;
+  for (let i = 0; i < 12 && !ev; i++) {
+    ev = life.startRobbery(game);
+    if (!ev) await wait(600);
+  }
+  const phases = [];
+  let units = 0;
+  let shots = 0;
+  const hp = new Map();
+  if (ev) {
+    for (const p of ev.crew) hp.set(p, p.hp);
+    for (let i = 0; i < 400; i++) {
+      if (!phases.length || phases[phases.length - 1] !== ev.phase) phases.push(ev.phase);
+      units = Math.max(units, ev.units.length);
+      for (const p of ev.crew) if (hp.has(p) && p.hp < hp.get(p)) { shots++; hp.set(p, p.hp); }
+      if (ev.over) break;
+      await wait(250);
+    }
+  }
+  out.rapina = ev ? {
+    fasi: phases.join('>'),
+    volanti: units,
+    colpiti: shots,
+    morti: ev.crew.filter((p) => p.dead).length,
+    catturati: ev.crew.filter((p) => p.gone && !p.dead).length,
+  } : 'nessun negozio a tiro';
+}
+
+// --- 6. guerra fra bande ----------------------------------------------------
+{
+  const t = city.turfs[0];
+  jump(t.cx + 620, t.cy + 620);
+  // Le guardie di un territorio nascono dallo streaming dei pedoni: senza questa
+  // attesa la guerra parte contro un cortile vuoto e non succede niente.
+  await wait(9000);
+  let ev = null;
+  for (let i = 0; i < 14 && !ev; i++) {
+    ev = life.startWar(game);
+    if (!ev) await wait(1200);
+  }
+  out.guardieInPiedi = game.peds.filter((p) => p.turf === t && !p.dead).length;
+  let dead = 0;
+  let units = 0;
+  if (ev) {
+    for (let i = 0; i < 200; i++) {
+      units = Math.max(units, ev.units.length);
+      dead = ev.crew.concat(ev.guards).filter((p) => p.dead).length;
+      if (ev.over) break;
+      await wait(300);
+    }
+  }
+  out.guerra = ev
+    ? { incursori: ev.crew.length, difensori: ev.guards.length, morti: dead, volanti: units }
+    : 'nessun territorio a tiro';
+}
+
+out.fps = game.loop.fps;
+out.stato = life.info;
+return out;

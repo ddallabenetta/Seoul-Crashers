@@ -110,6 +110,17 @@ export function createPed(kind, x, y, rng) {
     dealer: false,    // 거래책: l'uomo con cui si tratta (vedi `spawnTurf`)
     cop: false,       // in servizio: lo stato lo guida `police.copBehavior`
     copWeapon: null,
+    // Chi ha un compito da `life.js`. `role` dice quale mestiere sta facendo (e
+    // quindi che ordini riceve), `ev` il fatto a cui appartiene, `aggro` chi gli
+    // ha appena sparato. Stanno qui e non in un oggetto a parte perché un pedone
+    // con una forma sola è un pedone che il motore JS non ricompila a ogni evento.
+    role: null,
+    ev: null,
+    aggro: null,
+    job: null,        // campo assegnato al bracciante (stato `work`)
+    home: null,       // dove rincasa a fine turno (stato `commute`)
+    talkT: 0,         // sta parlando: lo disegna `scene.drawPed`
+    spotX: 0, spotY: 0, faceA: 0,   // il posto in un raduno (stato `gather`)
     gone: false,      // despawnato dallo streaming (vedi `stream`)
     fireT: 0,
     bleedT: 0,
@@ -252,13 +263,22 @@ export class PedestrianSystem {
     const ring = ringFor(game);
     for (let i = this.peds.length - 1; i >= 0; i--) {
       const p = this.peds[i];
+      // Chi è già stato congedato da qualcun altro (l'agente che risale in
+      // volante, il bracciante che ha chiuso la porta di casa, il rapinatore che
+      // è salito in auto): `gone` è l'unica cosa che quei sistemi possono
+      // scrivere, la lista la taglia solo chi la possiede.
+      if (p.gone) { this.peds.splice(i, 1); continue; }
       if (p.dead) {
         p.deadT += dt;
         if (p.deadT > 30) { p.gone = true; this.peds.splice(i, 1); continue; }
       }
       // `gone` serve a chi tiene riferimenti ai pedoni (la polizia): un agente
       // despawnato dallo streaming non deve restare a fare la caccia da fantasma.
-      if (dist(p.x, p.y, pl.x, pl.y) > ring.despawn) {
+      // Chi è dentro un fatto di `life.js` (`p.ev`) resiste molto più a lungo: una
+      // rapina che comincia al bordo dell'anello perdeva il rapinatore a metà
+      // scena, e l'evento si chiudeva da solo senza che fosse successo niente.
+      // Il margine sta sotto i 3000 px oltre i quali `life` chiude l'evento.
+      if (dist(p.x, p.y, pl.x, pl.y) > (p.ev ? ring.despawn * 1.8 : ring.despawn)) {
         p.gone = true;
         this.peds.splice(i, 1);
       }
@@ -393,8 +413,10 @@ export class PedestrianSystem {
       if (d < 22 && sp > 85) this.knockDown(p, v, game);
     }
     // Chi è in servizio non scappa dalle auto: se scappasse, il primo inseguimento
-    // in mezzo al traffico scioglierebbe la pattuglia.
-    if (p.cop) p.panic = 0;
+    // in mezzo al traffico scioglierebbe la pattuglia. Vale identico per chi ha un
+    // compito da `life.js`: una rapina in riva a un boulevard finirebbe prima di
+    // cominciare, sciolta dal traffico invece che dalla polizia.
+    if (p.cop || p.state === 'errand') p.panic = 0;
 
     if (p.panic > 0 && !p.hostile) {
       p.panic -= dt;
@@ -533,6 +555,78 @@ export class PedestrianSystem {
         ty = p.postY;
         break;
       }
+      case 'errand': {
+        // Ha un compito: dove andare lo decide `life.order`, allo stesso modo in
+        // cui lo stato `duty` lo chiede a `police.copBehavior`. Qui non si sa (e
+        // non si deve sapere) se sta rapinando un negozio o difendendo un cortile.
+        const order = game.life ? game.life.order(p, dt, game) : null;
+        if (order) {
+          tx = order.x;
+          ty = order.y;
+          targetSpeed = order.speed;
+        }
+        break;
+      }
+      case 'work': {
+        // Nel campo. Ci si sposta piano fra un punto e l'altro dell'appezzamento
+        // con lunghe pause: da lontano è la sagoma ferma e china a dire che lì si
+        // sta lavorando, non la traiettoria.
+        const f = p.job && p.job.field;
+        if (!f) { p.state = 'walk'; break; }
+        if (p.talkT > 0) p.talkT -= dt;
+        if (p.idleT > 0) {
+          p.idleT -= dt;
+          targetSpeed = 0;
+          break;
+        }
+        targetSpeed = p.baseSpeed * 0.42;
+        if (!p.postX || dist(p.x, p.y, p.postX, p.postY) < 16) {
+          p.postX = f.x + 8 + Math.random() * Math.max(1, f.w - 16);
+          p.postY = f.y + 8 + Math.random() * Math.max(1, f.h - 16);
+          p.idleT = 2 + Math.random() * 7;
+          // Due che si fermano vicini si scambiano una parola: è l'unico modo in
+          // cui un campo di risaia racconta che ci lavora una squadra e non tre
+          // sagome che si ignorano.
+          if (Math.random() < 0.4) {
+            for (const o of game.pedGrid.queryCircle(p.x, p.y, 78)) {
+              if (o === p || o.state !== 'work' || o.dead) continue;
+              p.talkT = 1.2 + Math.random() * 1.4;
+              o.idleT = Math.max(o.idleT, p.talkT);
+              break;
+            }
+          }
+        }
+        tx = p.postX;
+        ty = p.postY;
+        break;
+      }
+      case 'commute': {
+        // Si rincasa. Arrivati sulla porta si sparisce: quello che c'è dietro è
+        // una facciata, e farceli entrare vorrebbe dire una pianta per cascina.
+        const h = p.home;
+        if (!h) { p.state = 'walk'; break; }
+        targetSpeed = p.baseSpeed * 1.15;
+        tx = h.x;
+        ty = h.y;
+        if (dist(p.x, p.y, tx, ty) < 18) p.gone = true;
+        break;
+      }
+      case 'gather': {
+        // Nel capannello: si raggiunge il proprio posto e da lì si guarda chi
+        // parla. Il posto e la direzione li scrive `life.js`, che è l'unico a
+        // sapere se questo è un cerchio o una coda davanti a una vetrina.
+        if (p.talkT > 0) p.talkT -= dt;
+        tx = p.spotX;
+        ty = p.spotY;
+        const gd = dist(p.x, p.y, tx, ty);
+        if (gd < 7) {
+          targetSpeed = 0;
+          p.angle = approachAngle(p.angle, p.faceA, 3 * dt);
+        } else {
+          targetSpeed = p.baseSpeed * (gd > 90 ? 1.1 : 0.55);
+        }
+        break;
+      }
       case 'duty': {
         // Poliziotto in servizio: dove andare lo decide `police.copBehavior`, il
         // come muoversi resta il codice di steering condiviso qui sotto.
@@ -658,7 +752,8 @@ export class PedestrianSystem {
     // scavalcato: rifargli la query dei solidi a ogni frame, per venti persone,
     // è il grosso di quello che costa la pioggia.
     if (p.state === 'flee' || p.state === 'crossing' || p.state === 'hostile'
-      || p.state === 'duty' || (p.state === 'shelter' && targetSpeed > 0)) {
+      || p.state === 'duty' || p.state === 'errand' || p.state === 'commute'
+      || ((p.state === 'shelter' || p.state === 'gather' || p.state === 'work') && targetSpeed > 0)) {
       const solids = this.city.solidGrid.queryRect(p.x - 24, p.y - 24, 48, 48);
       for (const s of solids) {
         if (s.vehicleOnly) continue;
@@ -778,8 +873,17 @@ export class PedestrianSystem {
         p.state = 'walk';
         p.shelterCd = 6 + this.rng.range(0, 6);
         break;
+      case 'gather':
+      case 'commute':
+        // Al proprio posto non ci si arriva: si lascia perdere invece di spingere
+        // contro un muro. Il capannello se ne accorge da solo — `life` scarta chi
+        // non è più in `gather` — e il bracciante torna un passante qualunque.
+        p.state = 'walk';
+        p.talkT = 0;
+        break;
       case 'guard':
-        p.postX = 0;    // si sceglie un altro posto dove ciondolare
+      case 'work':
+        p.postX = 0;    // si sceglie un altro posto dove ciondolare (o da zappare)
         p.idleT = 0;
         break;
       case 'flee':
@@ -849,6 +953,11 @@ export class PedestrianSystem {
       p.hostile = true;
       p.state = 'hostile';
       p.panic = 0;
+    } else if (p.state === 'errand') {
+      // Chi è già in mezzo a una sparatoria non scappa perché gli hanno sparato:
+      // gira il ferro verso chi l'ha colpito. Senza questa riga la prima
+      // pallottola scioglieva l'evento e restava una banda di gente che corre.
+      if (source && source !== game.player) p.aggro = source;
     } else {
       p.panic = Math.max(p.panic, 5);
       p.fleeFromX = p.x - dx * 90;
@@ -879,7 +988,9 @@ export class PedestrianSystem {
     // bianco, e il tetto delle voci lo taglierebbe comunque a caso.
     let voiced = Math.random() > 0.55;
     for (const p of this.peds) {
-      if (p.dead || p.hostile || p.cop) continue;
+      // Chi ha un compito non si spaventa per uno sparo: o è suo, o è di quello a
+      // cui sta sparando. Vale anche per la divisa, per la stessa ragione.
+      if (p.dead || p.hostile || p.cop || p.state === 'errand') continue;
       const d2 = (p.x - x) ** 2 + (p.y - y) ** 2;
       if (d2 > r2) continue;
       if (source === game.player && PED_KINDS[p.kind]?.fights && d2 < near2) {
