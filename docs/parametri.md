@@ -217,3 +217,12 @@
 | Arresto di un NPC | `life.orderLawman` | sotto il 45% della salute, a meno di 30 px, per 1,4 s |
 
 ---
+| **— pannelli e cutscene (§5.27) —** | | |
+| Stacco fra due pannelli | `cutscene.TRANS` | 0,26 s, triangolare: nero pieno a metà, ed è lì che il pannello cambia |
+| Rettangolo del pannello | `panelkit.panelRect` | 16:9, largo al massimo 1180 px, 96 px di aria ai lati e 150 in verticale |
+| Abbassamento dell'audio per modalità | `modes.MODES` | pannelli 0,12 · menu 0,22 · gioco 1 — e la radio ha il suo (`radioDuck`: menu 0,4) |
+| Durata del suggerimento «ESC per saltare» | `cutscene.skipHintT` | 5 s; la scorciatoia resta per sempre, si nasconde solo la scritta |
+| Sosta automatica di un pannello | voce `hold` in `story/intro.js` | solo il 20 (1,1 s): tutti gli altri li fa avanzare il giocatore |
+| Pioggia di un pannello | `panelkit.rain` | `amount` 0-1 → fino a 150 gocce; inclinazione 0,22-0,42 e velocità 1,7-2,6 |
+| Asfalto bagnato al risveglio | `story/intro.handoff` | `dayCycle.wet = 0,6` — ha appena smesso, e si asciuga da solo |
+| Dove nasce l'auto del padre | `story/intro.parkFathersCar` | stallo vero entro 420 px, altrimenti accostata a una linea attiva entro 260 px |

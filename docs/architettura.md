@@ -11,6 +11,8 @@ src/main.js           classe Game: boot, loop, callback del mondo, statistiche
 src/core/
   loop.js             passo fisso 1/60 con accumulatore, render libero
   input.js            tastiera/mouse, stato continuo + fronti (wasPressed)
+  events.js           il bus: `game.on/once/off/emit`, da cui passano i fatti del mondo
+  modes.js            in che modalità gira il gioco e cosa concede (`game.mode`, `paused`)
   audio.js            sintetizzatore WebAudio: colpi secchi + letti continui, mix, muto
   music.js            musica generata: tema del menu, caccia, stacchi — e la regia
   radio.js            stazioni coreane in streaming (`<audio>`, fuori dal grafo audio)
@@ -37,8 +39,12 @@ src/world/
   roadgraph.js        nodi/archi, corsie, semafori, prenotazione incrocio
   maptexture.js       texture 1100×1100 della mappa, con hillshade (minimappa + mappa piena)
 
+src/story/
+  intro.js            «12년»: i 28 pannelli della cutscene iniziale + il passaggio di consegne
+
 src/render/
   camera.js           camera 2.5D, PROJ, SUN, applyUI (DPR), shake, bounds
+  panelkit.js         primitive dei pannelli a fumetto: sagome, insegne, pioggia, quadrante
   sprites.js          VEHICLE_TYPES, PED_KINDS, sprite generati e cache
   facades.js          texture facciate (overlay), gradienti, insegne
   ground.js           GroundRenderer: tile 512 px, hillshade, coste e confini del mondo
@@ -71,6 +77,8 @@ src/ui/
   mixer.js            il pannello dei volumi, condiviso fra i due menu
   shopmenu.js         pannello del listino (compra/vendi)
   metro.js            ingresso/uscita, pianta fisica e rete locale/interurbana
+  text.js             a capo automatico e paragrafi: corpo fisso, misura condivisa
+  cutscene.js         il lettore di pannelli: sequenza, stacchi, salto, `onDone`
 
 .claude/              strumenti per chi sviluppa (non fa parte del gioco), vedi §9
   tools/probe.mjs     avvia il gioco headless, esegue scene, misura, screenshot
@@ -346,6 +354,32 @@ queste due regole un evento si scioglieva alla prima pallottola. E **le volanti 
 non sono `police.cars`**: quella lista è la caccia al giocatore, con dentro ricercato, assedio e
 arresto; qui si riusa solo ciò che è già generico (`followRoads`, `snapToRoad`) e si tiene una
 lista a parte, `life.units`, che l'audio legge per la sirena.
+
+**I fatti del mondo si dicono una volta e li ascolta chi vuole** (§5.27). Gli otto callback su
+`Game` — `onPedKilled`, `onVehicleDestroyed`, `onEnterVehicle`, … — ci sono ancora e i loro
+tredici chiamanti non sono cambiati: quello che è cambiato è che ognuno **finisce con un
+`emit`**. Chi vuole *osservare* si iscrive (`game.on`), invece di farsi aggiungere un `if`
+dentro `main.js`. Serve alle missioni e alla tabella di Kkachi, che hanno bisogno degli stessi
+eventi per ragioni diverse. Due regole del bus non sono decorative: si itera su una **copia**
+della lista (un iscritto che si disiscrive mentre viene chiamato è il caso normale) e
+l'eccezione di un iscritto **non ferma il frame**.
+
+**In che modalità gira il gioco lo dice una tabella, non dieci booleani** (§5.27). `core/modes.js`
+elenca le modalità in ordine di priorità e ognuna **dichiara cosa concede**: se il mondo avanza
+(`worldRuns`), se il giocatore risponde (`playerRuns`), quanto si abbassa l'audio (`duck`, e la
+radio ha il suo `radioDuck` perché è la musica che ha scelto il giocatore), se si vede il
+puntatore. **`game.paused` è derivato** da `worldRuns`, quindi tutti i posti che lo leggevano
+funzionano senza sapere che è cambiato qualcosa — ma **non si può più assegnare** (§4). La
+cutscene è la prima modalità che non è né «gioco» né «menu»: mondo fermo, giocatore fermo,
+pannelli che animano. Non è ancora una pila, ed è scritto lì perché il giorno che due modalità
+si sovrappongono davvero si cambia quel file e nient'altro.
+
+**Un pannello è una funzione, e si disegna dritto sul contesto.** Stesso patto degli sprite: il
+kit (`render/panelkit.js`) tiene solo i pezzi che tornano in più pannelli, il resto se lo disegna
+il pannello. Si disegna **dentro un rettangolo ritagliato** invece che su un canvas offscreen —
+il copione diceva offscreen e il senso («niente asset in cache») vale ancora, ma un canvas
+grande allocato a ogni frame per una pioggia che si muove costa più della pioggia. `ui/cutscene.js`
+non sa quale storia sta raccontando: riceve una sequenza, la mostra, e chiama `onDone`.
 
 **La polizia non ha entità sue.** Un agente è un pedone di `game.peds` con `p.cop = true` e
 stato `duty`: `pedestrians.updatePed` gli chiede dove andare a `police.copBehavior` e poi usa

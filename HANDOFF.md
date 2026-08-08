@@ -5,22 +5,23 @@ resta corto apposta.** Il contenuto vero sta in `docs/`, e si apre un documento 
 non tutti. Il `README.md` descrive il gioco e i comandi; qui c'è quello che serve a
 *sviluppare*. Avvio e vincoli stanno in `CLAUDE.md`, che si carica da solo.
 
-Ultimo aggiornamento: **il copione della campagna** (`docs/storia/`) — dodici missioni in tre
-atti, la cutscene iniziale, i finali e le chiamate radio, scritti per intero e **senza una riga
-di codice**, con l'impianto concordato con l'utente. L'ultima tappa *giocabile* resta la vita
-degli NPC (§5.26). Le precedenti sono §5.8-5.25.
+Ultimo aggiornamento: **la tappa A della campagna** (§5.27) — le primitive dei pannelli a
+fumetto, la **cutscene iniziale** da ventotto pannelli, e i due pezzi d'impianto che la
+reggono: il **bus di eventi** e la **tabella delle modalità**. Le precedenti sono §5.8-5.26.
 
-> 📌 **Il prossimo lavoro è la tappa A della campagna**: primitive dei pannelli a fumetto e la
-> **cutscene iniziale**. Le nove decisioni d'impianto prese con l'utente e le otto tappe stanno
-> in [`docs/storia/08-domande-aperte.md`](docs/storia/08-domande-aperte.md) — leggi quello, non
+> 📌 **Il prossimo lavoro è la tappa B**: impianto missioni (blip singolo, fasi, ripresa
+> dall'ultima fase) più **M1 e M2**. L'ordine delle sette tappe che restano, e le **quattro cose
+> d'impianto che la tappa A ha lasciato aperte apposta** — migrazioni del salvataggio, NPC
+> persistenti, il blip, la porta sigillata — stanno **in testa a
+> [`docs/backlog.md`](docs/backlog.md) (§6.0)**, che è la prima cosa da leggere prima di
+> cominciare. Le nove decisioni d'impianto prese con l'utente stanno in
+> [`docs/storia/08-domande-aperte.md`](docs/storia/08-domande-aperte.md): leggi quelle, non
 > ricavarle dal copione. Resta aperta una domanda sola (se le missioni si rigiocano) e non
-> blocca niente. Quello che il copione **non** decide — quanti pannelli in una schermata, come
-> si disegnano — si concorda a vista (§7). La musica copre
-> due momenti soli (menu e caccia, §5.19): i pezzi che accompagnano una missione sono un'altra
-> scelta di regia, e si fanno insieme alle missioni. Il §6 resta ordinato per impatto: le voci
-> più concrete sono il sorpasso, l'arresto che ti carica in volante e il **corridoio fra Seoul
-> e Busan**, che dal §5.25 è geografia percorribile ma non ha ancora niente da fare — ed è la
-> superficie naturale delle attività secondarie.
+> blocca niente. Due cose che la tappa A **non** ha fatto e che vanno con la D: la regia sonora
+> della cutscene e la prima riga di Kkachi, che oggi è un toast. Il resto del §6 resta ordinato
+> per impatto: le voci più concrete sono il sorpasso, l'arresto che ti carica in volante e il
+> **corridoio fra Seoul e Busan**, che dal §5.25 è geografia percorribile ma non ha ancora
+> niente da fare — ed è la superficie naturale delle attività secondarie.
 
 ---
 
@@ -64,6 +65,7 @@ commenti resta valido: si risolve qui.
 | §5.24 Strade libere, metro viva e confini | `docs/storico/13-strade-metro-confini.md` |
 | §5.25 Mappa unica della Corea | `docs/storico/14-mappa-unica-corea.md` |
 | §5.26 Vita degli NPC | `docs/storico/15-vita-degli-npc.md` |
+| §5.27 Pannelli, cutscene e impianto | `docs/storico/16-pannelli-e-cutscene.md` |
 | §6 Backlog | `docs/backlog.md` |
 | §8 Parametri | `docs/parametri.md` |
 | §9 Strumenti (`.claude/`) | `docs/strumenti.md` |
@@ -79,8 +81,8 @@ Canvas 2D puro, moduli ES nativi, **zero dipendenze, nessun build step**. Tutta 
 Stato: **Fase 1, Fase 1.5, Fase 2 (tutte e tre le tappe) e le prime tre tappe della Fase 3
 completate e collaudate**, più la revisione della guida AI del traffico (§5.10), i due giri di
 arretrati (§5.12 e §5.21), l'audio procedurale del §5.13, il salvataggio del §5.15, il giro
-menu-musica-autosave del §5.18-5.20 e le tre regioni collegate e ricostruite del §5.22-5.24.
-~25.100 righe in 47 moduli. 60 fps con ~44 veicoli e ~93
+menu-musica-autosave del §5.18-5.20, le tre regioni collegate e ricostruite del §5.22-5.24 e
+la prima tappa della campagna (§5.27). ~29.000 righe in 52 moduli. 60 fps con ~44 veicoli e ~93
 pedoni attivi, e restano 60 anche sotto raffica continua di SMG. Dentro un edificio il costo è
 trascurabile: la città non gira. Il ciclo giorno-notte costa **1,5 ms di JS per frame nel caso
 peggiore** (notte con temporale) — ma i veli a schermo intero non sono misurabili onestamente
@@ -136,6 +138,15 @@ formano capannelli in cui uno parla per volta — e ogni tanto qualcuno rapina u
 la sua banda nel cortile di un'altra, con la volante che arriva a rovinare la festa a tutti. Un
 modulo solo (`entities/life.js`) e **nessuna entità nuova**: un pilota è un veicolo con un
 `ai.mode`, un rapinatore è un pedone con lo stato `errand`. La caccia a *te* resta un altro file.
+
+**E la partita comincia con una scena** (§5.27). «Nuova partita» apre **«12년»**: ventotto
+pannelli a fumetto disegnati da codice come tutto il resto, saltabili sempre con `ESC` perché i
+tre indizi che seminano tornano tutti più avanti. All'ultimo si sveglia in un vicolo di Hongdae
+alle 8:24, l'asfalto ancora bagnato e l'auto di suo padre lì davanti — e se accende la radio,
+qualcuno gli parla. Sotto ci sono due pezzi d'impianto che valgono più della scena: il **bus di
+eventi** (`game.on/emit`), da cui passeranno i cento inneschi delle dodici missioni, e la
+**tabella delle modalità**, che ha sostituito i dieci booleani con cui il gioco diceva se era
+in pausa.
 
 La Fase 2 era divisa in tre tappe, concordate con l'utente: **A** combattimento base,
 **B** polizia e ricercato a 5 livelli, **C** armi pesanti ed esplosivi. **Sono tutte fatte.**

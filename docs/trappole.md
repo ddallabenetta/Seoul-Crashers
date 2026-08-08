@@ -277,3 +277,23 @@ alla vetrina finisce sotto una berlina una volta su tre. La cura non è ridargli
 `state === 'guard'` e falliva a caso: basta un'auto che accosta per mandare in `flee` mezzo
 cortile, e il ritorno alla ronda è di qualche secondo. È la stessa lezione già pagata da
 `canDeal` col 거래책 (§3): si guarda **dov'è**, non come si sente.
+
+**Un pannello nero su fondo nero nel sorgente si legge come un contrasto.** Alla prima passata
+metà dei ventotto pannelli della cutscene (§5.27) erano illeggibili: un giubbotto `#0a0b0f` su
+un tavolo `#22262e` *è* una differenza di valore, ma a schermo, dietro una vignettatura e con
+una pioggia sopra, è un rettangolo vuoto. La regola che li ha sistemati tutti è una sola: **le
+sagome sono nere, quindi il fondo non può esserlo**. Se un pannello ha una silhouette in primo
+piano, il fondo va portato a grigio medio (`#2a2731` e simili), non «un po' più chiaro del
+nero». E si guarda il provino (`cutscene-sheet.scene`), non il sorgente.
+
+**`paused` è diventato una proprietà calcolata, e assegnarla adesso alza un'eccezione.** Dal
+§5.27 `game.paused` si ricava dalla modalità (`core/modes.js`). I moduli ES girano in modalità
+rigorosa, quindi un `this.paused = false` rimasto in giro non è un no-op: è un `TypeError` che
+ferma il frame. Ce n'erano quattro (costruttore, `travelTo`, `toTitle`, `update`) e sono stati
+tolti tutti; chi ne aggiunge uno per abitudine se ne accorge solo a run time.
+
+**Il campo della larghezza di una linea stradale si chiama `width`, non `w`.** Scritto `l.w` si
+ottiene `undefined`, poi `NaN` sulle coordinate — e un veicolo creato a `NaN` **non alza niente**:
+entra nella lista, non si vede, non collide, e le prove che lo cercano per distanza rispondono
+«non c'è» invece di «è rotto». Ci è cascata l'auto del padre del passaggio di consegne (§5.27).
+Vale per qualunque cosa si posi sul bordo di una carreggiata.

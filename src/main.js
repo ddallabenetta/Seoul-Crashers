@@ -2,6 +2,8 @@
 import { Loop } from './core/loop.js';
 import { Input } from './core/input.js';
 import { Rng } from './core/rng.js';
+import { Events } from './core/events.js';
+import { resolveMode } from './core/modes.js';
 import { AudioSystem } from './core/audio.js';
 import { Radio } from './core/radio.js';
 import { DynamicGrid } from './core/spatial.js';
@@ -31,6 +33,8 @@ import { PauseMenu } from './ui/menu.js';
 import { StartMenu } from './ui/startmenu.js';
 import { ShopMenu } from './ui/shopmenu.js';
 import { MetroSystem } from './ui/metro.js';
+import { Cutscene } from './ui/cutscene.js';
+import { INTRO, handoff } from './story/intro.js';
 
 const MAX_PIXELS = 2_900_000;
 // Dentro un edificio non c'è traffico: la griglia dei veicoli si ricostruisce vuota
@@ -44,9 +48,12 @@ class Game {
     this.camera = new Camera();
     this.input = new Input(canvas);
     this.rng = new Rng(20260730);
+    // Il bus: da qui passano i fatti del mondo, e ci si iscrivono le missioni e la
+    // tabella di Kkachi invece di frugare nello stato del gioco a ogni frame.
+    this.events = new Events();
+    this.cutscene = new Cutscene();
     this.time = 0;
     this.debug = false;
-    this.paused = false;
     // Falso finché il menu iniziale è a schermo: il mondo gira lo stesso, il
     // giocatore no (§5.18).
     this.started = false;
@@ -297,7 +304,6 @@ class Game {
     this.mapView.open = false;
     this.menu.open = false;
     this.metro.open = false;
-    this.paused = false;
     this.hud.showDistrict(this.player.district);
     if (opts.silent) return;
     const toArea = this.areaAt(this.player.x, this.player.y);
@@ -368,7 +374,6 @@ class Game {
   toTitle() {
     this.newGame();
     this.started = false;
-    this.paused = false;
     this.menu.open = false;
     this.mapView.open = false;
     this.shopMenu.open = false;
@@ -380,6 +385,38 @@ class Game {
     // salvato qualcosa.
     this.startMenu.refresh();
     // Il tema torna da solo: `music.direct` guarda `game.started` a ogni frame.
+  }
+
+  // --- bus di eventi ----------------------------------------------------------
+  on(name, fn) { return this.events.on(name, fn); }
+  once(name, fn) { return this.events.once(name, fn); }
+  off(name, fn) { this.events.off(name, fn); }
+  emit(name, ...args) { this.events.emit(name, ...args); }
+
+  /**
+   * In che modalità sta girando il gioco (`core/modes.js`). Si risolve a ogni
+   * lettura ed è una manciata di predicati: chi lo chiede tre volte in un frame
+   * non paga niente, e non c'è uno stato in più da tenere allineato.
+   */
+  get mode() {
+    return resolveMode(this);
+  }
+
+  /**
+   * Il mondo è fermo. Era una riga di `update` con quattro `or` dentro; adesso è
+   * la modalità a dirlo, e la cutscene ci entra senza aggiungere un quinto `or` a
+   * ognuno dei posti che leggono questo campo.
+   */
+  get paused() {
+    return !this.mode.worldRuns;
+  }
+
+  /** La cutscene iniziale, e quello che viene dopo (`story/intro.js`). */
+  playIntro() {
+    this.cutscene.play(this, INTRO, 'intro', (game) => {
+      game.start(false);
+      handoff(game);
+    });
   }
 
   /** True quando il giocatore è in un interno: negozio oppure stazione metro. */
@@ -418,9 +455,16 @@ class Game {
   }
 
   // --- callback dal mondo ----------------------------------------------------
+  //
+  // Restano metodi, e restano i chiamanti di prima: `vehicle.js`, `player.js`,
+  // `pedestrians.js`, `projectiles.js` e `shops.js` chiamano `game.onQualcosa`
+  // esattamente come facevano. Quello che è cambiato è che ognuno finisce con un
+  // `emit`, così chi vuole *osservare* un fatto — una fase di missione, una riga
+  // di Kkachi — si iscrive invece di farsi aggiungere un `if` qui dentro.
   onDistrictChange(d) {
     this.hud.showDistrict(d);
     this.stats.districts.add(this.districtKey(d));
+    this.emit('districtChange', d);
   }
 
   onEnterVehicle(v) {
@@ -435,10 +479,12 @@ class Game {
     else if (this.pedGrid.queryCircle(v.x, v.y, 320).some((p) => !p.dead)) {
       this.wanted.report('theft', this);
     }
+    this.emit('enterVehicle', v);
   }
 
   onExitVehicle(v) {
     v.protect = false;
+    this.emit('exitVehicle', v);
   }
 
   onVehicleImpact(v, impact) {
@@ -454,6 +500,7 @@ class Game {
       }
     }
     if (impact > 40) this.fx.addDust(v.x, v.y, v.vx, v.vy, 3);
+    this.emit('vehicleImpact', v, impact);
   }
 
   onVehicleDestroyed(v) {
@@ -482,6 +529,7 @@ class Game {
     // carambole del traffico non devono mandare la centrale in allarme.
     if (v.lastAttacker === this.player) this.wanted.report('wreck', this);
     v.protect = false;
+    this.emit('vehicleDestroyed', v);
   }
 
   /**
@@ -505,6 +553,7 @@ class Game {
     if (v.spot) v.spot.taken = false;
     const i = this.vehicles.indexOf(v);
     if (i >= 0) this.vehicles.splice(i, 1);
+    this.emit('vehicleSunk', v);
   }
 
   onPedKilled(p, v, speed, source) {
@@ -527,6 +576,7 @@ class Game {
       this.fx.addDust(p.x, p.y, v.vx, v.vy, 3);
       if (v.driver === 'player') this.camera.addShake(6);
     }
+    this.emit('pedKilled', p, v, source);
   }
 
   /**
@@ -544,14 +594,20 @@ class Game {
       this.hud.toast('La radio è in macchina (o in un locale che ce l\'ha)', 1.8);
       return;
     }
-    if (shift) this.radio.off(this);
-    else this.radio.next(this);
+    if (shift) {
+      this.radio.off(this);
+    } else {
+      this.radio.next(this);
+      // `inCar` perché Kkachi sta nel motore: la radio di un 편의점 non è la sua.
+      this.emit('radioOn', !!inCar);
+    }
   }
 
   onPlayerDeath() {
     this.stats.deaths++;
     this.camera.addShake(16);
     this.audio.playerDown();
+    this.emit('playerDeath');
   }
 
   // --- combattimento ---------------------------------------------------------
@@ -614,6 +670,7 @@ class Game {
     pl.money -= bill;
     this.hud.toast(`Ospedale di ${best.name}: ti hanno ricucito, l'arsenale no`, 4);
     if (bill > 0) this.hud.toast(`Conto della clinica: ${won(bill)}`, 4);
+    this.emit('respawn', best);
     // Uscire dall'ospedale è un punto pulito: niente stelle, HP pieni, in piedi
     // davanti a una porta. Se una sconfitta non si salva qui, l'unico modo di
     // riavere quello che si aveva prima è non ricaricare mai.
@@ -662,12 +719,22 @@ class Game {
     this.hud.toast(`Arrestato — commissariato di ${best.name}`, 4);
     this.hud.toast('Sei ore dentro, e l\'arsenale se lo tengono', 4);
     if (bail > 0) this.hud.toast(`Cauzione: ${won(bail)}`, 4);
+    this.emit('busted', best);
     autosave(this, 'uscito di cella');
   }
 
   // --- ciclo ----------------------------------------------------------------
   update(dt) {
     const input = this.input;
+    // La cutscene è l'unica modalità in cui il mondo non gira *e* qualcosa si
+    // muove lo stesso. Gira solo lei e l'audio: i letti si abbassano da soli
+    // leggendo `mode.duck`, e la musica tace (`music.direct`).
+    if (this.cutscene.active) {
+      this.cutscene.update(dt, this);
+      this.audio.update(dt, this);
+      input.endFrame();
+      return;
+    }
     if (!this.started) {
       this.updateAttract(dt);
       return;
@@ -696,13 +763,12 @@ class Game {
 
     const canUseMetro = this.metro.open || (!this.menu.open && !this.mapView.open && !this.shopMenu.open);
     const metroUsed = canUseMetro ? this.metro.update(dt, this) : false;
-    this.paused = this.menu.open || this.mapView.open || this.shopMenu.open || this.metro.open;
     this.updateRadioKeys();
     // L'audio gira anche in pausa: i letti si abbassano invece di spegnersi (uno
     // stacco netto suona come un guasto) e i suoni dei menu restano a volume pieno.
     this.audio.update(dt, this);
     this.radio.update(dt, this);
-    const cursor = this.paused ? 'default' : 'none';
+    const cursor = this.mode.cursor;
     if (this.canvas.style.cursor !== cursor) this.canvas.style.cursor = cursor;
 
     if (this.paused || metroUsed) {
@@ -874,6 +940,13 @@ class Game {
 
   render() {
     const ctx = this.ctx;
+    // Durante i pannelli la città non si disegna affatto: sotto c'è il nero pieno
+    // della tavola, quindi renderizzarla sarebbe un frame intero buttato via.
+    if (this.cutscene.active) {
+      this.camera.applyUI(ctx);
+      this.cutscene.draw(ctx, this);
+      return;
+    }
     if (this.metro.inside) this.metroScene.render(ctx, this);
     else if (this.indoors) this.interiorScene.render(ctx, this);
     else this.scene.render(ctx, this);

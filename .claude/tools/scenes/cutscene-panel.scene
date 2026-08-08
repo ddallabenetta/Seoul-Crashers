@@ -1,0 +1,26 @@
+// Guarda un pannello della cutscene iniziale, fermo, per farci uno screenshot.
+//
+// La cutscene avanza solo quando il giocatore preme qualcosa, quindi un `--seconds`
+// lungo non la fa scorrere: si sceglie il pannello e si aspetta soltanto il tempo
+// che serve alla pioggia e ai fruscii per essere a regime.
+//
+// `--script` è ripetibile e i file girano nello stesso contesto, quindi il numero
+// del pannello si passa con uno script di una riga davanti a questo:
+//
+//   echo 'window.__PANEL = 11;' > /tmp/p.js
+//   node .claude/tools/probe.mjs --seconds 1.5 --shot /tmp/p11.png \
+//     --script /tmp/p.js --script .claude/tools/scenes/cutscene-panel.scene
+//
+// Senza, mostra il primo. Il numero è quello del copione (1-28), non l'indice:
+// `docs/storia/02-cutscene-iniziale.md`.
+const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
+const want = Number(window.__PANEL || 1);
+
+game.newGame();
+game.playIntro();
+const i = game.cutscene.seq.findIndex((p) => p.id === want);
+game.cutscene.i = i >= 0 ? i : 0;
+game.cutscene.t = 0;
+game.cutscene.trans = 0;
+game.cutscene.skipHintT = 0;   // il suggerimento sfuma da solo: fuori dallo scatto
+await wait(0.2);
