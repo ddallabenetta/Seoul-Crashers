@@ -209,7 +209,8 @@
 | Raduni | `life.MAX_CROWDS` · `startCrowd` | 2 alla volta · 3-6 persone reclutate entro 300 px · durata 28-70 s · 40% file davanti a una vetrina |
 | Chi parla, e ogni quanto | `life.chatter` | uno per volta, 1,1-2,2 s di nuvoletta, cambio ogni 1,6-3,4 s; suono solo entro 620 px e non più di uno ogni 1,5-4 s |
 | Fatti di cronaca | `life.MAX_EVENTS` · `eventT` · `EVENT_MIN`/`EVENT_MAX` | 2 alla volta · uno ogni 26-55 s · fra 420 e 1200 px dal giocatore, fuori inquadratura |
-| Durata di una rapina alla vetrina | `life.robTime` | 5-9 s; la volante parte 2 s dopo l'inizio del colpo |
+| Durata di una rapina alla vetrina | `life.robTime` | 5-9 s; la volante parte 2 s dopo l'inizio del colpo, la fuga scade a 40 s |
+| Dove aspetta l'auto della fuga | `life.getawaySpot` | stallo vero entro 340 px dalla vetrina, altrimenti un boulevard entro 340 px; si provano le sei vetrine più vicine |
 | Chiamata alla polizia in una guerra fra bande | `life.updateWar` | dopo 7 s di fuoco; l'evento si scioglie 5 s dopo l'ultimo caduto (16 s se una volante è in arrivo) |
 | Fine di un fatto | `life.updateEvents` | oltre 3000 px dal giocatore, oppure 150 s (60 dopo l'inizio di una fuga in auto) |
 | Streaming di chi è dentro un fatto | `pedestrians.stream` | `ring.despawn × 1,8`: un rapinatore non svanisce a metà scena |

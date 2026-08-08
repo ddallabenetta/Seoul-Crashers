@@ -892,19 +892,25 @@ export class LifeSystem {
    */
   startRobbery(game) {
     const pl = game.player;
-    let shop = null;
-    let bestD = Infinity;
+    // Non basta la vetrina più vicina: se lì attorno non c'è posto dove lasciare
+    // l'auto della fuga non si rapina niente, e il colpo salta per un dettaglio di
+    // urbanistica. Si guardano le prime candidate in ordine di distanza.
+    const shops = [];
     for (const s of this.city.shops || []) {
       const d = dist(s.x, s.y, pl.x, pl.y);
-      if (d < EVENT_MIN || d > EVENT_MAX || d > bestD) continue;
+      if (d < EVENT_MIN || d > EVENT_MAX) continue;
       if (!outsideView(game, s.x, s.y, 40)) continue;
-      bestD = d;
-      shop = s;
+      shops.push({ s, d });
+    }
+    if (!shops.length) return null;
+    shops.sort((a, b) => a.d - b.d);
+    let shop = null;
+    let road = null;
+    for (let i = 0; i < Math.min(6, shops.length); i++) {
+      road = this.getawaySpot(game, shops[i].s);
+      if (road) { shop = shops[i].s; break; }
     }
     if (!shop) return null;
-
-    const road = this.getawaySpot(game, shop);
-    if (!road) return null;
     const car = createVehicle(this.rng.chance(0.5) ? 'van' : 'sedan', road.x, road.y, road.angle, this.rng.int(0, 9));
     car.driver = null;
     car.handbrake = true;
@@ -971,9 +977,9 @@ export class LifeSystem {
         break;
       }
       case 'escape': {
-        // Se la fuga non parte entro mezzo minuto non partirà più: chi è rimasto
-        // molla il colpo e scappa a piedi come chiunque altro.
-        if (ev.phaseT > 30) { ev.over = true; break; }
+        // Se la fuga non parte entro quaranta secondi non partirà più: chi è
+        // rimasto molla il colpo e scappa a piedi come chiunque altro.
+        if (ev.phaseT > 40) { ev.over = true; break; }
         // Chi arriva alla portiera sale e sparisce: la scena è l'auto che riparte,
         // non due sagome che si infilano dentro una carrozzeria.
         for (const p of live) {
@@ -1026,7 +1032,11 @@ export class LifeSystem {
     const spots = game.traffic ? game.traffic.parkingSpots : null;
     if (spots) {
       let best = null;
-      let bestD = 520 * 520;
+      // Corto: da mezzo chilometro la squadra attraversa due carreggiate per
+      // andare e altrettante per tornare, e chi ha un compito **non scansa le
+      // auto** (`p.panic` azzerato) — cioè si fa investire. Il colpo deve stare
+      // nell'isolato del negozio.
+      let bestD = 340 * 340;
       for (const s of spots) {
         if (s.taken) continue;
         const d = (s.x - shop.x) ** 2 + (s.y - shop.y) ** 2;
@@ -1104,7 +1114,12 @@ export class LifeSystem {
       turf = t;
     }
     if (!turf) return null;
-    const guards = game.peds.filter((p) => alive(p) && p.turf === turf && p.state === 'guard');
+    // Chiunque sia di quel territorio e non stia già facendo altro. Pretendere
+    // `state === 'guard'` sembrava più sicuro e faceva fallire la guerra a caso:
+    // basta un'auto che accosta a mandare in `flee` mezzo cortile, e da lì il
+    // ritorno alla ronda è di qualche secondo. Chi c'è, c'è.
+    const guards = game.peds.filter((p) => alive(p) && p.turf === turf
+      && !p.hostile && p.state !== 'errand');
     if (guards.length < 2) return null;
     const rival = GANGS.filter((g) => g.id !== turf.gang);
     const gang = this.rng.pick(rival);
@@ -1379,7 +1394,9 @@ export class LifeSystem {
     let best = null;
     let bestD = reach;
     for (const o of this.foes(ev, p.role)) {
-      if (!alive(o) || o.state !== 'errand') continue;
+      // Mai se stessi: costa un confronto e chiude la porta al bug più assurdo
+      // che questa parte possa produrre — uno che si spara addosso da fermo.
+      if (o === p || !alive(o) || o.state !== 'errand') continue;
       const d = dist(p.x, p.y, o.x, o.y);
       if (d < bestD) { bestD = d; best = o; }
     }
@@ -1395,11 +1412,19 @@ export class LifeSystem {
   foes(ev, role) {
     const out = this._foes;
     out.length = 0;
-    if (role !== 'lawman') {
-      for (const u of ev.units || []) if (u.unit) for (const c of u.unit.cops) out.push(c);
+    if (role === 'lawman') {
+      for (const p of ev.crew || []) out.push(p);
+      for (const p of ev.guards || []) out.push(p);
+      return out;
     }
-    if (role !== 'defender') for (const p of ev.guards || []) out.push(p);
-    if (role !== 'raider') for (const p of ev.crew || []) out.push(p);
+    // Tutti gli altri hanno contro la legge, e in più: l'incursore le guardie, la
+    // guardia gli incursori, **il rapinatore nessun altro**. La riga che manca è
+    // quella che conta: scritta come «tutti tranne i miei» un rapinatore si
+    // ritrovava fra i nemici il proprio complice — e con un colpo solo in squadra,
+    // se stesso.
+    for (const u of ev.units || []) if (u.unit) for (const c of u.unit.cops) out.push(c);
+    if (role === 'raider') for (const p of ev.guards || []) out.push(p);
+    else if (role === 'defender') for (const p of ev.crew || []) out.push(p);
     return out;
   }
 

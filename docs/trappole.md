@@ -260,3 +260,20 @@ l'incrocio a monte è bloccato. Adesso si cerca prima uno **stallo vero** fra qu
 traffico usa già (`traffic.parkingSpots`, cortili e vicoli — fuori carreggiata per costruzione)
 e solo in mancanza di quello si ripiega su un **boulevard**, dove restano tre corsie. Vale per
 qualunque cosa si voglia lasciare ferma in strada.
+
+**«Tutti tranne i miei» non è l'elenco dei nemici.** In `life.foes` l'insieme dei bersagli
+scritto per esclusione funzionava per l'incursore e per il difensore, e in una rapina — dove il
+proprio gruppo *è* `ev.crew` — metteva il complice fra i nemici: con un uomo solo in squadra,
+sé stesso. Il sorgente si legge come corretto perché il ramo sbagliato è quello che **manca**.
+L'elenco va scritto per ruolo, non per differenza, e chi cerca un bersaglio scarta sé stesso.
+
+**Chi non ha paura delle auto si fa investire.** Azzerare `p.panic` per chi è in `errand` è
+obbligatorio (senza, il traffico scioglie ogni evento), ma toglie anche l'unico riflesso che
+un pedone ha davanti a una macchina: un rapinatore che attraversa due carreggiate per arrivare
+alla vetrina finisce sotto una berlina una volta su tre. La cura non è ridargli il panico, è
+**accorciare la strada**: l'auto della fuga si cerca entro 340 px dal negozio, non 520.
+
+**Uno stato non è un posto, nemmeno per le guardie di un territorio.** `startWar` pretendeva
+`state === 'guard'` e falliva a caso: basta un'auto che accosta per mandare in `flee` mezzo
+cortile, e il ritorno alla ronda è di qualche secondo. È la stessa lezione già pagata da
+`canDeal` col 거래책 (§3): si guarda **dov'è**, non come si sente.

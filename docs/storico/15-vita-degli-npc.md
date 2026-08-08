@@ -143,12 +143,14 @@ in cui può succedere davvero. Sul mondo attuale:
 | --- | --- |
 | quota massima raggiunta da un velivolo pilotato | 397 px |
 | fasi di volo osservate | `roll, cruise, final, rollout, taxi` |
-| imbarcazioni in navigazione · velocità media · campioni piantati | 3 · 222 px/s · 1 su 180 |
+| imbarcazioni in navigazione · velocità media · campioni piantati | 3 · 150-220 px/s · 0-1 su 180 |
 | braccianti nei campi alle 10 · trattori | 8 · 1 |
 | braccianti rimasti nei campi alle 20 | **0** (tutti rincasati) |
 | capannelli · membri del più grande · campioni con qualcuno che parla | 2 · 6 · 66 su 70 |
 | rapina: fasi percorse | `arrive > rob > escape [> chase]` |
-| guerra fra bande: caduti · volanti arrivate | 4 su 6 · 1 |
+| sei rapine di fila: volanti arrivate · arrivate alla fuga in auto | 6 su 6 · 5 su 6 |
+| distanza fra l'auto della fuga e la vetrina | 231-325 px |
+| guerra fra bande: caduti · volanti arrivate | 3-4 su 6 · 1 (2 prove su 2) |
 | auto civili piantate da oltre 6 s, **senza** fatti in corso | 7,65 in media · 16 al peggio |
 | le stesse **con** i fatti in corso | 8,53 in media · 13 al peggio |
 | fps con tutto acceso | 58-60 (45 headless, come senza) |
@@ -162,6 +164,12 @@ Tre cifre non si interpretano, sono invarianti: un velivolo pilotato **deve** st
 una rapina **deve** arrivare almeno a `escape`, e una guerra fra bande in cui non cade nessuno
 non è una guerra. Che una rapina arrivi a `chase` invece no: se il rapinatore resta a terra o la
 volante gli sfascia l'auto, la fuga non parte — ed è un finale legittimo, non un difetto.
+
+Il censimento ha anche trovato **il bug peggiore di questa tappa, e l'ha trovato solo lui**:
+`life.foes` costruiva l'elenco dei nemici come «tutti tranne i miei», e in una rapina — dove il
+proprio gruppo *è* `ev.crew` — un rapinatore si ritrovava fra i bersagli il complice, e con un
+uomo solo in squadra sé stesso. Nel sorgente si legge come corretto: la riga che manca è quella
+che conta. Adesso l'elenco si scrive per ruolo, e `pickFoe` scarta sé stessi per sicurezza.
 
 Tre numeri sono stati **spostati per una misura**, e sono i tre punti in cui questa tappa era
 sbagliata a occhio e giusta nel sorgente: il tastatore di riva delle barche (§ sopra), la
