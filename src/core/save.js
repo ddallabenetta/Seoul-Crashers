@@ -14,6 +14,23 @@
 // diversa viene rifiutato invece di far ricomparire il giocatore dentro un muro.
 import { WEATHERS } from '../world/daycycle.js';
 import { createVehicle } from '../entities/vehicle.js';
+import { REGIONS } from '../world/regions.js';
+
+const AREA_ORIGIN = Object.fromEntries(REGIONS.map((a) => [a.id, a]));
+
+/**
+ * Dove ricomincia la partita, in coordinate di mondo. Uno slot scritto prima
+ * della mappa unica (§5.25) contiene coordinate **locali alla sua regione**: un
+ * salvataggio a Busan diceva `3000/2000`, che nel mondo nuovo è un cortile di
+ * Seoul. Il campo `world` distingue i due formati, e le origini fanno il resto —
+ * è l'unico modo di non buttare via i salvataggi vecchi.
+ */
+function worldPoint(data) {
+  if (data.world) return { x: data.player.x, y: data.player.y };
+  const area = AREA_ORIGIN[data.region];
+  if (!area) return { x: data.player.x, y: data.player.y };
+  return { x: data.player.x + area.x, y: data.player.y + area.y };
+}
 
 export const SLOTS = 3;
 /**
@@ -76,7 +93,9 @@ export function snapshot(game) {
   return {
     v: VERSION,
     seed: SEED,
-    region: game.city.region?.id || 'seoul',
+    region: game.areaAt?.(game.player.x, game.player.y)?.id || 'korea',
+    // Marchia il formato: da qui in poi le coordinate sono già di mondo.
+    world: true,
     at: Date.now(),
     time: game.time,
     player: {
@@ -109,9 +128,10 @@ export function snapshot(game) {
 
 /** Le due righe che la lista degli slot mostra senza caricare niente. */
 export function describe(data, game) {
+  // Dal §5.25 c'è una mappa sola: il posto si legge dalle coordinate, sempre.
   const regionId = data.region || 'seoul';
-  const sameRegion = (game.city.region?.id || 'seoul') === regionId;
-  const d = sameRegion ? game.city.districtAt(data.player.x, data.player.y) : null;
+  const p = worldPoint(data);
+  const d = game.city.districtAt(p.x, p.y);
   const regionNames = { seoul: '서울 Seoul', busan: '부산 Busan', jeju: '제주 Jeju' };
   const h = data.clock.t / (24 * 60) * 24;
   const hh = Math.floor(h);
@@ -136,8 +156,6 @@ export function describe(data, game) {
 export function apply(game, data) {
   const pl = game.player;
   if (game.indoors) game.leaveInterior();
-  const regionId = data.region || 'seoul';
-  if ((game.city.region?.id || 'seoul') !== regionId) game.travelTo(regionId, null, { silent: true });
 
   // Il mondo attorno: quello che non è protetto se ne va. È lo stesso svuotamento
   // che fa la partita nuova, e sta in `Game` perché il mondo è suo (§5.21).
@@ -156,8 +174,9 @@ export function apply(game, data) {
   pl.heat = 0;
   pl.overheated = false;
   pl.stamina = 1;
-  pl.x = data.player.x;
-  pl.y = data.player.y;
+  const at = worldPoint(data);
+  pl.x = at.x;
+  pl.y = at.y;
   pl.angle = data.player.angle;
   pl.hp = data.player.hp;
   pl.money = data.player.money;

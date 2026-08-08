@@ -1,11 +1,9 @@
-// Registro delle regioni giocabili. Ogni città usa lo stesso contratto del
-// generatore originale, così traffico, polizia, negozi e renderer non hanno rami.
+// Registro del mondo giocabile. Dal §5.25 la regione non è più un mondo che si
+// esclude con gli altri: Seoul, Busan e Jeju stanno nella stessa mappa (vedi
+// `korea.js`) e qui resta la chiusura comune — validazione della carreggiata,
+// accessi metro solidi, indici spaziali, limiti del mondo.
 import { SpatialGrid } from '../core/spatial.js';
-import { generateCity } from './citygen.js';
-import { DISTRICTS } from './districts.js';
-import { expandSeoul } from './seoul_expansion.js';
-import { createBusanCity } from './busan.js';
-import { createJejuCity } from './jeju.js';
+import { createKorea, AREAS } from './korea.js';
 import { nearestActiveLine, rectIntersectsRoad, rectsOverlap } from './roadclearance.js';
 
 const ENTRANCE_W = 86;
@@ -274,20 +272,13 @@ function reindex(city) {
   return city;
 }
 
-export function createRegion(id = 'seoul') {
-  let city;
-  if (id === 'busan') city = createBusanCity();
-  else if (id === 'jeju') city = createJejuCity();
-  else {
-    city = generateCity(20260730);
-    city.region = { id: 'seoul', name: 'Seoul', hangul: '서울' };
-    city.name = 'Seoul';
-    city.hangul = '서울';
-    city.districts = DISTRICTS;
-    city.districtById = Object.fromEntries(DISTRICTS.map((d) => [d.id, d]));
-    expandSeoul(city);
-  }
-  return reindex(city);
+/**
+ * Il mondo, una volta sola. L'argomento resta per compatibilità con i richiami
+ * storici: non esiste più una regione da scegliere, esiste dove si atterra.
+ */
+export function createRegion() {
+  return reindex(createKorea());
 }
 
-export const REGION_IDS = ['seoul', 'busan', 'jeju'];
+export const REGION_IDS = AREAS.map((a) => a.id);
+export const REGIONS = AREAS;

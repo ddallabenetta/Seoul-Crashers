@@ -6,7 +6,7 @@ import { AudioSystem } from './core/audio.js';
 import { Radio } from './core/radio.js';
 import { DynamicGrid } from './core/spatial.js';
 import { KMH, clamp, dist } from './core/math.js';
-import { createRegion } from './world/regions.js';
+import { createRegion, REGION_IDS } from './world/regions.js';
 import { buildMapTexture } from './world/maptexture.js';
 import { DayCycle } from './world/daycycle.js';
 import { Camera } from './render/camera.js';
@@ -82,7 +82,6 @@ class Game {
       districts: new Set(),
     };
     this._skidT = 0;
-    this.regionCache = new Map();
     window.addEventListener('resize', () => this.resize());
     this.armAudio();
   }
@@ -122,15 +121,14 @@ class Game {
 
   async boot(onProgress) {
     this.resize();
-    await onProgress('Disegno le strade di Seoul…', 0.05);
-    this.city = createRegion('seoul');
+    await onProgress('Disegno le strade della Corea…', 0.05);
+    this.city = createRegion();
 
     await onProgress('Verniciano le carrozzerie…', 0.45);
     preloadSprites();
 
     await onProgress('Stampo le mappe turistiche…', 0.72);
     this.mapTexture = buildMapTexture(this.city);
-    this.regionCache.set('seoul', { city: this.city, mapTexture: this.mapTexture });
 
     await onProgress('Accendo i semafori…', 0.88);
     this.scene = new Scene(this.city);
@@ -160,7 +158,7 @@ class Game {
     this.traffic.prewarm(this, 72, 32);
     this.pedSystem.prewarm(this, 64);
 
-    this.stats.districts.add(this.player.district.id);
+    this.stats.districts.add(this.districtKey(this.player.district));
 
     await onProgress('Pronti.', 1);
     this.loop = new Loop((dt) => this.update(dt), () => this.render());
@@ -173,7 +171,7 @@ class Game {
     // percorso normale ingresso -> atrio -> tornelli. Il controllo automatico
     // può premere tasti ma non tenerli premuti per attraversare mezza città.
     const regionProbe = probe.get('regiontest');
-    if (['seoul', 'busan', 'jeju'].includes(regionProbe) && regionProbe !== 'seoul') {
+    if (REGION_IDS.includes(regionProbe)) {
       if (!this.started) this.start(false);
       this.travelTo(regionProbe, null, { silent: true });
     }
@@ -252,25 +250,16 @@ class Game {
     this.pickups.reset();
   }
 
-  /** Genera una regione una volta sola; le visite successive riusano la stessa
-   * geometria e la stessa carta, mentre traffico e pedoni restano streaming. */
-  region(id) {
-    let cached = this.regionCache.get(id);
-    if (cached) return cached;
-    const city = createRegion(id);
-    cached = { city, mapTexture: buildMapTexture(city) };
-    this.regionCache.set(id, cached);
-    return cached;
-  }
-
   /**
-   * Cambia stazione o città conservando Jae-min, inventario e orologio. Tutti i
-   * sistemi che tengono un riferimento alla città vengono ricostruiti insieme:
-   * lasciarne anche uno indietro significherebbe collisioni o spawn a Seoul dopo
-   * essere arrivati a Busan.
+   * Il treno. Dal §5.25 non c'è più una città da ricostruire — Seoul, Busan e
+   * Jeju stanno nella stessa mappa — quindi restano il salto fra due fermate e
+   * quello che va rimesso a posto attorno al giocatore: mondo svuotato, camera
+   * riagganciata, streaming ripopolato dove si arriva. `regionId` sopravvive
+   * perché i salvataggi e la rete metro lo passano ancora: qui significa
+   * soltanto «la prima fermata di quell'area».
    */
   travelTo(regionId, stationId = null, opts = {}) {
-    const oldId = this.city.region?.id || 'seoul';
+    const fromArea = this.areaAt(this.player.x, this.player.y);
     if (this.indoors) this.leaveInterior();
     if (!this.player.onFoot && this.player.vehicle) {
       const v = this.player.vehicle;
@@ -280,37 +269,10 @@ class Game {
     }
     this.clearWorld();
 
-    if (regionId !== oldId) {
-      // Anche i mezzi speciali protetti appartengono alla vecchia regione.
-      this.vehicles.length = 0;
-      for (const p of this.peds) p.gone = true;
-      this.peds.length = 0;
-
-      const bundle = this.region(regionId);
-      this.city = bundle.city;
-      this.mapTexture = bundle.mapTexture;
-      const seed = regionId === 'busan' ? 20260807 : regionId === 'jeju' ? 20260808 : 20260730;
-      this.rng = new Rng(seed);
-      this.scene = new Scene(this.city);
-      this.vehicleGrid = new DynamicGrid(this.city.w, this.city.h, 150);
-      this.pedGrid = new DynamicGrid(this.city.w, this.city.h, 120);
-      this.traffic = new TrafficSystem(this.city, this.rng, this.vehicles);
-      this.pedSystem = new PedestrianSystem(this.city, this.rng, this.peds);
-      this.pickups = new PickupSystem(this.city, this.rng);
-      this.projectiles = new ProjectileSystem();
-      this.wanted = new WantedSystem();
-      this.police = new PoliceSystem(this.city, this.rng);
-      this.shops = new ShopSystem(this.city);
-      this.interiorScene = new InteriorScene(this.scene);
-      this.metroScene = new MetroScene(this.scene);
-      this.hud = new Hud(this.city, this.mapTexture);
-      this.mapView = new MapView(this.city, this.mapTexture);
-      this.menu = new PauseMenu(this.mapView);
-      this.traffic.placeSpecialVehicles(this);
-    }
-
     const stations = this.city.transitStations || [];
-    const station = stations.find((s) => s.id === stationId) || stations[0];
+    const station = stations.find((s) => s.id === stationId)
+      || stations.find((s) => s.region === regionId)
+      || stations[0];
     const target = station || this.city.spawn;
     this.player.x = station ? station.arrivalX : target.x;
     this.player.y = station ? station.arrivalY : target.y;
@@ -318,8 +280,7 @@ class Game {
     this.player.vy = 0;
     this.player.enterCooldown = 0.5;
     this.player.district = this.city.districtAt(this.player.x, this.player.y);
-    const districtKey = regionId === 'seoul' ? this.player.district.id : `${regionId}:${this.player.district.id}`;
-    this.stats.districts.add(districtKey);
+    this.stats.districts.add(this.districtKey(this.player.district));
     this.camera.snapTo(this.player.x, this.player.y);
     this.vehicleGrid.rebuild(this.vehicles);
     this.pedGrid.rebuild(this.peds);
@@ -330,14 +291,30 @@ class Game {
     this.metro.open = false;
     this.paused = false;
     this.hud.showDistrict(this.player.district);
-    if (!opts.silent) {
-      if (regionId !== oldId) {
-        this.dayCycle.advance(regionId === 'jeju' || oldId === 'jeju' ? 2 : 1.25);
-        const region = this.city.region;
-        this.hud.toast(`Arrivo a ${region.hangul} ${region.name}`, 3.4);
-      }
-      if (station) this.hud.toast(`${station.hangul} · ${station.name}`, 2.4);
+    if (opts.silent) return;
+    const toArea = this.areaAt(this.player.x, this.player.y);
+    if (toArea && toArea.id !== fromArea?.id) {
+      // Un interurbano costa tempo: il treno per Busan non è la metro di due
+      // fermate, e il traghetto per Jeju ancora meno.
+      this.dayCycle.advance(toArea.id === 'jeju' || fromArea?.id === 'jeju' ? 2 : 1.25);
+      this.hud.toast(`Arrivo a ${toArea.hangul} ${toArea.name}`, 3.4);
     }
+    if (station) this.hud.toast(`${station.hangul} · ${station.name}`, 2.4);
+  }
+
+  /** In quale delle tre città si trova un punto (null = campagna o mare). */
+  areaAt(x, y) {
+    return this.city.areaAt ? this.city.areaAt(x, y) : null;
+  }
+
+  /**
+   * Chiave con cui una zona entra nelle statistiche. Gli id dei distretti sono
+   * gli stessi in tutte e tre le città — è quello che tiene in piedi mercati e
+   * salvataggi — quindi da soli conterebbero Gangnam e Haeundae come un posto solo.
+   */
+  districtKey(d) {
+    const area = this.areaAt(this.player.x, this.player.y);
+    return !area || area.id === 'seoul' ? d.id : `${area.id}:${d.id}`;
   }
 
   /**
@@ -350,7 +327,6 @@ class Game {
    */
   newGame() {
     if (this.indoors) this.leaveInterior();
-    if ((this.city.region?.id || 'seoul') !== 'seoul') this.travelTo('seoul', null, { silent: true });
     this.clearWorld();
     this.player.reset(this.city.spawn.x, this.city.spawn.y);
     this.player.district = this.city.districtAt(this.player.x, this.player.y);
@@ -364,7 +340,7 @@ class Game {
     Object.assign(this.stats, {
       distance: 0, topSpeed: 0, stolen: 0, crashes: 0, pedsHit: 0, kills: 0,
       deaths: 0, busted: 0, copsKilled: 0, maxWanted: 0, choppers: 0, blasts: 0,
-      robberies: 0, visits: 0, districts: new Set([this.player.district.id]),
+      robberies: 0, visits: 0, districts: new Set([this.districtKey(this.player.district)]),
     });
     this.traffic.prewarm(this, 40, 18);
     this.pedSystem.prewarm(this, 40);
@@ -436,8 +412,7 @@ class Game {
   // --- callback dal mondo ----------------------------------------------------
   onDistrictChange(d) {
     this.hud.showDistrict(d);
-    const regionId = this.city.region?.id || 'seoul';
-    this.stats.districts.add(regionId === 'seoul' ? d.id : `${regionId}:${d.id}`);
+    this.stats.districts.add(this.districtKey(d));
   }
 
   onEnterVehicle(v) {
@@ -843,7 +818,7 @@ class Game {
     for (const v of this.vehicles) {
       if (v.driver !== 'player') v.lightsOn = this._wasNight;
     }
-    const place = this.city.region?.name || 'Seoul';
+    const place = this.areaAt(this.player.x, this.player.y)?.name || 'Corea';
     this.hud.toast(this._wasNight ? `Cala la sera su ${place}` : `Sorge il sole su ${place}`, 3);
   }
 

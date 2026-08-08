@@ -10,8 +10,9 @@ il menu iniziale (§5.18), la musica (§5.19) e l'autosave (§5.20) sono fatti; 
 sul traffico è chiusa (§5.10) e quella sulle auto attraversabili pure (§5.17, e dal §5.21 vale
 anche per i pedoni). Dal §5.22-5.24 sono fatti anche **Seoul estesa, le geografie autonome di
 Busan e Jeju, gli interni metro e i collegamenti interurbani**: ingressi solidi fuori dalle
-corsie, passeggeri e chiosco nelle stazioni, confini collisionabili e coste rifinite. Mappe e
-salvataggi sono consapevoli della regione.
+corsie, passeggeri e chiosco nelle stazioni e coste rifinite. Dal §5.25 le tre città stanno
+**nella stessa mappa**, disposte come in Corea: a Busan ci si arriva guidando sulla Gyeongbu,
+a Jeju via mare o in volo. Mappa, carta e salvataggi sono unici.
 **Restano le missioni**, che sono il lavoro grosso: impianto (attivazione sulla mappa,
 obiettivi, fallimento e ripetizione), cutscene a pannelli a fumetto, e i contenuti. **Le scelte
 di design vanno concordate con l'utente prima di scrivere codice** — è la prima cosa da chiedere
@@ -126,16 +127,26 @@ il §5.21 altre undici — fra cui le due che erano tornate in cima.
   meno (sono sagome della stessa taglia che si sovrappongono per un istante), ma è lo stesso
   steering e costerebbe una query in più per pedone per frame.
 
-**Rimasto indietro dalle regioni e dalla metro** (§5.22-5.24):
-- **Lasciare una regione non conserva il suo stato locale.** Geometria e texture restano in
-  cache, ma `ShopSystem` e gli interni vengono ricostruiti: casse svuotate, spese, vendite e
-  personale di Busan non aspettano il giocatore dopo un viaggio a Jeju. Il salvataggio conserva
-  correttamente la regione attiva, non una fotografia delle altre due.
-- **Il tratto interurbano è ancora uno stacco funzionale.** Ingresso, atrio, tornelli,
-  banchina e treno ora si vedono e si percorrono; dopo la scelta, però, il tempo avanza e il
-  personaggio arriva senza tariffa, biglietto né sequenza di KTX, traghetto o aereo. Prima di
-  aggiungerle va deciso quanto spesso il giocatore deve viaggiare: una sequenza bella la prima
-  volta può diventare un ostacolo alla decima.
+**Rimasto indietro dalle regioni, dalla metro e dalla mappa unica** (§5.22-5.25):
+- **Il corridoio è geografia, non ancora contenuto.** Fra Seoul e Busan ci sono l'autostrada,
+  due aree di servizio, campi e boschi dipinti — ma nessun paese, nessuna uscita, nessun
+  casello, nessuna strada provinciale che scenda verso la costa. È la superficie migliore su
+  cui mettere le attività secondarie (consegne, corse), e va decisa insieme a quelle.
+- **Nessun collegamento marittimo o aereo *messo in scena*.** Jeju è raggiungibile davvero in
+  barca o in volo, ma non c'è un traghetto che parta a orari né una tratta di linea: si guida
+  o si vola per conto proprio, oppure si prende il treno dalla metro.
+- **Il tratto interurbano in metro è ancora uno stacco funzionale.** Ingresso, atrio, tornelli,
+  banchina e treno si vedono e si percorrono; dopo la scelta, però, il tempo avanza e il
+  personaggio arriva senza tariffa, biglietto né sequenza di KTX. Adesso però è una comodità e
+  non l'unica via, quindi pesa meno di prima.
+- **Il bordo di una città resta leggibile a terra.** La tinta del terreno si interpola fra i
+  distretti e la campagna si dirada, ma dove finiscono gli isolati la trama cambia di colpo. Si
+  legge come «qui finisce Seoul», che è quasi giusto — una periferia vera vorrebbe capannoni,
+  svincoli e case sparse.
+- **Lasciare una città non conserva il suo stato locale.** `ShopSystem` e gli interni non
+  ricordano casse svuotate, spese e vendite di una città quando si è dall'altra parte del paese.
+  Con una mappa sola non c'è più un momento in cui «si lascia una regione», quindi il difetto è
+  meno visibile ma non è chiuso.
 - **Le linee sono etichette, non un grafo.** Il pannello permette di scegliere ogni altra
   fermata; non calcola cambi, percorso, durata o fermate intermedie. Un vero grafo serve solo se
   il viaggio deve diventare gameplay invece di navigazione rapida.

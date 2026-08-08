@@ -12,11 +12,10 @@ const ACTION_REACH = 48;
 const WALL = 18;
 const KIOSK_PRICE = 2500;
 
-const REGION_LINKS = [
-  { id: 'seoul', label: 'Seoul', hangul: '서울', service: 'KTX' },
-  { id: 'busan', label: 'Busan', hangul: '부산', service: 'KTX' },
-  { id: 'jeju', label: 'Jeju', hangul: '제주', service: 'Aeroporto · traghetto' },
-];
+// Il servizio che collega due aree. Da quando la mappa è unica il treno non è
+// più l'unico modo di arrivarci — si può guidare fino a Busan e volare o
+// navigare fino a Jeju — ma resta il più rapido, e va detto quale mezzo è.
+const AREA_SERVICE = { seoul: 'KTX', busan: 'KTX', jeju: 'Volo · traghetto' };
 
 function solid(x, y, w, h, type, extra = {}) {
   return { x, y, w, h, type, solid: true, z: extra.z ?? 28, ...extra };
@@ -163,24 +162,24 @@ export class MetroSystem {
   }
 
   buildOptions(game) {
-    const regionId = game.city.region?.id || 'seoul';
-    const local = (game.city.transitStations || [])
+    // Una rete sola, ordinata per area: prima le fermate della città in cui si
+    // è, poi quelle delle altre due. Il servizio interurbano non cambia mondo —
+    // cambia soltanto capolinea — ma resta la via rapida fra le tre città.
+    const hereId = this.station?.region
+      || game.areaAt?.(game.player.x, game.player.y)?.id
+      || 'seoul';
+    const rank = (s) => (s.region === hereId ? 0 : 1);
+    this.options = (game.city.transitStations || [])
       .filter((s) => s.id !== this.station?.id)
+      .sort((a, b) => rank(a) - rank(b))
       .map((s) => ({
-        region: regionId,
+        region: s.region,
         station: s.id,
         title: `${s.hangul}  ${s.name}`,
-        detail: `Metro ${(s.lines || []).join(' · ')}`,
+        detail: s.region === hereId
+          ? `Metro ${(s.lines || []).join(' · ')}`
+          : `${s.regionHangul || ''} ${s.regionName || ''} · ${AREA_SERVICE[s.region] || 'KTX'}`.trim(),
       }));
-    const links = REGION_LINKS
-      .filter((r) => r.id !== regionId)
-      .map((r) => ({
-        region: r.id,
-        station: null,
-        title: `${r.hangul}  ${r.label}`,
-        detail: `Collegamento ${r.service}`,
-      }));
-    this.options = [...local, ...links];
   }
 
   enterStation(game, station) {

@@ -5,10 +5,10 @@ resta corto apposta.** Il contenuto vero sta in `docs/`, e si apre un documento 
 non tutti. Il `README.md` descrive il gioco e i comandi; qui c'è quello che serve a
 *sviluppare*. Avvio e vincoli stanno in `CLAUDE.md`, che si carica da solo.
 
-Ultimo aggiornamento: **strade libere, metro viva e confini rifiniti** (§5.24) — i 30 ingressi
-metro sono solidi e stanno fuori dalla carreggiata, l'atrio ha passeggeri in movimento e un
-chiosco utilizzabile, e i limiti delle tre mappe hanno collisioni e transizioni visive proprie.
-Le geografie dedicate restano descritte nel §5.23; le tappe precedenti sono §5.8-5.22.
+Ultimo aggiornamento: **una mappa sola** (§5.25) — Seoul, Busan e Jeju non sono più tre mondi
+che si escludono: stanno nello stesso spazio di coordinate, disposte come stanno davvero, e
+l'autostrada Gyeongbu collega su gomma le due città della terraferma. Jeju resta un'isola, e ci
+si arriva solo via mare o in volo. Le tappe precedenti sono §5.8-5.24.
 
 > 📌 **Da concordare con l'utente prima di scrivere codice:** della Fase 3 restano le
 > **missioni**, che sono il lavoro grosso e pieno di scelte di design (quante, come si
@@ -16,8 +16,9 @@ Le geografie dedicate restano descritte nel §5.23; le tappe precedenti sono §5
 > invece di trovarsele fatte (§7): **chiediglielo in apertura di sessione.** La musica copre
 > due momenti soli (menu e caccia, §5.19): i pezzi che accompagnano una missione sono un'altra
 > scelta di regia, e si fanno insieme alle missioni. Il §6 resta ordinato per impatto: le voci
-> più concrete sono il sorpasso, l'arresto che ti carica in volante e i debiti regionali
-> rimasti (persistenza fuori regione e viaggio interurbano messo in scena).
+> più concrete sono il sorpasso, l'arresto che ti carica in volante e il **corridoio fra Seoul
+> e Busan**, che dal §5.25 è geografia percorribile ma non ha ancora niente da fare — ed è la
+> superficie naturale delle attività secondarie.
 
 ---
 
@@ -58,6 +59,7 @@ commenti resta valido: si risolve qui.
 | §5.22 Regioni e metro | `docs/storico/11-regioni-e-metro.md` |
 | §5.23 Geografie dedicate e metro fisica | `docs/storico/12-geografie-dedicate-e-metro-fisica.md` |
 | §5.24 Strade libere, metro viva e confini | `docs/storico/13-strade-metro-confini.md` |
+| §5.25 Mappa unica della Corea | `docs/storico/14-mappa-unica-corea.md` |
 | §6 Backlog | `docs/backlog.md` |
 | §8 Parametri | `docs/parametri.md` |
 | §9 Strumenti (`.claude/`) | `docs/strumenti.md` |
@@ -115,14 +117,14 @@ momenti soli**: il tema sul menu e l'inseguimento quando ti stanno addosso (§5.
 non suona niente, perché in strada c'è già Seoul, e in macchina c'è la radio — che vince
 sempre. Dal menu di pausa si torna al titolo, e da lì si ricomincia davvero (§5.21).
 
-**Il mondo è una rete di tre geografie distinte.** Seoul è 7200×7200, con dodici lobi urbani,
-landmark reali e densità edilizia conservata; Busan è una costa 6400×5600 con baia, Nakdong,
-ponti e quartieri propri; Jeju è un'isola 5400×5400 chiusa dal mare, con Hallasan, campagne e
-due poli urbani. Tutte espongono lo stesso contratto sistemico, ma Busan e Jeju non derivano
-più dalla maglia di Seoul. Ogni fermata ha una scala solida sul marciapiede: si entra, si
-cammina fra passeggeri e chiosco attraverso atrio e tornelli, si raggiunge la banchina e solo
-davanti al treno si sceglie la tratta. Geometria e texture sono in cache per città; traffico e
-pedoni restano streaming.
+**Il mondo è una mappa sola, larga come la Corea** (§5.25): 16.800×24.000 px con dentro le tre
+città generate come prima — Seoul in alto a sinistra, Busan sulla costa sud-orientale, Jeju al
+largo — più la campagna del corridoio e il mare che le separa. **A Busan ci si arriva
+guidando**, sull'autostrada Gyeongbu, che è fatta di archi del grafo veri: ci passano il
+traffico civile e le volanti. **A Jeju no**: nessun nodo stradale la raggiunge, ci si va via
+mare o in volo. Ogni fermata ha una scala solida sul marciapiede e si attraversano atrio,
+tornelli e banchina a piedi; la tratta interurbana adesso è una comodità, non l'unica via.
+Traffico e pedoni restano streaming.
 
 La Fase 2 era divisa in tre tappe, concordate con l'utente: **A** combattimento base,
 **B** polizia e ricercato a 5 livelli, **C** armi pesanti ed esplosivi. **Sono tutte fatte.**

@@ -394,7 +394,10 @@ export class Scene {
     const view = cam.bounds(60);
     for (const n of city.intersections) {
       if (n.x < view.x || n.x > view.x + view.w || n.y < view.y || n.y > view.y + view.h) continue;
-      const node = city.graph.nodes.find((g) => g.vi === n.vi && g.hi === n.hi);
+      // `n.node` è il riferimento che `korea.js` aggancia a ogni incrocio: la
+      // ricerca per `vi/hi` scandiva tutti i nodi del grafo, e su tre maglie
+      // unite sono qualche migliaio per ogni lanterna in vista.
+      const node = n.node || city.graph.nodes.find((g) => g.vi === n.vi && g.hi === n.hi);
       if (!node || !node.signal) continue;
       const ph = signalAxis(node, time);
       const vGreen = ph === 'v';

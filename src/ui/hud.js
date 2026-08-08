@@ -1,6 +1,6 @@
 // HUD: minimappa, tachimetro, salute e arma, cartello del distretto, suggerimenti.
 import { KMH, clamp } from '../core/math.js';
-import { MAP_SIZE } from '../world/maptexture.js';
+import { MAP_W, MAP_H } from '../world/maptexture.js';
 import { VEHICLE_TYPES, getHeroPortrait, getWeaponIcon } from '../render/sprites.js';
 import { WEAPONS, WEAPON_SLOTS } from '../entities/weapons.js';
 import { won } from '../entities/shops.js';
@@ -547,10 +547,14 @@ export class Hud {
 
   drawMinimap(ctx, game, x, y) {
     const p = game.player;
-    const k = MAP_SIZE / this.city.w;
-    const src = MINIMAP_WORLD * k;
-    const sx = p.x * k - src / 2;
-    const sy = p.y * k - src / 2;
+    // La carta ha due scale diverse perché il mondo non è quadrato: il ritaglio
+    // della minimappa deve seguirle entrambe, o il nord si allunga.
+    const kx = MAP_W / this.city.w;
+    const ky = MAP_H / this.city.h;
+    const srcW = MINIMAP_WORLD * kx;
+    const srcH = MINIMAP_WORLD * ky;
+    const sx = p.x * kx - srcW / 2;
+    const sy = p.y * ky - srcH / 2;
 
     ctx.save();
     // Cornice
@@ -561,7 +565,7 @@ export class Hud {
     ctx.clip();
     ctx.fillStyle = '#12151a';
     ctx.fillRect(x, y, MINIMAP, MINIMAP);
-    ctx.drawImage(this.mapTexture, sx, sy, src, src, x, y, MINIMAP, MINIMAP);
+    ctx.drawImage(this.mapTexture, sx, sy, srcW, srcH, x, y, MINIMAP, MINIMAP);
     // Tinta della luce sopra il solo ritaglio della mappa: di notte la minimappa
     // deve leggersi come notte, ma blip e cornice restano fuori dalla tinta o
     // sparirebbero proprio quando servono.

@@ -12,6 +12,20 @@ function activeAt(line, point, pad = 0) {
 
 /** True quando un rettangolo invade una strada visibile, larghezza compresa. */
 export function rectIntersectsRoad(city, rect, clearance = 0) {
+  // Su una mappa con tre maglie sovrapposte la scansione lineare costa: se la
+  // città ha già indicizzato le carreggiate si passa da lì. Il risultato è lo
+  // stesso, e i generatori regionali — che l'indice non ce l'hanno ancora
+  // mentre costruiscono — continuano a usare il percorso qui sotto.
+  if (city.roadIndex) {
+    const hits = city.roadIndex.queryRect(
+      rect.x - clearance, rect.y - clearance, rect.w + clearance * 2, rect.h + clearance * 2
+    );
+    for (const r of hits) {
+      if (overlaps(rect.x, rect.x + rect.w, r.x - clearance, r.x + r.w + clearance)
+        && overlaps(rect.y, rect.y + rect.h, r.y - clearance, r.y + r.h + clearance)) return true;
+    }
+    return false;
+  }
   for (const line of city.vLines || []) {
     const left = line.c - line.width / 2 - clearance;
     const right = line.c + line.width / 2 + clearance;

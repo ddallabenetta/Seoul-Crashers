@@ -31,6 +31,45 @@ node .claude/tools/probe.mjs --seconds 5 --eval "game.city.stats" --shot /tmp/se
 > tornano a restare indietro. Non provare `127.0.0.2`: su macOS quell'alias di loopback non
 > esiste e la richiesta resta appesa.
 
+### La mappa unica regge ancora? (§5.25)
+
+Prima di dire che una modifica alla geografia funziona, il controllo che vale è **dove si
+arriva guidando**. Una visita in ampiezza sul grafo lo dice in un secondo, e coglie l'errore
+che a schermo non si vede: un arco di troppo che trasforma Jeju in una penisola.
+
+```bash
+node .claude/tools/probe.mjs --seconds 0 --quiet \
+  --script .claude/tools/scenes/korea-census.scene
+```
+
+Gli invarianti da difendere:
+
+| | atteso |
+| --- | --- |
+| nodi di Seoul e Busan raggiungibili su gomma da Seoul | **tutti** (306/306 e 177/177) |
+| nodi di Jeju raggiungibili su gomma | **zero** su 294 — è un'isola |
+| corridoio e sede dell'autostrada | asciutti |
+| mare del sud, canale Busan–Jeju, Mar dell'Est | bagnati |
+| segnaletica senza asfalto sotto | **zero** (`marks` e `segments` devono restare allineati) |
+| campioni di carreggiata in acqua | **zero** |
+| muri sul percorso Seoul → Busan | **zero** (la cintura di `citygen` va tolta alla fusione) |
+
+I conteggi esatti si spostano a ogni `rng` in più consumato in generazione (vedi il
+determinismo in `CLAUDE.md`): quello che non deve cambiare sono i **rapporti** — tutto
+raggiungibile sulla terraferma, niente su Jeju.
+
+Per guardarla invece che contarla, la carta a tutto schermo è la vista più informativa:
+
+```bash
+node .claude/tools/probe.mjs --seconds 2 --shot /tmp/korea.png --size 1400x900 \
+  --script /dev/stdin <<'EOF'
+game.mapView.open = true; game.paused = true;
+await new Promise((r) => setTimeout(r, 300));
+EOF
+```
+
+---
+
 ### Verifica rapida che tutto giri
 
 `F3` in gioco mostra fps, entità, posizione. Da console del browser è esposto `window.game`:
