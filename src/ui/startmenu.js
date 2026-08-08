@@ -101,10 +101,7 @@ export class StartMenu {
         // minuto fa (dal titolo si può, e dal menu di pausa ci si torna), e senza
         // `newGame` «Nuova partita» proseguiva quella.
         game.newGame();
-        // I ventotto pannelli, e solo qui: «Continua» e «Carica» riprendono una
-        // partita in cui l'apertura è già successa. `start` lo chiama la cutscene
-        // quando finisce — saltata o guardata che sia.
-        game.playIntro();
+        game.start(false);
         break;
       case 'load':
         this.tab = 'load';

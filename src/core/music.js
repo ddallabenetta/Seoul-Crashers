@@ -100,11 +100,7 @@ export class MusicSystem {
    */
   direct(game) {
     let want = null;
-    // Sotto i pannelli non suona niente: la scena è fatta di fruscio e pioggia, e
-    // il tema del menu ci passerebbe sopra. È l'unico posto in cui il silenzio è
-    // una scelta di regia invece che un'assenza.
-    if (game.cutscene?.active) want = null;
-    else if (!game.started) want = 'menu';
+    if (!game.started) want = 'menu';
     else if (game.wanted.level >= 2 && !game.indoors && !game.player.dying) want = 'chase';
     // La radio è la musica che ha scelto il giocatore: non gliela si copre.
     if (want === 'chase' && game.radio?.on) want = null;

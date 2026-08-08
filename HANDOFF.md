@@ -5,23 +5,23 @@ resta corto apposta.** Il contenuto vero sta in `docs/`, e si apre un documento 
 non tutti. Il `README.md` descrive il gioco e i comandi; qui c'è quello che serve a
 *sviluppare*. Avvio e vincoli stanno in `CLAUDE.md`, che si carica da solo.
 
-Ultimo aggiornamento: **la tappa A della campagna** (§5.27) — le primitive dei pannelli a
-fumetto, la **cutscene iniziale** da ventotto pannelli, e i due pezzi d'impianto che la
-reggono: il **bus di eventi** e la **tabella delle modalità**. Le precedenti sono §5.8-5.26.
+Ultimo aggiornamento: **l'impianto della campagna** (§5.27) — cinque limiti tecnici tolti di
+mezzo prima di scrivere una missione: bus di eventi, tabella delle modalità, migrazioni del
+salvataggio, personaggi nominati, porte sigillate e marcatori. **Non si vede niente di nuovo a
+schermo, ed è voluto.** Le tappe precedenti sono §5.8-5.26.
 
-> 📌 **Il prossimo lavoro è la tappa B**: impianto missioni (blip singolo, fasi, ripresa
-> dall'ultima fase) più **M1 e M2**. L'ordine delle sette tappe che restano, e le **quattro cose
-> d'impianto che la tappa A ha lasciato aperte apposta** — migrazioni del salvataggio, NPC
-> persistenti, il blip, la porta sigillata — stanno **in testa a
-> [`docs/backlog.md`](docs/backlog.md) (§6.0)**, che è la prima cosa da leggere prima di
-> cominciare. Le nove decisioni d'impianto prese con l'utente stanno in
+> 📌 **Il prossimo lavoro è la tappa A**: primitive dei pannelli a fumetto e la **cutscene
+> iniziale**. L'impianto che le serve c'è già (§5.27) — compreso `ui/text.js`, l'a capo
+> automatico a corpo fisso che il gioco non aveva mai avuto. L'ordine di tutte le tappe sta
+> **in testa a [`docs/backlog.md`](docs/backlog.md) (§6.0)**, che è la prima cosa da leggere
+> prima di cominciare, e le nove decisioni d'impianto prese con l'utente stanno in
 > [`docs/storia/08-domande-aperte.md`](docs/storia/08-domande-aperte.md): leggi quelle, non
 > ricavarle dal copione. Resta aperta una domanda sola (se le missioni si rigiocano) e non
-> blocca niente. Due cose che la tappa A **non** ha fatto e che vanno con la D: la regia sonora
-> della cutscene e la prima riga di Kkachi, che oggi è un toast. Il resto del §6 resta ordinato
-> per impatto: le voci più concrete sono il sorpasso, l'arresto che ti carica in volante e il
-> **corridoio fra Seoul e Busan**, che dal §5.25 è geografia percorribile ma non ha ancora
-> niente da fare — ed è la superficie naturale delle attività secondarie.
+> blocca niente. **Il copione dice cosa c'è in un pannello, non come si disegna:** la resa si
+> concorda a vista con l'utente *prima* di disegnare ventotto tavole (§7). Il resto del §6
+> resta ordinato per impatto: le voci più concrete sono il sorpasso, l'arresto che ti carica in
+> volante e il **corridoio fra Seoul e Busan**, che dal §5.25 è geografia percorribile ma non ha
+> ancora niente da fare — ed è la superficie naturale delle attività secondarie.
 
 ---
 
@@ -65,7 +65,7 @@ commenti resta valido: si risolve qui.
 | §5.24 Strade libere, metro viva e confini | `docs/storico/13-strade-metro-confini.md` |
 | §5.25 Mappa unica della Corea | `docs/storico/14-mappa-unica-corea.md` |
 | §5.26 Vita degli NPC | `docs/storico/15-vita-degli-npc.md` |
-| §5.27 Pannelli, cutscene e impianto | `docs/storico/16-pannelli-e-cutscene.md` |
+| §5.27 Impianto della campagna | `docs/storico/16-impianto-della-campagna.md` |
 | §6 Backlog | `docs/backlog.md` |
 | §8 Parametri | `docs/parametri.md` |
 | §9 Strumenti (`.claude/`) | `docs/strumenti.md` |
@@ -82,7 +82,7 @@ Stato: **Fase 1, Fase 1.5, Fase 2 (tutte e tre le tappe) e le prime tre tappe de
 completate e collaudate**, più la revisione della guida AI del traffico (§5.10), i due giri di
 arretrati (§5.12 e §5.21), l'audio procedurale del §5.13, il salvataggio del §5.15, il giro
 menu-musica-autosave del §5.18-5.20, le tre regioni collegate e ricostruite del §5.22-5.24 e
-la prima tappa della campagna (§5.27). ~29.000 righe in 52 moduli. 60 fps con ~44 veicoli e ~93
+l'impianto della campagna (§5.27). ~25.700 righe in 50 moduli. 60 fps con ~44 veicoli e ~93
 pedoni attivi, e restano 60 anche sotto raffica continua di SMG. Dentro un edificio il costo è
 trascurabile: la città non gira. Il ciclo giorno-notte costa **1,5 ms di JS per frame nel caso
 peggiore** (notte con temporale) — ma i veli a schermo intero non sono misurabili onestamente
@@ -139,14 +139,14 @@ la sua banda nel cortile di un'altra, con la volante che arriva a rovinare la fe
 modulo solo (`entities/life.js`) e **nessuna entità nuova**: un pilota è un veicolo con un
 `ai.mode`, un rapinatore è un pedone con lo stato `errand`. La caccia a *te* resta un altro file.
 
-**E la partita comincia con una scena** (§5.27). «Nuova partita» apre **«12년»**: ventotto
-pannelli a fumetto disegnati da codice come tutto il resto, saltabili sempre con `ESC` perché i
-tre indizi che seminano tornano tutti più avanti. All'ultimo si sveglia in un vicolo di Hongdae
-alle 8:24, l'asfalto ancora bagnato e l'auto di suo padre lì davanti — e se accende la radio,
-qualcuno gli parla. Sotto ci sono due pezzi d'impianto che valgono più della scena: il **bus di
-eventi** (`game.on/emit`), da cui passeranno i cento inneschi delle dodici missioni, e la
-**tabella delle modalità**, che ha sostituito i dieci booleani con cui il gioco diceva se era
-in pausa.
+**E il motore è pronto per la campagna** (§5.27), che è l'unica tappa di questo progetto in cui
+non si vede niente di nuovo. I fatti del mondo passano da un **bus** (`game.on/emit`) invece che
+da otto callback con un solo ascoltatore, così i cento inneschi delle dodici missioni non
+diventano cento `if` in `main.js`; le modalità del gioco stanno in una **tabella** invece che in
+dieci booleani, e `game.paused` è derivato; il **salvataggio si migra** invece di rifiutarsi, il
+che vuol dire che aggiungere uno stato non cancella più la partita di nessuno; e un personaggio
+può finalmente **stare in un posto** (`entities/actors.js`) senza che lo streaming se lo porti
+via o lo resusciti.
 
 La Fase 2 era divisa in tre tappe, concordate con l'utente: **A** combattimento base,
 **B** polizia e ricercato a 5 livelli, **C** armi pesanti ed esplosivi. **Sono tutte fatte.**

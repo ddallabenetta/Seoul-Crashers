@@ -12,7 +12,6 @@
 // non cresce con la mappa. Il prezzo è che una modifica alla generazione
 // **invalida i salvataggi**: per questo c'è `SEED`, e uno slot con una seed
 // diversa viene rifiutato invece di far ricomparire il giocatore dentro un muro.
-import { WEATHERS } from '../world/daycycle.js';
 import { createVehicle } from '../entities/vehicle.js';
 import { REGIONS } from '../world/regions.js';
 
@@ -47,8 +46,63 @@ export const ALL_SLOTS = 4;
  * sopra il momento in cui non l'aveva ancora fatto. Tre costano 2 kB.
  */
 export const AUTO_GENS = 3;
-const VERSION = 1;
+/**
+ * Versione del **formato**, non del gioco. Si alza quando la forma dei dati cambia,
+ * e per ogni scalino serve una riga in `MIGRATIONS`.
+ *
+ * Prima di questa revisione uno slot con `v` diverso veniva **rifiutato**, il che
+ * voleva dire una cosa sola: il primo campo nuovo che qualcuno avesse aggiunto
+ * avrebbe cancellato la partita di chiunque. La seed invece continua a rifiutare —
+ * lì non c'è niente da migrare, perché una Seoul diversa rende le coordinate
+ * salvate prive di significato e il giocatore rinascerebbe dentro un palazzo.
+ */
+const VERSION = 2;
 const SEED = 20260730;
+
+/**
+ * `MIGRATIONS[n]` porta uno slot dalla versione `n` alla `n+1`. Si applicano in
+ * fila, quindi per aggiungere un formato basta scrivere **l'ultimo scalino**: chi
+ * arriva da tre versioni fa ci passa da solo.
+ *
+ * Regola per chi ne scrive una: **non si legge lo stato del gioco qui dentro.** Una
+ * migrazione lavora sui dati e basta — gira anche solo per mostrare la riga di uno
+ * slot nella lista, quando quella partita non è caricata e non lo sarà mai.
+ */
+const MIGRATIONS = {
+  // 1 -> 2: i contatori dei negozi e le piante visitate stavano in due posti
+  // diversi (`shops` e `interiors`); adesso li possiede `ShopSystem` e stanno
+  // insieme. Nascono anche i sigilli delle vetrine e i personaggi nominati, che
+  // in una partita vecchia semplicemente non c'erano.
+  1: (d) => {
+    d.shops = {
+      robbed: d.shops?.robbed || 0,
+      spent: d.shops?.spent || 0,
+      sold: d.shops?.sold || 0,
+      sealed: {},
+      interiors: d.interiors || {},
+    };
+    delete d.interiors;
+    d.actors = {};
+    return d;
+  },
+};
+
+/**
+ * Porta uno slot alla versione corrente, o restituisce `null` se non ci si arriva.
+ * Uno slot **dal futuro** (scritto da una versione più nuova del gioco) non si
+ * tocca: indovinare cosa contiene è peggio che dire «non lo so leggere».
+ */
+function migrate(data) {
+  let d = data;
+  let guard = 0;
+  while (d.v < VERSION) {
+    const step = MIGRATIONS[d.v];
+    if (!step || guard++ > 32) return null;
+    d = step(d);
+    d.v += 1;
+  }
+  return d.v === VERSION ? d : null;
+}
 // La generazione 0 tiene la chiave storica: chi aggiorna il gioco si ritrova il
 // suo autosave dov'era, non uno slot vuoto.
 const KEY = (i, gen = 0) =>
@@ -84,45 +138,37 @@ function store() {
  */
 export function snapshot(game) {
   const pl = game.player;
-  const dc = game.dayCycle;
   const door = game.indoors && game.shops.active ? game.shops.active.shop : null;
   const metroExit = game.metro?.inside ? game.metro.outside : null;
-  const x = door ? door.x : metroExit ? metroExit.x : pl.x;
-  const y = door ? door.y : metroExit ? metroExit.y : pl.y;
   const v = pl.vehicle;
+  // **Ogni sistema si serializza da sé.** Questo file non sa più che cosa c'è dentro
+  // un giocatore, un orologio o un negozio: sa dove metterlo. Chi aggiunge uno stato
+  // lo aggiunge nel proprio `snapshot()` e qui non tocca niente — che è il motivo per
+  // cui `ShopSystem` lo faceva già da solo per le casse svuotate.
+  const player = pl.snapshot();
+  // L'unica cosa che decide *chi salva* e non il giocatore: dentro un negozio si
+  // registra la **vetrina**, non le coordinate della pianta. Quelle sono numeri da
+  // 200-470 px che in città cadono tutti nell'angolo nord-ovest della mappa.
+  if (door) { player.x = door.x; player.y = door.y; }
+  else if (metroExit) { player.x = metroExit.x; player.y = metroExit.y; }
   return {
     v: VERSION,
     seed: SEED,
-    region: game.areaAt?.(game.player.x, game.player.y)?.id || 'korea',
+    region: game.areaAt?.(pl.x, pl.y)?.id || 'korea',
     // Marchia il formato: da qui in poi le coordinate sono già di mondo.
     world: true,
     at: Date.now(),
     time: game.time,
-    player: {
-      x, y,
-      angle: pl.angle,
-      hp: pl.hp,
-      money: pl.money,
-      outfit: pl.outfit,
-      weapon: pl.weapon,
-      owned: [...pl.owned],
-      ammo: { ...pl.ammo },
-    },
+    player,
     // Il mezzo si salva come descrizione, non come oggetto: alla ricarica ne
     // nasce uno nuovo sotto il giocatore. Salvare la lista dei veicoli
     // vorrebbe dire salvare mezza città per riavere l'auto che stavi guidando.
     vehicle: v ? { kind: v.kind, colorIndex: v.colorIndex, hp: v.hp, flatTires: !!v.flatTires } : null,
-    clock: {
-      t: dc.t, day: dc.day, weather: dc.weather.id, next: dc.next.id,
-      weatherT: dc.weatherT, blend: dc.blend, wet: dc.wet,
-    },
-    wanted: {
-      level: game.wanted.level, heat: game.wanted.heat,
-      lastX: game.wanted.lastX, lastY: game.wanted.lastY,
-    },
+    clock: game.dayCycle.snapshot(),
+    wanted: game.wanted.snapshot(),
     stats: { ...game.stats, districts: [...game.stats.districts] },
-    shops: { robbed: game.shops.robbed, spent: game.shops.spent, sold: game.shops.sold },
-    interiors: game.shops.snapshot(),
+    shops: game.shops.snapshot(),
+    actors: game.actors.snapshot(),
   };
 }
 
@@ -161,53 +207,21 @@ export function apply(game, data) {
   // che fa la partita nuova, e sta in `Game` perché il mondo è suo (§5.21).
   game.clearWorld();
 
-  pl.vehicle = null;
-  pl.onFoot = true;
-  pl.dying = false;
-  pl.deathT = 0;
-  pl.hurtT = 0;
-  pl.carHitT = 0;
-  pl.vx = 0;
-  pl.vy = 0;
-  pl.spin = 0;
-  pl.scoping = false;
-  pl.heat = 0;
-  pl.overheated = false;
-  pl.stamina = 1;
+  // Ogni sistema si rimette a posto da sé (vedi `snapshot`). L'ordine conta per una
+  // cosa sola: gli attori vanno **dopo** `clearWorld`, che ha appena tolto dalla
+  // strada i loro pedoni, e prima del ripopolamento.
+  pl.restore(data.player);
   const at = worldPoint(data);
   pl.x = at.x;
   pl.y = at.y;
-  pl.angle = data.player.angle;
-  pl.hp = data.player.hp;
-  pl.money = data.player.money;
-  pl.outfit = data.player.outfit;
-  pl.owned = new Set(data.player.owned);
-  pl.ammo = { ...data.player.ammo };
-  pl.weapon = data.player.weapon;
-
-  const dc = game.dayCycle;
-  dc.t = data.clock.t;
-  dc.day = data.clock.day;
-  dc.weather = WEATHERS[data.clock.weather] || WEATHERS.clear;
-  dc.next = WEATHERS[data.clock.next] || WEATHERS.clear;
-  dc.weatherT = data.clock.weatherT;
-  dc.blend = data.clock.blend;
-  dc.apply();
-  dc.wet = data.clock.wet;
-
-  game.wanted.reset();
-  game.wanted.heat = data.wanted.heat;
-  game.wanted.level = data.wanted.level;
-  game.wanted.lastX = data.wanted.lastX;
-  game.wanted.lastY = data.wanted.lastY;
+  game.dayCycle.restore(data.clock);
+  game.wanted.restore(data.wanted);
+  game.shops.restore(data.shops);
+  game.actors.restore(data.actors);
 
   const districts = new Set(data.stats.districts);
   Object.assign(game.stats, data.stats, { districts });
   game.time = data.time;
-  game.shops.robbed = data.shops.robbed;
-  game.shops.spent = data.shops.spent;
-  game.shops.sold = data.shops.sold;
-  game.shops.restore(data.interiors);
 
   // Il mezzo che si stava guidando rinasce sotto il giocatore. `protect` glielo
   // dà `onEnterVehicle`, che qui non passa: senza, lo streaming può portarselo
@@ -247,9 +261,11 @@ export function readSlot(i, gen = 0) {
     if (!raw) return null;
     const data = JSON.parse(raw);
     // Una seed diversa vuol dire un'altra Seoul: le coordinate salvate non
-    // vogliono più dire niente e il giocatore rinascerebbe dentro un palazzo.
-    if (data.v !== VERSION || data.seed !== SEED) return null;
-    return data;
+    // vogliono più dire niente e il giocatore rinascerebbe dentro un palazzo. È
+    // rimasta l'unica ragione per **buttare** uno slot: il formato invece si
+    // aggiorna, e chi arriva da una versione vecchia ci passa da `migrate`.
+    if (data.seed !== SEED) return null;
+    return migrate(data);
   } catch {
     return null;
   }

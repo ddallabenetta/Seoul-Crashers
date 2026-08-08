@@ -19,6 +19,7 @@ import { Player } from './entities/player.js';
 import { TrafficSystem } from './entities/traffic.js';
 import { PedestrianSystem } from './entities/pedestrians.js';
 import { LifeSystem } from './entities/life.js';
+import { ActorSystem } from './entities/actors.js';
 import { PickupSystem } from './entities/pickups.js';
 import { ProjectileSystem } from './entities/projectiles.js';
 import { WantedSystem } from './entities/wanted.js';
@@ -33,8 +34,6 @@ import { PauseMenu } from './ui/menu.js';
 import { StartMenu } from './ui/startmenu.js';
 import { ShopMenu } from './ui/shopmenu.js';
 import { MetroSystem } from './ui/metro.js';
-import { Cutscene } from './ui/cutscene.js';
-import { INTRO, handoff } from './story/intro.js';
 
 const MAX_PIXELS = 2_900_000;
 // Dentro un edificio non c'è traffico: la griglia dei veicoli si ricostruisce vuota
@@ -51,7 +50,6 @@ class Game {
     // Il bus: da qui passano i fatti del mondo, e ci si iscrivono le missioni e la
     // tabella di Kkachi invece di frugare nello stato del gioco a ogni frame.
     this.events = new Events();
-    this.cutscene = new Cutscene();
     this.time = 0;
     this.debug = false;
     // Falso finché il menu iniziale è a schermo: il mondo gira lo stesso, il
@@ -151,6 +149,10 @@ class Game {
     // Ha un rng suo — pescare da `this.rng` sposterebbe lo streaming di traffico
     // e pedoni ogni volta che decolla un aereo.
     this.life = new LifeSystem(this.city, new Rng(20260808));
+    // I personaggi nominati. Rng suo, come `life`: uno che compare non deve
+    // spostare lo streaming di traffico e pedoni.
+    this.actors = new ActorSystem(new Rng(20260809));
+    this.actors.attach(this);
     this.pickups = new PickupSystem(this.city, this.rng);
     this.projectiles = new ProjectileSystem();
     this.wanted = new WantedSystem();
@@ -259,6 +261,9 @@ class Game {
     // continuerebbe la caccia con degli agenti che non sono più in nessuna lista.
     for (const p of this.peds) p.gone = true;
     this.peds.length = 0;
+    // Gli attori non si perdono: quello che sparisce è il loro pedone, e la
+    // definizione (con la morte, se è morto) resta a `ActorSystem`.
+    this.actors.clearPeds();
     this.police.standDown(this, true);
     this.projectiles.clear();
     this.fx.clear();
@@ -346,6 +351,8 @@ class Game {
     this.player.district = this.city.districtAt(this.player.x, this.player.y);
     this.wanted.reset();
     this.shops.reset();
+    this.actors.reset();
+    this.markers.length = 0;
     this.dayCycle.reset();
     this.radio.off(this);
     this.time = 0;
@@ -404,19 +411,36 @@ class Game {
 
   /**
    * Il mondo è fermo. Era una riga di `update` con quattro `or` dentro; adesso è
-   * la modalità a dirlo, e la cutscene ci entra senza aggiungere un quinto `or` a
-   * ognuno dei posti che leggono questo campo.
+   * la modalità a dirlo. Chi legge questo campo non è cambiato, e una modalità in
+   * più (un dialogo di missione, una schermata di fallimento) adesso è una riga in
+   * `core/modes.js` invece di un quinto `or` qui e di un ramo in ognuno di loro.
    */
   get paused() {
     return !this.mode.worldRuns;
   }
 
-  /** La cutscene iniziale, e quello che viene dopo (`story/intro.js`). */
-  playIntro() {
-    this.cutscene.play(this, INTRO, 'intro', (game) => {
-      game.start(false);
-      handoff(game);
-    });
+
+  // --- marcatori sulla mappa --------------------------------------------------
+  //
+  // `game.markers` esisteva già ed era letto da `hud.drawMinimap` e da
+  // `mapview.drawPanel`; quello che mancava era il modo di **scriverlo**. Un
+  // marcatore ha un `id` perché il caso normale è spostarlo, non accumularlo: la
+  // decisione presa con l'utente è **un blip solo, sulla missione in corso**.
+  setMarker(id, x, y, opts = {}) {
+    const mk = { id, x, y, ...opts };
+    const i = this.markers.findIndex((m) => m.id === id);
+    if (i >= 0) this.markers[i] = mk;
+    else this.markers.push(mk);
+    return mk;
+  }
+
+  clearMarker(id) {
+    const i = this.markers.findIndex((m) => m.id === id);
+    if (i >= 0) this.markers.splice(i, 1);
+  }
+
+  clearMarkers() {
+    this.markers.length = 0;
   }
 
   /** True quando il giocatore è in un interno: negozio oppure stazione metro. */
@@ -726,15 +750,6 @@ class Game {
   // --- ciclo ----------------------------------------------------------------
   update(dt) {
     const input = this.input;
-    // La cutscene è l'unica modalità in cui il mondo non gira *e* qualcosa si
-    // muove lo stesso. Gira solo lei e l'audio: i letti si abbassano da soli
-    // leggendo `mode.duck`, e la musica tace (`music.direct`).
-    if (this.cutscene.active) {
-      this.cutscene.update(dt, this);
-      this.audio.update(dt, this);
-      input.endFrame();
-      return;
-    }
     if (!this.started) {
       this.updateAttract(dt);
       return;
@@ -821,6 +836,10 @@ class Game {
       this.life.update(dt, this);
       this.traffic.update(dt, this);
       this.pedSystem.update(dt, this);
+      // Dopo lo streaming dei pedoni: `stream` ha appena tolto dalla lista chi era
+      // troppo lontano, e chi ha un nome va rimesso al suo posto subito, non al
+      // frame dopo — o per un frame il banco è vuoto.
+      this.actors.update(dt, this);
       this.pickups.update(dt, this);
     } else if (this.shops.active) {
       this.police.siege(dt, this);
@@ -940,13 +959,6 @@ class Game {
 
   render() {
     const ctx = this.ctx;
-    // Durante i pannelli la città non si disegna affatto: sotto c'è il nero pieno
-    // della tavola, quindi renderizzarla sarebbe un frame intero buttato via.
-    if (this.cutscene.active) {
-      this.camera.applyUI(ctx);
-      this.cutscene.draw(ctx, this);
-      return;
-    }
     if (this.metro.inside) this.metroScene.render(ctx, this);
     else if (this.indoors) this.interiorScene.render(ctx, this);
     else this.scene.render(ctx, this);

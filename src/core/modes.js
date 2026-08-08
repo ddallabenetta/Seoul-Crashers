@@ -6,18 +6,19 @@
 // `main.update` che ne metteva quattro in `or`. Ha retto finché le modalità erano
 // due e mezzo: si gioca, c'è un pannello davanti, si guarda il titolo.
 //
-// La cutscene è la prima che non è nessuna delle tre. Vuole il mondo fermo (come
-// un menu), il giocatore fermo (come un menu), **i pannelli che animano** (come il
-// gioco) e un abbassamento dell'audio suo. Scritta a booleani sarebbe stata la
-// quinta condizione di una riga che ne aveva già quattro, più un ramo in ognuno
-// dei posti che leggono `game.paused`.
+// Le modalità che serviranno non sono nessuna delle tre. Un dialogo di missione
+// vuole il mondo fermo (come un menu), il giocatore fermo (come un menu) e
+// **qualcosa che anima lo stesso** (come il gioco); una cutscene a pannelli lo
+// stesso, con un ducking suo. Scritte a booleani sarebbero state la quinta e la
+// sesta condizione di una riga che ne aveva già quattro, **più un ramo in ognuno
+// dei posti che leggono `game.paused`** — e quelli non sono in questo file.
 //
 // Qui invece ogni modalità **dichiara cosa concede**, e chi deve saperlo lo chiede
 // a `game.mode` invece di ricostruirlo. Aggiungerne una è una riga in questa
-// tabella; le missioni ne porteranno almeno altre due (dialogo, fallimento).
+// tabella.
 //
-// Non è ancora una pila: l'ordine di questa lista *è* la priorità, e per adesso le
-// modalità non si sovrappongono davvero (non si apre la mappa dentro una cutscene).
+// Non è una pila: l'ordine di questa lista *è* la priorità, e per adesso le
+// modalità non si sovrappongono (non si apre la mappa dentro un dialogo).
 // Diventerà una pila il giorno che due si sovrappongono per davvero, e quel giorno
 // cambia questo file e nient'altro.
 
@@ -30,11 +31,6 @@
  * - `cursor`     il puntatore del mouse si vede o no
  */
 export const MODES = [
-  {
-    id: 'cutscene',
-    when: (game) => !!game.cutscene?.active,
-    worldRuns: false, playerRuns: false, duck: 0.12, radioDuck: 0, cursor: 'default',
-  },
   {
     // Il titolo: il mondo gira eccome (è l'attract mode), il giocatore no.
     id: 'title',
