@@ -7,16 +7,15 @@ non tutti. Il `README.md` descrive il gioco e i comandi; qui c'è quello che ser
 
 Ultimo aggiornamento: **il copione della campagna** (`docs/storia/`) — dodici missioni in tre
 atti, la cutscene iniziale, i finali e le chiamate radio, scritti per intero e **senza una riga
-di codice**: è materiale da leggere e da approvare, non una tappa fatta. L'ultima tappa
-*giocabile* resta la vita degli NPC (§5.26). Le precedenti sono §5.8-5.25.
+di codice**, con l'impianto concordato con l'utente. L'ultima tappa *giocabile* resta la vita
+degli NPC (§5.26). Le precedenti sono §5.8-5.25.
 
-> 📌 **Da concordare con l'utente prima di scrivere codice:** della Fase 3 restano le
-> **missioni**. La storia adesso c'è (`docs/storia/`), l'impianto no: come si attivano, come
-> si falliscono, se i pannelli parlano, se la cutscene si salta. Le domande sono già in fila
-> con una raccomandazione ciascuna in [`docs/storia/08-domande-aperte.md`](docs/storia/08-domande-aperte.md),
-> e in fondo c'è una proposta di sette tappe: **la prima da concordare è la A** (sistema di
-> pannelli + cutscene iniziale). L'utente vuole essere consultato invece di trovarsele fatte
-> (§7). La musica copre
+> 📌 **Il prossimo lavoro è la tappa A della campagna**: primitive dei pannelli a fumetto e la
+> **cutscene iniziale**. Le nove decisioni d'impianto prese con l'utente e le otto tappe stanno
+> in [`docs/storia/08-domande-aperte.md`](docs/storia/08-domande-aperte.md) — leggi quello, non
+> ricavarle dal copione. Resta aperta una domanda sola (se le missioni si rigiocano) e non
+> blocca niente. Quello che il copione **non** decide — quanti pannelli in una schermata, come
+> si disegnano — si concorda a vista (§7). La musica copre
 > due momenti soli (menu e caccia, §5.19): i pezzi che accompagnano una missione sono un'altra
 > scelta di regia, e si fanno insieme alle missioni. Il §6 resta ordinato per impatto: le voci
 > più concrete sono il sorpasso, l'arresto che ti carica in volante e il **corridoio fra Seoul

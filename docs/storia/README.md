@@ -17,7 +17,7 @@ Dal proverbio 호랑이 없는 산에 토끼가 왕 노릇 한다: *sul monte se
 | Atto III — missioni 9-12 (la riqualificazione) | [`05-atto-3.md`](05-atto-3.md) |
 | i finali, i titoli di coda, la scena dopo | [`06-finali-ed-epilogo.md`](06-finali-ed-epilogo.md) |
 | le chiamate radio facoltative (il «codec» del gioco) | [`07-radio-kkachi.md`](07-radio-kkachi.md) |
-| **le decisioni che aspettano l'utente** prima di scrivere codice | [`08-domande-aperte.md`](08-domande-aperte.md) |
+| **le decisioni d'impianto prese con l'utente** e le tappe di lavoro | [`08-domande-aperte.md`](08-domande-aperte.md) |
 
 ---
 

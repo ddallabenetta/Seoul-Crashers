@@ -14,9 +14,13 @@ avere il controllo. Ventotto pannelli, tre stacchi neri, un titolo.
   costruita perché non serva.
 - **Il testo del narratore non entra mai nella testa di Jae-min.** Dice solo cose vere e
   verificabili: ore, distanze, prezzi, anni.
-- **Si può saltare** (decisione da confermare, [`08-domande-aperte.md`](08-domande-aperte.md)),
-  ma i pannelli 11, 19 e 26 sono i tre indizi seminati qui: se la scena è saltabile, vanno
-  ripescabili altrove.
+- **Si può saltare**, sempre, dal primo avvio ([`08-domande-aperte.md`](08-domande-aperte.md)).
+  I pannelli 11, 19 e 26 sono i tre indizi seminati qui, e **tornano tutti e tre più avanti**
+  (11 in M4, 19 in M7 e M8, 26 in M4 e R4): chi salta arriva agli stessi ribaltamenti da
+  un'altra porta.
+- **Nessuno parla: si legge.** Le battute qui sotto sono già tarate per stare in un pannello
+  senza rimpicciolire il corpo del testo. Se in fase di disegno una non ci sta, si taglia la
+  battuta.
 - Il pannello 1 e l'ultimo pannello del gioco sono **la stessa immagine con un dettaglio
   cambiato**. Vedi [`06-finali-ed-epilogo.md`](06-finali-ed-epilogo.md).
 
@@ -240,12 +244,11 @@ tema musicale e stacchi (§5.19) · insegne e neon dei distretti (§5.8) · vola
 
 ## Chiederebbe
 
-- **Il sistema di pannelli**: un modo di mostrare figure ferme con testo, e di saltarle.
-  Non esiste niente del genere oggi. È il pezzo d'impianto più grosso della storia.
+- **Il sistema di pannelli**: un modo di mostrare figure ferme con testo, e di saltarle. Non
+  esiste niente del genere oggi, è il pezzo d'impianto più grosso della storia, ed è **la
+  tappa A**: un pannello = una funzione di disegno, e questa scena sta in un file suo.
 - **Una stazione radio finta a `91.45`** che non stia nella lista delle stazioni vere e non
-  dipenda dalla rete: le battute di Kkachi sono sintesi, non stream (l'audio del gioco è
-  tutto generato, §5.13 — coerente).
-- **Voce parlata o solo testo?** Il gioco non ha mai fatto parlare nessuno (§6: «ci sono
-  quattro voci e nessuna parla»). Vedi [`08-domande-aperte.md`](08-domande-aperte.md).
+  dipenda dalla rete. Le righe di Kkachi sono testo; quello che si sente è il fruscio, che
+  l'audio del gioco già sa fare (§5.13).
 - **Il cane.** Non esiste un cane nel gioco. Serve in due pannelli fermi e in nessun momento
   giocato: si può disegnare solo nei pannelli.

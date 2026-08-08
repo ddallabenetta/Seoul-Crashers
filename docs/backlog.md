@@ -16,11 +16,12 @@ a Jeju via mare o in volo. Mappa, carta e salvataggi sono unici.
 **Restano le missioni**, che sono il lavoro grosso. **I contenuti però adesso ci sono**: il
 copione completo della campagna — dodici missioni in tre atti, cutscene iniziale, raccordi,
 finali e ventiquattro chiamate radio — sta in [`storia/`](storia/), scritto e non implementato.
-Resta da decidere **l'impianto** (attivazione sulla mappa, obiettivi, fallimento e ripetizione,
-sistema di pannelli, pannelli parlanti o muti): le domande sono in fila con una raccomandazione
-ciascuna in [`storia/08-domande-aperte.md`](storia/08-domande-aperte.md), insieme a una proposta
-di sette tappe. **Le scelte di design vanno concordate con l'utente prima di scrivere codice** —
-è la prima cosa da chiedere in apertura di sessione.
+**E l'impianto è deciso**, con l'utente: pannelli solo testo, cutscene saltabile, un blip solo
+sulla missione attiva, fallimento che riparte dall'ultima fase, un pannello = una funzione,
+cortili persistenti, tre finali, Kkachi come tabella con predicato, storia prima delle attività
+secondarie. Le decisioni e le **otto tappe** di lavoro stanno in
+[`storia/08-domande-aperte.md`](storia/08-domande-aperte.md); si comincia dalla **A** (primitive
+dei pannelli + cutscene iniziale). Resta aperta una domanda sola: se le missioni si rigiocano.
 
 Quello che segue è quanto resta indietro, in ordine di quanto si sente. È molto più corto di
 prima: il §5.12 ha pagato diciannove voci di questo elenco, il §5.13 ha chiuso l'audio, il
@@ -164,9 +165,10 @@ il §5.21 altre undici — fra cui le due che erano tornate in cima.
   c'è nessuno~~ — **fatte con il §5.26**, con quattro cose ancora aperte:
   - **un territorio non cambia mai padrone.** Una guerra fra bande adesso si vede e fa dei
     morti, ma il cortile resta di chi era: conquistarlo vuol dire uno stato persistente sul
-    turf (e quindi nel salvataggio) e un effetto sul commercio. **La storia adesso lo chiede
-    per nome**: è la missione M5 (`storia/04-atto-2.md`), ed è l'unica cosa della campagna che
-    cambia il mondo in modo permanente — va fatta prima delle missioni, non insieme;
+    turf (e quindi nel salvataggio) e un effetto sul commercio. **Deciso: si fa**, ed è la
+    tappa C della campagna — prima delle missioni che la usano, perché M5
+    (`storia/04-atto-2.md`) la dà per scontata ed è l'unica cosa della storia che cambia il
+    mondo in modo permanente;
   - **le rapine non riguardano il giocatore.** Passare di lì mentre succede è uno spettacolo,
     non un'occasione: non si può derubare il rapinatore, denunciarlo o farsi assumere. La
     superficie naturale sono le attività secondarie;

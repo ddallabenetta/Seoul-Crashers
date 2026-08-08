@@ -113,7 +113,14 @@ storia è avanzata; chi ci torna trova qualcosa.
 stato del motore e dell'auto (§5.4) · orologio e meteo (§5.11) · ricercato (§5.5) · metro e
 interni come «zone senza segnale» (§5.23, §5.8).
 
-**Chiederebbe** — una stazione fittizia a `91.45` fuori dalla lista delle stazioni vere · un
-innesco di dialogo su condizione (ora, luogo, avanzamento, primo evento di un tipo) · un conto
-delle chiamate ascoltate nel salvataggio · **la scelta fra voce sintetizzata e solo testo**,
-che è la domanda aperta più grossa di tutto il copione ([`08-domande-aperte.md`](08-domande-aperte.md)).
+**Chiederebbe** — una stazione fittizia a `91.45` fuori dalla lista delle stazioni vere · **una
+tabella di righe con predicato** (luogo, ora, meteo, prima volta di un evento, avanzamento),
+nello stile di `WEAPONS` e `BUSINESSES`: è la forma decisa, e regge anche le righe di servizio
+e, un giorno, le attività secondarie · un conto delle chiamate ascoltate nel salvataggio,
+perché venti su ventiquattro sono una delle condizioni del finale C.
+
+**Non chiede una voce.** I pannelli sono muti (§ [`08-domande-aperte.md`](08-domande-aperte.md)):
+Kkachi è testo, e quello che lo rende riconoscibile è che le sue righe non hanno un nome
+davanti ma il quadrante della frequenza, stanno sempre da sole nel pannello, e sotto c'è il
+fruscio — che l'audio del gioco già sa fare (§5.13). **Queste chiamate non sono più
+facoltative per chi sviluppa**: senza, il finale C non esiste.

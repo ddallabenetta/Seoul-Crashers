@@ -119,6 +119,8 @@ Promette: dodici missioni con apertura e chiusura a pannelli, una cutscene inizi
 scene di raccordo, due finali giocabili più uno nascosto, ventiquattro chiamate radio
 facoltative ([`07-radio-kkachi.md`](07-radio-kkachi.md)).
 
-Non promette: come si attivano, come si falliscono, come si ripetono, quanti pannelli stanno
-in memoria, se la cutscene è saltabile. Sono decisioni d'impianto, ed è la prima cosa da
-concordare — l'elenco è in [`08-domande-aperte.md`](08-domande-aperte.md).
+Non promette l'impianto — ma l'impianto adesso è deciso, e sta in
+[`08-domande-aperte.md`](08-domande-aperte.md): pannelli **muti**, cutscene **saltabile**, un
+blip solo sulla missione attiva, ripresa **dall'ultima fase**, un pannello = una funzione,
+cortili **persistenti**, **tre** finali, Kkachi come tabella con predicato, e la storia prima
+delle attività secondarie. Resta aperta una domanda sola: se le missioni si possano rigiocare.
