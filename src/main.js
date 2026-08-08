@@ -2,6 +2,8 @@
 import { Loop } from './core/loop.js';
 import { Input } from './core/input.js';
 import { Rng } from './core/rng.js';
+import { Events } from './core/events.js';
+import { resolveMode } from './core/modes.js';
 import { AudioSystem } from './core/audio.js';
 import { Radio } from './core/radio.js';
 import { DynamicGrid } from './core/spatial.js';
@@ -17,6 +19,7 @@ import { Player } from './entities/player.js';
 import { TrafficSystem } from './entities/traffic.js';
 import { PedestrianSystem } from './entities/pedestrians.js';
 import { LifeSystem } from './entities/life.js';
+import { ActorSystem } from './entities/actors.js';
 import { PickupSystem } from './entities/pickups.js';
 import { ProjectileSystem } from './entities/projectiles.js';
 import { WantedSystem } from './entities/wanted.js';
@@ -44,9 +47,11 @@ class Game {
     this.camera = new Camera();
     this.input = new Input(canvas);
     this.rng = new Rng(20260730);
+    // Il bus: da qui passano i fatti del mondo, e ci si iscrivono le missioni e la
+    // tabella di Kkachi invece di frugare nello stato del gioco a ogni frame.
+    this.events = new Events();
     this.time = 0;
     this.debug = false;
-    this.paused = false;
     // Falso finché il menu iniziale è a schermo: il mondo gira lo stesso, il
     // giocatore no (§5.18).
     this.started = false;
@@ -144,6 +149,10 @@ class Game {
     // Ha un rng suo — pescare da `this.rng` sposterebbe lo streaming di traffico
     // e pedoni ogni volta che decolla un aereo.
     this.life = new LifeSystem(this.city, new Rng(20260808));
+    // I personaggi nominati. Rng suo, come `life`: uno che compare non deve
+    // spostare lo streaming di traffico e pedoni.
+    this.actors = new ActorSystem(new Rng(20260809));
+    this.actors.attach(this);
     this.pickups = new PickupSystem(this.city, this.rng);
     this.projectiles = new ProjectileSystem();
     this.wanted = new WantedSystem();
@@ -252,6 +261,9 @@ class Game {
     // continuerebbe la caccia con degli agenti che non sono più in nessuna lista.
     for (const p of this.peds) p.gone = true;
     this.peds.length = 0;
+    // Gli attori non si perdono: quello che sparisce è il loro pedone, e la
+    // definizione (con la morte, se è morto) resta a `ActorSystem`.
+    this.actors.clearPeds();
     this.police.standDown(this, true);
     this.projectiles.clear();
     this.fx.clear();
@@ -297,7 +309,6 @@ class Game {
     this.mapView.open = false;
     this.menu.open = false;
     this.metro.open = false;
-    this.paused = false;
     this.hud.showDistrict(this.player.district);
     if (opts.silent) return;
     const toArea = this.areaAt(this.player.x, this.player.y);
@@ -340,6 +351,8 @@ class Game {
     this.player.district = this.city.districtAt(this.player.x, this.player.y);
     this.wanted.reset();
     this.shops.reset();
+    this.actors.reset();
+    this.markers.length = 0;
     this.dayCycle.reset();
     this.radio.off(this);
     this.time = 0;
@@ -368,7 +381,6 @@ class Game {
   toTitle() {
     this.newGame();
     this.started = false;
-    this.paused = false;
     this.menu.open = false;
     this.mapView.open = false;
     this.shopMenu.open = false;
@@ -380,6 +392,55 @@ class Game {
     // salvato qualcosa.
     this.startMenu.refresh();
     // Il tema torna da solo: `music.direct` guarda `game.started` a ogni frame.
+  }
+
+  // --- bus di eventi ----------------------------------------------------------
+  on(name, fn) { return this.events.on(name, fn); }
+  once(name, fn) { return this.events.once(name, fn); }
+  off(name, fn) { this.events.off(name, fn); }
+  emit(name, ...args) { this.events.emit(name, ...args); }
+
+  /**
+   * In che modalità sta girando il gioco (`core/modes.js`). Si risolve a ogni
+   * lettura ed è una manciata di predicati: chi lo chiede tre volte in un frame
+   * non paga niente, e non c'è uno stato in più da tenere allineato.
+   */
+  get mode() {
+    return resolveMode(this);
+  }
+
+  /**
+   * Il mondo è fermo. Era una riga di `update` con quattro `or` dentro; adesso è
+   * la modalità a dirlo. Chi legge questo campo non è cambiato, e una modalità in
+   * più (un dialogo di missione, una schermata di fallimento) adesso è una riga in
+   * `core/modes.js` invece di un quinto `or` qui e di un ramo in ognuno di loro.
+   */
+  get paused() {
+    return !this.mode.worldRuns;
+  }
+
+
+  // --- marcatori sulla mappa --------------------------------------------------
+  //
+  // `game.markers` esisteva già ed era letto da `hud.drawMinimap` e da
+  // `mapview.drawPanel`; quello che mancava era il modo di **scriverlo**. Un
+  // marcatore ha un `id` perché il caso normale è spostarlo, non accumularlo: la
+  // decisione presa con l'utente è **un blip solo, sulla missione in corso**.
+  setMarker(id, x, y, opts = {}) {
+    const mk = { id, x, y, ...opts };
+    const i = this.markers.findIndex((m) => m.id === id);
+    if (i >= 0) this.markers[i] = mk;
+    else this.markers.push(mk);
+    return mk;
+  }
+
+  clearMarker(id) {
+    const i = this.markers.findIndex((m) => m.id === id);
+    if (i >= 0) this.markers.splice(i, 1);
+  }
+
+  clearMarkers() {
+    this.markers.length = 0;
   }
 
   /** True quando il giocatore è in un interno: negozio oppure stazione metro. */
@@ -418,9 +479,16 @@ class Game {
   }
 
   // --- callback dal mondo ----------------------------------------------------
+  //
+  // Restano metodi, e restano i chiamanti di prima: `vehicle.js`, `player.js`,
+  // `pedestrians.js`, `projectiles.js` e `shops.js` chiamano `game.onQualcosa`
+  // esattamente come facevano. Quello che è cambiato è che ognuno finisce con un
+  // `emit`, così chi vuole *osservare* un fatto — una fase di missione, una riga
+  // di Kkachi — si iscrive invece di farsi aggiungere un `if` qui dentro.
   onDistrictChange(d) {
     this.hud.showDistrict(d);
     this.stats.districts.add(this.districtKey(d));
+    this.emit('districtChange', d);
   }
 
   onEnterVehicle(v) {
@@ -435,10 +503,12 @@ class Game {
     else if (this.pedGrid.queryCircle(v.x, v.y, 320).some((p) => !p.dead)) {
       this.wanted.report('theft', this);
     }
+    this.emit('enterVehicle', v);
   }
 
   onExitVehicle(v) {
     v.protect = false;
+    this.emit('exitVehicle', v);
   }
 
   onVehicleImpact(v, impact) {
@@ -454,6 +524,7 @@ class Game {
       }
     }
     if (impact > 40) this.fx.addDust(v.x, v.y, v.vx, v.vy, 3);
+    this.emit('vehicleImpact', v, impact);
   }
 
   onVehicleDestroyed(v) {
@@ -482,6 +553,7 @@ class Game {
     // carambole del traffico non devono mandare la centrale in allarme.
     if (v.lastAttacker === this.player) this.wanted.report('wreck', this);
     v.protect = false;
+    this.emit('vehicleDestroyed', v);
   }
 
   /**
@@ -505,6 +577,7 @@ class Game {
     if (v.spot) v.spot.taken = false;
     const i = this.vehicles.indexOf(v);
     if (i >= 0) this.vehicles.splice(i, 1);
+    this.emit('vehicleSunk', v);
   }
 
   onPedKilled(p, v, speed, source) {
@@ -527,6 +600,7 @@ class Game {
       this.fx.addDust(p.x, p.y, v.vx, v.vy, 3);
       if (v.driver === 'player') this.camera.addShake(6);
     }
+    this.emit('pedKilled', p, v, source);
   }
 
   /**
@@ -544,14 +618,20 @@ class Game {
       this.hud.toast('La radio è in macchina (o in un locale che ce l\'ha)', 1.8);
       return;
     }
-    if (shift) this.radio.off(this);
-    else this.radio.next(this);
+    if (shift) {
+      this.radio.off(this);
+    } else {
+      this.radio.next(this);
+      // `inCar` perché Kkachi sta nel motore: la radio di un 편의점 non è la sua.
+      this.emit('radioOn', !!inCar);
+    }
   }
 
   onPlayerDeath() {
     this.stats.deaths++;
     this.camera.addShake(16);
     this.audio.playerDown();
+    this.emit('playerDeath');
   }
 
   // --- combattimento ---------------------------------------------------------
@@ -614,6 +694,7 @@ class Game {
     pl.money -= bill;
     this.hud.toast(`Ospedale di ${best.name}: ti hanno ricucito, l'arsenale no`, 4);
     if (bill > 0) this.hud.toast(`Conto della clinica: ${won(bill)}`, 4);
+    this.emit('respawn', best);
     // Uscire dall'ospedale è un punto pulito: niente stelle, HP pieni, in piedi
     // davanti a una porta. Se una sconfitta non si salva qui, l'unico modo di
     // riavere quello che si aveva prima è non ricaricare mai.
@@ -662,6 +743,7 @@ class Game {
     this.hud.toast(`Arrestato — commissariato di ${best.name}`, 4);
     this.hud.toast('Sei ore dentro, e l\'arsenale se lo tengono', 4);
     if (bail > 0) this.hud.toast(`Cauzione: ${won(bail)}`, 4);
+    this.emit('busted', best);
     autosave(this, 'uscito di cella');
   }
 
@@ -696,13 +778,12 @@ class Game {
 
     const canUseMetro = this.metro.open || (!this.menu.open && !this.mapView.open && !this.shopMenu.open);
     const metroUsed = canUseMetro ? this.metro.update(dt, this) : false;
-    this.paused = this.menu.open || this.mapView.open || this.shopMenu.open || this.metro.open;
     this.updateRadioKeys();
     // L'audio gira anche in pausa: i letti si abbassano invece di spegnersi (uno
     // stacco netto suona come un guasto) e i suoni dei menu restano a volume pieno.
     this.audio.update(dt, this);
     this.radio.update(dt, this);
-    const cursor = this.paused ? 'default' : 'none';
+    const cursor = this.mode.cursor;
     if (this.canvas.style.cursor !== cursor) this.canvas.style.cursor = cursor;
 
     if (this.paused || metroUsed) {
@@ -755,6 +836,10 @@ class Game {
       this.life.update(dt, this);
       this.traffic.update(dt, this);
       this.pedSystem.update(dt, this);
+      // Dopo lo streaming dei pedoni: `stream` ha appena tolto dalla lista chi era
+      // troppo lontano, e chi ha un nome va rimesso al suo posto subito, non al
+      // frame dopo — o per un frame il banco è vuoto.
+      this.actors.update(dt, this);
       this.pickups.update(dt, this);
     } else if (this.shops.active) {
       this.police.siege(dt, this);

@@ -147,6 +147,23 @@ export class WantedSystem {
     this.seen = false;
   }
 
+  snapshot() {
+    return { level: this.level, heat: this.heat, lastX: this.lastX, lastY: this.lastY };
+  }
+
+  /**
+   * `reset` prima di tutto: azzera anche `unseenT` e `seen`, che non si salvano ma
+   * appartengono alla partita di prima — ricaricare con l'avvistamento di venti
+   * minuti fa faceva cadere una stella nel frame dopo il caricamento.
+   */
+  restore(d) {
+    this.reset();
+    this.level = d.level;
+    this.heat = d.heat;
+    this.lastX = d.lastX;
+    this.lastY = d.lastY;
+  }
+
   /** Distanza dall'ultima posizione nota: la usa la polizia per il rastrellamento. */
   distFromLastKnown(x, y) {
     return dist(x, y, this.lastX, this.lastY);

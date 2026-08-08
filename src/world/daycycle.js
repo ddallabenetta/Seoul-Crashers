@@ -124,6 +124,29 @@ export class DayCycle {
     this.apply();
   }
 
+  snapshot() {
+    return {
+      t: this.t, day: this.day, weather: this.weather.id, next: this.next.id,
+      weatherT: this.weatherT, blend: this.blend, wet: this.wet,
+    };
+  }
+
+  /**
+   * `apply` **prima** di `wet`: riscrive tutto il `light` derivato, e fra le cose
+   * che riscrive c'è il bagnato. Invertire le due righe fa ricaricare con
+   * l'asfalto asciutto sotto la pioggia.
+   */
+  restore(d) {
+    this.t = d.t;
+    this.day = d.day;
+    this.weather = WEATHERS[d.weather] || WEATHERS.clear;
+    this.next = WEATHERS[d.next] || WEATHERS.clear;
+    this.weatherT = d.weatherT;
+    this.blend = d.blend;
+    this.apply();
+    this.wet = d.wet;
+  }
+
   /** Ora del giorno in [0,24). */
   get hour() { return (this.t / DAY_SECONDS) * 24; }
 

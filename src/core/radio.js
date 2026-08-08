@@ -262,7 +262,9 @@ export class Radio {
     const a = this.audio;
     if (a.muted || a.mix.master <= 0) return 0;
     const base = a.mix.master * a.mix.radio;
-    const duck = game.paused ? 0.4 : 1;
+    // La radio si abbassa meno del mondo: è la musica che ha scelto il giocatore.
+    // Ha un valore suo nella tabella delle modalità, per questo.
+    const duck = game.mode.radioDuck;
     const pl = game.player;
     if (!pl.onFoot && pl.vehicle && !pl.vehicle.dead) return base * duck;
     if (game.indoors) {

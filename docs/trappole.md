@@ -277,3 +277,28 @@ alla vetrina finisce sotto una berlina una volta su tre. La cura non è ridargli
 `state === 'guard'` e falliva a caso: basta un'auto che accosta per mandare in `flee` mezzo
 cortile, e il ritorno alla ronda è di qualche secondo. È la stessa lezione già pagata da
 `canDeal` col 거래책 (§3): si guarda **dov'è**, non come si sente.
+
+**`paused` è diventato una proprietà calcolata, e assegnarla adesso alza un'eccezione.** Dal
+§5.27 `game.paused` si ricava dalla modalità (`core/modes.js`). I moduli ES girano in modalità
+rigorosa, quindi un `this.paused = false` rimasto in giro non è un no-op: è un `TypeError` che
+ferma il frame. Ce n'erano quattro (costruttore, `travelTo`, `toTitle`, `update`) e sono stati
+tolti tutti; chi ne aggiunge uno per abitudine se ne accorge solo a run time.
+
+**Il campo della larghezza di una linea stradale si chiama `width`, non `w`.** Scritto `l.w` si
+ottiene `undefined`, poi `NaN` sulle coordinate — e un veicolo creato a `NaN` **non alza niente**:
+entra nella lista, non si vede, non collide, e le prove che lo cercano per distanza rispondono
+«non c'è» invece di «è rotto». Vale per qualunque cosa si posi sul bordo di una carreggiata.
+
+**Un attore che muore mentre sei lontano deve morire lo stesso.** `ActorSystem` ricrea il pedone
+di un personaggio ogni volta che torni: se la morte stesse sul **pedone** invece che sulla
+definizione, chiunque tu abbia ammazzato sarebbe di nuovo dietro il suo banco al secondo giro. La
+morte arriva dal bus (`pedKilled`) e sta sulla definizione. Stessa forma del problema che aveva
+`v.spot` con le auto in sosta: lo stato che conta non è dell'oggetto che va e viene.
+
+**`idle` non vuol dire «sta fermo», vuol dire «si è fermato un attimo».** È una sosta con un
+timer (`idleT`): scade e il pedone riprende a camminare. Un personaggio nominato nato in `idle`
+se ne andava a spasso dopo un secondo — e la prova che lo ha scoperto stava fallendo per il
+motivo *sbagliato* (confrontava le coordinate dopo che aveva già camminato), quindi la prima
+lettura è stata «asserzione fragile» invece di «bug». Chi deve restare dove lo metti va in
+**`post`** (§5.27), che ci torna se lo spostano. La lezione è doppia: leggere cosa fa davvero
+uno stato prima di riusarlo, e diffidare di una prova che passa a volte.
