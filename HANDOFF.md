@@ -5,16 +5,17 @@ resta corto apposta.** Il contenuto vero sta in `docs/`, e si apre un documento 
 non tutti. Il `README.md` descrive il gioco e i comandi; qui c'è quello che serve a
 *sviluppare*. Avvio e vincoli stanno in `CLAUDE.md`, che si carica da solo.
 
-Ultimo aggiornamento: **la vita degli NPC** (§5.26) — la Corea adesso ha dei *fatti* e non solo
-delle cose. Aerei e barche hanno qualcuno a bordo, la campagna lavora e rincasa, la gente si
-raduna e parla, e c'è chi rapina un negozio o si prende a fucilate per un cortile con la volante
-che arriva. Tutto in un modulo solo (`life.js`) e senza un'entità nuova. Le tappe precedenti
-sono §5.8-5.25.
+Ultimo aggiornamento: **il copione della campagna** (`docs/storia/`) — dodici missioni in tre
+atti, la cutscene iniziale, i finali e le chiamate radio, scritti per intero e **senza una riga
+di codice**, con l'impianto concordato con l'utente. L'ultima tappa *giocabile* resta la vita
+degli NPC (§5.26). Le precedenti sono §5.8-5.25.
 
-> 📌 **Da concordare con l'utente prima di scrivere codice:** della Fase 3 restano le
-> **missioni**, che sono il lavoro grosso e pieno di scelte di design (quante, come si
-> attivano, cutscene a fumetti, fallimento e ripetizione). L'utente vuole essere consultato
-> invece di trovarsele fatte (§7): **chiediglielo in apertura di sessione.** La musica copre
+> 📌 **Il prossimo lavoro è la tappa A della campagna**: primitive dei pannelli a fumetto e la
+> **cutscene iniziale**. Le nove decisioni d'impianto prese con l'utente e le otto tappe stanno
+> in [`docs/storia/08-domande-aperte.md`](docs/storia/08-domande-aperte.md) — leggi quello, non
+> ricavarle dal copione. Resta aperta una domanda sola (se le missioni si rigiocano) e non
+> blocca niente. Quello che il copione **non** decide — quanti pannelli in una schermata, come
+> si disegnano — si concorda a vista (§7). La musica copre
 > due momenti soli (menu e caccia, §5.19): i pezzi che accompagnano una missione sono un'altra
 > scelta di regia, e si fanno insieme alle missioni. Il §6 resta ordinato per impatto: le voci
 > più concrete sono il sorpasso, l'arresto che ti carica in volante e il **corridoio fra Seoul
@@ -32,6 +33,7 @@ sono §5.8-5.25.
 | diagnosticare un comportamento strano — **prima di indagare da zero** | [`docs/trappole.md`](docs/trappole.md) |
 | tarare un numero (velocità, densità, danno, luce, audio, maglia) | [`docs/parametri.md`](docs/parametri.md) |
 | sapere cosa viene dopo e cosa è già stato deciso | [`docs/backlog.md`](docs/backlog.md) |
+| scrivere o implementare una missione, una cutscene, un dialogo | [`docs/storia/`](docs/storia/) — è l'indice: apri **un capitolo alla volta**, sono ~2000 righe |
 | verificare headless, usare `probe.mjs`, le scene o le skill | [`docs/strumenti.md`](docs/strumenti.md) |
 | capire *perché* una parte esistente è fatta così | [`docs/storico/`](docs/storico/) |
 

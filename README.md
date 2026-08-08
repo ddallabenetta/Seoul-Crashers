@@ -175,6 +175,10 @@ il crimine indossa un completo. (Missioni e cutscene a fumetti sono l'ultimo pez
 vedi *Stato* più sotto. Le bande però ci sono già, e con loro si può trattare: basta entrare
 nel loro cortile a mani vuote.)
 
+Il copione della campagna — le dodici missioni, la cutscene iniziale, i finali — è scritto per
+intero in [`docs/storia/`](docs/storia/). **Non apritelo se volete giocarci:** è pieno di
+spoiler dalla prima riga.
+
 ## I quartieri
 
 | Distretto | Carattere | Palette |

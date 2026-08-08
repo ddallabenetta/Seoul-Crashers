@@ -13,10 +13,15 @@ Busan e Jeju, gli interni metro e i collegamenti interurbani**: ingressi solidi 
 corsie, passeggeri e chiosco nelle stazioni e coste rifinite. Dal §5.25 le tre città stanno
 **nella stessa mappa**, disposte come in Corea: a Busan ci si arriva guidando sulla Gyeongbu,
 a Jeju via mare o in volo. Mappa, carta e salvataggi sono unici.
-**Restano le missioni**, che sono il lavoro grosso: impianto (attivazione sulla mappa,
-obiettivi, fallimento e ripetizione), cutscene a pannelli a fumetto, e i contenuti. **Le scelte
-di design vanno concordate con l'utente prima di scrivere codice** — è la prima cosa da chiedere
-in apertura di sessione.
+**Restano le missioni**, che sono il lavoro grosso. **I contenuti però adesso ci sono**: il
+copione completo della campagna — dodici missioni in tre atti, cutscene iniziale, raccordi,
+finali e ventiquattro chiamate radio — sta in [`storia/`](storia/), scritto e non implementato.
+**E l'impianto è deciso**, con l'utente: pannelli solo testo, cutscene saltabile, un blip solo
+sulla missione attiva, fallimento che riparte dall'ultima fase, un pannello = una funzione,
+cortili persistenti, tre finali, Kkachi come tabella con predicato, storia prima delle attività
+secondarie. Le decisioni e le **otto tappe** di lavoro stanno in
+[`storia/08-domande-aperte.md`](storia/08-domande-aperte.md); si comincia dalla **A** (primitive
+dei pannelli + cutscene iniziale). Resta aperta una domanda sola: se le missioni si rigiocano.
 
 Quello che segue è quanto resta indietro, in ordine di quanto si sente. È molto più corto di
 prima: il §5.12 ha pagato diciannove voci di questo elenco, il §5.13 ha chiuso l'audio, il
@@ -160,7 +165,10 @@ il §5.21 altre undici — fra cui le due che erano tornate in cima.
   c'è nessuno~~ — **fatte con il §5.26**, con quattro cose ancora aperte:
   - **un territorio non cambia mai padrone.** Una guerra fra bande adesso si vede e fa dei
     morti, ma il cortile resta di chi era: conquistarlo vuol dire uno stato persistente sul
-    turf (e quindi nel salvataggio) e un effetto sul commercio. È materia della storia;
+    turf (e quindi nel salvataggio) e un effetto sul commercio. **Deciso: si fa**, ed è la
+    tappa C della campagna — prima delle missioni che la usano, perché M5
+    (`storia/04-atto-2.md`) la dà per scontata ed è l'unica cosa della storia che cambia il
+    mondo in modo permanente;
   - **le rapine non riguardano il giocatore.** Passare di lì mentre succede è uno spettacolo,
     non un'occasione: non si può derubare il rapinatore, denunciarlo o farsi assumere. La
     superficie naturale sono le attività secondarie;
@@ -174,7 +182,8 @@ il §5.21 altre undici — fra cui le due che erano tornate in cima.
   vorrebbe dire uno stato sui volumi e un modo di disegnarlo.
 
 **Fase 3 — quello che resta.**
-12 missioni in 3 atti con cutscene a **pannelli a fumetto** (gli interni sono anche il posto
+12 missioni in 3 atti con cutscene a **pannelli a fumetto** — **scritte**, vedi [`storia/`](storia/),
+e da qui in poi il lavoro è impianto e disegno, non invenzione (gli interni sono anche il posto
 dove ambientarne metà: un incontro in un 노래방 non ha bisogno di niente di nuovo, un
 appuntamento può avere un'ora, e adesso una banda ha anche un motivo per parlarti); attività
 secondarie (taxi, consegne, salti). **Sono il prossimo lavoro grosso**; i debiti tecnici e di
