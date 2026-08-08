@@ -103,6 +103,24 @@ nome che il giocatore legge sul cartello.
   migliaia per griglia, e quella riallocazione sessanta volte al secondo da sola valeva più
   della metà del frame rate.
 
+#### Tre difetti trovati provandolo, non leggendolo
+
+Sono la ragione per cui `korea-census.scene` contiene tre controlli che devono restare a zero.
+
+- **Non si usciva da Seoul in auto.** `citygen` chiude la capitale con una cintura di volumi
+  solidi sui quattro margini: era il bordo giocabile quando Seoul *era* il mondo. Con la
+  campagna attaccata a quel bordo diventava un muro invisibile, e a schermo era una fascia
+  verde con le auto incolonnate contro. La cintura viene tolta alla fusione.
+- **Segnaletica sparsa sul mare.** `shiftCity` traslava `l.segments` ma non `l.marks`: le righe
+  bianche, le linee gialle e le scritte 버스 di Busan e Jeju finivano nello spazio dove quelle
+  città *erano*, cioè sopra Seoul e sull'acqua, senza un pixel di asfalto sotto. Nessun errore
+  in console: ogni singolo pezzo era formalmente valido.
+- **La giunzione dell'autostrada era sfasata.** Il tratto orizzontale cominciava sull'asse del
+  verticale invece che sul suo bordo esterno, lasciando all'angolo un quadrante di terra grande
+  quanto un quarto di incrocio; e l'innesto poteva capitare su una via secondaria da 76 px,
+  attaccata a una carreggiata da 144. Adesso ogni tratto sborda di mezza carreggiata dentro
+  l'altro, l'innesto pretende un'arteria e la larghezza la detta la città a cui si attacca.
+
 #### Verifica
 
 Headless, con `probe.mjs`:
@@ -116,6 +134,8 @@ Headless, con `probe.mjs`:
 | Autostrada | 10 veicoli in transito, tutti in movimento · **60 fps** |
 | Viaggi metro Seoul → Busan → Jeju → Seoul | distretti corretti, nessun errore in console |
 | Salvataggio, ricarica, slot vecchio di Busan | `3000/2000` → `12562/12400`, Seomyeon |
+| Segnaletica senza asfalto sotto · strada in acqua · muri sul percorso Seoul–Busan | 0 · 0 · 0 |
+| Uscita da Seoul guidando | dall'innesto a `y = 7451`, in campagna, con i comandi del gioco |
 
 Il frame rate in container headless senza GPU sta fra 25 e 26 fps **anche sul ramo
 precedente**: è il costo della composizione software, non della mappa. In campagna, dove il

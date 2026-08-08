@@ -182,6 +182,25 @@ per normalizzare.
 ricordarsi cosa ha già visto raddoppia l'offset su quegli oggetti. Il `WeakSet` in
 `korea.shiftCity` è lì per questo.
 
+**`marks` va traslato insieme a `segments`.** Sono le stesse coordinate lungo la linea, e i
+tratti di segnaletica non hanno un asfalto proprio: stanno sopra quello dei segmenti. Traslarne
+uno solo lascia le righe bianche, le linee gialle e le scritte 버스 di una città sparse sulla
+campagna e sul mare di un'altra, **senza un pixel di strada sotto** — e il difetto non dà
+nessun errore, perché ogni singolo pezzo è formalmente valido.
+
+**La cintura invalicabile di Seoul era il limite di *quel* mondo.** `citygen` chiude la mappa
+con quattro volumi solidi (`isBelt`) sui margini: quando Seoul era il mondo intero erano il
+bordo giocabile, adesso sono un muro invisibile fra la capitale e la campagna, ed è esattamente
+quello che questa tappa esiste per togliere. Il sintomo è una fascia verde che attraversa lo
+schermo con le auto incolonnate contro. Il limite del mondo è uno solo, e lo mettono i
+`boundaryColliders` di `regions.reindex` ai bordi della Corea.
+
+**Due carreggiate che si incontrano devono sovrapporsi, non toccarsi.** Se il tratto orizzontale
+comincia sull'*asse* di quello verticale invece che sul suo bordo esterno, all'angolo resta un
+quadrante di terra grande quanto un quarto di incrocio. E l'innesto va su un'**arteria**: una
+carreggiata da 144 px attaccata a una via secondaria da 76 dà lo stesso scalino, con in più la
+corsia esterna (offset 54) che finisce fuori dall'asfalto.
+
 **`l.on[j]` non significa più niente dopo la fusione.** L'indice `j` individua la *j*-esima
 perpendicolare della **stessa** maglia: con le linee di tre città in un array solo punta a una
 strada di un'altra provincia. Chiunque abbia bisogno dei tratti fra due incroci deve usare

@@ -50,6 +50,9 @@ Gli invarianti da difendere:
 | nodi di Jeju raggiungibili su gomma | **zero** su 294 — è un'isola |
 | corridoio e sede dell'autostrada | asciutti |
 | mare del sud, canale Busan–Jeju, Mar dell'Est | bagnati |
+| segnaletica senza asfalto sotto | **zero** (`marks` e `segments` devono restare allineati) |
+| campioni di carreggiata in acqua | **zero** |
+| muri sul percorso Seoul → Busan | **zero** (la cintura di `citygen` va tolta alla fusione) |
 
 I conteggi esatti si spostano a ogni `rng` in più consumato in generazione (vedi il
 determinismo in `CLAUDE.md`): quello che non deve cambiare sono i **rapporti** — tutto

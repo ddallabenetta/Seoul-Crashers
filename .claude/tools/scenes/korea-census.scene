@@ -43,8 +43,55 @@ const acqua = {
   aEstDiBusan: city.isWater(city.w - 200, (busan.y0 + busan.y1) / 2),
 };
 
+// Tre controlli che sono altrettanti bug già pagati (§5.25).
+//
+// 1. La segnaletica deve stare sopra l'asfalto della **sua** linea: `marks` e
+//    `segments` sono le stesse coordinate lungo la linea, e traslarne uno solo
+//    lascia le righe bianche sparse in mezzo alla campagna e sul mare.
+// 2. Nessun tratto di carreggiata deve finire in acqua.
+// 3. Il percorso Seoul → Busan non deve avere muri: la cintura invalicabile che
+//    `citygen` costruisce attorno a Seoul era il limite di *quel* mondo, e qui
+//    diventerebbe un muro invisibile fra la capitale e la campagna.
+const segnaletica = [];
+for (const lines of [city.vLines, city.hLines]) {
+  for (const l of lines) {
+    for (const [a, b] of l.marks || []) {
+      if (!l.segments.some(([sa, sb]) => a >= sa - 2 && b <= sb + 2)) {
+        segnaletica.push({ c: Math.round(l.c), tratto: [Math.round(a), Math.round(b)] });
+      }
+    }
+  }
+}
+
+let stradaInAcqua = 0;
+for (const l of city.vLines) for (const [a, b] of l.segments) {
+  for (let y = a; y <= b; y += 120) if (city.isWater(l.c, y)) stradaInAcqua++;
+}
+for (const l of city.hLines) for (const [a, b] of l.segments) {
+  for (let x = a; x <= b; x += 120) if (city.isWater(x, l.c)) stradaInAcqua++;
+}
+
+const muri = [];
+const sonda = (x, y) => {
+  for (const o of city.solidGrid.queryCircle(x, y, 40)) {
+    if (x > o.x - 6 && x < o.x + o.w + 6 && y > o.y - 6 && y < o.y + o.h + 6) {
+      muri.push({ at: [Math.round(x), Math.round(y)], cintura: !!o.isBelt, confine: !!o.isBoundary });
+    }
+  }
+};
+const exp = city.expressway;
+for (let y = exp.exit.y; y <= exp.y; y += 40) sonda(exp.exit.x, y);
+const xa = Math.min(exp.exit.x, exp.entry.x);
+const xb = Math.max(exp.exit.x, exp.entry.x);
+for (let x = xa; x <= xb; x += 40) sonda(x, exp.y);
+for (let y = exp.y; y <= exp.entry.y; y += 40) sonda(exp.entry.x, y);
+
 return {
   mondo: `${city.w} × ${city.h}`,
+  // Tutti e tre devono restare a zero.
+  segnaleticaSenzaAsfalto: segnaletica.length,
+  campioniDiStradaInAcqua: stradaInAcqua,
+  muriSulPercorsoSeoulBusan: muri.length,
   aree: city.areas.map((a) => `${a.id} ${a.x0},${a.y0} → ${a.x1},${a.y1}`),
   autostrada: {
     quota: city.expressway.y,

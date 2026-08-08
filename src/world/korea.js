@@ -119,13 +119,18 @@ function shiftCity(city, dx, dy) {
     if (typeof e.approachX === 'number') { e.approachX += dx; e.approachY += dy; }
   }
 
+  // `marks` viaggia con `segments`: sono le stesse coordinate lungo la linea.
+  // Dimenticarne uno dei due lascia la segnaletica dove la città *era*, cioè
+  // sparsa in mezzo alla campagna e sul mare, senza un pixel di asfalto sotto.
   for (const l of city.vLines || []) {
     l.c += dx;
     for (const s of l.segments) { s[0] += dy; s[1] += dy; }
+    for (const m of l.marks || []) { m[0] += dy; m[1] += dy; }
   }
   for (const l of city.hLines || []) {
     l.c += dy;
     for (const s of l.segments) { s[0] += dx; s[1] += dx; }
+    for (const m of l.marks || []) { m[0] += dx; m[1] += dx; }
   }
 
   for (const n of city.graph.nodes) { n.x += dx; n.y += dy; }
@@ -386,8 +391,12 @@ function connect(edges, na, nb, axis) {
  * un landmark non si demolisce: lì l'innesto si sposta di una linea.
  */
 function borderNode(city, { minX, maxX, south, edgeY, water }) {
-  const ranked = city.graph.usableNodes
-    .filter((n) => n.x >= minX && n.x <= maxX)
+  const inWindow = city.graph.usableNodes.filter((n) => n.x >= minX && n.x <= maxX);
+  // L'innesto va su un'**arteria**. Attaccare una carreggiata da 144 px a una via
+  // secondaria da 76 produce esattamente lo scalino che si vede a schermo, e le
+  // corsie della corsia esterna (offset 54) finirebbero fuori dall'asfalto.
+  const arterials = inWindow.filter((n) => n.vWidth >= 120);
+  const ranked = (arterials.length ? arterials : inWindow)
     .sort((a, b) => (south ? b.y - a.y : a.y - b.y));
   for (const n of ranked) {
     const y0 = Math.min(n.y, edgeY);
@@ -431,15 +440,31 @@ function addExpressway(korea, parts) {
   connect(edges, bendA, bendB, 'h');
   connect(edges, bendB, entry, 'v');
 
-  const line = (c, width, from, to) => ({
-    c, width, arterial: true, keep: true, expressway: true,
-    segments: [[Math.min(from, to), Math.max(from, to)]],
-    marks: [[Math.min(from, to) + 30, Math.max(from, to) - 30]],
-    on: null,
-  });
-  korea.vLines.push(line(exit.x, EXPRESSWAY_W, exit.y, EXPRESSWAY_Y));
-  korea.hLines.push(line(EXPRESSWAY_Y, EXPRESSWAY_W, exit.x, entry.x));
-  korea.vLines.push(line(entry.x, EXPRESSWAY_W, EXPRESSWAY_Y, entry.y));
+  // Ogni tratto **sborda di mezza carreggiata dentro l'altro**: senza, all'angolo
+  // resta un quadrante di terra grande quanto un quarto di incrocio, ed è la
+  // giunzione sfasata che si vede guidando. La larghezza la detta la città a cui
+  // il tratto si attacca, così non c'è nessuno scalino sul bordo.
+  const wExit = exit.vWidth || EXPRESSWAY_W;
+  const wEntry = entry.vWidth || EXPRESSWAY_W;
+  const half = EXPRESSWAY_W / 2;
+  const line = (c, width, from, to, markPad) => {
+    const a = Math.min(from, to);
+    const b = Math.max(from, to);
+    return {
+      c, width, arterial: true, keep: true, expressway: true,
+      segments: [[a, b]],
+      // La segnaletica si ferma prima dell'angolo, come in ogni altro incrocio.
+      marks: b - a > markPad * 2 ? [[a + markPad, b - markPad]] : [],
+      on: null,
+    };
+  };
+  korea.vLines.push(line(exit.x, wExit, exit.y, EXPRESSWAY_Y + half, half + 8));
+  korea.hLines.push(line(
+    EXPRESSWAY_Y, EXPRESSWAY_W,
+    Math.min(exit.x, entry.x) - wExit / 2, Math.max(exit.x, entry.x) + wEntry / 2,
+    Math.max(wExit, wEntry) / 2 + 8
+  ));
+  korea.vLines.push(line(entry.x, wEntry, EXPRESSWAY_Y - half, entry.y, half + 8));
 
   return { exit, entry, bendA, bendB };
 }
@@ -549,6 +574,15 @@ export function createKorea() {
   }
   const country = countryDistricts();
   districts.push(...country);
+
+  // `citygen` chiude Seoul con una cintura di volumi solidi sui quattro margini:
+  // era il limite del mondo quando Seoul *era* il mondo. Qui a sud e a est di
+  // quel bordo c'è la campagna, e la cintura diventa un muro invisibile che
+  // impedisce di uscire dalla capitale in auto — che è esattamente quello che
+  // questa tappa esiste per permettere. Il limite del mondo adesso è uno solo, e
+  // lo mette `regions.reindex` ai bordi della Corea.
+  const seoulCity = parts[0].city;
+  seoulCity.buildings = seoulCity.buildings.filter((b) => !b.isBelt);
 
   for (const part of parts) {
     buildLaneMarks(part.city);
