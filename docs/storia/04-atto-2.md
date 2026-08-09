@@ -255,14 +255,14 @@ domanda a cui non ha una risposta pronta. La seconda si sente solo se la prima �
    > Narratore: `변기태, capocantiere di 한성개발. È dentro per il crollo del mercato:`
    > `due operai morti. Domattina alle nove lo tirano fuori gli avvocati.`
    >
-   > Byeon: «Lei era al cantiere. Il ventidue del mese scorso. Con la cartellina.»
+   > Byeon: «Lei era al cantiere. Il ventidue luglio. Con la cartellina.»
    > Jae-min: «Non ero io.»
    > Byeon: «Era lei. Ha firmato il verbale e ha detto ai ragazzi di scendere sotto il muro.
    > Poi il muro è venuto giù e lei era già in macchina.»
    > Jae-min: «Che macchina.»
    > Byeon: «Una nera, con l'autista. E teneva la mano destra in tasca, così, tutto il tempo.
    > Anche mentre firmava.»
-   > *(nota)* Il ventidue del mese scorso Jae-min era a Los Angeles.
+   > *(nota)* Il ventidue luglio Jae-min era a Los Angeles. È atterrato il dieci agosto.
 
 4. **L'uscita.** Alle sei del mattino: cauzione, un quinto dei contanti, arsenale sequestrato
    (§5.16). Il giocatore esce **povero e disarmato**, ed è la prima volta che il gioco lo
@@ -311,7 +311,7 @@ del mattino. Mi-rae con le cuffie al collo.
 >
 > Mi-rae: «Sei più vecchio della foto.»
 > Jae-min: «Quale foto.»
-> Mi-rae: «Quella del ventidue del mese scorso. Quella del nove. E quella di due anni fa a
+> Mi-rae: «Quella del ventidue luglio. Quella dell'anno scorso. E quella di due anni fa a
 > Busan.»
 
 **2 ·** Nove fermi immagine di videosorveglianza appesi al muro con lo scotch. Nove volte lo
@@ -325,8 +325,8 @@ stesso bomber, nove posti diversi, dodici anni.
 
 **4 ·** Mi-rae che gli mette in mano un telefono.
 
-> Mi-rae: «Alle due del pomeriggio uno con il tuo giubbotto ritira una busta a 명동. Lo fa il
-> nove di ogni mese, da sempre.»
+> Mi-rae: «Oggi è il nove. Alle due del pomeriggio uno con il tuo giubbotto ritira una busta a
+> 명동, e il nove lo fa da sempre.»
 > Jae-min: «Perché mi aiuti?»
 > Mi-rae: «Perché il nove di ogni mese arrivavano dei soldi anche a me, sempre dallo stesso
 > conto. Il mese scorso non sono arrivati. O mio padre è morto, o ha smesso di volermi bene, e

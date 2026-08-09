@@ -15,11 +15,19 @@ sigillate, marcatori, testo su più righe). Quello che resta è **contenuto**, i
 | ~~1~~ | ~~**A**~~ | ~~primitive dei pannelli + la cutscene iniziale~~ — **fatta**, §5.28 | — |
 | 2 | **B** | impianto missioni: blip singolo, fasi, ripresa dall'ultima fase + **M1 e M2** | due missioni intere, una in strada e una in un interno |
 | 3 | **C** | **cortili persistenti** (nel salvataggio, con effetto sul commercio) | si prende un cortile, si esce, si ricarica, è ancora tuo |
-| 4 | **D** | Kkachi: stazione `91.45`, tabella con predicato, le otto chiamate dell'Atto I | si gira per Seoul con la radio accesa |
+| 4 | **D** | Kkachi: stazione `91.45`, tabella con predicato, le otto chiamate dell'Atto I **e le dodici righe di servizio** | si gira per Seoul con la radio accesa |
 | 5 | **E** | Atto I completo (M3, M4) + R1 | il primo ribaltamento in mano al giocatore |
 | 6 | **F** | Atto II (M5-M8) + R2, R3 + le otto chiamate dell'Atto II | l'atto che chiede più cose nuove al motore |
-| 7 | **G** | Atto III (M9-M12) + R4 + le otto chiamate dell'Atto III | il viaggio: ha bisogno di tutto quello di prima |
+| 7 | **G** | Atto III (M9-M12) + R4 + le otto chiamate dell'Atto III **e l'incontro facoltativo di Busan** | il viaggio: ha bisogno di tutto quello di prima |
 | 8 | **H** | i tre finali, i titoli di coda, la scena dopo | e a quel punto la Fase 3 è chiusa |
+
+**Fuori dalla fila, e va fatto presto: il filo del 병원**
+([`storia/09-ospedale.md`](storia/09-ospedale.md)). È l'unico contenuto della campagna che
+**si accumula per tutta la partita** — una battuta diversa a ogni morte, e il conto delle morti
+che M12 stampa sulle fatture. Non dipende da nessuna tappa (il risveglio esiste dal §5.16 ed
+emette già `respawn`), chiede solo **un intero nel salvataggio**, e se arriva alla tappa H
+tutte le morti fatte prima sono state mute per niente. Va agganciato alla **B**, insieme al
+primo pezzo d'impianto che tocca il salvataggio.
 
 **Cosa l'impianto del §5.27 ha già tolto di mezzo**, e che quindi nessuna di queste tappe deve
 più affrontare: gli inneschi delle missioni (bus, `game.on('pedKilled', …)`), una modalità nuova

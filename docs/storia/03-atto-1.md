@@ -229,7 +229,21 @@ seconda persona sta guardando lo stesso posto**. Non si vede chi.
    completo**, ritira la busta e paga un caffè con la carta.
 4. **Seguire la seconda auto** senza farsi vedere. Inseguimento lento, a fari spenti, sotto
    l'acqua: è l'unico pezzo di guida «piano» del gioco, e la pioggia rende tutto più difficile
-   (§5.11: sul bagnato si frena peggio).
+   (§5.11: sul bagnato si frena peggio). All'inizio del pedinamento, due battute:
+
+   > 91.45: «Abbassa.»
+   > Jae-min: «Sei una radio. Non ti sente nessuno.»
+   > 91.45: «Abbassa lo stesso.»
+
+   **E il volume scende davvero** — quello che sta suonando: la stazione coreana se il
+   giocatore ce l'ha accesa, la musica del gioco se è partita. Non risale da solo: quando il
+   pedinamento finisce resta basso finché non è il giocatore a rialzarlo. È il pezzo di
+   [`00-soggetto.md`](00-soggetto.md), §6 — il gioco che tratta le proprie manopole come fatti
+   del mondo — e sta qui perché è l'unica scena in cui *stare zitti* è già la meccanica.
+
+   *(La battuta di Jae-min è la difesa del copione contro sé stesso: dire ad alta voce che è
+   assurdo è il modo di farlo passare. E resta un indizio, perché una radio che chiede di
+   essere abbassata sta dicendo che dall'altra parte c'è qualcuno che ascolta.)*
 5. **La destinazione:** un parcheggio interrato di Gangnam, sotto una torre di vetro con
    l'insegna `한성개발`. Qui la missione dice la sua unica cosa importante, e la dice piana:
 
@@ -268,9 +282,11 @@ scendere. Il tesserino è appoggiato sul cruscotto, girato verso di lui.
 
 **Poggia su** — orologio e orari dei negozi (§5.11) · pioggia e frenata sul bagnato (§5.11) ·
 편의점 aperto 24h e commesso (§5.8) · vista ridotta della polizia di notte (§5.11) · traffico
-notturno (§5.10).
+notturno (§5.10) · volumi separati di radio e musica (§5.14, §5.19).
 **Chiederebbe** — un pedinamento con soglia di distanza («ti ha visto / l'hai perso»): è la
-meccanica nuova più leggera dell'atto e torna in M6 e M9.
+meccanica nuova più leggera dell'atto e torna in M6 e M9 · **una riga di copione che abbassa il
+volume** e non lo rialza (§5.19 espone già `music.direct`; la radio vera è un'altra manopola, e
+la scena le tocca tutte e due).
 
 ---
 

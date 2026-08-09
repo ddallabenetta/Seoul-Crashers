@@ -164,6 +164,15 @@ Ogni tanto, fra i nomi, una riga di stato che dipende dalla partita:
 **3 ·** Il quadrante di una radio in una macchina qualunque, guidata da qualcuno che non
 vediamo, che scorre le stazioni e si ferma da sola fra 91.4 e 91.5.
 
+> *(nota)* Nello specchietto si vede una spalla sola, e sulla spalla la banda rossa.
+
+*(È il bomber, e chi lo porta non ha ancora un nome — non lo avrà. Il giubbotto è passato dal
+padre a Jae-min nella cutscene iniziale, in M8 si è scoperto che ce n'erano due, in M12 Dulchae
+ha lasciato il suo piegato su una transenna, e adesso lo porta qualcuno che nel gioco non è mai
+comparso. È l'oggetto-tema ([`00-soggetto.md`](00-soggetto.md), §3), e questo pannello è il
+posto in cui il titolo della scena — «seconda generazione» — smette di essere un modo di dire.
+La spalla si vede per un secondo e non la commenta nessuno.)*
+
 **4 · La voce che risponde**, e cambia col finale:
 
 - **Dopo A (태워):** è la voce di **Jo Ok-bun**. Ha quarantun anni di roba in testa e adesso

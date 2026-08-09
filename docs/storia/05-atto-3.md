@@ -153,21 +153,26 @@ portafoto, un accendino…
 ### Chiusura (3 pannelli)
 
 **5 ·** La barca che entra in una darsena, storta, con il fumo.
-**6 ·** I diciotto oggetti allineati sul cemento, bagnati: i nove di Nam e i nove che Jo ha
-consegnato prima della partenza.
+**6 ·** I nove oggetti di Nam allineati sul cemento, bagnati.
 **7 ·** Il quadrante, con la frequenza che qui prende male.
 
 > 91.45: «Mettili in fila. Prima quello che pesa meno.»
 > Jae-min: «E in fila cosa vengono?»
-> 91.45: «Un indirizzo. È così che si tiene un registro che non si può sequestrare: pesi e
-> ordine, e la chiave in testa a una vecchia.»
-> Jae-min: «Come fai a sapere in che ordine vanno?»
+> 91.45: «Un indirizzo. È così che si tiene un registro che non si può sequestrare: gli oggetti
+> stanno da una parte e l'ordine sta in testa a qualcuno.»
+> Jae-min: «E l'ordine come lo sai tu?»
 > 91.45: «Perché li ho portati io.» *(pausa)* «Perché **li ha portati lui**.»
 
 *(La correzione. Prima volta che la voce si accorge di aver detto «io» al posto di «lui». Da
-qui in avanti lo fa altre quattro volte, sempre più spesso. Le due battute in mezzo sono
-nuove e servono a una cosa sola: senza, il giocatore arriva a M11 senza sapere **perché** stia
+qui in avanti lo fa altre quattro volte, sempre più spesso. Le tre battute prima sono nuove e
+servono a una cosa sola: senza, il giocatore arriva a M11 senza sapere **perché** stia
 allineando degli oggetti su un molo.)*
+
+*(E dicono anche di chi è l'ordine, che è il punto: gli oggetti li ha Nam, la testa che sa
+metterli in fila è quella di Jo Ok-bun ([`01-personaggi.md`](01-personaggi.md)). Qui l'ordine
+lo dà Kkachi, e lo dà perché quei nove li ha portati Dong-hyeok. **Le altre nove copie restano
+sullo scaffale di Hongdae** e arrivano solo in M12, quando Jo non ha più uno scaffale dove
+tenerle.)*
 
 **Poggia su** — Busan e i suoi distretti (§5.22-5.25) · porto e barche (§5.9) · motovedette ed
 elicottero (§5.5) · ponte 광안대교 (§5.23) · officine e rivendita (§5.8) · mercato di Jagalchi
@@ -176,12 +181,67 @@ come landmark (§5.23).
 
 ---
 
+## Incontro facoltativo · «Le sedie arancioni» — fra M10 e M11
+
+**Non è una missione, non ha un blip, e non lo segnala nessuno.** Chi va al terminal dei
+traghetti di 부산항 **prima delle 04:10** e si siede ad aspettare invece di imbarcarsi subito,
+trova qualcuno che aspetta già. Chi sale in stiva e basta non lo incontra mai, e non saprà mai
+di averlo mancato.
+
+È la terza delle tre occasioni in cui **il giocatore può uccidere Dulchae**
+([`06-finali-ed-epilogo.md`](06-finali-ed-epilogo.md), finale C). È anche l'unica in cui non
+c'è nessuno a guardare, nessuna stella da prendere e niente da perdere: sono le tre e mezza di
+notte in una sala d'attesa vuota. **Il gioco non fa niente per impedirlo e niente per
+suggerirlo.**
+
+### Quattro pannelli
+
+**1 ·** La sala d'attesa: file di sedie di plastica arancioni, un distributore acceso, il
+pavimento lucido. Due uomini seduti sulla stessa fila, a tre sedie di distanza. Stesso bomber.
+
+> Narratore: `03:31. Il traghetto delle 04:10 è l'unico della giornata.`
+
+**2 ·** I due a mezzo busto, di profilo, nessuno dei due voltato verso l'altro.
+
+> Jae-min: «Mi hai seguito.»
+> Dulchae: «Sapevo l'orario. Non è la stessa cosa.»
+> Jae-min: «E come lo sapevi.»
+> Dulchae: «Perché è l'unico traghetto, hyung. Chi va là va con quello.»
+
+**3 ·** Primo piano dei due braccioli. Quattro mani appoggiate.
+
+> *(nota)* Nessuna delle due destre è in tasca.
+>
+> Jae-min: «Perché non mi fermi?»
+> Dulchae: «Perché quando torni avrai visto una cosa che io vedo da dodici anni.» *(pausa)*
+> «E per la prima volta la sapremo in due.»
+> Jae-min: «E se poi la racconto?»
+> Dulchae: «A chi? Il nome che serve per raccontarla ce l'ho io.»
+
+**4 ·** Dulchae che si alza e se ne va prima che aprano l'imbarco. Jae-min resta seduto.
+
+> Dulchae *(senza voltarsi)*: «Portati una giacca. A Jeju piove poco, ma di notte tira.»
+> *(nota)* Jae-min non ha detto dove va.
+
+*(La scena non anticipa M11 di una parola: chi la vede prima di Jeju sente un uomo che sa un
+orario, e chi ci ripensa dopo capisce che ha appena parlato con **il signore che viene da
+Seoul, tiene la mano al vecchio e firma**. È il modo più economico che il copione ha di dare
+a Dulchae la cosa che gli manca — non essere solo una minaccia — e va tenuto facoltativo
+proprio per questo: chi lo uccide a M8 non lo scopre mai, ed è il prezzo.)*
+
+**Poggia su** — terminal dei traghetti e molo di Busan (§5.25, §5.9) · interni percorribili di
+notte (§5.8, §5.11) · orologio (§5.11).
+**Chiederebbe** — un personaggio fermo in un posto a una certa ora (`game.actors.define` con
+una finestra oraria: l'impianto c'è dal §5.27, la finestra no).
+
+---
+
 ## M11 · «Il traghetto delle 04:10» — 04시 10분 배
 
 **Dove / quando** — Da 부산 a **Jeju**. Partenza `04:10`, arrivo con la luce. Poi 서귀포, un
 resort sul lungomare del sud. È la missione più lenta e più corta del gioco.
 
-**Innesco** — I diciotto oggetti in fila danno un indirizzo. L'indirizzo è un albergo a Jeju.
+**Innesco** — I nove oggetti in fila danno un indirizzo. L'indirizzo è un albergo a Jeju.
 
 ### Apertura (4 pannelli)
 
@@ -221,12 +281,13 @@ segnale. Il giocatore arriva a Jeju **solo**, e questo è il punto.)*
    > Dong-hyeok: «Ha piovuto?»
 
 5. **La cartellina appesa al letto.** Non è una cartella clinica: è un **calendario delle
-   firme**. Ogni mese, una data, e la nota `firma acquisita`. L'ultima è di undici giorni fa,
-   due giorni prima del funerale. Un'infermiera lo spiega con la naturalezza di chi lo fa da
-   anni:
+   firme**. Ogni mese, una data, e la nota `firma acquisita`. Un'infermiera lo spiega con la
+   naturalezza di chi lo fa da anni:
 
    > Narratore: `Centoquarantaquattro righe, una al mese, dodici anni. Accanto a ognuna:`
    > `서명 취득 — firma acquisita.`
+   > `L'ultima firmata è dell'8 agosto, due giorni prima del funerale.`
+   > *(nota)* Sotto, a matita, c'è già la data della prossima.
    >
    > Infermiera: «Viene un signore da Seoul. Gli tiene la mano e firma. Il signor Seo è molto
    > tranquillo quando c'è.»
@@ -298,8 +359,9 @@ selezionandolo il pannello dice una riga sola.
 **Dove / quando** — Seoul. Notte, temporale. Tutti e sette i distretti in una missione sola,
 e la torre di Gangnam alla fine.
 
-**Innesco** — Tornati a Seoul: il quartiere di Hongdae è transennato. Le gru arrivano
-all'alba.
+**Innesco** — Tornati a Seoul: il quartiere di Hongdae è transennato. È **la notte fra il 20 e
+il 21 settembre**, e le gru arrivano all'alba — la data che il manifesto della cutscene
+iniziale annunciava sei settimane prima, e l'unica scadenza che il gioco si è dato.
 
 ### Apertura (4 pannelli)
 
@@ -310,7 +372,12 @@ strada che non se ne va.
 
 > Jo: «Ho quarantun anni di roba in testa. Se me la portano via, dove la mettono?»
 > Jae-min: «Da nessuna parte. Non la vogliono.»
-> Jo: «Appunto.»
+> Jo: «Appunto.» *(gli spinge verso i piedi una cassetta della frutta)* «Tieni. Sono i miei
+> nove. Adesso non ho più uno scaffale dove lasciarli, e tu hai visto gli altri.»
+
+*(È il momento in cui il registro si ricompone: i nove di Nam vengono da Busan, questi erano
+sullo scaffale dal primo atto, e da adesso sono diciotto oggetti in una cassetta della frutta —
+che è la forma in cui arrivano sul tavolo di Ryu e in tutti e tre i finali.)*
 
 **3 ·** Chun-sik e otto uomini del 백호파 in fila davanti alle transenne. Poi arrivano sei del
 황소파 con Pyo. Poi quattro del 철마파. Nessuno si parla. **Stanno lì.**
@@ -332,8 +399,35 @@ strada che non se ne va.
    > Ha-eun: «Diciassette anni. Sono tutti lì dentro, e sono la mappa con cui vi hanno
    > censiti.» *(glielo mette in mano)* «Adesso è una prova. Dipende da chi ce l'ha.»
 
-3. **La torre.** Salita finale a Gangnam. **Il gioco toglie la musica a un piano dalla cima.**
-4. **Ryu Gwang-ho**, ventesimo piano, che non scappa e ha già versato due whisky.
+3. **Il secondo giubbotto** — **seconda delle tre occasioni in cui si può uccidere Dulchae**, e
+   la più facile da cogliere, perché il gioco per un minuto la rende comodissima. A metà
+   assedio, dal lato di Hanseong, arriva un'auto nera: scende Dulchae con la cartellina degli
+   sgomberi, che è quello per cui l'hanno mandato. Poi non torna in macchina.
+
+   Le radio della polizia danno **un nome solo** — `서재민` — e in mezzo alla via ci sono due
+   uomini con lo stesso giubbotto. Per un minuto intero nessuno dei due può essere identificato
+   da nessuno, il ricercato è a cinque stelle e chiunque spari sparerebbe a «lui». **Il gioco
+   non lo dice**: lo dispone, e sta zitto.
+
+   > *(nota)* Con un nome solo sul registro, un corpo solo chiude la pratica.
+
+   Chi non spara vede la scena finire così:
+
+   **A ·** Dulchae che lascia cadere la cartellina in una pozza e non la raccoglie.
+   **B ·** Dulchae che si toglie il bomber sotto l'acqua e lo appoggia piegato sulla transenna,
+   in mezzo alla strada, con la banda rossa verso l'alto. Sotto ha una camicia bianca da
+   ufficio, e adesso i due non si somigliano più per niente.
+
+   > Jae-min: «Dove vai?»
+   > Dulchae: «Da nessuna parte. Volevo solo che da lontano ne restasse uno.»
+
+   *(Il bomber resta lì per tutto il resto della missione, e **resta lì anche nell'epilogo**:
+   è l'oggetto-tema del gioco ([`00-soggetto.md`](00-soggetto.md), §3) e questo è il pannello
+   in cui cambia padrone per l'ultima volta. Chi ha ucciso Dulchae a M8 o al terminal di Busan
+   non vede niente di tutto questo: la transenna è vuota, e nessuno gliene parla.)*
+
+4. **La torre.** Salita finale a Gangnam. **Il gioco toglie la musica a un piano dalla cima.**
+5. **Ryu Gwang-ho**, ventesimo piano, che non scappa e ha già versato due whisky.
    Il confronto è lungo, e va lasciato lungo:
 
    > Ryu: «Sa qual è la parte che non le hanno raccontato? Suo padre non me lo ha venduto, il
@@ -350,10 +444,11 @@ strada che non se ne va.
    > padrone del suo quartiere: è che il suo quartiere è **scritto**, e io ho la penna.»
    > *(nota)* Gli occhiali sono sul tavolo da quando ha cominciato a parlare del consorzio.
 
-5. **Il conto.** Sulla scrivania, fra le carte, una cosa piccolissima e definitiva: **le
+6. **Il conto.** Sulla scrivania, fra le carte, una cosa piccolissima e definitiva: **le
    fatture del 병원 «성심»**. Dodici anni di rianimazioni, ricoveri, trasfusioni, tutte
    intestate a 한성개발. Il numero delle voci è **esattamente il numero di volte che il
-   giocatore è morto in partita** (§5.16: il risveglio all'ospedale c'è già).
+   giocatore è morto in partita** — cioè il numero che il direttore Jeong Han-su gli dice in
+   faccia a ogni risveglio dal decimo in poi ([`09-ospedale.md`](09-ospedale.md)).
 
    > Narratore: `Fatture del 병원 성심, intestate a 한성개발. Le voci sono diciassette.`
    > *(Il numero è quello vero della partita in corso.)*
@@ -362,7 +457,11 @@ strada che non se ne va.
    > Ryu: «Sono nostre. Le abbiamo pagato la vita, letteralmente, a rate. Non per bontà: un
    > asset lo si mantiene.»
 
-6. **Il fascicolo e la penna.** Sul tavolo restano tre cose: il registro di Jo e Nam rimesso
+   **Se il giocatore non è mai morto** la cartellina è vuota, e la scena cambia invece di
+   fingere: la variante sta in [`09-ospedale.md`](09-ospedale.md), «il caso di chi non muore
+   mai», ed è più cattiva di questa.
+
+7. **Il fascicolo e la penna.** Sul tavolo restano tre cose: il registro di Jo e Nam rimesso
    insieme, il fascicolo di Ha-eun, e la cartellina delle firme di Jeju. **Qui il gioco si
    ferma e chiede.**
 

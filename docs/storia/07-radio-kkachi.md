@@ -81,12 +81,34 @@ doveva diventare un fatto tipografico ([`08-domande-aperte.md`](08-domande-apert
 
 ## Le righe di servizio
 
-Non contano per il finale nascosto, ma vanno scritte perché sono quelle che il giocatore
-sente **cento volte** e sono il tono del gioco:
+Non contano per il finale nascosto, ma vanno scritte perché sono quelle che il giocatore sente
+**cento volte** e sono il tono del gioco.
 
-- **Quando sale in auto:** una fra dodici righe brevi, che cambiano con l'ora e col tempo.
-  («Le sei e dieci. Il traffico va da sud.» · «Piove da tre ore. Frena prima.» · «C'è una
-  volante ferma due strade più in là. Da venti minuti.»)
+**Quando sale in auto**, una riga fra dodici, scelta dalla prima condizione che è vera. Cento
+ripetizioni perdonano una battuta piatta e non perdonano una battuta che commenta il giocatore:
+quindi ognuna dice **un fatto**, e le condizioni sono tutte roba che il motore già sa.
+
+| # | Quando | Riga |
+| --- | --- | --- |
+| S1 | fra le 05:00 e le 08:00 | «Le sei e dieci. Il traffico va da sud: a quest'ora chi entra a Seoul ci viene a lavorare.» |
+| S2 | ora di punta | «Adesso non si guida, si sta in fila. Se prendi i vicoli fai prima e sbagli lo stesso.» |
+| S3 | pomeriggio sereno | «Bella giornata. Si vede tutto il quartiere, e tutto il quartiere vede te.» |
+| S4 | sera, insegne accese | «Le insegne si accendono a scaglioni: prima i 편의점, poi i 술집, per ultimo chi è indietro con la corrente.» |
+| S5 | dopo le 02:00 | «Tre auto in tutta la strada, e due sono ferme.» |
+| S6 | pioggia | «Piove da tre ore. Frena prima.» |
+| S7 | temporale | «Con questo tempo le volanti stanno sotto i cavalcavia. Tu sai dove sono, loro sanno dove sei.» |
+| S8 | volante ferma nel raggio | «C'è una volante ferma due strade più in là. Da venti minuti.» |
+| S9 | veicolo malandato | «Questa macchina fa un rumore che due giorni fa non faceva. Non è un problema finché non ti fermi.» |
+| S10 | veicolo appena rubato | «Il proprietario sta già telefonando. Gli servono nove minuti per farsi credere.» |
+| S11 | contanti sotto la soglia | «Hai in tasca meno di quanto costa un pieno. Non è un giudizio, è un'informazione.» |
+| S12 | distretto mai visitato | «Qui non ci sei mai stato. Si capisce da come guardi i numeri civici.» |
+
+*(Nessuna delle dodici ha una «origine» come le ventiquattro chiamate, e va bene: sono le righe
+in cui Kkachi fa **la radio**, non il personaggio. La regola 3 vale per le conversazioni, dove
+il colpo di scena si deve poter dimostrare, non per l'ora e il meteo.)*
+
+Le altre righe di servizio:
+
 - **Quando ha cinque stelle:** Kkachi **tace**. Non commenta mai gli inseguimenti — parla solo
   prima e dopo. È una scelta di regia: la caccia ha già la sua musica (§5.19).
 - **Quando esce di prigione:** «Sei ore. Ti hanno preso l'arsenale e un quinto dei contanti.

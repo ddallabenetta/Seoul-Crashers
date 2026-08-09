@@ -18,6 +18,8 @@ Dal proverbio 호랑이 없는 산에 토끼가 왕 노릇 한다: *sul monte se
 | i finali, i titoli di coda, la scena dopo | [`06-finali-ed-epilogo.md`](06-finali-ed-epilogo.md) |
 | le chiamate radio facoltative (il «codec» del gioco) | [`07-radio-kkachi.md`](07-radio-kkachi.md) |
 | **le decisioni d'impianto prese con l'utente** e le tappe di lavoro | [`08-domande-aperte.md`](08-domande-aperte.md) |
+| cosa si sente **a ogni morte**: il 병원 e il suo direttore | [`09-ospedale.md`](09-ospedale.md) |
+| **il calendario e i numeri** — da leggere prima di scrivere una data | [`10-continuita.md`](10-continuita.md) |
 
 ---
 
@@ -105,3 +107,8 @@ Per chi deve avere il quadro senza leggere tutto. **Contiene tutti gli spoiler.*
 | 5 | Atto III, M11 | il padre è morto dodici anni fa, o nove giorni fa | è vivo a Jeju, e serve solo la sua firma: la mente non c'è più |
 | 6 | Atto III, M12 | i dodici anni in America erano protezione | erano l'alibi: serviva un nome pulito da sporcare al momento giusto |
 | 7 | dopo i titoli | la voce alla radio è un alleato | la voce è un archivio, e adesso qualcun altro ci sta parlando dentro |
+
+E uno che non è un colpo di scena ma una **riscrittura all'indietro**: in M12 si scopre che le
+rianimazioni del giocatore sono fatturate a 한성개발 da dodici anni, e ogni singola morte fatta
+fino a quel momento cambia di segno. Il filo comincia al primo risveglio e sta in
+[`09-ospedale.md`](09-ospedale.md).

@@ -115,13 +115,17 @@ progetto (§7), e **si consegna una per volta**.
 | **A** | primitive dei pannelli + **la cutscene iniziale** (28 pannelli, saltabile) | si avvia il gioco e si guarda |
 | **B** | impianto missioni: blip singolo, fasi, ripresa dall'ultima fase + **M1 e M2** | due missioni intere, una in strada e una in un interno |
 | **C** | **cortili persistenti** (nel salvataggio, con effetto sul commercio) | si prende un cortile, si esce, si ricarica, è ancora tuo |
-| **D** | Kkachi: stazione `91.45`, tabella con predicato, le otto chiamate dell'Atto I | si gira per Seoul con la radio accesa |
+| **D** | Kkachi: stazione `91.45`, tabella con predicato, le otto chiamate dell'Atto I e le dodici righe di servizio | si gira per Seoul con la radio accesa |
 | **E** | Atto I completo (M3, M4) + R1 | il primo ribaltamento in mano al giocatore |
 | **F** | Atto II (M5-M8) + R2, R3 + le otto chiamate dell'Atto II | l'atto che chiede più cose nuove al motore |
-| **G** | Atto III (M9-M12) + R4 + le otto chiamate dell'Atto III | il viaggio: ha bisogno di tutto quello di prima |
+| **G** | Atto III (M9-M12) + R4 + le otto chiamate dell'Atto III e l'incontro facoltativo di Busan | il viaggio: ha bisogno di tutto quello di prima |
 | **H** | i tre finali, i titoli di coda, la scena dopo | e a quel punto la Fase 3 è chiusa |
 
 **Cambia una cosa rispetto alla prima stesura:** i cortili persistenti salgono in tappa C,
 prima delle missioni che li usano, per la ragione scritta al punto 7.
+
+**E una cosa non sta nella fila:** il filo del 병원 ([`09-ospedale.md`](09-ospedale.md)) va
+agganciato alla **B**, perché si accumula per tutta la partita e alla H sarebbe tardi. Costa un
+intero nel salvataggio e nient'altro.
 
 **Si comincia dalla A.**
