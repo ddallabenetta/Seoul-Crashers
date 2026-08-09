@@ -1,7 +1,18 @@
 # Seoul Crashers · 서울 크래셔스
 
+![Jae-min e la sua berlina in una Seoul notturna, inseguiti dalla polizia](docs/images/hero-seoul-crashers.png)
+
 Gioco d'azione top-down 2.5D ambientato a Seoul, nello spirito di *GTA: Chinatown Wars*.
 Canvas 2D puro, moduli ES, zero dipendenze: tutta la grafica è generata da codice.
+
+## Screenshot
+
+![Guida nel traffico di Hongdae con HUD, minimappa e città 2.5D](docs/images/screenshot-gameplay.jpg)
+
+<p align="center">
+  <img src="docs/images/screenshot-menu.jpg" alt="Menu iniziale di Seoul Crashers sopra la città in movimento" width="49%">
+  <img src="docs/images/screenshot-map.jpg" alt="Mappa di gioco con Seoul, Busan e Jeju" width="49%">
+</p>
 
 ## Avvio
 
