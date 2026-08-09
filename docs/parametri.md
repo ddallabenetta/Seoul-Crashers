@@ -222,3 +222,15 @@
 | Versione del formato di salvataggio | `save.VERSION` | 2. Si alza quando cambia la **forma** dei dati, e ogni scalino vuole una riga in `MIGRATIONS` |
 | Tetto delle migrazioni in fila | `save.migrate` | 32 scalini: è una rete contro una catena scritta male, non un limite di progetto |
 | Raggio di comparsa di un attore | `actors.SPAWN_R` | 1400 px. L'anello di despawn dello streaming è più largo (`ring.despawn × 1,8`), e la differenza è l'isteresi che gli impedisce di lampeggiare |
+| **— pannelli e cutscene (§5.28) —** | | |
+| Modalità dei pannelli | `modes.MODES` (`cutscene`) | mondo 0,12 · radio 0 — là fuori non sta succedendo niente, e la radio non è di nessuno finché non sali in macchina |
+| Rettangolo di una tavola | `panelkit.panelRect` | 16:9, largo al massimo 1180 px, 96 px d'aria ai lati e 150 in verticale |
+| Stacco fra due pannelli | `cutscene.TRANS` | 0,26 s, nero pieno a metà corsa |
+| Dissolvenza del salto | `cutscene.SKIP_FADE` | 0,6 s — più lunga di uno stacco apposta: si esce su nero, non con un taglio |
+| Tema dell'apertura | `music.BPM.intro` · `LEVEL.intro` | 60 bpm · 0,62 (fra il tema del titolo, 0,85, e la caccia, 0,5) |
+| Rilancio del tema sul titolo | pannello 28, campo `music` | ×1,35. Lo dichiara **il pannello**, non `music.js` |
+| Griglia di una testa | `pixelkit.HEAD_UNITS` | 24×24 celle. Occhi alla riga 12, sopracciglia alla 11, bocca alla 17: le espressioni ci scrivono sopra |
+| Altezza di una figura intera | `pixelkit.FIGURE_UNITS` | 50 celle (24 di testa + 26 di corpo) |
+| Scala di un pixel-sprite | `pixelkit.unitScale` | **intera**, sempre: con una scala frazionaria alcuni quadrati escono di un pixel più larghi |
+| Mezzo busto in un pannello che parla | `intro.bust` | finisce a `0,62` dell'altezza e ne occupa `0,46`: sopra il riquadro delle battute |
+| Contorno chiaro delle figure | `pixelkit.RIM` | `#4d5768`, **sempre acceso**: senza, il cast sparisce nei fondi notturni |

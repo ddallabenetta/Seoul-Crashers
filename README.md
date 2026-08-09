@@ -29,6 +29,7 @@ Poi apri <http://localhost:8123>.
 | `1` … `6` | barra armi: una fila per tasto, ripremi per scorrere la fila (rotella = tutto l'arsenale) |
 | `M` | mappa a tutto schermo (rotella = zoom, trascina = sposta) |
 | `ESC` | menu di pausa (mappa, **salvataggi**, audio, comandi, statistiche, esci al titolo) |
+| `ESC` (nell'apertura) | salta la cutscene iniziale |
 | `F` (nei salvataggi) | accende e sospende il salvataggio automatico |
 | `F3` | pannello tecnico (fps, entità, posizione) |
 | `F4` | audio muto |
@@ -43,6 +44,16 @@ contanti in meno: la clinica presenta il conto.
 Le auto sono solide anche quando sei a piedi: non ci si passa attraverso e non ci si cammina
 sopra. Una che ti arriva addosso a velocità ti stende, una ferma ti sposta e basta. Vale anche
 per i passanti, che le auto in sosta le **aggirano** invece di attraversarle.
+
+## L'apertura
+
+Da **Nuova partita** non si finisce in strada: si finisce in **«12년»**, ventotto tavole a
+pixel art che raccontano perché Seo Jae-min è tornato a Seoul dopo dodici anni — un funerale,
+un giubbotto che era di suo padre, un manifesto di demolizione e una voce alla radio che si
+ferma fra due tacche. Si avanza con `Spazio`, `Invio` o un clic; **`ESC` la salta**, sempre,
+anche al primo avvio. Quello che semina torna tutto più avanti, quindi saltarla non ti fa
+perdere niente. Sotto suona un tema suo, e alla fine si apre sul gioco vero: stesso vicolo, la
+mattina dopo, con l'asfalto ancora bagnato e l'auto di tuo padre parcheggiata lì davanti.
 
 ## Il menu iniziale
 
@@ -348,6 +359,10 @@ Alcune scelte tecniche che spiegano il risultato a schermo:
   la puoi fissare tu, in `localStorage` sotto `seoul.radio.stations`.
 
 ## Stato
+
+**Campagna, tappa A — completata.** I pannelli, la cutscene iniziale «12년» (ventotto tavole,
+saltabile) e la pixel art dei personaggi: cinque volti disegnati cella per cella con quattro
+espressioni a testa, un tema musicale suo e il tasto di salto.
 
 **Fase 1 — completata.** Città esplorabile, guida, traffico, pedoni, camera 2.5D, minimappa
 e mappa, menu, effetti (gomma, fumo, scintille, esplosioni), statistiche.

@@ -1,0 +1,68 @@
+// Provino del cast: ogni personaggio dei pannelli, ingrandito, in tutte le facce
+// che sa fare e in tutte le pose.
+//
+// È il `sprite.mjs` dei volti. Una griglia 24×24 nel sorgente non dice **niente**
+// su come si legge a schermo — quale personaggio si riconosce da lontano, quale
+// espressione arriva, quale naso è una macchia — e provarli dentro la cutscene
+// vuol dire ventotto avvii per guardarne uno.
+//
+//   node .claude/tools/probe.mjs --seconds 0.4 --size 1700x1150 --shot /tmp/cast.png \
+//     --script .claude/tools/scenes/cast-sheet.scene
+const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
+const pk = await import('/src/render/pixelkit.js');
+
+await wait(0.15);
+game.loop.stop();
+
+const ctx = game.ctx;
+const W = game.camera.viewW;
+const H = game.camera.viewH;
+game.camera.applyUI(ctx);
+ctx.fillStyle = '#171a21';
+ctx.fillRect(0, 0, W, H);
+
+const P = { ctx, x: 0, y: 0, w: W, h: H, t: 1 };
+const ids = Object.keys(pk.CAST);
+const MOODS = ['fermo', 'parla', 'ride', 'giu'];
+const POSES = ['stand', 'walk', 'hug', 'lean', 'curb', 'back'];
+
+const label = (text, x, y, color = 'rgba(226,236,248,0.7)') => {
+  ctx.font = '600 13px ui-monospace, monospace';
+  ctx.fillStyle = color;
+  ctx.textAlign = 'left';
+  ctx.fillText(text, x, y);
+};
+
+const K = 5;          // scala dei primi piani
+const KF = 4;         // scala delle figure intere
+const HEAD_W = pk.HEAD_UNITS * K;
+const FIG_W = pk.HEAD_UNITS * KF;
+const rowH = (H - 40) / ids.length;
+
+ids.forEach((id, i) => {
+  const top = 30 + rowH * i;
+  label(pk.CAST[id].name, 12, top + 14, '#ff5fa2');
+
+  // A sinistra: i quattro stati d'animo, grandi. A destra: le pose, intere.
+  MOODS.forEach((mood, m) => {
+    const cx = 150 + m * (HEAD_W + 18) + HEAD_W / 2;
+    pk.head(P, id, cx, top, K, { mood });
+    label(mood, cx - 16, top + pk.HEAD_UNITS * K + 15, 'rgba(226,236,248,0.45)');
+  });
+
+  const baseY = top + pk.FIGURE_UNITS * KF * 0.86;
+  POSES.forEach((pose, p) => {
+    const cx = 150 + (HEAD_W + 18) * MOODS.length + 40 + p * (FIG_W + 14) + FIG_W / 2;
+    pk.figure(P, id, cx, baseY, KF, pose);
+    label(pose.slice(0, 5), cx - 18, baseY + 16, 'rgba(226,236,248,0.4)');
+  });
+});
+
+// La folla e il cane: servono a vedere che le sagome **non** rubano l'occhio ai
+// personaggi veri, che è tutto il loro mestiere.
+pk.crowd(P, W - 430, H - 130, 3, 6, { pose: 'walk', seed: 4 });
+pk.crowd(P, W - 180, H - 130, 3, 5, { pose: 'kneel', seed: 9 });
+pk.dog(P, W - 600, H - 130, 5);
+label('folla · cane', W - 640, H - 108, 'rgba(226,236,248,0.4)');
+
+return { personaggi: ids.length, scalaPrimoPiano: K, scalaFigura: KF };

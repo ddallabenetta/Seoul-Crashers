@@ -12,7 +12,7 @@ sigillate, marcatori, testo su più righe). Quello che resta è **contenuto**, i
 
 | # | Tappa | Cosa contiene | Si prova così |
 | --- | --- | --- | --- |
-| 1 | **A** | primitive dei pannelli + **la cutscene iniziale** (28 pannelli, saltabile) | si avvia il gioco e si guarda |
+| ~~1~~ | ~~**A**~~ | ~~primitive dei pannelli + la cutscene iniziale~~ — **fatta**, §5.28 | — |
 | 2 | **B** | impianto missioni: blip singolo, fasi, ripresa dall'ultima fase + **M1 e M2** | due missioni intere, una in strada e una in un interno |
 | 3 | **C** | **cortili persistenti** (nel salvataggio, con effetto sul commercio) | si prende un cortile, si esce, si ricarica, è ancora tuo |
 | 4 | **D** | Kkachi: stazione `91.45`, tabella con predicato, le otto chiamate dell'Atto I | si gira per Seoul con la radio accesa |
@@ -29,13 +29,19 @@ devono stare in un posto (`game.actors.define(...)` — Chun-sik al 당구장 e 
 di M1 e M2), il blip sulla mappa (`game.setMarker(...)`), e la porta sigillata su cui M1 si
 sarebbe fermata al punto 4 su 5 (`game.shops.seal(...)`).
 
-**Due cose da tenere presenti quando si farà la tappa A.** La prima: il copione decide *cosa*
-c'è in un pannello, non *come si disegna* — la resa grafica si concorda a vista prima di
-disegnare ventotto tavole, perché in questo stile la differenza fra una sagoma leggibile e una
-macchia è tutta nel contrasto di valore col fondo, e nel sorgente non si vede. La seconda: la
-cutscene ha bisogno di una **regia sonora** (fruscio di banda, la voce che conta, il cane, la
-sirena lontana) che conviene fare **insieme alla tappa D**, dove nasce la stazione `91.45` e
-quindi il timbro del fruscio di Kkachi.
+**Cosa ha lasciato la tappa A** (§5.28), e vale per tutte le altre. I pannelli si disegnano con
+`render/panelkit.js` (fondi, insegne, pioggia, manifesti, quadrante) e `render/pixelkit.js` (i
+personaggi); un pannello resta **una funzione**, una cutscene resta **un file**. Il cast a
+pixel c'è — Jae-min, Chun-sik, il tassista, il commesso, Seo Dong-hyeok — con quattro
+espressioni e sette pose; aggiungere un personaggio è una griglia 24×24 e una riga di palette.
+Le **tre regole di scrittura dei dialoghi** (si dice in chiaro una volta, il narratore traduce
+l'hangul che porta trama, gli indizi si rendono visibili e mai spiegati) sono in testa a
+`story/intro.js` e vanno rispettate dalle aperture delle missioni.
+
+**Due debiti che l'apertura lascia alla tappa D.** La riga di Kkachi del passaggio di consegne
+è un `hud.toast` finché non esiste la stazione `91.45`. E la scena chiede ancora una **regia
+sonora** (fruscio di banda, la voce che conta, il cane, la sirena lontana): la musica c'è, gli
+effetti no, e conviene farli dove nasce il timbro del fruscio di Kkachi.
 
 ---
 

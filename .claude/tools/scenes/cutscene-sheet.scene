@@ -1,0 +1,58 @@
+// Provino: tutti i pannelli di una cutscene in una griglia sola.
+//
+// Guardare ventotto scatti uno per uno è il modo lento di accorgersi che tre non
+// si leggono. Qui si ferma il loop e si ridisegnano tutti i pannelli affiancati
+// sullo stesso canvas: uno scatto, e si vede subito quale è una macchia.
+//
+//   node .claude/tools/probe.mjs --seconds 0.4 --size 1800x1500 --shot /tmp/sheet.png \
+//     --script .claude/tools/scenes/cutscene-sheet.scene
+//
+// I pannelli sono disegnati piccoli: serve a **trovare** quelli illeggibili, non a
+// giudicarne il dettaglio. Quello si guarda con `cutscene-panel.scene`.
+const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
+const COLS = 5;
+const T = 1.4;      // il tempo dentro il pannello: pioggia e fruscii a regime
+
+game.newGame();
+game.playIntro();
+const seq = game.cutscene.seq;
+await wait(0.15);
+game.loop.stop();
+
+const ctx = game.ctx;
+const W = game.camera.viewW;
+const H = game.camera.viewH;
+game.camera.applyUI(ctx);
+ctx.fillStyle = '#000';
+ctx.fillRect(0, 0, W, H);
+
+const rows = Math.ceil(seq.length / COLS);
+const pad = 8;
+const cw = (W - pad * (COLS + 1)) / COLS;
+const ch = cw * 0.5625;
+const top = (H - (ch + 22) * rows - pad) / 2;
+
+seq.forEach((panel, k) => {
+  const c = k % COLS;
+  const r = Math.floor(k / COLS);
+  const P = {
+    ctx,
+    x: Math.round(pad + c * (cw + pad)),
+    y: Math.round(top + r * (ch + 22)),
+    w: Math.round(cw),
+    h: Math.round(ch),
+    t: T,
+  };
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(P.x, P.y, P.w, P.h);
+  ctx.clip();
+  panel.draw(P);
+  ctx.restore();
+  ctx.strokeStyle = 'rgba(226,236,248,0.2)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(P.x + 0.5, P.y + 0.5, P.w - 1, P.h - 1);
+  ctx.fillStyle = 'rgba(226,236,248,0.55)';
+  ctx.font = '600 12px ui-monospace, monospace';
+  ctx.fillText(String(panel.id), P.x + 2, P.y + P.h + 14);
+});

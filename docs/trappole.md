@@ -302,3 +302,28 @@ motivo *sbagliato* (confrontava le coordinate dopo che aveva già camminato), qu
 lettura è stata «asserzione fragile» invece di «bug». Chi deve restare dove lo metti va in
 **`post`** (§5.27), che ci torna se lo spostano. La lezione è doppia: leggere cosa fa davvero
 uno stato prima di riusarlo, e diffidare di una prova che passa a volte.
+
+**Un personaggio scuro su un fondo scuro non è «poco contrastato»: è invisibile.** Capelli quasi
+neri più un contorno di inchiostro, su un vicolo di notte, fanno un buco nella tavola — e nel
+sorgente `#15121a` su `#171a21` si legge benissimo come «due colori diversi». Da §5.28 i capelli
+non sono mai neri e ogni figura porta un **rim chiaro sempre acceso** (`pixelkit.RIM`), che
+funziona da tutte e due le parti: stacca dal nero e si legge come bordo sul grigio. È la stessa
+trappola che nei pannelli vettoriali era costata metà tavola, ripresentata su un altro impianto.
+
+**In un pannello che parla, il testo si mangia il terzo centrale.** `speech` disegna in basso e
+può arrivare a metà tavola: un personaggio centrato verticalmente finisce **dietro** la propria
+battuta. Non si scopre leggendo il codice del pannello, perché lì la figura è centrata e basta.
+Da §5.28 c'è `intro.bust()`, che tiene in un posto solo dove finisce un mezzo busto; chi
+posiziona una figura a mano in un pannello con `speech` sta per rifare quell'errore.
+
+**Una sagoma che non arriva a terra galleggia.** Le pose disegnate in celle vanno riferite al
+**fondo** del riquadro, non alla cima: le sagome inginocchiate del funerale occupavano le righe
+10-31 di 50 e restavano sospese venti celle sopra il pavimento, leggendosi come casse. Chi
+aggiunge una posa bassa (seduta, a terra, china) parte dal fondo e sale.
+
+**`imageSmoothingEnabled = false` non basta se la scala non è intera.** La pixel art si rovina
+in due modi, e uno solo si vede subito: l'interpolazione, e il fatto che con una scala
+frazionaria alcuni quadrati escono larghi *n* e altri *n+1*. `pixelkit.unitScale` arrotonda per
+difetto apposta, e le destinazioni si arrotondano a intero. Attenzione anche a giudicare uno
+screenshot ridimensionato: un pannello perfettamente netto sembra sfocato in anteprima, e si
+verifica con `probe.mjs --zoom`.

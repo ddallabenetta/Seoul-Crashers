@@ -5,23 +5,23 @@ resta corto apposta.** Il contenuto vero sta in `docs/`, e si apre un documento 
 non tutti. Il `README.md` descrive il gioco e i comandi; qui c'è quello che serve a
 *sviluppare*. Avvio e vincoli stanno in `CLAUDE.md`, che si carica da solo.
 
-Ultimo aggiornamento: **l'impianto della campagna** (§5.27) — cinque limiti tecnici tolti di
-mezzo prima di scrivere una missione: bus di eventi, tabella delle modalità, migrazioni del
-salvataggio, personaggi nominati, porte sigillate e marcatori. **Non si vede niente di nuovo a
-schermo, ed è voluto.** Le tappe precedenti sono §5.8-5.26.
+Ultimo aggiornamento: **la tappa A della campagna** (§5.28) — i pannelli, la **cutscene
+iniziale** «12년» e la pixel art dei personaggi. È la prima cosa della campagna che si vede a
+schermo: si sceglie «Nuova partita» e partono ventotto tavole, con una musica sua e `ESC` per
+saltarle. Le tappe precedenti sono §5.8-5.27.
 
-> 📌 **Il prossimo lavoro è la tappa A**: primitive dei pannelli a fumetto e la **cutscene
-> iniziale**. L'impianto che le serve c'è già (§5.27) — compreso `ui/text.js`, l'a capo
-> automatico a corpo fisso che il gioco non aveva mai avuto. L'ordine di tutte le tappe sta
-> **in testa a [`docs/backlog.md`](docs/backlog.md) (§6.0)**, che è la prima cosa da leggere
-> prima di cominciare, e le nove decisioni d'impianto prese con l'utente stanno in
+> 📌 **Il prossimo lavoro è la tappa B**: impianto delle missioni (blip singolo, fasi, ripresa
+> dall'ultima fase) più **M1 e M2**. L'ordine di tutte le tappe sta **in testa a
+> [`docs/backlog.md`](docs/backlog.md) (§6.0)**, che è la prima cosa da leggere prima di
+> cominciare, e le nove decisioni d'impianto prese con l'utente stanno in
 > [`docs/storia/08-domande-aperte.md`](docs/storia/08-domande-aperte.md): leggi quelle, non
 > ricavarle dal copione. Resta aperta una domanda sola (se le missioni si rigiocano) e non
-> blocca niente. **Il copione dice cosa c'è in un pannello, non come si disegna:** la resa si
-> concorda a vista con l'utente *prima* di disegnare ventotto tavole (§7). Il resto del §6
-> resta ordinato per impatto: le voci più concrete sono il sorpasso, l'arresto che ti carica in
-> volante e il **corridoio fra Seoul e Busan**, che dal §5.25 è geografia percorribile ma non ha
-> ancora niente da fare — ed è la superficie naturale delle attività secondarie.
+> blocca niente. **Chi disegna pannelli nuovi parte da §5.28**: il cast a pixel, le quattro
+> espressioni e le tre regole di scrittura dei dialoghi ci sono già, e le tavole si guardano
+> con `cutscene-sheet.scene` *prima* di dire che funzionano. Il resto del §6 resta ordinato per
+> impatto: le voci più concrete sono il sorpasso, l'arresto che ti carica in volante e il
+> **corridoio fra Seoul e Busan**, che dal §5.25 è geografia percorribile ma non ha ancora
+> niente da fare — ed è la superficie naturale delle attività secondarie.
 
 ---
 
@@ -35,6 +35,7 @@ schermo, ed è voluto.** Le tappe precedenti sono §5.8-5.26.
 | tarare un numero (velocità, densità, danno, luce, audio, maglia) | [`docs/parametri.md`](docs/parametri.md) |
 | sapere cosa viene dopo e cosa è già stato deciso | [`docs/backlog.md`](docs/backlog.md) |
 | scrivere o implementare una missione, una cutscene, un dialogo | [`docs/storia/`](docs/storia/) — è l'indice: apri **un capitolo alla volta**, sono ~2000 righe |
+| disegnare un pannello, un personaggio a pixel o una nuova espressione | `docs/storico/17-pannelli-e-cutscene.md` (§5.28) |
 | verificare headless, usare `probe.mjs`, le scene o le skill | [`docs/strumenti.md`](docs/strumenti.md) |
 | capire *perché* una parte esistente è fatta così | [`docs/storico/`](docs/storico/) |
 
@@ -66,6 +67,7 @@ commenti resta valido: si risolve qui.
 | §5.25 Mappa unica della Corea | `docs/storico/14-mappa-unica-corea.md` |
 | §5.26 Vita degli NPC | `docs/storico/15-vita-degli-npc.md` |
 | §5.27 Impianto della campagna | `docs/storico/16-impianto-della-campagna.md` |
+| §5.28 Pannelli, pixel art e cutscene iniziale | `docs/storico/17-pannelli-e-cutscene.md` |
 | §6 Backlog | `docs/backlog.md` |
 | §8 Parametri | `docs/parametri.md` |
 | §9 Strumenti (`.claude/`) | `docs/strumenti.md` |
@@ -81,8 +83,9 @@ Canvas 2D puro, moduli ES nativi, **zero dipendenze, nessun build step**. Tutta 
 Stato: **Fase 1, Fase 1.5, Fase 2 (tutte e tre le tappe) e le prime tre tappe della Fase 3
 completate e collaudate**, più la revisione della guida AI del traffico (§5.10), i due giri di
 arretrati (§5.12 e §5.21), l'audio procedurale del §5.13, il salvataggio del §5.15, il giro
-menu-musica-autosave del §5.18-5.20, le tre regioni collegate e ricostruite del §5.22-5.24 e
-l'impianto della campagna (§5.27). ~25.700 righe in 50 moduli. 60 fps con ~44 veicoli e ~93
+menu-musica-autosave del §5.18-5.20, le tre regioni collegate e ricostruite del §5.22-5.24,
+l'impianto della campagna (§5.27) e la sua prima tappa a schermo (§5.28). ~27.400 righe in
+53 moduli. 60 fps con ~44 veicoli e ~93
 pedoni attivi, e restano 60 anche sotto raffica continua di SMG. Dentro un edificio il costo è
 trascurabile: la città non gira. Il ciclo giorno-notte costa **1,5 ms di JS per frame nel caso
 peggiore** (notte con temporale) — ma i veli a schermo intero non sono misurabili onestamente
@@ -147,6 +150,11 @@ dieci booleani, e `game.paused` è derivato; il **salvataggio si migra** invece 
 che vuol dire che aggiungere uno stato non cancella più la partita di nessuno; e un personaggio
 può finalmente **stare in un posto** (`entities/actors.js`) senza che lo streaming se lo porti
 via o lo resusciti.
+
+**E la campagna è cominciata** (§5.28). «Nuova partita» manda in «12년»: ventotto pannelli a
+pixel art, cinque personaggi disegnati cella per cella con quattro espressioni a testa, un tema
+musicale suo, e `ESC` che salta sempre. I tre indizi che semina tornano tutti più avanti, ed è
+la ragione per cui saltarla non costa niente.
 
 La Fase 2 era divisa in tre tappe, concordate con l'utente: **A** combattimento base,
 **B** polizia e ricercato a 5 livelli, **C** armi pesanti ed esplosivi. **Sono tutte fatte.**
