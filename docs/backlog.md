@@ -34,9 +34,13 @@ sarebbe fermata al punto 4 su 5 (`game.shops.seal(...)`).
 personaggi); un pannello resta **una funzione**, una cutscene resta **un file**. Il cast a
 pixel c'è — Jae-min, Chun-sik, il tassista, il commesso, Seo Dong-hyeok — con quattro
 espressioni e sette pose; aggiungere un personaggio è una griglia 24×24 e una riga di palette.
-Le **tre regole di scrittura dei dialoghi** (si dice in chiaro una volta, il narratore traduce
+Le **regole di scrittura dei dialoghi** (si dice in chiaro una volta, il narratore traduce
 l'hangul che porta trama, gli indizi si rendono visibili e mai spiegati) sono in testa a
-`story/intro.js` e vanno rispettate dalle aperture delle missioni.
+`story/intro.js` e vanno rispettate dalle aperture delle missioni. **Il copione dei tre atti è
+già stato riscritto su quelle regole**: chi implementa un'apertura trova le battute nella forma
+definitiva, con le `(nota)` dove il giocatore va aiutato a *guardare* e la tabella delle parole
+già tradotte in testa a [`storia/README.md`](storia/README.md) — glossare una seconda volta la
+stessa parola è un errore, non una gentilezza.
 
 **Due debiti che l'apertura lascia alla tappa D.** La riga di Kkachi del passaggio di consegne
 è un `hud.toast` finché non esiste la stazione `91.45`. E la scena chiede ancora una **regia

@@ -305,7 +305,7 @@ pioggia è finita, l'asfalto è ancora bagnato, e l'auto del padre è parcheggia
 Il primo comando che il giocatore può dare è **accendere la radio**. Se lo fa entro il primo
 minuto, Kkachi dice una riga sola:
 
-> Kkachi: «Bene. Adesso mettiamo in ordine. Guida.»
+> 91.45: «Bene. Adesso mettiamo in ordine. Guida.»
 
 Se non lo fa, la stessa riga arriva quando sale in macchina la prima volta. Se il giocatore
 scende, cammina e non guida, **Kkachi non parla** — e questo è il modo in cui il gioco insegna,

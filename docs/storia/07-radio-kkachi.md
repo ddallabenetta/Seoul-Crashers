@@ -27,6 +27,11 @@ semina. **Venti su ventiquattro sono una delle tre condizioni del finale nascost
 6. **La radio vera vince sempre** (§5.14). Se il giocatore sta ascoltando una stazione
    coreana, Kkachi aspetta. Non si sovrappone e non abbassa nessuno.
 
+**Nelle tabelle qui sotto `K:` e `J:` sono abbreviazioni, e solo qui.** Nel pannello le righe
+di Kkachi non portano un nome davanti ma **la frequenza** — `91.45:` — come nella cutscene
+iniziale e in tutto il copione: è l'indizio principale del settimo colpo di scena e senza voce
+doveva diventare un fatto tipografico ([`08-domande-aperte.md`](08-domande-aperte.md), punto 1).
+
 ---
 
 ## Atto I — otto chiamate
@@ -40,7 +45,7 @@ semina. **Venti su ventiquattro sono una delle tre condizioni del finale nascost
 | 5 | prima volta a Gangnam col bomber | K: «Non metterlo qui.» / J: «Me l'hanno già detto.» / K: «Allora ero io.» | Chun-sik, pannello 17 |
 | 6 | prima notte fonda in giro (dopo le 03:00) | K: «A quest'ora in strada ci sono tre categorie: chi torna, chi non è mai andato a casa e chi lavora. Tu di quale sei?» / J: «Della quarta.» / K: «Non esiste una quarta.» / J: «Appunto.» | — |
 | 7 | primo furto d'auto con testimoni | K: «Adesso quella signora racconterà di un uomo alto un metro e ottantatré.» / J: «Sono un metro e settantotto.» / K: «Sì. Ma è l'altezza che dicono sempre.» | referto di M4, `171 cm` — **rovesciata** |
-| 8 | dopo M3, guidando a Itaewon | K: «I martedì e i venerdì. Dodici anni. Se moltiplichi, fa una cifra che non entra in una busta.» / J: «E dove entra?» / K: «In una perizia.» | — |
+| 8 | dopo M3, guidando a Itaewon | K: «I martedì e i venerdì. Dodici anni. Se moltiplichi, fa una cifra che in una busta non ci sta.» / J: «E dove va a finire?» / K: «Nelle perizie. Le paga qualcuno, e quel qualcuno siete voi.» | — |
 
 ---
 
@@ -101,7 +106,7 @@ storia è avanzata; chi ci torna trova qualcosa.
 
 | Chi | Prima di… | Dopo… |
 | --- | --- | --- |
-| **Jo Ok-bun** (전당포 di Hongdae) | M6: «Torna quando sai fare la domanda giusta.» | M6: se le si chiede di 구만기 dicendo il proprio nome, gli mette in mano l'accendino inciso e dice: «Tuo padre lo ha impegnato il giorno che ti ha preso. Non è mai tornato a riprenderlo.» **È una delle tre condizioni del finale C.** |
+| **Jo Ok-bun** (전당포 di Hongdae) | M6: «Torna quando sai fare la domanda giusta.» | M6: la domanda giusta è dirle che 구만기 è inciso sul proprio orologio. Allora gli mette in mano l'accendino inciso: «Tuo padre lo ha impegnato il giorno che ti ha preso. Non è mai tornato a riprenderlo.» **È una delle tre condizioni del finale C**, ed è l'accendino con cui si brucia il registro nel finale A. |
 | **Chun-sik** (당구장) | M9: ordina cibo per due e parla di Dong-hyeok al presente | M9: ordina per uno e parla al passato. Una riga sola: «Adesso lo posso dire.» |
 | **Il commesso del 편의점 di Itaewon** | M8: «…di nuovo?» | M8: «Ah, lei è l'altro.» *(e non aggiunge niente, mai, per tutto il resto del gioco)* |
 

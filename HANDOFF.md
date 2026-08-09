@@ -16,9 +16,11 @@ saltarle. Le tappe precedenti sono §5.8-5.27.
 > cominciare, e le nove decisioni d'impianto prese con l'utente stanno in
 > [`docs/storia/08-domande-aperte.md`](docs/storia/08-domande-aperte.md): leggi quelle, non
 > ricavarle dal copione. Resta aperta una domanda sola (se le missioni si rigiocano) e non
-> blocca niente. **Chi disegna pannelli nuovi parte da §5.28**: il cast a pixel, le quattro
-> espressioni e le tre regole di scrittura dei dialoghi ci sono già, e le tavole si guardano
-> con `cutscene-sheet.scene` *prima* di dire che funzionano. Il resto del §6 resta ordinato per
+> blocca niente. **Chi disegna pannelli nuovi parte da §5.28**: il cast a pixel e le quattro
+> espressioni ci sono già, le **sei regole di scrittura** (tre di disegno, tre di
+> comprensibilità) stanno in testa a [`docs/storia/README.md`](docs/storia/README.md) con la
+> tabella delle parole già tradotte, e le tavole si guardano con `cutscene-sheet.scene`
+> *prima* di dire che funzionano. Il resto del §6 resta ordinato per
 > impatto: le voci più concrete sono il sorpasso, l'arresto che ti carica in volante e il
 > **corridoio fra Seoul e Busan**, che dal §5.25 è geografia percorribile ma non ha ancora
 > niente da fare — ed è la superficie naturale delle attività secondarie.
