@@ -14,7 +14,7 @@ src/core/
   events.js           il bus: `game.on/once/off/emit`, da cui passano i fatti del mondo
   modes.js            in che modalità gira il gioco e cosa concede (`game.mode`, `paused`)
   audio.js            sintetizzatore WebAudio: colpi secchi + letti continui, mix, muto
-  music.js            musica generata: tema del menu, caccia, stacchi — e la regia
+  music.js            musica generata: tema del menu, caccia, apertura, stacchi — e la regia
   radio.js            stazioni coreane in streaming (`<audio>`, fuori dal grafo audio)
   save.js             salvataggio su localStorage: 3 slot + autosave, fotografia e ripristino
   math.js             angoli, damp, circleRectPush, pointSegment, KMH, PX_PER_M
@@ -48,6 +48,10 @@ src/render/
   fx.js               decals (gomma, sangue, bruciature) e particelle
   interiorscene.js    disegno di un piano: pavimento, muri estrusi, arredo, scale
   metroscene.js       interno stazione: folla, chiosco, atrio, tornelli, banchina e convoglio
+  panelkit.js         primitive dei pannelli: fondi, palazzi, insegne, pioggia, manifesti,
+                      un'auto, il quadrante della radio, narratore e battute
+  pixelkit.js         i personaggi dei pannelli in pixel art: teste 24×24 disegnate a mano,
+                      corpo e pose parametrici, quattro espressioni, folla e cane
 
 src/entities/
   vehicle.js          fisica arcade, pendenza, collisioni a tre cerchi, gomme a terra,
@@ -75,6 +79,10 @@ src/ui/
   shopmenu.js         pannello del listino (compra/vendi)
   metro.js            ingresso/uscita, pianta fisica e rete locale/interurbana
   text.js             a capo automatico e paragrafi: corpo fisso, misura condivisa
+  cutscene.js         il lettore di pannelli: avanzamento, stacchi, salto con ESC
+
+src/story/
+  intro.js            «12년», i 28 pannelli dell'apertura e il passaggio di consegne
 
 .claude/              strumenti per chi sviluppa (non fa parte del gioco), vedi §9
   tools/probe.mjs     avvia il gioco headless, esegue scene, misura, screenshot
@@ -370,6 +378,21 @@ una modalità (un dialogo di missione: mondo fermo, giocatore fermo, ma qualcosa
 riga in quel file, invece di una condizione in più qui e di un ramo in ognuno dei posti che
 leggono `game.paused`. Non è una pila, ed è scritto lì perché il giorno che due modalità si
 sovrappongono davvero si cambia quel file e nient'altro.
+
+**Un pannello è una funzione, una cutscene è un file, un personaggio è una griglia** (§5.28).
+`ui/cutscene.js` è il **lettore**, e non sa niente della storia che sta raccontando: riceve un
+array di `{ id, draw(P), hold?, music? }` e lo mostra: avanza il giocatore (`hold` solo dove non
+c'è niente da leggere), `ESC` salta sempre, e `onDone` — deciso da chi chiama, non da lui — è
+quello che viene dopo. Le missioni useranno lo stesso oggetto. Sotto ci sono **due kit
+separati, e la divisione è netta**: `render/panelkit.js` disegna il mondo del pannello (fondi,
+palazzi, insegne al neon, pioggia, asfalto bagnato, manifesti, un'auto, il quadrante della
+radio, narratore e battute), `render/pixelkit.js` disegna **le persone**, in pixel art. Lì
+l'identità sta nella **testa** — una griglia di caratteri 24×24 per personaggio, in cache come
+uno sprite (§5.4) — mentre corpo, braccia, gambe e pose sono parametrici, così una posa in più
+costa quattro righe invece di una griglia nuova; le espressioni si **sovrascrivono** alle celle
+che il modello riserva a occhi e bocca, e quattro stati bastano. La folla resta sagoma apposta.
+I pannelli veri di una scena stanno tutti in un file suo sotto `src/story/`, che è anche l'unico
+posto in cui il gioco sa qualcosa della trama.
 
 **Un salvataggio si migra, non si rifiuta** (§5.27). Prima uno slot con `v` diverso da `VERSION`
 veniva buttato: il primo campo nuovo che qualcuno avesse aggiunto avrebbe cancellato la partita

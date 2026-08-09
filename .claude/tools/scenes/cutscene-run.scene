@@ -1,0 +1,70 @@
+// L'apertura fatta girare davvero, dal menu al gioco. Asserisce, non misura.
+//
+// Il provino a griglia (`cutscene-sheet.scene`) dice se i pannelli si *vedono*.
+// Questa dice se la scena **funziona**: che parta da «Nuova partita» e non da una
+// chiamata di comodo, che il mondo si fermi, che sotto suoni il tema
+// dell'apertura, che `ESC` salti, e che dopo il salto il gioco sia in strada con
+// l'auto del padre lì davanti. Sono le cinque cose che si rompono per prime.
+//
+//   node .claude/tools/probe.mjs --menu --seconds 26 \
+//     --script .claude/tools/scenes/cutscene-run.scene
+//
+// Va lanciata con `--menu`: con `?autostart` il menu iniziale non c'è, e la
+// cutscene parte proprio da lì.
+const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
+const out = [];
+const check = (nome, ok, extra) => out.push({ nome, ok: !!ok, ...(extra ? { extra } : {}) });
+
+game.audio.unlock();
+await wait(0.4);
+
+// 1. Si parte da «Nuova partita», che è l'unico ingresso vero.
+const iNew = game.startMenu.items.findIndex((i) => i.id === 'new');
+check('la voce «Nuova partita» esiste nel menu', iNew >= 0);
+game.startMenu.index = iNew;
+game.startMenu.activate(game);
+await wait(0.3);
+
+check('la cutscene è partita', game.cutscene.active);
+check('la modalità è «cutscene»', game.mode.id === 'cutscene', game.mode.id);
+check('il mondo è fermo', game.paused);
+check('il gioco non è ancora cominciato', !game.started);
+check('i pannelli sono ventotto', game.cutscene.seq.length === 28, game.cutscene.seq.length);
+
+// 2. La musica. `direct` gira dentro `audio.update`, che in cutscene è l'unico
+// sistema che continua a girare: se il pezzo non cambia qui, non cambia mai.
+await wait(2.2);
+const m = game.audio.music.stats;
+check('sotto i pannelli suona il tema dell\'apertura', m.pezzo === 'intro', m.pezzo);
+check('il tema dell\'apertura si sente', m.volume > 0.2, m.volume);
+check('ci sono voci vive', m.voci > 0, m.voci);
+check('la radio è azzerata durante i pannelli', game.mode.radioDuck === 0);
+
+// 3. Si avanza a mano, come farebbe il giocatore.
+const primo = game.cutscene.i;
+game.input.justPressed.add('Space');
+await wait(0.6);
+check('lo spazio fa avanzare di un pannello', game.cutscene.i === primo + 1, game.cutscene.i);
+
+// 4. Il salto. È il tasto nuovo, ed è la ragione per cui questa scena esiste.
+game.input.justPressed.add('Escape');
+await wait(1.4);
+check('ESC ha chiuso i pannelli', !game.cutscene.active);
+check('dopo il salto il gioco è cominciato', game.started);
+check('la modalità è tornata «play»', game.mode.id === 'play', game.mode.id);
+check('il mondo è ripartito', !game.paused);
+
+// 5. Il passaggio di consegne: ora, asfalto bagnato, e l'auto del padre vicina.
+const ora = game.dayCycle.hour;
+check('si comincia alle 08:24 come prima', ora > 8.3 && ora < 8.6, ora.toFixed(2));
+check('l\'asfalto è ancora bagnato', game.dayCycle.wet > 0.4, game.dayCycle.wet);
+const vicina = game.vehicles
+  .map((v) => Math.hypot(v.x - game.player.x, v.y - game.player.y))
+  .sort((a, b) => a - b)[0];
+check('c\'è un\'auto a portata di mano', vicina < 460, Math.round(vicina));
+
+// 6. E la musica torna quella del gioco: in strada, da puliti, non suona niente.
+await wait(1.6);
+check('in strada la musica tace', game.audio.music.stats.verso === null, game.audio.music.stats.verso);
+
+return { falliti: out.filter((r) => !r.ok), totale: out.length, ok: out.filter((r) => r.ok).length };

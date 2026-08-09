@@ -8,9 +8,11 @@
 //   1. **In strada non suona niente.** Seoul ha già un fondo suo (traffico, pioggia,
 //      insegne, sirene) e in macchina c'è la radio (§5.14), che è musica scelta dal
 //      giocatore. Coprirle con un tappeto sarebbe togliere, non aggiungere.
-//   2. **Suona dove il gioco parla di sé**: il menu iniziale (il tema) e la caccia
-//      (l'inseguimento). Sono i due momenti in cui non c'è niente da ascoltare
-//      *nel* mondo e tutto da sentire *sul* mondo.
+//   2. **Suona dove il gioco parla di sé**: il menu iniziale (il tema), la caccia
+//      (l'inseguimento) e i pannelli (l'apertura). Sono i momenti in cui non c'è
+//      niente da ascoltare *nel* mondo e tutto da sentire *sul* mondo — e nella
+//      cutscene il mondo non c'è affatto, quindi senza musica resterebbe il
+//      silenzio di una scheda muta.
 //   3. **La radio vince sempre.** Se il giocatore ha acceso la sua stazione, la
 //      musica del gioco non si sovrappone nemmeno con cinque stelle addosso.
 //
@@ -26,10 +28,11 @@ const STEPS_PER_BAR = 8;
 const BARS = 4;
 const LOOKAHEAD = 0.25;
 
-const BPM = { menu: 84, chase: 148 };
+const BPM = { menu: 84, chase: 148, intro: 60 };
 // Guadagno del pezzo dentro il bus musica. Il tema sta più alto della caccia:
-// nel menu non c'è nient'altro, in strada ci sono sirene e piombo.
-const LEVEL = { menu: 0.85, chase: 0.5 };
+// nel menu non c'è nient'altro, in strada ci sono sirene e piombo. L'apertura sta
+// in mezzo: non ha concorrenza, ma sopra ci sono battute da leggere.
+const LEVEL = { menu: 0.85, chase: 0.5, intro: 0.62 };
 
 // Semitoni rispetto al LA1 (55 Hz): `r` è il basso, `t` la triade.
 const CHORDS = {
@@ -44,6 +47,10 @@ const CHORDS = {
 const PROG = {
   menu: [CHORDS.am, CHORDS.f, CHORDS.c, CHORDS.g],
   chase: [CHORDS.am, CHORDS.am, CHORDS.f, CHORDS.g],
+  // L'apertura **torna sempre sulla tonica**: è un giro che non porta da nessuna
+  // parte, ed è il punto — sono ventotto pannelli in cui il protagonista non
+  // decide ancora niente.
+  intro: [CHORDS.am, CHORDS.f, CHORDS.am, CHORDS.g],
 };
 
 // Pentatonica minore: cinque note, ed è anche la scala su cui gira la musica
@@ -53,6 +60,9 @@ const PENTA = [0, 3, 5, 7, 10, 12, 15, 17];
 const RIFF = [5, 4, 5, 7, 6, 4, 3, 4];
 // Arpeggio del tema: indici nella triade allargata (la quarta voce è l'ottava).
 const ARP = [0, 2, 1, 3, 2, 1, 3, 2];
+// La frase dell'apertura, in gradi della pentatonica: cinque note e tre silenzi.
+// I `null` sono la metà che conta — è nei buchi che si leggono le battute.
+const INTRO_LINE = [4, null, 3, null, 2, 1, null, 2];
 
 const hz = (n) => 55 * Math.pow(2, n / 12);
 
@@ -100,7 +110,11 @@ export class MusicSystem {
    */
   direct(game) {
     let want = null;
-    if (!game.started) want = 'menu';
+    // I pannelli vengono prima del titolo: la cutscene parte **da** «Nuova
+    // partita», quindi `game.started` è ancora falso e senza questa riga sotto
+    // l'apertura continuerebbe a suonare il tema del menu.
+    if (game.cutscene?.active) want = 'intro';
+    else if (!game.started) want = 'menu';
     else if (game.wanted.level >= 2 && !game.indoors && !game.player.dying) want = 'chase';
     // La radio è la musica che ha scelto il giocatore: non gliela si copre.
     if (want === 'chase' && game.radio?.on) want = null;
@@ -118,7 +132,12 @@ export class MusicSystem {
       }
     }
     if (this.cue && this.cue === this.want) {
-      this.target = LEVEL[this.cue] * (this.cue === 'chase' ? 0.72 + 0.28 * this.intensity : 1);
+      let lvl = LEVEL[this.cue];
+      if (this.cue === 'chase') lvl *= 0.72 + 0.28 * this.intensity;
+      // La regia dell'apertura la scrive il pannello, non questo file: gli basta
+      // dichiarare un `music` e il tema sale (l'ultima tavola è il titolo).
+      else if (this.cue === 'intro') lvl *= game.cutscene?.musicWeight ?? 1;
+      this.target = lvl;
     }
   }
 
@@ -144,6 +163,7 @@ export class MusicSystem {
   step(i, t) {
     if (this.cue === 'menu') this.stepMenu(i, t);
     else if (this.cue === 'chase') this.stepChase(i, t);
+    else if (this.cue === 'intro') this.stepIntro(i, t);
   }
 
   // --- i due pezzi ----------------------------------------------------------
@@ -171,6 +191,35 @@ export class MusicSystem {
       dur: 0.5, peak: beat % 2 ? 0.05 : 0.075, attack: 0.004, lp: 2600,
     });
     if (beat % 2 === 1) this.hat(t, 0.03);
+  }
+
+  /**
+   * L'apertura. Stesso impasto del tema — è lo stesso gioco, e la cutscene parte
+   * dal titolo — ma **la metà del tempo e senza batteria**: sopra ci sono battute
+   * da leggere, e una musica che chiede attenzione le copre. Un pad che entra
+   * lentissimo, un basso ogni quattro secondi, un battito sordo a metà battuta al
+   * posto della cassa, e una frase di cinque note che compare a battute alterne.
+   *
+   * Il livello lo decide `direct` leggendo `cutscene.musicWeight`: sull'ultima
+   * tavola — il titolo — il pezzo sale ed è l'unico gesto di regia della scena.
+   */
+  stepIntro(i, t) {
+    const bar = Math.floor(i / STEPS_PER_BAR) % BARS;
+    const beat = i % STEPS_PER_BAR;
+    const ch = PROG.intro[bar];
+    if (beat === 0) {
+      for (const n of ch.t) {
+        this.note({ type: 'triangle', f: hz(n + 24), t, dur: 4.4, peak: 0.07, attack: 1.2, lp: 1000 });
+      }
+      this.note({ type: 'sine', f: hz(ch.r), t, dur: 3.2, peak: 0.2, attack: 0.06 });
+    }
+    // Non è una cassa, è un battito: tiene il tempo a chi legge senza chiedergli
+    // di seguirlo.
+    if (beat === 4) this.kick(t, 0.12);
+    const deg = bar % 2 === 1 ? INTRO_LINE[beat] : null;
+    if (deg != null) {
+      this.note({ type: 'triangle', f: hz(PENTA[deg] + 36), t, dur: 1.3, peak: 0.055, attack: 0.02, lp: 2000 });
+    }
   }
 
   /**

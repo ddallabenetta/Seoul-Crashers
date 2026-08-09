@@ -32,6 +32,14 @@
  */
 export const MODES = [
   {
+    // I pannelli: il mondo è fermo come in un menu, ma qualcosa anima lo stesso.
+    // Il mondo si abbassa quasi a zero (là fuori non c'è niente che stia
+    // succedendo) e la radio tace del tutto — sotto la scena suona il suo tema.
+    id: 'cutscene',
+    when: (game) => !!game.cutscene?.active,
+    worldRuns: false, playerRuns: false, duck: 0.12, radioDuck: 0, cursor: 'default',
+  },
+  {
     // Il titolo: il mondo gira eccome (è l'attract mode), il giocatore no.
     id: 'title',
     when: (game) => !game.started,

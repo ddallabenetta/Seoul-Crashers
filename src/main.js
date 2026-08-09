@@ -34,6 +34,8 @@ import { PauseMenu } from './ui/menu.js';
 import { StartMenu } from './ui/startmenu.js';
 import { ShopMenu } from './ui/shopmenu.js';
 import { MetroSystem } from './ui/metro.js';
+import { Cutscene } from './ui/cutscene.js';
+import { INTRO, handoff } from './story/intro.js';
 
 const MAX_PIXELS = 2_900_000;
 // Dentro un edificio non c'è traffico: la griglia dei veicoli si ricostruisce vuota
@@ -50,6 +52,9 @@ class Game {
     // Il bus: da qui passano i fatti del mondo, e ci si iscrivono le missioni e la
     // tabella di Kkachi invece di frugare nello stato del gioco a ogni frame.
     this.events = new Events();
+    // Il lettore di pannelli. Vuoto finché qualcuno non gli passa una sequenza:
+    // la prima è l'apertura, le missioni useranno lo stesso oggetto.
+    this.cutscene = new Cutscene();
     this.time = 0;
     this.debug = false;
     // Falso finché il menu iniziale è a schermo: il mondo gira lo stesso, il
@@ -419,6 +424,18 @@ class Game {
     return !this.mode.worldRuns;
   }
 
+  /**
+   * L'apertura, e quello che viene dopo (`story/intro.js`). `start` lo chiama la
+   * cutscene quando finisce — saltata o guardata che sia — così il passaggio di
+   * consegne è uno solo e non due.
+   */
+  playIntro() {
+    this.cutscene.play(this, INTRO, 'intro', (game) => {
+      game.start(false);
+      handoff(game);
+    });
+  }
+
 
   // --- marcatori sulla mappa --------------------------------------------------
   //
@@ -750,6 +767,15 @@ class Game {
   // --- ciclo ----------------------------------------------------------------
   update(dt) {
     const input = this.input;
+    // I pannelli sono l'unica modalità in cui il mondo non gira *e* qualcosa si
+    // muove lo stesso. Gira solo la cutscene e l'audio: i letti si abbassano da
+    // soli leggendo `mode.duck` e la musica passa al tema dell'apertura.
+    if (this.cutscene.active) {
+      this.cutscene.update(dt, this);
+      this.audio.update(dt, this);
+      input.endFrame();
+      return;
+    }
     if (!this.started) {
       this.updateAttract(dt);
       return;
@@ -959,6 +985,13 @@ class Game {
 
   render() {
     const ctx = this.ctx;
+    // Sotto i pannelli c'è il nero pieno della tavola: disegnare anche la città
+    // sarebbe un frame intero buttato via.
+    if (this.cutscene.active) {
+      this.camera.applyUI(ctx);
+      this.cutscene.draw(ctx, this);
+      return;
+    }
     if (this.metro.inside) this.metroScene.render(ctx, this);
     else if (this.indoors) this.interiorScene.render(ctx, this);
     else this.scene.render(ctx, this);
