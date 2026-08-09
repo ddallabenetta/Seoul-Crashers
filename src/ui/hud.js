@@ -4,6 +4,7 @@ import { MAP_W, MAP_H } from '../world/maptexture.js';
 import { VEHICLE_TYPES, getHeroPortrait, getWeaponIcon } from '../render/sprites.js';
 import { WEAPONS, WEAPON_SLOTS } from '../entities/weapons.js';
 import { won } from '../entities/shops.js';
+import { wrapLines } from './text.js';
 
 const MINIMAP = 196;
 const MINIMAP_WORLD = 1000; // porzione di mondo inquadrata
@@ -64,6 +65,7 @@ export class Hud {
     this.drawMoney(ctx, game, 22, 88);
     if (game.wanted) this.drawWanted(ctx, game, 22, 124);
     this.drawClock(ctx, game, w - CLOCK_W - 22, 22);
+    this.drawMission(ctx, game, w - CLOCK_W - 22, 22 + CLOCK_H + 12);
     if (!game.indoors) this.drawDistrictToast(ctx, game, w, h);
     this.drawVenueToast(ctx, game, w, h);
     this.drawHints(ctx, game, w, h);
@@ -292,6 +294,37 @@ export class Hud {
     ctx.fillStyle = '#f0f2f6';
     ctx.font = '700 17px system-ui, sans-serif';
     ctx.fillText(f.biz.label.toUpperCase(), w / 2, h * 0.17 + 24);
+    ctx.restore();
+  }
+
+  /**
+   * La missione in corso. Sta sotto l'orologio e non in mezzo allo schermo perché
+   * è un promemoria, non un cartello: la decisione presa con l'utente è **un blip
+   * solo** e nessun elenco di commissioni, quindi qui c'è una riga di titolo e una
+   * di cosa si sta facendo — e sparisce del tutto quando non c'è niente in corso.
+   */
+  drawMission(ctx, game, x, y) {
+    const m = game.missions;
+    const def = m?.def;
+    if (!def) return;
+    const w = CLOCK_W;
+    const hint = m.hint || '';
+    ctx.save();
+    ctx.font = '600 12px system-ui, "Apple SD Gothic Neo", sans-serif';
+    const hintLines = hint ? wrapLines(ctx, hint, w - 22) : [];
+    const h = 26 + hintLines.length * 15 + (hintLines.length ? 6 : 0);
+    ctx.fillStyle = 'rgba(12,14,18,0.72)';
+    roundPath(ctx, x, y, w, h, 8);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,210,63,0.28)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = '#ffd23f';
+    ctx.font = '700 12px system-ui, "Apple SD Gothic Neo", sans-serif';
+    ctx.fillText(`${def.hangul ? `${def.hangul} · ` : ''}${def.title}`, x + 11, y + 18);
+    ctx.fillStyle = 'rgba(238,242,248,0.82)';
+    ctx.font = '600 12px system-ui, "Apple SD Gothic Neo", sans-serif';
+    hintLines.forEach((l, i) => ctx.fillText(l, x + 11, y + 33 + i * 15));
     ctx.restore();
   }
 
@@ -928,6 +961,9 @@ export class Hud {
   drawHints(ctx, game, w, h) {
     const p = game.player;
     const lines = [];
+    // Prima quelle della missione: quando un punto di missione e una porta stanno
+    // nello stesso metro quadro, quello che il giocatore è venuto a fare va in cima.
+    for (const a of game.missions ? game.missions.actions : []) lines.push(`${a.key || 'E'}  —  ${a.text}`);
     for (const a of game.shops ? game.shops.actions : []) lines.push(`${a.key}  —  ${a.text}`);
     const metroHint = game.metro?.hint(game);
     if (metroHint) lines.push(metroHint);

@@ -35,7 +35,10 @@ import { StartMenu } from './ui/startmenu.js';
 import { ShopMenu } from './ui/shopmenu.js';
 import { MetroSystem } from './ui/metro.js';
 import { Cutscene } from './ui/cutscene.js';
+import { Dialogue } from './ui/dialogue.js';
+import { MissionSystem } from './core/missions.js';
 import { INTRO, handoff } from './story/intro.js';
+import { registerCampaign, beginCampaign } from './story/campaign.js';
 
 const MAX_PIXELS = 2_900_000;
 // Dentro un edificio non c'è traffico: la griglia dei veicoli si ricostruisce vuota
@@ -53,8 +56,11 @@ class Game {
     // tabella di Kkachi invece di frugare nello stato del gioco a ogni frame.
     this.events = new Events();
     // Il lettore di pannelli. Vuoto finché qualcuno non gli passa una sequenza:
-    // la prima è l'apertura, le missioni useranno lo stesso oggetto.
+    // la prima è l'apertura, le missioni usano lo stesso oggetto.
     this.cutscene = new Cutscene();
+    // Il riquadro delle battute: quello che i pannelli non devono fare, cioè le
+    // due righe che si dicono **nel posto in cui succedono** (§5.29).
+    this.dialogue = new Dialogue();
     this.time = 0;
     this.debug = false;
     // Falso finché il menu iniziale è a schermo: il mondo gira lo stesso, il
@@ -158,6 +164,10 @@ class Game {
     // spostare lo streaming di traffico e pedoni.
     this.actors = new ActorSystem(new Rng(20260809));
     this.actors.attach(this);
+    // Le missioni. Il motore non sa niente della trama: la trama gliela registra
+    // `story/campaign.js`, che è l'unico file che le conosce tutte e dodici.
+    this.missions = new MissionSystem();
+    this.missions.attach(this);
     this.pickups = new PickupSystem(this.city, this.rng);
     this.projectiles = new ProjectileSystem();
     this.wanted = new WantedSystem();
@@ -171,6 +181,9 @@ class Game {
     this.shopMenu = new ShopMenu();
     this.metro = new MetroSystem();
     this.metroScene = new MetroScene(this.scene);
+    // Dopo l'HUD: il filo del 병원 gli parla addosso al primo risveglio, e una
+    // definizione di attore vuole i negozi già in piedi.
+    registerCampaign(this);
 
     // Riempie subito la scena, così il giocatore non parte in una città deserta.
     this.traffic.placeSpecialVehicles(this);
@@ -357,6 +370,7 @@ class Game {
     this.wanted.reset();
     this.shops.reset();
     this.actors.reset();
+    this.missions.reset(this);
     this.markers.length = 0;
     this.dayCycle.reset();
     this.radio.off(this);
@@ -433,6 +447,9 @@ class Game {
     this.cutscene.play(this, INTRO, 'intro', (game) => {
       game.start(false);
       handoff(game);
+      // Da qui parte M1 (`02-cutscene-iniziale.md`, «il passaggio di consegne»):
+      // l'innesco è lo stesso di Kkachi — il motore acceso — e sta nella missione.
+      beginCampaign(game);
     });
   }
 
@@ -780,6 +797,18 @@ class Game {
       this.updateAttract(dt);
       return;
     }
+    // Un dialogo ferma il mondo come un menu ma **non lo copre**: la città resta
+    // disegnata sotto, quindi qui gira solo il riquadro (e l'audio, che si abbassa
+    // da solo leggendo `mode.duck`). L'HUD continua ad aggiornarsi, o i toast
+    // scritti dalla battuta prima resterebbero appesi.
+    if (this.dialogue.active) {
+      this.dialogue.update(dt, this);
+      this.audio.update(dt, this);
+      this.radio.update(dt, this);
+      this.hud.update(dt);
+      input.endFrame();
+      return;
+    }
 
     if (input.wasPressed('Escape')) {
       // `backOut` è il pannello audio del menu: ESC lì dentro torna alle voci
@@ -836,7 +865,12 @@ class Game {
     const prevX = this.player.x;
     const prevY = this.player.y;
 
-    // I negozi girano per primi: decidono se il frame si svolge in strada o dentro
+    // **Prima dei negozi**, e non per eleganza: un punto di missione e una porta
+    // possono stare nello stesso metro quadro, e chi consuma il tasto per primo
+    // alza `enterCooldown`, che è quello che fa desistere l'altro. Quando il
+    // giocatore è lì per la missione, la missione vince.
+    this.missions.update(dt, this);
+    // I negozi girano poi: decidono se il frame si svolge in strada o dentro
     // un edificio, e il giocatore deve muoversi già nello spazio giusto.
     if (this.metro.inside) {
       this.shops.actions.length = 0;
@@ -1005,6 +1039,8 @@ class Game {
     this.menu.draw(ctx, this);
     this.shopMenu.draw(ctx, this);
     this.metro.draw(ctx, this);
+    // Per ultimo: il riquadro delle battute sta sopra tutto, HUD compreso.
+    this.dialogue.draw(ctx, this);
   }
 }
 

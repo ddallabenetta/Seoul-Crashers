@@ -9,13 +9,28 @@
 //
 // I pannelli sono disegnati piccoli: serve a **trovare** quelli illeggibili, non a
 // giudicarne il dettaglio. Quello si guarda con `cutscene-panel.scene`.
+//
+// Di suo mostra l'apertura; con una riga davanti mostra le tavole di una missione
+// o del 병원, che sono le altre sequenze che esistono:
+//
+//   echo 'window.__SCENA = "m2";' > /tmp/s.js   # intro · m1 · m2 · ospedale
 const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
 const COLS = 5;
 const T = 1.4;      // il tempo dentro il pannello: pioggia e fruscii a regime
 
 game.newGame();
-game.playIntro();
-const seq = game.cutscene.seq;
+let seq;
+const quale = window.__SCENA || 'intro';
+if (quale === 'intro') {
+  game.playIntro();
+  seq = game.cutscene.seq;
+} else if (quale === 'ospedale') {
+  const H = await import('/src/story/hospital.js');
+  seq = [...H.PRIMO, ...H.TERZO, ...H.DECIMO, ...H.DOPO_M12];
+} else {
+  const M = await import(`/src/story/${quale}.js`);
+  seq = [...M.APERTURA, ...M.CHIUSURA];
+}
 await wait(0.15);
 game.loop.stop();
 
