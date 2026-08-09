@@ -35,6 +35,7 @@ import { StartMenu } from './ui/startmenu.js';
 import { ShopMenu } from './ui/shopmenu.js';
 import { MetroSystem } from './ui/metro.js';
 import { Cutscene } from './ui/cutscene.js';
+import { MobileControls } from './ui/mobilecontrols.js';
 import { INTRO, handoff } from './story/intro.js';
 
 const MAX_PIXELS = 2_900_000;
@@ -48,6 +49,9 @@ class Game {
     this.ctx = canvas.getContext('2d', { alpha: false });
     this.camera = new Camera();
     this.input = new Input(canvas);
+    // I controlli touch sono un adattatore DOM: quando non c'è un puntatore
+    // coarse restano invisibili e non cambiano il percorso desktop.
+    this.mobileControls = new MobileControls(this);
     this.rng = new Rng(20260730);
     // Il bus: da qui passano i fatti del mondo, e ci si iscrivono le missioni e la
     // tabella di Kkachi invece di frugare nello stato del gioco a ogni frame.
@@ -93,7 +97,22 @@ class Game {
       districts: new Set(),
     };
     this._skidT = 0;
-    window.addEventListener('resize', () => this.resize());
+    this.hidden = !!document.hidden;
+    this._resizeQueued = false;
+    this._queueResize = () => {
+      if (this._resizeQueued) return;
+      this._resizeQueued = true;
+      const apply = () => {
+        this._resizeQueued = false;
+        this.resize();
+      };
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(apply);
+      else apply();
+    };
+    window.addEventListener('resize', this._queueResize);
+    window.addEventListener('orientationchange', this._queueResize);
+    window.visualViewport?.addEventListener('resize', this._queueResize);
+    window.visualViewport?.addEventListener('scroll', this._queueResize);
     this.armAudio();
   }
 
@@ -106,28 +125,46 @@ class Game {
   armAudio() {
     const start = () => {
       this.audio.unlock();
-      if (!this.audio.ready) return;
-      window.removeEventListener('pointerdown', start);
-      window.removeEventListener('keydown', start);
     };
-    window.addEventListener('pointerdown', start);
+    // In cattura raggiunge anche i pulsanti touch, che fermano la propagazione
+    // per non trasformarsi in un clic sulla tavola sottostante. Resta installato:
+    // dopo un ritorno dal background iOS può richiedere un altro gesto per il resume.
+    window.addEventListener('pointerdown', start, { capture: true });
     window.addEventListener('keydown', start);
     document.addEventListener('visibilitychange', () => {
+      this.hidden = !!document.hidden;
+      this.input.clearAll();
+      this.mobileControls?.clear();
       this.audio.setActive(!document.hidden);
     });
   }
 
   resize() {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
+    // visualViewport è affidabile dopo la rotazione o il cambio della barra del
+    // browser mobile. Può riportare zero per un istante: resta il fallback di window.
+    const viewport = window.visualViewport;
+    const w = Math.max(1, Math.round(viewport?.width || window.innerWidth || 1));
+    const h = Math.max(1, Math.round(viewport?.height || window.innerHeight || 1));
     let s = Math.min(window.devicePixelRatio || 1, 2);
-    if (w * h * s * s > MAX_PIXELS) s = Math.max(1, Math.sqrt(MAX_PIXELS / (w * h)));
-    this.canvas.width = Math.round(w * s);
-    this.canvas.height = Math.round(h * s);
+    if (w * h * s * s > MAX_PIXELS) s = Math.sqrt(MAX_PIXELS / (w * h));
+    let pixelW = Math.max(1, Math.round(w * s));
+    let pixelH = Math.max(1, Math.round(h * s));
+    // L'arrotondamento può aggiungere pochi pixel oltre il tetto: rifacciamo la
+    // scala una volta, così il prodotto dei due lati non lo supera mai.
+    if (pixelW * pixelH > MAX_PIXELS) {
+      s *= Math.sqrt(MAX_PIXELS / (pixelW * pixelH));
+      pixelW = Math.max(1, Math.floor(w * s));
+      pixelH = Math.max(1, Math.floor(h * s));
+    }
+    this.canvas.width = pixelW;
+    this.canvas.height = pixelH;
     this.canvas.style.width = `${w}px`;
     this.canvas.style.height = `${h}px`;
     this.camera.resize(w, h);
     this.camera.dpr = s;
+    // Evita che il mirino resti nella vecchia orientazione. Anche sul desktop il
+    // puntatore torna al centro; il prossimo movimento riprende subito il controllo.
+    this.input.recenterAim(w, h);
   }
 
   async boot(onProgress) {
@@ -238,9 +275,15 @@ class Game {
     this.audio.music?.sting('go');
     this.hud.showDistrict(this.player.district);
     if (loaded) return;
-    this.hud.toast('E per rubare un\'auto · M per la mappa', 5);
-    this.hud.toast('Mouse per mirare e sparare · 1-6 per l\'arma', 6.5);
-    this.hud.toast('E sulla porta di un negozio per entrare · F svuota la cassa', 8);
+    if (this.mobileControls?.active) {
+      this.hud.toast('Stick sinistro: muoviti · stick destro: mira e spara', 5);
+      this.hud.toast('E interagisce · ↻ cambia arma · M apre la mappa', 6.5);
+      this.hud.toast('F svuota la cassa · tieni premuto R per spegnere la radio', 8);
+    } else {
+      this.hud.toast('E per rubare un\'auto · M per la mappa', 5);
+      this.hud.toast('Mouse per mirare e sparare · 1-6 per l\'arma', 6.5);
+      this.hud.toast('E sulla porta di un negozio per entrare · F svuota la cassa', 8);
+    }
   }
 
   /**
@@ -767,6 +810,14 @@ class Game {
   // --- ciclo ----------------------------------------------------------------
   update(dt) {
     const input = this.input;
+    this.mobileControls?.update(dt);
+    // In background non avanza niente: né mondo, né titolo, né tavole automatiche.
+    // Il primo frame visibile riparte dallo stesso stato e senza input trattenuti.
+    if (this.hidden) {
+      this.audio.update(dt, this);
+      input.endFrame();
+      return;
+    }
     // I pannelli sono l'unica modalità in cui il mondo non gira *e* qualcosa si
     // muove lo stesso. Gira solo la cutscene e l'audio: i letti si abbassano da
     // soli leggendo `mode.duck` e la musica passa al tema dell'apertura.

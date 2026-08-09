@@ -4,6 +4,7 @@ import { MAP_W, MAP_H } from '../world/maptexture.js';
 import { VEHICLE_TYPES, getHeroPortrait, getWeaponIcon } from '../render/sprites.js';
 import { WEAPONS, WEAPON_SLOTS } from '../entities/weapons.js';
 import { won } from '../entities/shops.js';
+import { uiLayout, ellipsisText } from './layout.js';
 
 const MINIMAP = 196;
 const MINIMAP_WORLD = 1000; // porzione di mondo inquadrata
@@ -50,27 +51,45 @@ export class Hud {
   draw(ctx, game) {
     const w = game.camera.viewW;
     const h = game.camera.viewH;
+    const L = uiLayout(w, h, game);
+    const mini = L.compact
+      ? Math.round(Math.max(96, Math.min(156, Math.min(w * (L.controls && L.portrait ? 0.30 : L.portrait ? 0.34 : 0.27), h * 0.28))))
+      : MINIMAP;
+    // La mappa resta a sinistra: in landscape la griglia azioni vive a destra,
+    // mentre in portrait la misura più stretta la tiene fuori da entrambi gli stick.
+    const mapX = L.safeX;
+    const mapY = h - L.safeBottom - mini;
     ctx.save();
     ctx.textBaseline = 'alphabetic';
 
-    if (game.indoors) this.drawFloorPlan(ctx, game, 22, h - MINIMAP - 22);
-    else this.drawMinimap(ctx, game, 22, h - MINIMAP - 22);
+    if (game.indoors) this.drawFloorPlan(ctx, game, mapX, mapY, mini, L);
+    else this.drawMinimap(ctx, game, mapX, mapY, mini, L);
     if (!game.player.onFoot) {
-      this.drawSpeedo(ctx, game, w - 132, h - 112);
-      this.drawRadio(ctx, game, w - 18, h - 154);
+      const speedScale = L.compact ? 0.72 : 1;
+      this.drawSpeedo(ctx, game, w - (L.compact ? 104 : 132), L.compact ? h - L.safeBottom - 86 : h - 112, speedScale);
+      this.drawRadio(ctx, game, w - L.safeX, L.compact ? h - L.safeBottom - 132 : h - 154, L);
     }
-    this.drawWeaponBar(ctx, game, w, h);
-    this.drawVitals(ctx, game, 22, 22);
-    this.drawMoney(ctx, game, 22, 88);
-    if (game.wanted) this.drawWanted(ctx, game, 22, 124);
-    this.drawClock(ctx, game, w - CLOCK_W - 22, 22);
-    if (!game.indoors) this.drawDistrictToast(ctx, game, w, h);
-    this.drawVenueToast(ctx, game, w, h);
-    this.drawHints(ctx, game, w, h);
-    this.drawMessages(ctx, w, h);
+    // Sui controlli touch l'arma corrente è già nel pannello vitale e il tasto
+    // ↻ la cambia: la fila desktop da sei slot coprirebbe leve e pulsanti.
+    if (!L.controls) this.drawWeaponBar(ctx, game, w, h, L, mapY);
+    const vitW = L.compact ? Math.min(238, Math.max(168, w * (L.portrait ? 0.55 : 0.38))) : 262;
+    this.drawVitals(ctx, game, L.safeX, L.safeTop, { w: vitW, h: L.compact ? 56 : 62 });
+    const vitBottom = L.safeTop + (L.compact ? 56 : 62);
+    this.drawMoney(ctx, game, L.safeX, vitBottom + (L.compact ? 6 : 4), L.compact ? Math.min(142, vitW - 10) : 150);
+    if (game.wanted) this.drawWanted(ctx, game, L.safeX, vitBottom + (L.compact ? 38 : 40), L);
+    const clockW = L.compact ? Math.min(190, Math.max(150, w * 0.43)) : CLOCK_W;
+    const clockX = L.compact && L.portrait ? L.safeX : w - clockW - L.safeX;
+    const clockY = L.compact && L.portrait
+      ? vitBottom + (game.wanted?.level ? 66 : 38)
+      : L.safeTop;
+    this.drawClock(ctx, game, clockX, clockY, { w: clockW, h: L.compact ? 42 : CLOCK_H });
+    if (!game.indoors) this.drawDistrictToast(ctx, game, w, h, L);
+    this.drawVenueToast(ctx, game, w, h, L);
+    this.drawHints(ctx, game, w, h, L);
+    this.drawMessages(ctx, w, h, L);
     if (game.debug) this.drawDebug(ctx, game, w, h);
-    this.drawDamage(ctx, game, w, h);
-    this.drawArrest(ctx, game, w, h);
+    this.drawDamage(ctx, game, w, h, L);
+    this.drawArrest(ctx, game, w, h, L);
     this.drawCrosshair(ctx, game);
     this.drawFade(ctx, game, w, h);
 
@@ -78,24 +97,26 @@ export class Hud {
   }
 
   /** Ritratto, salute e arma in mano: la colonna di sinistra, sopra la minimappa. */
-  drawVitals(ctx, game, x, y) {
+  drawVitals(ctx, game, x, y, opts = {}) {
     const p = game.player;
-    const w = 262;
-    const bx = x + 68; // colonna di barre e testo, a destra del ritratto
+    const w = opts.w || 262;
+    const ph = opts.h || 62;
+    const portraitSize = Math.min(46, Math.max(36, ph - 16));
+    const bx = x + portraitSize + 14; // colonna di barre e testo
     ctx.save();
     ctx.fillStyle = 'rgba(10,12,15,0.72)';
-    roundPath(ctx, x, y, w, 62, 10);
+    roundPath(ctx, x, y, w, ph, 10);
     ctx.fill();
 
     // Ritratto di Jae-min: sotto tiro pulsa di rosso.
     const portrait = getHeroPortrait();
-    ctx.drawImage(portrait.canvas, x + 8, y + 8, 46, 46);
+    ctx.drawImage(portrait.canvas, x + 8, y + 8, portraitSize, portraitSize);
     if (p.hurtT > 0 || p.hp < p.maxHp * 0.3) {
       ctx.save();
       ctx.globalAlpha = Math.max(clamp(p.hurtT / 0.4, 0, 1) * 0.5,
         p.hp < p.maxHp * 0.3 ? 0.18 + 0.14 * Math.sin(game.time * 5) : 0);
       ctx.fillStyle = '#c62f2a';
-      roundPath(ctx, x + 8, y + 8, 46, 46, 7);
+      roundPath(ctx, x + 8, y + 8, portraitSize, portraitSize, 7);
       ctx.fill();
       ctx.restore();
     }
@@ -103,37 +124,40 @@ export class Hud {
     // Barra della salute
     const t = clamp(p.hp / p.maxHp, 0, 1);
     ctx.fillStyle = 'rgba(255,255,255,0.12)';
-    roundPath(ctx, bx, y + 13, w - 12 - (bx - x), 12, 6);
+    const barW = Math.max(58, w - 12 - (bx - x));
+    const barH = ph < 60 ? 11 : 12;
+    roundPath(ctx, bx, y + (ph < 60 ? 11 : 13), barW, barH, 6);
     ctx.fill();
     ctx.fillStyle = t > 0.5 ? '#4ad98a' : t > 0.22 ? '#e8c33a' : '#e04a3a';
     if (t > 0.01) {
-      roundPath(ctx, bx, y + 13, (w - 12 - (bx - x)) * t, 12, 6);
+      roundPath(ctx, bx, y + (ph < 60 ? 11 : 13), barW * t, barH, 6);
       ctx.fill();
     }
     ctx.font = '700 10px system-ui, sans-serif';
     ctx.textAlign = 'right';
     ctx.fillStyle = 'rgba(12,14,18,0.85)';
-    ctx.fillText(String(Math.max(0, Math.ceil(p.hp))), x + w - 17, y + 23);
+    ctx.fillText(String(Math.max(0, Math.ceil(p.hp))), x + w - 17, y + (ph < 60 ? 21 : 23));
 
     // Arma corrente e colpi
     const spec = WEAPONS[p.weapon];
     ctx.textAlign = 'left';
-    ctx.font = '700 13px system-ui, "Apple SD Gothic Neo", sans-serif';
+    ctx.font = `${ph < 60 ? '700 11px' : '700 13px'} system-ui, "Apple SD Gothic Neo", sans-serif`;
     ctx.fillStyle = '#eef1f6';
-    ctx.fillText(`${spec.hangul}  ${spec.label}`, bx, y + 47);
+    const weapon = ellipsisText(ctx, `${spec.hangul}  ${spec.label}`, Math.max(38, barW - 26));
+    ctx.fillText(weapon, bx, y + (ph < 60 ? 43 : 47), Math.max(38, barW - 26));
     ctx.textAlign = 'right';
     ctx.font = '700 15px ui-monospace, monospace';
     ctx.fillStyle = spec.infinite ? 'rgba(230,235,245,0.45)' : p.shots > 0 ? '#ffd23f' : '#e04a3a';
-    ctx.fillText(spec.infinite ? '∞' : String(p.shots), x + w - 12, y + 48);
+    ctx.fillText(spec.infinite ? '∞' : String(p.shots), x + w - 12, y + (ph < 60 ? 44 : 48));
     ctx.restore();
   }
 
   /** Contanti. Sta sotto il pannello vitale perché è un numero che cambia di rado. */
-  drawMoney(ctx, game, x, y) {
+  drawMoney(ctx, game, x, y, width = 150) {
     const p = game.player;
     ctx.save();
     ctx.fillStyle = 'rgba(10,12,15,0.66)';
-    roundPath(ctx, x, y, 150, 26, 8);
+    roundPath(ctx, x, y, width, 26, 8);
     ctx.fill();
     ctx.textAlign = 'left';
     ctx.font = '700 15px ui-monospace, monospace';
@@ -147,33 +171,36 @@ export class Hud {
    * a sinistra c'è la colonna vitale, in basso tachimetro, barra armi e
    * suggerimenti.
    */
-  drawClock(ctx, game, x, y) {
+  drawClock(ctx, game, x, y, opts = {}) {
     const dc = game.dayCycle;
     if (!dc) return;
+    const cw = opts.w || CLOCK_W;
+    const ch = opts.h || CLOCK_H;
     ctx.save();
     ctx.fillStyle = 'rgba(10,12,15,0.72)';
-    roundPath(ctx, x, y, CLOCK_W, CLOCK_H, 10);
+    roundPath(ctx, x, y, cw, ch, 10);
     ctx.fill();
 
-    drawWeatherIcon(ctx, dc, x + 27, y + CLOCK_H / 2, 8, game.time);
+    drawWeatherIcon(ctx, dc, x + (ch < 48 ? 23 : 27), y + ch / 2, ch < 48 ? 7 : 8, game.time);
 
     ctx.textAlign = 'left';
-    ctx.font = '700 18px system-ui, "Apple SD Gothic Neo", sans-serif';
+    ctx.font = `${ch < 48 ? '700 15px' : '700 18px'} system-ui, "Apple SD Gothic Neo", sans-serif`;
     ctx.fillStyle = '#eef1f6';
-    ctx.fillText(dc.clock, x + 50, y + 24);
+    ctx.fillText(dc.clock, x + (ch < 48 ? 42 : 50), y + (ch < 48 ? 21 : 24));
 
-    ctx.font = '600 11px system-ui, sans-serif';
+    ctx.font = `${ch < 48 ? '600 9px' : '600 11px'} system-ui, sans-serif`;
     ctx.fillStyle = 'rgba(230,235,245,0.62)';
     // 'giorno' da solo si confonde col contatore dei giorni, a due centimetri.
     const ph = dc.phase;
     const phase = ph === 'giorno' ? 'Pieno giorno' : ph[0].toUpperCase() + ph.slice(1);
-    ctx.fillText(`${phase} · ${dc.weather.label}`, x + 50, y + 39);
+    const phaseText = ellipsisText(ctx, `${phase} · ${dc.weather.label}`, Math.max(60, cw - (ch < 48 ? 48 : 58)));
+    ctx.fillText(phaseText, x + (ch < 48 ? 42 : 50), y + (ch < 48 ? 35 : 39), Math.max(60, cw - (ch < 48 ? 48 : 58)));
 
     if (dc.day > 1) {
       ctx.textAlign = 'right';
       ctx.font = '700 9px ui-monospace, monospace';
       ctx.fillStyle = 'rgba(255,214,80,0.8)';
-      ctx.fillText(`GIORNO ${dc.day}`, x + CLOCK_W - 12, y + 23);
+      ctx.fillText(`GIORNO ${dc.day}`, x + cw - 12, y + (ch < 48 ? 17 : 23));
     }
     ctx.restore();
   }
@@ -182,7 +209,16 @@ export class Hud {
    * Pianta del piano al posto della minimappa. Dentro un edificio la mappa della
    * città non dice niente, e senza un riferimento non si trova più la porta.
    */
-  drawFloorPlan(ctx, game, x, y) {
+  drawFloorPlan(ctx, game, x, y, size = MINIMAP) {
+    const s = size / MINIMAP;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(s, s);
+    this._drawFloorPlan(ctx, game, 0, 0);
+    ctx.restore();
+  }
+
+  _drawFloorPlan(ctx, game, x, y) {
     const f = game.interiorFloor;
     const pl = game.player;
     const pal = f.biz.pal;
@@ -278,7 +314,7 @@ export class Hud {
     ctx.restore();
   }
 
-  drawVenueToast(ctx, game, w, h) {
+  drawVenueToast(ctx, game, w, h, L = uiLayout(w, h, game)) {
     if (this.venueT <= 0 || !this.venue) return;
     const f = this.venue;
     ctx.save();
@@ -287,11 +323,12 @@ export class Hud {
     ctx.shadowColor = 'rgba(0,0,0,0.85)';
     ctx.shadowBlur = 12;
     ctx.fillStyle = f.biz.pal.accent;
-    ctx.font = '800 42px system-ui, "Apple SD Gothic Neo", sans-serif';
-    ctx.fillText(f.biz.hangul, w / 2, h * 0.17);
+    const titleSize = L.compact ? Math.max(24, Math.min(36, w * 0.09)) : 42;
+    ctx.font = `800 ${titleSize}px system-ui, "Apple SD Gothic Neo", sans-serif`;
+    ctx.fillText(f.biz.hangul, w / 2, h * (L.compact ? 0.18 : 0.17));
     ctx.fillStyle = '#f0f2f6';
-    ctx.font = '700 17px system-ui, sans-serif';
-    ctx.fillText(f.biz.label.toUpperCase(), w / 2, h * 0.17 + 24);
+    ctx.font = `${L.compact ? '700 13px' : '700 17px'} system-ui, sans-serif`;
+    ctx.fillText(f.biz.label.toUpperCase(), w / 2, h * (L.compact ? 0.18 : 0.17) + (L.compact ? 20 : 24));
     ctx.restore();
   }
 
@@ -331,14 +368,18 @@ export class Hud {
    * si cambia arma — con undici armi il giocatore deve poter sapere cosa ha in mano
    * e cosa gli manca senza aprire un menu.
    */
-  drawWeaponBar(ctx, game, w, h) {
+  drawWeaponBar(ctx, game, w, h, L = uiLayout(w, h, game), mapY = h - 196 - 22) {
     const p = game.player;
-    const CW = 58, CH = 42, GAP = 6;
+    const CW = L.compact ? 44 : 58;
+    const CH = L.compact ? 34 : 42;
+    const GAP = L.compact ? 4 : 6;
     const total = WEAPON_SLOTS.length * (CW + GAP) - GAP;
     const x0 = (w - total) / 2;
     // Sopra la riga dei suggerimenti (`E — sali in…`), che sta a h-62: sotto ci
     // finirebbe esattamente sopra.
-    const y0 = h - CH - 76;
+    const y0 = L.compact
+      ? Math.max(L.safeTop + 64, mapY - CH - 8)
+      : h - CH - 76;
     const wake = clamp(p.weaponT / 1.8, 0, 1);
 
     ctx.save();
@@ -366,19 +407,21 @@ export class Hud {
       ctx.fillStyle = active ? 'rgba(255,214,80,0.95)' : 'rgba(230,235,245,0.4)';
       ctx.font = '700 9px ui-monospace, monospace';
       ctx.textAlign = 'left';
-      ctx.fillText(String(i + 1), x + 5, y0 + 11);
+      ctx.fillText(String(i + 1), x + 5, y0 + (L.compact ? 10 : 11));
       if (owned.length > 1) {
         for (let k = 0; k < owned.length; k++) {
           ctx.fillStyle = owned[k] === p.weapon ? '#ffd23f' : 'rgba(230,235,245,0.35)';
           ctx.beginPath();
-          ctx.arc(x + CW - 7 - k * 5, y0 + 8, 1.6, 0, 6.2832);
+          ctx.arc(x + CW - 7 - k * 5, y0 + (L.compact ? 7 : 8), 1.6, 0, 6.2832);
           ctx.fill();
         }
       }
 
       const icon = getWeaponIcon(id);
       ctx.globalAlpha *= has ? 1 : 0.35;
-      ctx.drawImage(icon.canvas, x + (CW - icon.w) / 2, y0 + 10, icon.w, icon.h);
+      const iw = Math.min(icon.w, CW - 12);
+      const ih = icon.h * (iw / icon.w);
+      ctx.drawImage(icon.canvas, x + (CW - iw) / 2, y0 + (L.compact ? 8 : 10), iw, ih);
       ctx.globalAlpha = active ? 1 : 0.55 + wake * 0.3;
 
       ctx.textAlign = 'center';
@@ -404,19 +447,19 @@ export class Hud {
    * sarebbe un fermo che arriva dal nulla: qui si vede quanto manca, e quindi si
    * capisce che scappare (o rimettere mano alla pistola) serve a qualcosa.
    */
-  drawArrest(ctx, game, w, h) {
+  drawArrest(ctx, game, w, h, L = uiLayout(w, h, game)) {
     const t = game.police ? game.police.bustProgress : 0;
     if (t <= 0) return;
-    const bw = 232;
+    const bw = L.compact ? Math.min(250, w - L.safeX * 2) : 232;
     const x = (w - bw) / 2;
     // Sotto il centro e sopra la barra armi: il terzo alto dello schermo è già
     // occupato dal cartello del distretto e dai messaggi, e il fermo ci finiva
     // sotto proprio nel momento in cui c'è più roba a schermo.
-    const y = h * 0.6;
+    const y = Math.min(h * 0.6, h - L.safeBottom - (L.compact ? 90 : 60));
     ctx.save();
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ffffff';
-    ctx.font = '900 19px system-ui, "Apple SD Gothic Neo", sans-serif';
+    ctx.font = `${L.compact ? '900 15px' : '900 19px'} system-ui, "Apple SD Gothic Neo", sans-serif`;
     ctx.fillText('체포 · FERMO!', w / 2, y - 12);
     ctx.fillStyle = 'rgba(10,12,15,0.72)';
     roundPath(ctx, x, y, bw, 9, 4);
@@ -425,12 +468,12 @@ export class Hud {
     roundPath(ctx, x, y, Math.max(5, bw * t), 9, 4);
     ctx.fill();
     ctx.fillStyle = 'rgba(235,240,250,0.7)';
-    ctx.font = '600 12px system-ui, sans-serif';
-    ctx.fillText('scappa, sali in macchina o tira fuori la pistola', w / 2, y + 28);
+    ctx.font = `${L.compact ? '600 10px' : '600 12px'} system-ui, sans-serif`;
+    ctx.fillText(ellipsisText(ctx, 'scappa, sali in macchina o tira fuori la pistola', bw), w / 2, y + 24, bw);
     ctx.restore();
   }
 
-  drawDamage(ctx, game, w, h) {
+  drawDamage(ctx, game, w, h, L = uiLayout(w, h, game)) {
     const p = game.player;
     const low = clamp(1 - p.hp / (p.maxHp * 0.3), 0, 1);
     const hit = clamp(p.hurtT / 0.4, 0, 1);
@@ -451,11 +494,11 @@ export class Hud {
     ctx.globalAlpha = clamp((p.deathT - 0.4) / 0.6, 0, 1);
     ctx.textAlign = 'center';
     ctx.fillStyle = '#e04a3a';
-    ctx.font = '800 62px system-ui, "Apple SD Gothic Neo", sans-serif';
+    ctx.font = `${L.compact ? '800 42px' : '800 62px'} system-ui, "Apple SD Gothic Neo", sans-serif`;
     ctx.fillText('사망', w / 2, h / 2 - 6);
     ctx.fillStyle = '#f0f2f6';
-    ctx.font = '700 22px system-ui, sans-serif';
-    ctx.fillText('CI HAI LASCIATO LE PENNE', w / 2, h / 2 + 26);
+    ctx.font = `${L.compact ? '700 14px' : '700 22px'} system-ui, sans-serif`;
+    ctx.fillText(ellipsisText(ctx, 'CI HAI LASCIATO LE PENNE', w - L.safeX * 2), w / 2, h / 2 + (L.compact ? 20 : 26), w - L.safeX * 2);
     ctx.restore();
   }
 
@@ -545,7 +588,16 @@ export class Hud {
     ctx.restore();
   }
 
-  drawMinimap(ctx, game, x, y) {
+  drawMinimap(ctx, game, x, y, size = MINIMAP) {
+    const s = size / MINIMAP;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(s, s);
+    this._drawMinimap(ctx, game, 0, 0);
+    ctx.restore();
+  }
+
+  _drawMinimap(ctx, game, x, y) {
     const p = game.player;
     // La carta ha due scale diverse perché il mondo non è quadrato: il ritaglio
     // della minimappa deve seguirle entrambe, o il nord si allunga.
@@ -791,7 +843,19 @@ export class Hud {
     }
   }
 
-  drawSpeedo(ctx, game, x, y) {
+  drawSpeedo(ctx, game, x, y, scale = 1) {
+    if (scale !== 1) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(scale, scale);
+      this._drawSpeedo(ctx, game, 0, 0);
+      ctx.restore();
+      return;
+    }
+    this._drawSpeedo(ctx, game, x, y);
+  }
+
+  _drawSpeedo(ctx, game, x, y) {
     const v = game.player.vehicle;
     if (!v) return;
     const spec = VEHICLE_TYPES[v.kind];
@@ -865,14 +929,15 @@ export class Hud {
    * anche da spenta — è l'unico posto in cui il tasto `R` si racconta da solo,
    * e una radio che non si sa di avere è una radio che nessuno accende.
    */
-  drawRadio(ctx, game, right, y) {
+  drawRadio(ctx, game, right, y, L = null) {
     const r = game.radio;
     if (!r) return;
     const on = r.on;
-    const text = on ? r.label : 'R  —  radio';
+    const maxW = L?.compact ? Math.max(116, Math.min(190, L.w * 0.42)) : 230;
+    const text = on ? ellipsisText(ctx, r.label, maxW) : (L?.compact ? 'R · radio' : 'R  —  radio');
     ctx.save();
     ctx.font = '600 12px system-ui, "Apple SD Gothic Neo", sans-serif';
-    const tw = Math.min(230, ctx.measureText(text).width);
+    const tw = Math.min(maxW, ctx.measureText(text).width);
     const pad = on ? 34 : 14;
     const bw = tw + pad + 14;
     const x = right - bw;
@@ -899,7 +964,7 @@ export class Hud {
     ctx.restore();
   }
 
-  drawDistrictToast(ctx, game, w, h) {
+  drawDistrictToast(ctx, game, w, h, L = uiLayout(w, h, game)) {
     if (this.districtToast <= 0 || !this.districtInfo) return;
     const d = this.districtInfo;
     const t = this.districtToast;
@@ -910,14 +975,15 @@ export class Hud {
     ctx.shadowColor = 'rgba(0,0,0,0.85)';
     ctx.shadowBlur = 14;
     ctx.fillStyle = d.accent;
-    ctx.font = '800 54px system-ui, "Apple SD Gothic Neo", sans-serif';
-    ctx.fillText(d.hangul, w / 2, h * 0.2);
+    const titleSize = L.compact ? Math.max(26, Math.min(42, w * 0.11)) : 54;
+    ctx.font = `800 ${titleSize}px system-ui, "Apple SD Gothic Neo", sans-serif`;
+    ctx.fillText(d.hangul, w / 2, h * (L.compact ? 0.23 : 0.2));
     ctx.fillStyle = '#f0f2f6';
-    ctx.font = '700 22px system-ui, sans-serif';
-    ctx.fillText(d.name.toUpperCase(), w / 2, h * 0.2 + 30);
+    ctx.font = `${L.compact ? '700 15px' : '700 22px'} system-ui, sans-serif`;
+    ctx.fillText(d.name.toUpperCase(), w / 2, h * (L.compact ? 0.23 : 0.2) + (L.compact ? 22 : 30));
     ctx.fillStyle = 'rgba(235,240,250,0.66)';
-    ctx.font = '500 14px system-ui, sans-serif';
-    ctx.fillText(d.subtitle, w / 2, h * 0.2 + 52);
+    ctx.font = `${L.compact ? '500 11px' : '500 14px'} system-ui, sans-serif`;
+    ctx.fillText(ellipsisText(ctx, d.subtitle, w - L.safeX * 2), w / 2, h * (L.compact ? 0.23 : 0.2) + (L.compact ? 41 : 52));
     ctx.restore();
   }
 
@@ -925,7 +991,7 @@ export class Hud {
    * Suggerimenti contestuali, impilati verso l'alto. Le azioni dei negozi arrivano
    * già pronte da `shops.actions`: l'HUD non decide cosa si può fare, lo mostra.
    */
-  drawHints(ctx, game, w, h) {
+  drawHints(ctx, game, w, h, L = uiLayout(w, h, game)) {
     const p = game.player;
     const lines = [];
     for (const a of game.shops ? game.shops.actions : []) lines.push(`${a.key}  —  ${a.text}`);
@@ -947,10 +1013,12 @@ export class Hud {
     if (!lines.length) return;
     ctx.save();
     ctx.textAlign = 'center';
-    ctx.font = '600 14px system-ui, "Apple SD Gothic Neo", sans-serif';
-    let y = h - 62;
+    ctx.font = `${L.compact ? '600 11px' : '600 14px'} system-ui, "Apple SD Gothic Neo", sans-serif`;
+    const maxW = Math.max(120, w - L.safeX * 2);
+    let y = h - L.safeBottom - (L.compact ? 4 : 40);
     for (const text of lines) {
-      const tw = ctx.measureText(text).width + 26;
+      const shown = ellipsisText(ctx, text, maxW - 24);
+      const tw = Math.min(maxW, ctx.measureText(shown).width + 26);
       ctx.fillStyle = 'rgba(12,14,18,0.78)';
       roundPath(ctx, w / 2 - tw / 2, y, tw, 30, 8);
       ctx.fill();
@@ -958,26 +1026,26 @@ export class Hud {
       ctx.lineWidth = 1;
       ctx.stroke();
       ctx.fillStyle = '#eef1f6';
-      ctx.fillText(text, w / 2, y + 20);
-      y -= 34;
+      ctx.fillText(shown, w / 2, y + (L.compact ? 18 : 20), tw - 18);
+      y -= (L.compact ? 30 : 34);
     }
     ctx.restore();
   }
 
-  drawMessages(ctx, w, h) {
+  drawMessages(ctx, w, h, L = uiLayout(w, h)) {
     ctx.save();
     ctx.textAlign = 'center';
-    ctx.font = '600 15px system-ui, sans-serif';
-    let y = h * 0.32;
+    ctx.font = `${L.compact ? '600 12px' : '600 15px'} system-ui, sans-serif`;
+    let y = L.compact ? h * 0.42 : h * 0.32;
     for (const m of this.messages) {
       const a = Math.min(1, m.t / 0.6);
       ctx.globalAlpha = a;
       ctx.fillStyle = 'rgba(10,12,16,0.7)';
-      const tw = ctx.measureText(m.text).width + 24;
+      const tw = Math.min(w - L.safeX * 2, ctx.measureText(m.text).width + 24);
       roundPath(ctx, w / 2 - tw / 2, y - 19, tw, 27, 7);
       ctx.fill();
       ctx.fillStyle = '#f2f5fa';
-      ctx.fillText(m.text, w / 2, y);
+      ctx.fillText(ellipsisText(ctx, m.text, tw - 18), w / 2, y, tw - 18);
       y += 34;
     }
     ctx.restore();

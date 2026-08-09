@@ -6,6 +6,7 @@ import { SpatialGrid } from '../core/spatial.js';
 import { Rng } from '../core/rng.js';
 import { createPed } from '../entities/pedestrians.js';
 import { roundPath } from './hud.js';
+import { uiLayout, insideRect, ellipsisText } from './layout.js';
 
 const ENTRANCE_REACH = 72;
 const ACTION_REACH = 48;
@@ -118,6 +119,7 @@ export class MetroSystem {
     this.floor = null;
     this.outside = null;
     this.options = [];
+    this.optionRects = [];
     this.fade = 0;
   }
 
@@ -365,7 +367,11 @@ export class MetroSystem {
       this.index = (this.index + 1) % this.options.length;
       game.audio?.ui('move');
     }
-    if (input.wasPressed('Enter') || input.wasPressed('KeyE')) {
+    const tapped = input.mouse.pressed
+      ? this.optionRects.find((r) => insideRect(input.mouse.x, input.mouse.y, r))
+      : null;
+    if (tapped) this.index = tapped.index;
+    if (input.wasPressed('Enter') || input.wasPressed('KeyE') || !!tapped) {
       const option = this.options[this.index];
       game.audio?.ui('ok');
       this.open = false;
@@ -379,13 +385,15 @@ export class MetroSystem {
     if (!this.open) return;
     const w = game.camera.viewW;
     const h = game.camera.viewH;
+    const L = uiLayout(w, h, game);
+    const modalBottom = L.controls ? 70 : L.safeBottom;
     ctx.save();
     ctx.fillStyle = 'rgba(5,7,11,0.88)';
     ctx.fillRect(0, 0, w, h);
-    const pw = Math.min(620, w - 48);
-    const ph = Math.min(560, h - 48);
-    const x = (w - pw) / 2;
-    const y = (h - ph) / 2;
+    const pw = Math.min(620, w - L.safeX * 2);
+    const ph = Math.min(560, h - L.safeTop - modalBottom);
+    const x = L.safeX + Math.max(0, (w - L.safeX * 2 - pw) / 2);
+    const y = L.safeTop + Math.max(0, (h - L.safeTop - modalBottom - ph) / 2);
     ctx.fillStyle = 'rgba(16,20,28,0.98)';
     roundPath(ctx, x, y, pw, ph, 16);
     ctx.fill();
@@ -395,24 +403,37 @@ export class MetroSystem {
 
     ctx.textAlign = 'left';
     ctx.fillStyle = '#eef5ff';
-    ctx.font = '800 27px system-ui, "Apple SD Gothic Neo", sans-serif';
-    ctx.fillText('승강장 · PROSSIMO TRENO', x + 30, y + 42);
+    ctx.font = `${L.compact ? '800 18px' : '800 27px'} system-ui, "Apple SD Gothic Neo", sans-serif`;
+    ctx.fillText(ellipsisText(ctx, '승강장 · PROSSIMO TRENO', pw - 54), x + (L.compact ? 18 : 30), y + (L.compact ? 30 : 42), pw - 54);
     ctx.fillStyle = '#64c7ff';
-    ctx.font = '600 13px system-ui, sans-serif';
-    ctx.fillText(`Banchina: ${this.station?.hangul || ''} ${this.station?.name || ''}`, x + 30, y + 66);
+    ctx.font = `${L.compact ? '600 10px' : '600 13px'} system-ui, sans-serif`;
+    ctx.fillText(ellipsisText(ctx, `Banchina: ${this.station?.hangul || ''} ${this.station?.name || ''}`, pw - 54), x + (L.compact ? 18 : 30), y + (L.compact ? 52 : 66), pw - 54);
 
-    const columns = this.options.length > 9 ? 2 : 1;
-    const rows = Math.ceil(this.options.length / columns);
-    const gap = 10;
+    const columns = L.compact ? (this.options.length > 4 ? 2 : 1) : (this.options.length > 9 ? 2 : 1);
+    const allRows = Math.ceil(this.options.length / columns);
+    const gap = L.compact ? 7 : 10;
     const colW = (pw - 48 - gap * (columns - 1)) / columns;
-    const rowH = Math.min(54, (ph - 138) / Math.max(1, rows));
-    for (let i = 0; i < this.options.length; i++) {
-      const o = this.options[i];
+    const rowH = L.compact
+      ? Math.max(44, Math.min(48, (ph - (L.short ? 92 : 112)) / Math.max(1, Math.min(allRows, L.short ? 3 : allRows))))
+      : Math.min(54, (ph - 138) / Math.max(1, allRows));
+    const visibleRows = Math.max(1, Math.floor((ph - (L.compact ? (L.short ? 92 : 112) : 138)) / rowH));
+    const visibleCount = Math.min(this.options.length, visibleRows * columns);
+    let start = 0;
+    if (visibleCount < this.options.length) {
+      start = Math.max(0, Math.min(this.index - Math.floor(visibleCount / 2), this.options.length - visibleCount));
+    }
+    const shownOptions = [];
+    for (let n = 0; n < visibleCount; n++) shownOptions.push({ option: this.options[(start + n) % this.options.length], index: start + n });
+    const rows = Math.ceil(shownOptions.length / columns);
+    this.optionRects.length = 0;
+    for (let vi = 0; vi < shownOptions.length; vi++) {
+      const { option: o, index: i } = shownOptions[vi];
       const active = i === this.index;
-      const col = Math.floor(i / rows);
-      const row = i % rows;
+      const col = Math.floor(vi / rows);
+      const row = vi % rows;
       const ox = x + 24 + col * (colW + gap);
-      const oy = y + 92 + row * rowH;
+      const oy = y + (L.compact ? 72 : 92) + row * rowH;
+      this.optionRects.push({ x: ox, y: oy, w: colW, h: rowH, index: i });
       ctx.fillStyle = active ? 'rgba(61,169,232,0.24)' : 'rgba(255,255,255,0.045)';
       roundPath(ctx, ox, oy, colW, rowH - 7, 9);
       ctx.fill();
@@ -422,15 +443,18 @@ export class MetroSystem {
         ctx.stroke();
       }
       ctx.fillStyle = active ? '#ffffff' : 'rgba(235,241,250,0.78)';
-      ctx.font = `700 ${columns === 1 ? 17 : 13}px system-ui, "Apple SD Gothic Neo", sans-serif`;
-      ctx.fillText(o.title, ox + 14, oy + 18, colW - 26);
+      ctx.font = `700 ${L.compact ? (columns === 1 ? 13 : 11) : (columns === 1 ? 17 : 13)}px system-ui, "Apple SD Gothic Neo", sans-serif`;
+      ctx.fillText(ellipsisText(ctx, o.title, colW - 26), ox + 14, oy + (L.compact ? 15 : 18), colW - 26);
       ctx.fillStyle = active ? '#8ed9ff' : 'rgba(225,235,245,0.45)';
-      ctx.font = `500 ${columns === 1 ? 11 : 9}px system-ui, sans-serif`;
-      ctx.fillText(o.detail, ox + 14, oy + 34, colW - 26);
+      ctx.font = `500 ${L.compact ? (columns === 1 ? 9 : 8) : (columns === 1 ? 11 : 9)}px system-ui, sans-serif`;
+      ctx.fillText(ellipsisText(ctx, o.detail, colW - 26), ox + 14, oy + (L.compact ? 27 : 34), colW - 26);
     }
     ctx.fillStyle = 'rgba(235,241,250,0.48)';
-    ctx.font = '500 12px system-ui, sans-serif';
-    ctx.fillText('W/S o frecce: scegli · E/INVIO: sali · ESC: resta in banchina', x + 30, y + ph - 24);
+    ctx.font = `${L.compact ? '500 10px' : '500 12px'} system-ui, sans-serif`;
+    const footer = L.controls
+      ? 'su/giù · E/Invio sali · ESC resta in banchina'
+      : 'W/S o frecce: scegli · E/Invio: sali · ESC: resta in banchina';
+    ctx.fillText(ellipsisText(ctx, footer, pw - 54), x + (L.compact ? 18 : 30), y + ph - (L.compact ? 12 : 24), pw - 54);
     ctx.restore();
   }
 }

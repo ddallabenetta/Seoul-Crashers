@@ -36,6 +36,20 @@ Poi apri <http://localhost:8123>.
 | `R` | radio: accendi · stazione successiva |
 | `Shift + R` | radio: spegni |
 
+### Mobile
+
+Su telefoni e tablet l'interfaccia si adatta automaticamente sia in verticale sia in
+orizzontale, rispettando notch e area del gesto di sistema. Lo stick sinistro muove o sterza;
+quello destro mira e spara. I pulsanti a schermo coprono interazione, azione alternativa,
+scatto, guida e quota, mirino, cambio arma, mappa, pausa e radio. Un tocco su `R` cambia
+stazione, una pressione prolungata la spegne.
+
+Menu, negozi, salvataggi e metro si usano con il dock da 44 px in fondo allo schermo oppure
+toccando direttamente le voci. Nella mappa si trascina con un dito e si pizzica con due;
+durante le cutscene si tocca la tavola per avanzare e `Salta` per uscire. La rotazione non
+ricarica la pagina né perde lo stato della partita. Per provare i controlli touch anche da un
+browser desktop si può aggiungere `?touch=1` all'indirizzo.
+
 Armi e munizioni si raccolgono a terra, nei cortili e nei vicoli, oppure si **comprano**
 (vedi sotto). A zero salute ci si risveglia davanti all'ospedale del distretto più vicino —
 con la salute piena, senza più un'arma, senza più nessuno alle costole e con un quarto dei

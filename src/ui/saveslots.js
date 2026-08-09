@@ -11,6 +11,7 @@ import {
   ALL_SLOTS, AUTO_SLOT, AUTO_GENS, readSlot, writeSlot, clearSlot, describe, apply,
   slotLabel, autosaveOn, toggleAutosave,
 } from '../core/save.js';
+import { uiLayout, insideRect, ellipsisText } from './layout.js';
 
 // Azioni di uno slot. `Salva` vale sempre, le altre due solo su uno slot
 // occupato: A/D scelgono la colonna, W/S la riga, Invio conferma.
@@ -39,6 +40,7 @@ export class SaveSlots {
     // partita non si perde per un tasto premuto per sbaglio.
     this.confirm = -1;
     this.hover = null;
+    this.hitTargets = [];
     // Gli slot si leggono all'apertura del pannello e dopo ogni azione, non a
     // ogni frame: `readSlot` fa un `JSON.parse` di qualche kB, e farlo quattro
     // volte per sessanta frame al secondo per disegnare quattro schede ferme è
@@ -84,6 +86,9 @@ export class SaveSlots {
     const input = game.input;
     const audio = game.audio;
     const was = `${this.slot}/${this.action}`;
+    const tapped = input.mouse.pressed
+      ? this.hitTargets.find((r) => insideRect(input.mouse.x, input.mouse.y, r))
+      : null;
     if (input.wasPressed('KeyW') || input.wasPressed('ArrowUp')) {
       this.slot = (this.slot - 1 + ALL_SLOTS) % ALL_SLOTS;
     }
@@ -97,9 +102,10 @@ export class SaveSlots {
     if (input.wasPressed('KeyA') || input.wasPressed('ArrowLeft')) {
       this.action = (this.action - 1 + cols) % cols;
     }
-    if (this.hover && input.mouse.pressed) {
-      this.slot = this.hover.slot;
-      this.action = this.hover.action;
+    if (tapped || (this.hover && input.mouse.pressed)) {
+      const target = tapped || this.hover;
+      this.slot = target.slot;
+      this.action = target.action;
     }
     if (`${this.slot}/${this.action}` !== was) {
       this.confirm = -1;
@@ -111,7 +117,7 @@ export class SaveSlots {
       audio?.ui('ok');
     }
     const go = input.wasPressed('Space') || input.wasPressed('Enter')
-      || (this.hover && input.mouse.pressed);
+      || !!tapped || (this.hover && input.mouse.pressed);
     if (!go) return null;
     return this.run(game);
   }
@@ -187,15 +193,26 @@ export class SaveSlots {
    * senza quelle tre righe uno slot è una data, e fra due partite non si
    * riconosce quale sia quale.
    */
-  draw(ctx, game, x, y, w, h, active = true) {
+  draw(ctx, game, x, y, w, h, active = true, L = null) {
+    L = L || uiLayout(game.camera.viewW, game.camera.viewH, game);
     const mx = game.input.mouse.x;
     const my = game.input.mouse.y;
     this.hover = null;
+    this.hitTargets.length = 0;
     const gap = 10;
-    const cardH = Math.min(112, (h - 30 - gap * (ALL_SLOTS - 1)) / ALL_SLOTS);
+    const visibleCount = L.compact && h < 170 ? 1 : L.compact && h < 270 ? 2 : ALL_SLOTS;
+    const visibleSlots = [];
+    const start = visibleCount === ALL_SLOTS
+      ? 0
+      : Math.max(0, Math.min(this.slot - Math.floor(visibleCount / 2), ALL_SLOTS - visibleCount));
+    for (let n = 0; n < visibleCount; n++) visibleSlots.push(start + n);
+    const cardH = L.compact
+      ? Math.max(64, Math.min(100, (h - gap * (visibleCount - 1)) / visibleCount))
+      : Math.min(112, (h - 30 - gap * (ALL_SLOTS - 1)) / ALL_SLOTS);
     ctx.textAlign = 'left';
-    for (let i = 0; i < ALL_SLOTS; i++) {
-      const cy = y + i * (cardH + gap);
+    for (let vi = 0; vi < visibleSlots.length; vi++) {
+      const i = visibleSlots[vi];
+      const cy = y + vi * (cardH + gap);
       const sel = active && i === this.slot;
       ctx.fillStyle = sel ? 'rgba(255,95,162,0.10)' : 'rgba(255,255,255,0.04)';
       roundPath(ctx, x, cy, w, cardH, 8);
@@ -207,44 +224,44 @@ export class SaveSlots {
 
       const data = this.data(i);
       ctx.fillStyle = sel ? '#ffffff' : 'rgba(235,240,250,0.6)';
-      ctx.font = '700 13px system-ui, sans-serif';
+      ctx.font = `${L.compact ? '700 11px' : '700 13px'} system-ui, sans-serif`;
       const name = this.label(i);
-      ctx.fillText(name, x + 18, cy + 24);
+      ctx.fillText(ellipsisText(ctx, name, w * 0.48), x + (L.compact ? 12 : 18), cy + (L.compact ? 18 : 24), w * 0.48);
       if (i === AUTO_SLOT) {
         // L'etichetta cambia larghezza con la generazione mostrata: la si misura
         // col font con cui è stata scritta, non con quello che viene dopo.
         const after = x + 30 + ctx.measureText(name).width;
         const on = autosaveOn();
         ctx.fillStyle = on ? 'rgba(90,220,150,0.9)' : 'rgba(235,240,250,0.3)';
-        ctx.font = '600 11px system-ui, sans-serif';
-        ctx.fillText(on ? '· ACCESO  (F)' : '· SOSPESO  (F)', after, cy + 24);
+        ctx.font = `${L.compact ? '600 9px' : '600 11px'} system-ui, sans-serif`;
+        ctx.fillText(on ? '· ACCESO  (F)' : '· SOSPESO  (F)', after, cy + (L.compact ? 18 : 24), w - (after - x) - 12);
       }
 
       if (!data) {
         ctx.fillStyle = 'rgba(235,240,250,0.32)';
-        ctx.font = '500 13px system-ui, sans-serif';
-        ctx.fillText('vuoto', x + 18, cy + 48);
+        ctx.font = `${L.compact ? '500 10px' : '500 13px'} system-ui, sans-serif`;
+        ctx.fillText('vuoto', x + (L.compact ? 12 : 18), cy + (L.compact ? 38 : 48));
       } else {
         const d = describe(data, game);
         ctx.textAlign = 'right';
         ctx.fillStyle = 'rgba(235,240,250,0.35)';
-        ctx.font = '500 11px system-ui, sans-serif';
+        ctx.font = `${L.compact ? '500 9px' : '500 11px'} system-ui, sans-serif`;
         ctx.fillText(d.at.toLocaleString('it-IT', {
           day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
-        }), x + w - 18, cy + 24);
+        }), x + w - (L.compact ? 12 : 18), cy + (L.compact ? 18 : 24));
         ctx.textAlign = 'left';
         ctx.fillStyle = 'rgba(235,240,250,0.72)';
-        ctx.font = '600 14px system-ui, "Apple SD Gothic Neo", sans-serif';
-        ctx.fillText(d.place, x + 18, cy + 46);
+        ctx.font = `${L.compact ? '600 11px' : '600 14px'} system-ui, "Apple SD Gothic Neo", sans-serif`;
+        ctx.fillText(ellipsisText(ctx, d.place, w * 0.62), x + (L.compact ? 12 : 18), cy + (L.compact ? 36 : 46), w * 0.62);
         ctx.fillStyle = 'rgba(235,240,250,0.42)';
-        ctx.font = '500 12px system-ui, sans-serif';
-        ctx.fillText(d.clock, x + 18, cy + 64);
+        ctx.font = `${L.compact ? '500 9px' : '500 12px'} system-ui, sans-serif`;
+        ctx.fillText(d.clock, x + (L.compact ? 12 : 18), cy + (L.compact ? 50 : 64));
         ctx.fillStyle = '#ffd23f';
-        ctx.font = '700 13px system-ui, sans-serif';
-        ctx.fillText(won(d.money), x + 18, cy + 84);
+        ctx.font = `${L.compact ? '700 10px' : '700 13px'} system-ui, sans-serif`;
+        ctx.fillText(won(d.money), x + (L.compact ? 12 : 18), cy + (L.compact ? 62 : 84));
         if (d.stars) {
           ctx.fillStyle = '#ff5fa2';
-          ctx.fillText('★'.repeat(d.stars), x + 122, cy + 84);
+          ctx.fillText('★'.repeat(d.stars), x + (L.compact ? 76 : 122), cy + (L.compact ? 62 : 84));
         }
       }
 
@@ -255,12 +272,16 @@ export class SaveSlots {
       for (let a = acts.length - 1; a >= 0; a--) {
         const act = acts[a];
         const on = this.enabled(i, act.id);
-        ctx.font = '700 12px system-ui, sans-serif';
+        ctx.font = `${L.compact ? '700 9px' : '700 12px'} system-ui, sans-serif`;
         const bw = ctx.measureText(act.label.toUpperCase()).width + 22;
-        const bh = 25;
+        const bh = L.compact ? 21 : 25;
         const bxx = bx - bw;
         const byy = cy + cardH - bh - 11;
         const hot = mx >= bxx && mx <= bxx + bw && my >= byy && my <= byy + bh;
+        if (on && active) {
+          const hitPad = Math.max(0, (44 - bh) / 2);
+          this.hitTargets.push({ x: bxx, y: byy - hitPad, w: bw, h: Math.max(44, bh), slot: i, action: a });
+        }
         if (hot && on && active) this.hover = { slot: i, action: a };
         const cur = sel && a === this.action;
         const asking = cur && this.confirm === a;
@@ -275,7 +296,7 @@ export class SaveSlots {
         }
         ctx.fillStyle = !on ? 'rgba(235,240,250,0.22)' : asking ? '#0b0d11' : cur ? '#ffffff' : 'rgba(235,240,250,0.6)';
         ctx.textAlign = 'center';
-        ctx.fillText(act.label.toUpperCase(), bxx + bw / 2, byy + 16);
+        ctx.fillText(ellipsisText(ctx, act.label.toUpperCase(), bw - 8), bxx + bw / 2, byy + (L.compact ? 14 : 16), bw - 8);
         ctx.textAlign = 'left';
         bx = bxx - 8;
       }
@@ -285,11 +306,11 @@ export class SaveSlots {
     // l'etichetta gli cambierebbe la larghezza, e le file ballerebbero.
     if (this.confirm >= 0 && active) {
       ctx.fillStyle = '#ff5fa2';
-      ctx.font = '700 12px system-ui, sans-serif';
+      ctx.font = `${L.compact ? '700 10px' : '700 12px'} system-ui, sans-serif`;
       const what = this.actions(this.slot)[this.confirm].id === 'save' ? 'sovrascrivere' : 'cancellare';
       ctx.fillText(
-        `Invio di nuovo per ${what} ${this.label(this.slot).toLowerCase()}`,
-        x, y + ALL_SLOTS * (cardH + gap) + 8
+        ellipsisText(ctx, `Invio di nuovo per ${what} ${this.label(this.slot).toLowerCase()}`, w),
+        x, Math.min(y + h - 4, y + visibleCount * (cardH + gap) + 8), w
       );
     }
   }

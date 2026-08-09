@@ -38,12 +38,17 @@ export function hash(i) {
 
 /** Il rettangolo del pannello: cinematografico, centrato, con aria attorno. */
 export function panelRect(w, h) {
-  const maxW = Math.min(w - 96, 1180);
-  const maxH = h - 150;
+  const compact = w < 700 || h < 500;
+  const portrait = h >= w;
+  const marginX = compact ? Math.max(20, Math.round(w * 0.07)) : 96;
+  const maxW = Math.min(Math.max(1, w - marginX * 2), 1180);
+  const maxH = Math.max(80, h - (compact ? 94 : 150));
+  const aspect = compact && portrait ? 0.82 : 0.5625;
   let pw = maxW;
-  let ph = pw * 0.5625;
-  if (ph > maxH) { ph = maxH; pw = ph / 0.5625; }
-  return { x: Math.round((w - pw) / 2), y: Math.round((h - ph) / 2 - 14), w: Math.round(pw), h: Math.round(ph) };
+  let ph = pw * aspect;
+  if (ph > maxH) { ph = maxH; pw = ph / aspect; }
+  const yShift = compact ? -4 : -14;
+  return { x: Math.round((w - pw) / 2), y: Math.round((h - ph) / 2 + yShift), w: Math.round(pw), h: Math.round(ph) };
 }
 
 /** Coordinate relative: un pannello si scrive in frazioni, non in pixel. */
@@ -338,9 +343,9 @@ export function dial(P, x, y, w, h, opts = {}) {
 export function narrator(P, text) {
   const ctx = P.ctx;
   const pad = P.w * 0.035;
-  ctx.font = `600 ${Math.round(P.h * 0.036)}px ${MONO}`;
+  ctx.font = `600 ${Math.max(12, Math.round(P.h * 0.036))}px ${MONO}`;
   const lines = wrapLines(ctx, text, P.w * 0.56);
-  const lh = P.h * 0.052;
+  const lh = Math.max(16, P.h * 0.052);
   const bh = lines.length * lh + pad * 0.5;
   ctx.fillStyle = 'rgba(5,6,9,0.72)';
   ctx.fillRect(P.x, P.y + pad * 0.6, P.w * 0.62 + pad, bh);
@@ -360,7 +365,7 @@ export function speech(P, lines) {
   const ctx = P.ctx;
   const pad = P.w * 0.035;
   const colW = P.w - pad * 2;
-  const size = Math.round(P.h * 0.045);
+  const size = Math.max(13, Math.round(P.h * 0.045));
   const lh = size * 1.38;
   ctx.font = `500 ${size}px ${SANS}`;
 
@@ -400,8 +405,8 @@ export function speech(P, lines) {
 /** Una riga sola grande in mezzo al nero: il pannello 2 e i cartelli. */
 export function slate(P, text, opts = {}) {
   const ctx = P.ctx;
-  const { size = P.h * 0.075, color = PAPER, align = 'left', at = 0.5 } = opts;
-  ctx.font = `500 ${Math.round(size)}px ${SANS}`;
+  const { size = Math.max(16, P.h * 0.075), color = PAPER, align = 'left', at = 0.5 } = opts;
+  ctx.font = `500 ${Math.max(16, Math.round(size))}px ${SANS}`;
   const colW = P.w * 0.74;
   const h = wrapLines(ctx, text, colW).length * size * 1.42;
   ctx.fillStyle = color;

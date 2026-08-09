@@ -15,6 +15,7 @@
 // (`hold`): un pannello che scorre da solo mentre stai ancora leggendo la battuta
 // è il modo più veloce di far saltare tutta la scena a chi l'avrebbe guardata.
 import { panelRect, clipPanel, unclip, hexA, PAPER } from '../render/panelkit.js';
+import { uiLayout, ellipsisText } from './layout.js';
 
 const TRANS = 0.26;        // lo stacco fra due pannelli, in secondi
 // Il salto è più lungo dello stacco normale, e apposta: si esce su un nero pieno
@@ -129,6 +130,7 @@ export class Cutscene {
     if (!this.active) return;
     const w = game.camera.viewW;
     const h = game.camera.viewH;
+    const L = uiLayout(w, h, game);
     ctx.save();
     ctx.textBaseline = 'alphabetic';
     ctx.fillStyle = '#000000';
@@ -150,17 +152,24 @@ export class Cutscene {
       // scena gli fa contare i pannelli invece di guardarli.
       const prog = (this.i + 1) / this.seq.length;
       ctx.fillStyle = 'rgba(226,236,248,0.12)';
-      ctx.fillRect(r.x, r.y + r.h + 10, r.w, 2);
+      const progressY = Math.min(h - (L.compact ? 30 : 24), r.y + r.h + 10);
+      ctx.fillRect(r.x, progressY, r.w, 2);
       ctx.fillStyle = 'rgba(255,95,162,0.7)';
-      ctx.fillRect(r.x, r.y + r.h + 10, r.w * prog, 2);
+      ctx.fillRect(r.x, progressY, r.w * prog, 2);
 
-      ctx.font = '500 12px system-ui, sans-serif';
-      ctx.fillStyle = 'rgba(226,236,248,0.4)';
-      ctx.fillText('Spazio o clic per continuare', r.x, r.y + r.h + 32);
-      ctx.textAlign = 'right';
-      ctx.fillStyle = hexA(PAPER, 0.42);
-      ctx.fillText('ESC per saltare l\'introduzione', r.x + r.w, r.y + r.h + 32);
-      ctx.textAlign = 'left';
+      // Su touch il suggerimento e il pulsante Salta sono elementi DOM grandi:
+      // ripeterli in piccolo sotto la tavola crea solo due istruzioni sovrapposte.
+      if (!L.controls) {
+        ctx.font = `${L.compact ? '500 10px' : '500 12px'} system-ui, sans-serif`;
+        ctx.fillStyle = 'rgba(226,236,248,0.4)';
+        const promptY = Math.min(h - (L.compact ? 10 : 14), progressY + (L.compact ? 18 : 22));
+        const promptW = Math.max(70, r.w * 0.58);
+        ctx.fillText('Spazio o clic per continuare', r.x, promptY, promptW);
+        ctx.textAlign = 'right';
+        ctx.fillStyle = hexA(PAPER, 0.42);
+        ctx.fillText(ellipsisText(ctx, 'ESC per saltare l\'introduzione', promptW), r.x + r.w, promptY, promptW);
+        ctx.textAlign = 'left';
+      }
     }
 
     if (this.trans > 0) {
