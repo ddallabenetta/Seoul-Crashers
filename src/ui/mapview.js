@@ -4,6 +4,7 @@ import { DISTRICTS } from '../world/districts.js';
 import { clamp } from '../core/math.js';
 import { VEHICLE_TYPES } from '../render/sprites.js';
 import { roundPath } from './hud.js';
+import { uiLayout, ellipsisText } from './layout.js';
 
 export class MapView {
   constructor(city, texture) {
@@ -96,10 +97,16 @@ export class MapView {
       y: dy + (wy / city.h) * drawH,
     });
 
-    // Etichette dei distretti
+    // Etichette dei distretti. Sulle carte più piccole si applica un semplice
+    // filtro di collisione: venticinque nomi sovrapposti non ne rendono leggibile
+    // nessuno, mentre zoomando tornano tutti.
     ctx.textAlign = 'center';
+    const labelPositions = [];
+    const sparseLabels = size < 300 && zoom <= 1.25;
     for (const d of city.districts || DISTRICTS) {
       const s = toScreen(d.seed.x * city.w, d.seed.y * city.h);
+      if (sparseLabels && labelPositions.some((p2) => Math.hypot(p2.x - s.x, p2.y - s.y) < 46)) continue;
+      labelPositions.push(s);
       ctx.save();
       ctx.shadowColor = 'rgba(0,0,0,0.9)';
       ctx.shadowBlur = 8;
@@ -115,6 +122,7 @@ export class MapView {
     // Territori delle bande: rettangolo tratteggiato e nome della banda. Sulla
     // mappa piena servono a decidere dove *non* passare, o dove andare a cercare.
     for (const t of city.turfs || []) {
+      if (sparseLabels) continue;
       const a = toScreen(t.x, t.y);
       const b = toScreen(t.x + t.w, t.y + t.h);
       ctx.save();
@@ -305,38 +313,45 @@ export class MapView {
     if (!this.open) return;
     const w = game.camera.viewW;
     const h = game.camera.viewH;
+    const L = uiLayout(w, h, game);
+    const modalBottom = L.controls ? 70 : L.safeBottom;
     ctx.save();
     ctx.fillStyle = 'rgba(6,7,9,0.86)';
     ctx.fillRect(0, 0, w, h);
 
-    const size = Math.min(h * 0.82, w * 0.62);
-    const x = (w - size) / 2 - 90;
-    const y = (h - size) / 2;
+    const size = L.portrait
+      ? Math.min(w - L.safeX * 2, Math.max(180, (h - L.safeTop - modalBottom) * (L.controls ? 0.4 : L.short ? 0.48 : 0.54)))
+      : Math.min(h - L.safeTop - modalBottom, h * 0.82, w * 0.62);
+    const x = L.portrait ? L.safeX : Math.max(L.safeX, (w - size) / 2 - 90);
+    const y = L.portrait ? L.safeTop + 8 : Math.max(L.safeTop, (h - modalBottom - size) / 2);
     this.drawPanel(ctx, game, x, y, size, { zoom: this.zoom, panX: this.panX, panY: this.panY });
 
     // Colonna informativa
-    const px = x + size + 26;
+    const infoBelow = L.portrait;
+    const px = infoBelow ? L.safeX : Math.min(w - L.safeX - 180, x + size + 26);
+    const infoW = infoBelow ? w - L.safeX * 2 : Math.max(150, w - px - L.safeX);
+    const infoY = infoBelow ? y + size + 24 : y;
     ctx.textAlign = 'left';
     ctx.fillStyle = '#f2f5fa';
-    ctx.font = '800 26px system-ui, sans-serif';
+    ctx.font = `${L.compact ? '800 20px' : '800 26px'} system-ui, sans-serif`;
     // La carta è una sola: il titolo dice dove si è, non quale mappa è aperta.
     const here = game.areaAt?.(game.player.x, game.player.y)
       || { name: 'Corea', hangul: '대한민국' };
-    ctx.fillText(here.name.toUpperCase(), px, y + 30);
+    ctx.fillText(ellipsisText(ctx, here.name.toUpperCase(), infoW), px, infoY + 30, infoW);
     ctx.fillStyle = '#ff5fa2';
-    ctx.font = '700 18px system-ui, "Apple SD Gothic Neo", sans-serif';
-    ctx.fillText(`${here.hangul} — 지도`, px, y + 54);
+    ctx.font = `${L.compact ? '700 14px' : '700 18px'} system-ui, "Apple SD Gothic Neo", sans-serif`;
+    ctx.fillText(`${here.hangul} — 지도`, px, infoY + 54, infoW);
 
     const d = game.player.district;
-    let ly = y + 96;
+    let ly = infoY + (L.compact ? 80 : 96);
     const line = (label, value, color = 'rgba(235,240,250,0.7)') => {
       ctx.fillStyle = 'rgba(235,240,250,0.45)';
       ctx.font = '600 11px system-ui, sans-serif';
       ctx.fillText(label.toUpperCase(), px, ly);
       ctx.fillStyle = color;
       ctx.font = '600 15px system-ui, "Apple SD Gothic Neo", sans-serif';
-      ctx.fillText(value, px, ly + 19);
-      ly += 44;
+      ctx.fillText(ellipsisText(ctx, value, infoW), px, ly + 19, infoW);
+      ly += L.compact ? 28 : 44;
     };
     if (d) line('quartiere', `${d.name} · ${d.hangul}`, d.accent);
     line('posizione', `${Math.round(game.player.x)} / ${Math.round(game.player.y)}`);
@@ -345,9 +360,9 @@ export class MapView {
     line('contanti', `₩${game.player.money.toLocaleString('it-IT')}`, '#ffd23f');
 
     ctx.fillStyle = 'rgba(235,240,250,0.4)';
-    ctx.font = '500 12px system-ui, sans-serif';
-    ctx.fillText('rotella: zoom · trascina: sposta', px, ly + 4);
-    ctx.fillText('M o ESC: chiudi', px, ly + 22);
+    ctx.font = `${L.compact ? '500 11px' : '500 12px'} system-ui, sans-serif`;
+    ctx.fillText(L.controls ? 'pinza/trascina: zoom e sposta' : 'rotella: zoom · trascina: sposta', px, ly + 4, infoW);
+    ctx.fillText(L.controls ? 'indietro: chiudi · tocca una voce per orientarti' : 'M o ESC: chiudi', px, ly + 22, infoW);
 
     ctx.restore();
   }

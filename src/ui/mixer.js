@@ -4,6 +4,7 @@
 // tasti. Prima esisteva solo in pausa, e chi apriva il gioco e lo trovava troppo
 // alto doveva cominciare a giocare per abbassarlo.
 import { roundPath } from './hud.js';
+import { uiLayout, ellipsisText } from './layout.js';
 
 // Righe del pannello: la chiave è il bus in `AudioSystem.mix`.
 const MIXER = [
@@ -63,44 +64,55 @@ export class Mixer {
   }
 
   /** Le barre dentro un pannello già disegnato: la cornice la mette chi ospita. */
-  draw(ctx, game, x, y, w, focused) {
+  draw(ctx, game, x, y, w, focused, L = null) {
+    L = L || uiLayout(game.camera.viewW, game.camera.viewH, game);
     const audio = game.audio;
     const muted = audio ? audio.muted : true;
     ctx.textAlign = 'left';
-    ctx.font = '600 12px system-ui, sans-serif';
+    const columns = L.compact && L.short ? 2 : 1;
+    const rows = Math.ceil(MIXER.length / columns);
+    const gap = columns > 1 ? 12 : 0;
+    const colW = (w - gap * (columns - 1)) / columns;
+    const rowH = L.compact ? (L.short ? 26 : 42) : 58;
+    ctx.font = `${L.compact ? '600 10px' : '600 12px'} system-ui, sans-serif`;
     ctx.fillStyle = muted ? '#ff5fa2' : 'rgba(90,220,150,0.9)';
     ctx.fillText(muted ? 'MUTO' : 'ACCESO', x + w - 68, y - 48);
 
     this.bars.length = 0;
     MIXER.forEach(([bus, label], i) => {
-      const ly = y + i * 58;
+      const col = Math.floor(i / rows);
+      const row = i % rows;
+      const lx = x + col * (colW + gap);
+      const ly = y + row * rowH;
       const sel = i === this.index && focused;
       const v = audio ? audio.mix[bus] : 0;
       ctx.fillStyle = sel ? '#ffffff' : 'rgba(235,240,250,0.55)';
-      ctx.font = `${sel ? '700' : '600'} 12px system-ui, sans-serif`;
-      ctx.fillText(label.toUpperCase(), x, ly);
+      ctx.font = `${sel ? '700' : '600'} ${L.compact ? 10 : 12}px system-ui, sans-serif`;
+      ctx.fillText(label.toUpperCase(), lx, ly, Math.max(36, colW * 0.64));
       ctx.textAlign = 'right';
       ctx.fillStyle = 'rgba(235,240,250,0.45)';
-      ctx.fillText(`${Math.round(v * 100)}%`, x + w, ly);
+      ctx.fillText(`${Math.round(v * 100)}%`, lx + colW, ly);
       ctx.textAlign = 'left';
-      const by = ly + 10;
-      this.bars.push({ x, y: by, w, h: 8 });
+      const by = ly + (L.compact ? 7 : 10);
+      this.bars.push({ x: lx, y: by, w: colW, h: L.compact ? 7 : 8 });
       ctx.fillStyle = 'rgba(255,255,255,0.12)';
-      roundPath(ctx, x, by, w, 8, 4);
+      roundPath(ctx, lx, by, colW, L.compact ? 7 : 8, 4);
       ctx.fill();
       ctx.fillStyle = muted ? 'rgba(235,240,250,0.28)' : (sel ? '#ff5fa2' : 'rgba(56,214,255,0.8)');
-      roundPath(ctx, x, by, Math.max(4, w * v), 8, 4);
+      roundPath(ctx, lx, by, Math.max(4, colW * v), L.compact ? 7 : 8, 4);
       ctx.fill();
     });
 
     // Il browser non lascia partire l'audio finché non si tocca qualcosa: senza
     // dirlo, chi apre il menu per primo pensa che sia rotto.
-    ctx.fillStyle = 'rgba(235,240,250,0.4)';
-    ctx.font = '500 12px system-ui, sans-serif';
-    ctx.fillText(!audio || !audio.ready
-      ? 'Il browser accende l\'audio al primo clic o tasto premuto.'
-      : 'Tutto sintetizzato, nessun file audio. La radio no: è in streaming (R in macchina).',
-    x, y + MIXER.length * 58 + 12);
+    if (!L.short) {
+      ctx.fillStyle = 'rgba(235,240,250,0.4)';
+      ctx.font = `${L.compact ? '500 9px' : '500 12px'} system-ui, sans-serif`;
+      ctx.fillText(ellipsisText(ctx, !audio || !audio.ready
+        ? 'Il browser accende l\'audio al primo clic o tasto premuto.'
+        : 'Tutto sintetizzato, nessun file audio. La radio no: è in streaming (R in macchina).', Math.max(60, w)),
+      x, y + rows * rowH + (L.compact ? 10 : 12), Math.max(60, w));
+    }
   }
 
   static get LEGEND() {

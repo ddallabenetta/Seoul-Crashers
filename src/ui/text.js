@@ -18,6 +18,7 @@
  * sarebbe un errore di regia, non di impaginazione.
  */
 export function wrapLines(ctx, text, maxW) {
+  maxW = Math.max(1, maxW);
   const out = [];
   for (const para of String(text).split('\n')) {
     if (!para) { out.push(''); continue; }
@@ -49,6 +50,7 @@ export function wrapLines(ctx, text, maxW) {
  * `y` è la baseline della prima riga.
  */
 export function drawParagraph(ctx, text, x, y, maxW, opts = {}) {
+  maxW = Math.max(1, maxW);
   const { lineHeight = 20, align = 'left', maxLines = 0 } = opts;
   let lines = wrapLines(ctx, text, maxW);
   if (maxLines && lines.length > maxLines) {
@@ -65,11 +67,12 @@ export function drawParagraph(ctx, text, x, y, maxW, opts = {}) {
 
 /** Quanto sarebbe alto, senza disegnare: serve a centrare un blocco. */
 export function measureParagraph(ctx, text, maxW, lineHeight = 20) {
-  return wrapLines(ctx, text, maxW).length * lineHeight;
+  return wrapLines(ctx, text, Math.max(1, maxW)).length * lineHeight;
 }
 
 /** Una riga sola accorciata con i puntini. */
 export function ellipsize(ctx, text, maxW) {
+  maxW = Math.max(1, maxW);
   if (ctx.measureText(text).width <= maxW) return text;
   let s = text;
   while (s.length > 1 && ctx.measureText(`${s}…`).width > maxW) s = s.slice(0, -1);

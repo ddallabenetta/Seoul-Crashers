@@ -15,6 +15,7 @@
 // da solo mentre stai ancora leggendo è il modo più veloce di far premere ESC.
 // Qui però non c'è nessun ESC — un dialogo di due battute non si salta, si legge.
 import { drawParagraph, measureParagraph } from './text.js';
+import { uiLayout, ellipsisText } from './layout.js';
 
 const BOX_W = 720;       // larghezza massima del riquadro
 const PAD = 18;
@@ -82,9 +83,13 @@ export class Dialogue {
     if (!line) return;
     const w = game.camera.viewW;
     const h = game.camera.viewH;
-    const bw = Math.min(BOX_W, w - 64);
+    const L = uiLayout(w, h, game);
+    const compact = L.compact;
+    const pad = compact ? 14 : PAD;
+    const lineH = compact ? 18 : LINE;
+    const bw = Math.min(BOX_W, w - (compact ? L.safeX * 2 : 64));
     const x = (w - bw) / 2;
-    const inner = bw - PAD * 2;
+    const inner = bw - pad * 2;
 
     ctx.save();
     ctx.textBaseline = 'alphabetic';
@@ -92,13 +97,16 @@ export class Dialogue {
     ctx.fillStyle = 'rgba(6,8,12,0.34)';
     ctx.fillRect(0, 0, w, h);
 
-    ctx.font = '600 16px system-ui, "Apple SD Gothic Neo", sans-serif';
-    const bodyH = measureParagraph(ctx, line.text, inner, LINE);
-    ctx.font = 'italic 500 13px system-ui, sans-serif';
-    const noteH = line.note ? measureParagraph(ctx, line.note, inner, 18) + 10 : 0;
-    const nameH = line.who || line.kkachi ? 24 : 0;
-    const bh = PAD * 2 + nameH + bodyH + noteH + 16;
-    const y = h - bh - 96;
+    ctx.font = `${compact ? '600 14px' : '600 16px'} system-ui, "Apple SD Gothic Neo", sans-serif`;
+    const bodyH = measureParagraph(ctx, line.text, inner, lineH);
+    ctx.font = `italic 500 ${compact ? 12 : 13}px system-ui, sans-serif`;
+    const noteLineH = compact ? 16 : 18;
+    const noteH = line.note ? measureParagraph(ctx, line.note, inner, noteLineH) + 8 : 0;
+    const nameH = line.who || line.kkachi ? (compact ? 20 : 24) : 0;
+    const bh = pad * 2 + nameH + bodyH + noteH + (compact ? 14 : 16);
+    const y = compact
+      ? Math.max(L.safeTop, h - bh - (L.controls ? 62 : 42))
+      : h - bh - 96;
 
     ctx.fillStyle = 'rgba(10,12,17,0.92)';
     box(ctx, x, y, bw, bh, 10);
@@ -107,30 +115,34 @@ export class Dialogue {
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    let ty = y + PAD + 14;
+    let ty = y + pad + (compact ? 12 : 14);
     if (nameH) {
-      ctx.font = '700 13px system-ui, "Apple SD Gothic Neo", sans-serif';
+      ctx.font = `700 ${compact ? 11 : 13}px system-ui, "Apple SD Gothic Neo", sans-serif`;
       // La radio non ha un nome: ha una frequenza, ed è di un altro colore perché
       // è l'unica voce del gioco che non sta nella stanza.
       ctx.fillStyle = line.kkachi ? '#38d6ff' : '#ffb163';
-      ctx.fillText(line.kkachi ? '91.45' : `${line.who}${line.hangul ? ` · ${line.hangul}` : ''}`, x + PAD, ty);
-      ty += 22;
+      const speaker = line.kkachi ? '91.45' : `${line.who}${line.hangul ? ` · ${line.hangul}` : ''}`;
+      ctx.fillText(ellipsisText(ctx, speaker, inner), x + pad, ty, inner);
+      ty += compact ? 18 : 22;
     }
-    ctx.font = '600 16px system-ui, "Apple SD Gothic Neo", sans-serif';
+    ctx.font = `${compact ? '600 14px' : '600 16px'} system-ui, "Apple SD Gothic Neo", sans-serif`;
     ctx.fillStyle = line.who || line.kkachi ? '#eef2f8' : '#c3ccda';
-    ty += drawParagraph(ctx, line.text, x + PAD, ty, inner, { lineHeight: LINE });
+    ty += drawParagraph(ctx, line.text, x + pad, ty, inner, { lineHeight: lineH });
 
     if (line.note) {
       ty += 8;
-      ctx.font = 'italic 500 13px system-ui, sans-serif';
+      ctx.font = `italic 500 ${compact ? 12 : 13}px system-ui, sans-serif`;
       ctx.fillStyle = 'rgba(226,236,248,0.5)';
-      drawParagraph(ctx, line.note, x + PAD, ty, inner, { lineHeight: 18 });
+      drawParagraph(ctx, line.note, x + pad, ty, inner, { lineHeight: noteLineH });
     }
 
-    ctx.font = '500 12px system-ui, sans-serif';
+    ctx.font = `${compact ? '500 10px' : '500 12px'} system-ui, sans-serif`;
     ctx.fillStyle = 'rgba(226,236,248,0.42)';
     ctx.textAlign = 'right';
-    ctx.fillText(`${this.i + 1} / ${this.lines.length}  ·  Spazio`, x + bw - PAD, y + bh - 12);
+    const footer = L.controls
+      ? `${this.i + 1} / ${this.lines.length}`
+      : `${this.i + 1} / ${this.lines.length}  ·  Spazio`;
+    ctx.fillText(footer, x + bw - pad, y + bh - (compact ? 9 : 12));
     ctx.textAlign = 'left';
     ctx.restore();
   }

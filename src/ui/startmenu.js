@@ -14,6 +14,7 @@ import { panelCard, drawControlsList } from './menu.js';
 import { SaveSlots } from './saveslots.js';
 import { Mixer } from './mixer.js';
 import { latestSlot, readSlot, describe, apply } from '../core/save.js';
+import { uiLayout, insideRect, ellipsisText } from './layout.js';
 
 export class StartMenu {
   constructor() {
@@ -22,6 +23,7 @@ export class StartMenu {
     this.tab = null;          // null | 'load' | 'audio' | 'controls'
     this.focus = 'items';
     this.hover = -1;
+    this.hitRects = [];
     this.items = [];
     this.saves = new SaveSlots({ canSave: false });
     this.mixer = new Mixer();
@@ -54,8 +56,8 @@ export class StartMenu {
     }
     if (item.id === 'new') return 'Seoul, un funerale e nessun piano';
     if (item.id === 'load') return 'Tre slot più il salvataggio automatico';
-    if (item.id === 'audio') return 'Volumi · F4 per il muto';
-    return 'Tastiera e mouse';
+    if (item.id === 'audio') return game.mobileControls?.active ? 'Volumi e audio' : 'Volumi · F4 per il muto';
+    return game.mobileControls?.active ? 'Stick, pulsanti e gesti touch' : 'Tastiera e mouse';
   }
 
   update(dt, game) {
@@ -75,15 +77,20 @@ export class StartMenu {
       return;
     }
     const was = this.index;
+    const tapped = input.mouse.pressed
+      ? this.hitRects.find((r) => insideRect(input.mouse.x, input.mouse.y, r))
+      : null;
     if (input.wasPressed('KeyW') || input.wasPressed('ArrowUp')) {
       this.index = (this.index - 1 + this.items.length) % this.items.length;
     }
     if (input.wasPressed('KeyS') || input.wasPressed('ArrowDown')) {
       this.index = (this.index + 1) % this.items.length;
     }
-    if (this.hover >= 0 && input.mouse.pressed) this.index = this.hover;
+    if (tapped) this.index = tapped.index;
+    else if (this.hover >= 0 && input.mouse.pressed) this.index = this.hover;
     if (this.index !== was) game.audio?.ui('move');
-    if (input.wasPressed('Space') || input.wasPressed('Enter') || (this.hover >= 0 && input.mouse.pressed)) {
+    if (input.wasPressed('Space') || input.wasPressed('Enter') || !!tapped
+      || (this.hover >= 0 && input.mouse.pressed)) {
       this.activate(game);
     }
   }
@@ -126,6 +133,7 @@ export class StartMenu {
   draw(ctx, game) {
     const w = game.camera.viewW;
     const h = game.camera.viewH;
+    const L = uiLayout(w, h, game);
     ctx.save();
     ctx.textBaseline = 'alphabetic';
 
@@ -143,6 +151,12 @@ export class StartMenu {
     ctx.fillRect(0, 0, w, bar);
     ctx.fillRect(0, h - bar, w, bar);
 
+    if (L.compact) {
+      this.drawCompact(ctx, game, L);
+      ctx.restore();
+      return;
+    }
+
     ctx.textAlign = 'left';
     ctx.fillStyle = '#f2f5fa';
     ctx.font = '900 58px system-ui, sans-serif';
@@ -159,11 +173,13 @@ export class StartMenu {
     const mx = game.input.mouse.x;
     const my = game.input.mouse.y;
     this.hover = -1;
+    this.hitRects.length = 0;
     let y = bar + 274;
     this.items.forEach((item, i) => {
       const boxX = 56, boxY = y - 26, boxW = 300, boxH = 44;
       const inside = this.focus === 'items'
         && mx >= boxX && mx <= boxX + boxW && my >= boxY && my <= boxY + boxH;
+      this.hitRects.push({ x: boxX, y: boxY, w: boxW, h: boxH, index: i });
       if (inside) this.hover = i;
       const active = this.focus === 'items' && i === this.index;
       if (active) {
@@ -214,5 +230,78 @@ export class StartMenu {
     }
 
     ctx.restore();
+  }
+
+  drawCompact(ctx, game, L) {
+    const { w, h, safeX, safeTop } = L;
+    const safeBottom = L.controls ? (L.short ? 70 : 72) : L.safeBottom;
+    const x = safeX;
+    const panelW = w - safeX * 2;
+    ctx.fillStyle = 'rgba(7,9,12,0.9)';
+    roundPath(ctx, x, safeTop, panelW, h - safeTop - safeBottom, 12);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(235,240,250,0.15)';
+    ctx.stroke();
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#f2f5fa';
+    ctx.font = '900 27px system-ui, sans-serif';
+    ctx.fillText('SEOUL', x + 18, safeTop + 38);
+    ctx.fillStyle = '#ff5fa2';
+    ctx.fillText('CRASHERS', x + 18, safeTop + 67);
+
+    if (this.tab) {
+      const title = this.tab === 'controls' ? 'Comandi' : this.tab === 'audio' ? 'Audio' : 'Salvataggi';
+      const py = safeTop + 84;
+      const ph = h - py - safeBottom - 28;
+      panelCard(ctx, x + 12, py, panelW - 24, ph, title);
+      if (this.tab === 'controls') {
+        drawControlsList(ctx, x + 28, py + 66, { maxW: panelW - 56, lineHeight: L.short ? 17 : 19, compact: true, columns: L.short ? 2 : 1, touch: L.controls });
+      } else if (this.tab === 'audio') {
+        this.mixer.draw(ctx, game, x + 28, py + (L.short ? 62 : 86), Math.max(90, panelW - 56), this.focus === 'audio', L);
+      } else {
+        ctx.fillStyle = 'rgba(235,240,250,0.4)';
+        ctx.font = '500 10px system-ui, sans-serif';
+        ctx.fillText('Salvataggi nel browser', x + 28, py + 58, panelW - 56);
+        this.saves.draw(ctx, game, x + 28, py + 78, panelW - 56, Math.max(130, ph - 100), this.focus === 'load', L);
+      }
+      ctx.fillStyle = 'rgba(235,240,250,0.42)';
+      ctx.font = '500 11px system-ui, sans-serif';
+      ctx.fillText(this.focus === 'items' ? 'ESC · chiudi menu' : 'ESC · torna alle voci', x + 18, h - safeBottom - 10);
+      return;
+    }
+
+    const mx = game.input.mouse.x;
+    const my = game.input.mouse.y;
+    this.hover = -1;
+    this.hitRects.length = 0;
+    let y = safeTop + (L.short ? 90 : 106);
+    const rowH = 44;
+    this.items.forEach((item, i) => {
+      const box = { x: x + 12, y: y - 26, w: panelW - 24, h: rowH };
+      this.hitRects.push({ ...box, index: i });
+      if (insideRect(mx, my, box)) this.hover = i;
+      const active = this.focus === 'items' && i === this.index;
+      if (active) {
+        ctx.fillStyle = 'rgba(255,95,162,0.16)';
+        roundPath(ctx, box.x, box.y, box.w, box.h, 7);
+        ctx.fill();
+        ctx.fillStyle = '#ff5fa2';
+        ctx.fillRect(box.x, box.y, 3, box.h);
+      }
+      ctx.fillStyle = active ? '#ffffff' : 'rgba(235,240,250,0.66)';
+      ctx.font = `${active ? '700' : '600'} ${L.short ? 14 : 16}px system-ui, sans-serif`;
+      ctx.fillText(item.label, box.x + 14, y);
+      y += rowH + (L.short ? 0 : 4);
+    });
+    if (!L.short) {
+      ctx.fillStyle = 'rgba(235,240,250,0.46)';
+      ctx.font = '500 10px system-ui, sans-serif';
+      ctx.fillText(ellipsisText(ctx, this.hint(game, this.items[this.index]), panelW - 34), x + 18, y + 4, panelW - 34);
+    }
+    if (!L.short) {
+      ctx.fillStyle = 'rgba(235,240,250,0.42)';
+      ctx.font = '500 11px system-ui, sans-serif';
+      ctx.fillText(L.controls ? 'tocca una voce · conferma o torna indietro' : 'W/S · scegli  Invio · conferma  F4 · muto', x + 18, h - safeBottom - 10);
+    }
   }
 }

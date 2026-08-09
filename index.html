@@ -2,19 +2,36 @@
 <html lang="it">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Seoul Crashers</title>
 <style>
   :root { color-scheme: dark; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
-    width: 100%; height: 100%; overflow: hidden;
+    width: 100%; height: 100%; min-height: 100%;
+    height: 100dvh; overflow: hidden;
+    overscroll-behavior: none; touch-action: none;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
     background: #07080a;
     font-family: system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", sans-serif;
     color: #eef1f6;
   }
   /* Il mirino lo disegna l'HUD: il cursore di sistema torna solo nei menu. */
-  #game { display: block; width: 100vw; height: 100vh; cursor: none; }
+  #game {
+    display: block; width: 100vw; height: 100vh; height: 100dvh;
+    cursor: none; touch-action: none; user-select: none;
+    -webkit-user-select: none; -webkit-touch-callout: none;
+  }
+
+  /* Lo strato touch nasce da MobileControls, ma il contratto safe-area qui evita
+     un bordo bianco/nero durante la rotazione su iOS. */
+  #mobile-controls {
+    min-height: 100vh; min-height: 100dvh;
+    padding-top: max(8px, env(safe-area-inset-top));
+    padding-right: max(8px, env(safe-area-inset-right));
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    padding-left: max(8px, env(safe-area-inset-left));
+  }
 
   #loading {
     position: fixed; inset: 0; z-index: 10;
@@ -50,7 +67,7 @@
 </style>
 </head>
 <body>
-<canvas id="game"></canvas>
+<canvas id="game" role="application" aria-label="Gioco Seoul Crashers" tabindex="0"></canvas>
 
 <div id="loading">
   <h1>SEOUL<span>CRASHERS</span></h1>
