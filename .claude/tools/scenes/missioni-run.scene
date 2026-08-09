@@ -1,0 +1,265 @@
+// M1 e M2 giocate davvero, dall'inizio alla fine (§5.29).
+//
+// Non misura niente: **asserisce**. Ogni voce `false` è un difetto, e le voci sono
+// scelte perché ognuna corrisponde a un modo in cui l'impianto delle missioni può
+// marcire in silenzio — una fase che non si chiude, un blip che non si sposta, una
+// cutscene rivista due volte, una ripresa che riparte dalla missione invece che
+// dalla fase, un salvataggio che dimentica a che punto era la storia.
+//
+//   node .claude/tools/probe.mjs --seconds 1 --quiet \
+//     --script .claude/tools/scenes/missioni-run.scene \
+//     --eval "Object.entries(window.__OUT).filter(([k,v]) => v===false).map(([k])=>k)"
+//
+// La riga sopra stampa **solo quello che è rotto**: `[]` vuol dire tutto a posto.
+// Per vedere tutto, `--eval "window.__OUT"`; `window.__LOG` è la fila delle fasi
+// attraversate, che è la cosa da guardare quando una voce è falsa.
+//
+// Tre asserzioni non si interpretano, sono invarianti:
+//   · `unBlipSolo` — i marcatori a schermo non devono mai essere più di uno
+//   · `apertureNonRiviste` — riprendere una fase non rimette i pannelli
+//   · `riprendeDallaFase` — morire non riporta all'inizio della missione
+const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
+const S = await import('/src/core/save.js');
+const out = {};
+const log = [];
+const M = game.missions;
+const pl = game.player;
+
+const fase = () => `${M.active}/${M.phaseDef && M.phaseDef.id}`;
+const nota = (k) => log.push(`${k} → ${fase()}`);
+const blip = () => game.markers.find((m) => m.id === 'mission');
+
+/** Quanti blip ci sono a schermo. La decisione presa con l'utente dice: uno. */
+let maxBlip = 0;
+const contaBlip = () => { maxBlip = Math.max(maxBlip, game.markers.length); };
+
+function vetrinaSulBlip() {
+  const b = blip();
+  if (!b) return null;
+  let best = null;
+  let bd = 1e9;
+  for (const s of game.city.shops) {
+    const d = Math.hypot(s.x - b.x, s.y - b.y);
+    if (d < bd) { bd = d; best = s; }
+  }
+  return bd < 6 ? best : null;
+}
+
+/** Fuori da una porta senza restare con le coordinate della pianta addosso (§3). */
+async function esci() {
+  if (game.shops.active) game.shops.leave(game);
+  await wait(0.25);
+}
+
+async function entraSulBlip() {
+  const s = vetrinaSulBlip();
+  if (!s) return false;
+  await esci();
+  pl.x = s.x + s.nx * 18;
+  pl.y = s.y + s.ny * 18;
+  pl.onFoot = true;
+  pl.enterCooldown = 0;
+  const ok = game.shops.enter(s, game);
+  await wait(0.25);
+  return ok;
+}
+
+/** I punti che valgono **qui**: `points` è di tutta la fase, non di questo piano. */
+const puntiQui = () => M.points.filter((p) => M.pointHere(p, game));
+
+/** Sale finché il punto della missione non compare: il piano lo sa la missione. */
+async function saliFinoAlPunto() {
+  let g = 0;
+  while (!puntiQui().length && game.shops.active
+    && game.shops.active.cur < game.shops.active.floors.length - 1 && g++ < 5) {
+    game.shops.useStairs(1, game);
+    await wait(0.25);
+  }
+}
+
+/** Va sul punto, controlla che l'HUD lo veda, e lo usa. */
+async function usaPunto(id = null) {
+  contaBlip();
+  const p = id ? M.points.find((q) => q.id === id) : puntiQui()[0];
+  if (!p) return false;
+  pl.x = p.x;
+  pl.y = p.y;
+  pl.enterCooldown = 0;
+  await wait(0.15);
+  const visto = M.actions.some((a) => a.id === p.id);
+  p.run(M.context(game));
+  await chiudiDialogo();
+  return visto;
+}
+
+async function chiudiDialogo() {
+  let g = 0;
+  while (game.dialogue.active && g++ < 40) { game.dialogue.finish(game); await wait(0.06); }
+  await wait(0.2);
+}
+
+async function saltaPannelli() {
+  if (!game.cutscene.active) return false;
+  game.cutscene.skip(game);
+  let g = 0;
+  while (game.cutscene.active && g++ < 40) await wait(0.1);
+  await wait(0.15);
+  return true;
+}
+
+// ---- 1. M1, dall'auto ai due pannelli di chiusura ----------------------------
+game.newGame();
+M.start('m1', game);
+nota('start');
+out.m1Parte = fase() === 'm1/motore';
+
+game.emit('enterVehicle', {});
+await wait(0.15);
+out.m1Apertura = await saltaPannelli();
+nota('apertura saltata');
+out.m1VaAlBiliardo = fase() === 'm1/biliardo' && !!blip();
+
+const soldi0 = pl.money;
+out.m1EntraBiliardo = await entraSulBlip();
+await saliFinoAlPunto();
+nota('dentro il 당구장');
+// Il 당구장 apre alle 15 e adesso sono le 8:24: se si entra lo si deve a
+// `shops.hold`, che è la sola ragione per cui questa riga può essere vera.
+out.m1PortaTenutaAperta = !!game.shops.active && game.shops.floor.openNow;
+out.m1RiscuoteInSala = await usaPunto('pizzo1');
+nota('pizzo 1');
+
+const bilipPrima = blip();
+out.m1VaAlBar = fase() === 'm1/bar' && !!bilipPrima
+  && (bilipPrima.x !== game.city.spawn.x);
+out.m1EntraBar = await entraSulBlip();
+await saliFinoAlPunto();
+out.m1RiscuoteAlBar = await usaPunto('pizzo2');
+nota('pizzo 2');
+out.m1PizzoIncassato = pl.money > soldi0;
+
+// Il terzo posto non paga: è il primo muro della storia, ed è una serranda.
+await esci();
+{
+  const b = blip();
+  const stall = vetrinaSulBlip();
+  out.m1SerrandaSigillata = !!stall && game.shops.isSealed(stall.id);
+  pl.x = b.x; pl.y = b.y; pl.onFoot = true; pl.enterCooldown = 0;
+  await wait(0.2);
+  out.m1LeggeIlSigillo = await usaPunto('sigillo');
+}
+nota('mercato');
+
+out.m1Ritorno = await entraSulBlip();
+await saliFinoAlPunto();
+out.m1ChunsikAspetta = !!game.actors.get('chunsik');
+out.m1Chiusura = await saltaPannelli();
+nota('chiusura M1');
+out.m1Completata = M.isDone('m1');
+
+// ---- 2. M2 parte da sé, e la catena è in `campaign.js` ------------------------
+out.m2ParteDaSola = fase() === 'm2/innesco';
+game.emit('enterVehicle', {});
+await wait(0.15);
+out.m2VaAlBanco = fase() === 'm2/banco' && !!blip();
+out.m2EntraAlBanco = await entraSulBlip();
+out.m2Apertura = await saltaPannelli();
+nota('apertura M2');
+out.m2JoAlBanco = !!game.actors.get('jo');
+out.m2ScenaDelRegistro = await usaPunto('jo');
+nota('registro');
+
+// ---- 3. La ripresa: si muore e si torna **nella fase**, non nella missione -----
+const faseAllaMorte = fase();
+const pannelliPrima = M.seen.size;
+await esci();
+pl.hp = 1;
+game.respawnPlayer();
+await wait(0.4);
+// Il 병원 ha una battuta al primo risveglio, ed è un pannello: si salta e basta.
+await saltaPannelli();
+out.riprendeDallaFase = fase() === faseAllaMorte;
+out.apertureNonRiviste = M.seen.size === pannelliPrima;
+out.blipRimesso = !!blip();
+nota('dopo la morte');
+
+// ---- 4. Il salvataggio si ricorda a che punto è la storia ----------------------
+const snap = S.snapshot(game);
+out.storiaNelSalvataggio = !!snap.story && snap.story.active === 'm2';
+out.pesoStoriaByte = JSON.stringify(snap.story).length;
+game.newGame();
+out.nuovaPartitaAzzera = M.active === null && game.markers.length === 0;
+S.apply(game, JSON.parse(JSON.stringify(snap)));
+await wait(0.35);
+out.ricaricaRiprendeLaFase = fase() === faseAllaMorte;
+out.ricaricaNonRimetteIPannelli = !game.cutscene.active;
+out.ricaricaRimetteIlBlip = !!blip();
+out.ricaricaRimetteISigilli = game.shops.sealed.size > 0 && game.shops.held.size > 0;
+nota('dopo il caricamento');
+
+// ---- 5. I tre pegni, la rapina, il pagamento -----------------------------------
+const raccolti = [];
+for (let i = 0; i < 3 && fase() === 'm2/pegni'; i++) {
+  contaBlip();
+  const dentro = await entraSulBlip();
+  if (dentro) await saliFinoAlPunto();
+  else {
+    const b = blip();
+    await esci();
+    pl.x = b.x; pl.y = b.y; pl.onFoot = true; pl.enterCooldown = 0;
+    await wait(0.2);
+  }
+  const p = puntiQui()[0];
+  if (!p) break;
+  raccolti.push(p.id);
+  await usaPunto(p.id);
+  nota(`pegno ${p.id}`);
+}
+out.treePegni = raccolti.length === 3;
+out.pegniRaccolti = raccolti.join(',');
+out.m2VaAllaConsegna = fase() === 'm2/consegna';
+
+out.m2Riconsegna = await entraSulBlip();
+nota('rapina in corso');
+// La rapina: due entrano, vanno al cassetto e scappano. Non è una scena scritta a
+// mano — sono due pedoni normali nella gente del piano, e se li si spara muoiono.
+out.rapinaInScena = game.peds.filter((p) => p.armed && !p.staff).length >= 2;
+{
+  let g = 0;
+  while (fase() === 'm2/rapina' && g++ < 140) {
+    await wait(0.12);
+    if (game.dialogue.active) await chiudiDialogo();
+  }
+}
+nota('dopo la rapina');
+out.rapinaSiChiude = fase() === 'm2/pagamento';
+out.cassettoSvuotato = !!(game.shops.floor && game.shops.floor.robbed);
+
+out.m2Pagamento = await usaPunto('jo');
+out.m2Chiusura = await saltaPannelli();
+nota('chiusura M2');
+out.m2Completata = M.isDone('m2');
+out.nomeInciso = M.flag('kumangi');
+out.nessunaMissioneAppesa = M.active === null && game.markers.length === 0;
+
+// ---- 6. Il filo del 병원: le battute non si ripetono mai ------------------------
+const dette = [];
+for (const n of [2, 3, 4, 10, 11]) {
+  game.stats.deaths = n;
+  game.hud.messages.length = 0;
+  game.emit('respawn', game.city.hospitals[0]);
+  await wait(0.1);
+  const pannello = game.cutscene.active;
+  await saltaPannelli();
+  dette.push(pannello ? `${n}:pannello` : `${n}:${(game.hud.messages[0] || {}).text || '—'}`);
+}
+out.ospedale = dette;
+out.ospedaleTerzoEPannello = dette[1] === '3:pannello';
+out.ospedaleDecimoEPannello = dette[3] === '10:pannello';
+out.ospedaleDiceIlNumero = /Signor Seo\. 11\./.test(dette[4]);
+out.ospedaleNonSiRipete = new Set(dette).size === dette.length;
+
+out.unBlipSolo = maxBlip <= 1;
+window.__LOG = log;
+window.__OUT = out;
+return out;

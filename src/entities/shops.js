@@ -428,6 +428,12 @@ export class ShopSystem {
     // Vetrine chiuse **non dall'orario**: una serranda con il sigillo di perizia
     // non riapre domani mattina. Id della vetrina -> motivo da mostrare (o `true`).
     this.sealed = new Map();
+    // E il contrario: indirizzi che oggi sono aperti **perché lo dice la storia**.
+    // Il 당구장 apre alle 15 e M1 succede alle 8:24 — non perché il copione si sia
+    // distratto, ma perché in quella sala si conta il pizzo di martedì mattina a
+    // saracinesca abbassata. Senza questo, metà delle missioni andrebbe spostata
+    // all'ora di apertura di un negozio.
+    this.held = new Set();
     this.active = null;
     this.outside = null;      // dove si torna uscendo
     this.backSpot = null;     // dove si sbuca dal retro, se là dietro c'è posto
@@ -456,6 +462,7 @@ export class ShopSystem {
     this.cache.clear();
     this.pending = null;
     this.sealed.clear();
+    this.held.clear();
     this.active = null;
     this.outside = null;
     this.backSpot = null;
@@ -574,6 +581,7 @@ export class ShopSystem {
       spent: this.spent,
       sold: this.sold,
       sealed: Object.fromEntries(this.sealed),
+      held: [...this.held],
       interiors,
     };
   }
@@ -583,7 +591,12 @@ export class ShopSystem {
     this.robbed = d.robbed || 0;
     this.spent = d.spent || 0;
     this.sold = d.sold || 0;
-    this.sealed = new Map(Object.entries(d.sealed || {}));
+    // **Le chiavi tornano numeri.** L'id di una vetrina è l'indice in `city.shops`,
+    // e passando da un oggetto JSON diventa la stringa `"42"`: rimessa in una Map
+    // così com'è, `isSealed(42)` risponderebbe di no e la serranda col sigillo si
+    // riaprirebbe al primo caricamento.
+    this.sealed = new Map(Object.entries(d.sealed || {}).map(([k, v]) => [Number(k), v]));
+    this.held = new Set((d.held || []).map(Number));
     // Le piante già in cache sono quelle della partita che si sta abbandonando:
     // vanno buttate, o la cassa svuotata di *prima* si sovrapporrebbe a quella
     // del salvataggio.
@@ -638,7 +651,10 @@ export class ShopSystem {
     // chiusura del turno.
     const dead = f.staff.filter((p) => p.dead);
     const live = f.openNow ? f.staff.filter((p) => !p.dead) : [];
-    f.people = [...dead, ...f.kept, ...live, ...f.crowd];
+    // I personaggi nominati non sono personale e non sono folla: **restano anche a
+    // locale chiuso**, perché uno che ti aspetta dietro un banco ti aspetta e basta.
+    const named = game.actors ? game.actors.populate(this.active.shop.id, f.idx, f, game) : [];
+    f.people = [...dead, ...f.kept, ...live, ...f.crowd, ...named];
   }
 
   // --- orari ------------------------------------------------------------------
@@ -654,7 +670,27 @@ export class ShopSystem {
   /** Vetrina aperta = **almeno un piano** aperto: la scala è del palazzo, non del negozio. */
   shopOpen(shop, game) {
     if (this.sealed.has(shop.id)) return false;
+    if (this.held.has(shop.id)) return true;
     return shop.biz.some((id) => this.isOpen(id, game));
+  }
+
+  /**
+   * Questo piano **di questo indirizzo** è aperto adesso? È `isOpen` più il fatto
+   * della storia: un indirizzo tenuto aperto lo è per tutta la colonna, perché
+   * quello che è aperto è il portone, e la scala è del palazzo.
+   */
+  floorOpen(shop, bizId, game) {
+    if (this.sealed.has(shop.id)) return false;
+    return this.held.has(shop.id) || this.isOpen(bizId, game);
+  }
+
+  /** «Oggi qui si entra». Il contrario di `seal`, e sta nel salvataggio come lei. */
+  hold(shopId) {
+    this.held.add(shopId);
+  }
+
+  release(shopId) {
+    this.held.delete(shopId);
   }
 
   /**
@@ -739,6 +775,7 @@ export class ShopSystem {
     game.stats.visits = (game.stats.visits || 0) + 1;
     this.near = null;
     this.fade = 1;
+    game.emit('shopEnter', shop);
     return true;
   }
 
@@ -753,7 +790,7 @@ export class ShopSystem {
    * finire di comprare. Chiude quando esci.
    */
   showFloor(game, f) {
-    f.openNow = this.isOpen(f.biz.id, game);
+    f.openNow = this.floorOpen(this.active.shop, f.biz.id, game);
     this.refreshCrowd(f, game);
     // I pedoni della città restano dove sono: dentro `game.peds` ci va la gente di
     // questo piano, così raggi, mischia e onde d'urto la trovano senza sapere che
@@ -762,6 +799,9 @@ export class ShopSystem {
     game.pedGrid.rebuild(game.peds);
     game.hud.showVenue(f);
     if (!f.openNow) game.hud.toast(`${f.biz.hangul} — chiuso · apre alle ${clockLabel(f.biz.open[0])}`, 2.6);
+    // Il varco unico per arrivare su un piano — porta, scala, risveglio dal futon —
+    // quindi è l'unico posto da cui una fase di missione può sapere dove sei.
+    game.emit('floorShown', this.active.shop, f.idx, f);
   }
 
   leave(game) {
@@ -835,6 +875,7 @@ export class ShopSystem {
   /** Chiude l'interno senza spostare nessuno: lo usa anche la morte in un negozio. */
   forceExit(game) {
     if (!this.active) return;
+    const shop = this.active.shop;
     this.active = null;
     this.backSpot = null;
     game.peds = game.pedSystem.peds;
@@ -845,6 +886,7 @@ export class ShopSystem {
     game.projectiles.clear();
     game.player.enterCooldown = 0.4;
     this.fade = 1;
+    game.emit('shopLeave', shop);
   }
 
   /**
@@ -903,7 +945,7 @@ export class ShopSystem {
       // Il primo piano aperto della colonna. Se non è il terra, il negozio della
       // vetrina ha la saracinesca giù ma il portone resta aperto per quello di sopra:
       // è come funziona un palazzo di Seoul, e il suggerimento lo deve dire.
-      const openIdx = shop.biz.findIndex((id) => this.isOpen(id, game));
+      const openIdx = shop.biz.findIndex((id) => this.floorOpen(shop, id, game));
       let act;
       if (openIdx < 0) {
         const n = this.nextOpening(shop, game);
@@ -977,7 +1019,7 @@ export class ShopSystem {
     // Azioni contestuali: scala, porta, bancone, cassa.
     if (f.stairUp && pointInRect(pl.x, pl.y, padRect(f.stairUp, STAIR_PAD))) {
       const up = this.active.floors[this.active.cur + 1].biz;
-      const shut = this.isOpen(up.id, game) ? '' : ` — ${up.hangul} è chiuso`;
+      const shut = this.floorOpen(this.active.shop, up.id, game) ? '' : ` — ${up.hangul} è chiuso`;
       this.actions.push({ key: 'E', text: `sali al ${ordinal(this.active.cur + 2)} piano${shut}`, run: () => this.useStairs(1, game) });
     } else if (f.stairDown && pointInRect(pl.x, pl.y, padRect(f.stairDown, STAIR_PAD))) {
       this.actions.push({ key: 'E', text: this.active.cur === 1 ? 'scendi al piano terra' : `scendi al ${ordinal(this.active.cur)} piano`, run: () => this.useStairs(-1, game) });

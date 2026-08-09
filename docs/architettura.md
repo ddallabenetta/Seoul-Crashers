@@ -13,6 +13,8 @@ src/core/
   input.js            tastiera/mouse, stato continuo + fronti (wasPressed)
   events.js           il bus: `game.on/once/off/emit`, da cui passano i fatti del mondo
   modes.js            in che modalità gira il gioco e cosa concede (`game.mode`, `paused`)
+  missions.js         fasi, blip, punti, ripresa: il motore delle missioni, che della
+                      campagna non sa niente
   audio.js            sintetizzatore WebAudio: colpi secchi + letti continui, mix, muto
   music.js            musica generata: tema del menu, caccia, apertura, stacchi — e la regia
   radio.js            stazioni coreane in streaming (`<audio>`, fuori dal grafo audio)
@@ -80,9 +82,14 @@ src/ui/
   metro.js            ingresso/uscita, pianta fisica e rete locale/interurbana
   text.js             a capo automatico e paragrafi: corpo fisso, misura condivisa
   cutscene.js         il lettore di pannelli: avanzamento, stacchi, salto con ESC
+  dialogue.js         due che parlano senza uscire dal gioco: mondo fermo, città a schermo
 
 src/story/
+  campaign.js         chi c'è e in che ordine: l'unico file che conosce tutte le missioni
   intro.js            «12년», i 28 pannelli dell'apertura e il passaggio di consegne
+  places.js           dove succedono le cose: la storia non piazza indirizzi, li cerca
+  m1.js · m2.js       una missione per file: le sue fasi e i suoi pannelli
+  hospital.js         il 병원 «성심»: una battuta a ogni morte, e quattro pannelli
 
 .claude/              strumenti per chi sviluppa (non fa parte del gioco), vedi §9
   tools/probe.mjs     avvia il gioco headless, esegue scene, misura, screenshot
@@ -393,6 +400,40 @@ costa quattro righe invece di una griglia nuova; le espressioni si **sovrascrivo
 che il modello riserva a occhi e bocca, e quattro stati bastano. La folla resta sagoma apposta.
 I pannelli veri di una scena stanno tutti in un file suo sotto `src/story/`, che è anche l'unico
 posto in cui il gioco sa qualcosa della trama.
+
+**Una missione è una fila di fasi, e una fase apparecchia invece di controllare** (§5.29).
+`core/missions.js` sta accanto a `events.js` e a `modes.js` e non sotto `story/` per la stessa
+ragione per cui `ui/cutscene.js` non sa niente di «12년»: è un motore, e la trama gliela registra
+`story/campaign.js`. `enter` mette blip, punti interattivi e iscrizioni al bus; da lì la fase
+dorme finché non arriva il fatto che aspettava, e `tick` serve solo a quello che un evento non sa
+dire. **Quello che una fase apparecchia lo smonta il cambio di fase**: `ctx.on` e `ctx.point` si
+disfano da soli, o una missione ripresa tre volte lascia tre iscritti sullo stesso evento. Le tre
+regole della campagna sono cablate lì e non nelle missioni — **un blip solo** (stesso id, quindi
+`setMarker` lo sposta), **il fallimento riparte dall'ultima fase** (iscritti a `respawn` e
+`busted`, non a `playerDeath`: quando arrivano quei due il giocatore è già stato spostato), **una
+cutscene non si rivede mai** (`seen`, che sta nel salvataggio). Nel salvataggio va la *posizione*
+nella storia, non la storia: ~122 byte, e il ripristino **rientra nella fase** invece di saltarla.
+
+**Un dialogo non è una cutscene: è la stessa scena, ferma** (§5.29). Metà del copione delle
+missioni sono scambi di due righe *nel posto in cui succedono*, e coprire quel posto con una
+tavola toglie l'unica cosa che li distingue da un pannello. `ui/dialogue.js` è la modalità che
+`core/modes.js` aveva previsto e che nessuno aveva scritto: mondo fermo e giocatore fermo come in
+un menu, ma la città resta disegnata sotto il riquadro — quindi si abbassa meno di una cutscene
+(`duck` 0,4 contro 0,12). Non si salta: due battute si leggono.
+
+**Un personaggio nominato può stare dentro un edificio, e allora non è lo streaming a
+occuparsene** (§5.29). Una definizione `indoor` non passa da `actors.update` — lì `game.peds` è
+la gente del piano (§3) — ma da `shops.refreshCrowd`, che chiede a `actors.populate` chi c'è su
+questo piano di questo indirizzo. Il pedone **non si ricostruisce** fra una visita e l'altra:
+stesse ferite, stessa posizione, e lo stesso morto per terra. Un attore resta anche a locale
+chiuso, perché uno che ti aspetta ti aspetta. Chi non conosce le coordinate della pianta — il
+caso normale, le piante sono generate — passa `place(floor)` e le riceve alla prima apertura.
+
+**Una porta può essere aperta perché lo dice la storia** (§5.29). `shops.hold` è il contrario
+esatto di `seal`: il 당구장 apre alle 15 e M1 comincia alle 08:24, e senza un modo di dirlo metà
+campagna andrebbe spostata all'orario di un negozio. Apre l'**indirizzo** e non il piano, perché
+quello che è aperto è il portone e la scala è del palazzo; passa da `floorOpen`, che è `isOpen`
+più questo fatto, e sta nel salvataggio come i sigilli.
 
 **Un salvataggio si migra, non si rifiuta** (§5.27). Prima uno slot con `v` diverso da `VERSION`
 veniva buttato: il primo campo nuovo che qualcuno avesse aggiunto avrebbe cancellato la partita

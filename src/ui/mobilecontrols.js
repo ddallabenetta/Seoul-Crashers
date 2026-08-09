@@ -88,8 +88,9 @@ const STYLE = `
 @media (orientation: landscape) {
   #mobile-controls .mc-actions {
     width: min(250px, 45vw); grid-template-columns: repeat(5, 1fr);
-    transform: translateY(-118px);
+    transform: translateY(-104px);
   }
+  #mobile-controls .mc-stick { width: 104px; height: 104px; min-width: 104px; min-height: 104px; }
 }
 @media (min-width: 900px) and (orientation: landscape) {
   #mobile-controls .mc-actions { width: 270px; }
@@ -400,6 +401,7 @@ export class MobileControls {
 
   _mode() {
     if (this.game.cutscene?.active) return 'cutscene';
+    if (this.game.dialogue?.active) return 'dialogue';
     if (!this.game.started) return 'title';
     if (this.game.mode?.id === 'menu') return 'menu';
     return 'play';
@@ -469,7 +471,13 @@ export class MobileControls {
     this.root.dataset.mode = mode;
     this._show(this._layers.play, mode === 'play');
     this._show(this._layers.nav, mode === 'title' || mode === 'menu');
-    this._show(this._layers.cutscene, mode === 'cutscene');
+    this._show(this._layers.cutscene, mode === 'cutscene' || mode === 'dialogue');
+    const skip = this.buttons.get('skip');
+    if (skip) skip.hidden = mode === 'dialogue';
+    const hint = this._layers.cutscene?.querySelector('.mc-hint');
+    if (hint) hint.textContent = mode === 'dialogue'
+      ? 'Tocca la battuta per continuare'
+      : 'Tocca la scena per continuare';
     this._labels(mode);
   }
 
