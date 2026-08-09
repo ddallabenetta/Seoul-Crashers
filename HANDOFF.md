@@ -5,27 +5,26 @@ resta corto apposta.** Il contenuto vero sta in `docs/`, e si apre un documento 
 non tutti. Il `README.md` descrive il gioco e i comandi; qui c'è quello che serve a
 *sviluppare*. Avvio e vincoli stanno in `CLAUDE.md`, che si carica da solo.
 
-Ultimo aggiornamento: **la tappa A della campagna** (§5.28) — i pannelli, la **cutscene
-iniziale** «12년» e la pixel art dei personaggi. È la prima cosa della campagna che si vede a
-schermo: si sceglie «Nuova partita» e partono ventotto tavole, con una musica sua e `ESC` per
-saltarle. Le tappe precedenti sono §5.8-5.27.
+Ultimo aggiornamento: **la tappa B della campagna** (§5.29) — l'impianto delle missioni, **M1 e
+M2** giocabili dall'inizio alla fine, e il **filo del 병원**. È la prima cosa della campagna che
+si *gioca*: si finisce l'apertura, si sale in macchina, e da lì il gioco ha un blip e qualcosa
+da fare. Le tappe precedenti sono §5.8-5.28.
 
-> 📌 **Il prossimo lavoro è la tappa B**: impianto delle missioni (blip singolo, fasi, ripresa
-> dall'ultima fase) più **M1 e M2** — e, agganciato lì perché si accumula per tutta la partita,
-> il **filo del 병원** ([`docs/storia/09-ospedale.md`](docs/storia/09-ospedale.md)): una battuta
-> diversa a ogni morte, e il conto delle morti che M12 stampa sulle fatture. L'ordine di tutte
-> le tappe sta **in testa a [`docs/backlog.md`](docs/backlog.md) (§6.0)**, che è la prima cosa
-> da leggere prima di cominciare, e le nove decisioni d'impianto prese con l'utente stanno in
+> 📌 **Il prossimo lavoro è la tappa C**: i **cortili persistenti** — la proprietà di un turf
+> nel salvataggio, con effetto sul commercio. Va prima delle missioni che la usano, perché M5 la
+> dà per scontata ed è l'unica cosa della storia che cambia il mondo in modo permanente. Poi la
+> **D** (Kkachi), che ha quattro righe già in attesa: le tre di M1 e M2 e quella dell'apertura
+> sono `hud.toast` finché non esiste la stazione `91.45`. L'ordine di tutte le tappe sta **in
+> testa a [`docs/backlog.md`](docs/backlog.md) (§6.0)**, che è la prima cosa da leggere prima di
+> cominciare, e le nove decisioni d'impianto prese con l'utente stanno in
 > [`docs/storia/08-domande-aperte.md`](docs/storia/08-domande-aperte.md): leggi quelle, non
 > ricavarle dal copione. Resta aperta una domanda sola (se le missioni si rigiocano) e non
-> blocca niente. **Chi disegna pannelli nuovi parte da §5.28**: il cast a pixel e le quattro
-> espressioni ci sono già, le **sei regole di scrittura** (tre di disegno, tre di
-> comprensibilità) stanno in testa a [`docs/storia/README.md`](docs/storia/README.md) con la
-> tabella delle parole già tradotte, e le tavole si guardano con `cutscene-sheet.scene`
-> *prima* di dire che funzionano. Il resto del §6 resta ordinato per
-> impatto: le voci più concrete sono il sorpasso, l'arresto che ti carica in volante e il
-> **corridoio fra Seoul e Busan**, che dal §5.25 è geografia percorribile ma non ha ancora
-> niente da fare — ed è la superficie naturale delle attività secondarie.
+> blocca niente. **Chi scrive una missione nuova parte da §5.29**: un file sotto `src/story/`,
+> una riga in `story/campaign.js`, e il motore fa il resto. **Chi disegna pannelli parte da
+> §5.28**, e li guarda con `cutscene-sheet.scene` *prima* di dire che funzionano — metà delle
+> tavole di questa tappa sono state rifatte dopo il primo provino. Il resto del §6 resta
+> ordinato per impatto: sorpasso, arresto che ti carica in volante, e il **corridoio fra Seoul e
+> Busan**, che è la superficie naturale delle attività secondarie.
 
 ---
 
@@ -41,6 +40,7 @@ saltarle. Le tappe precedenti sono §5.8-5.27.
 | scrivere o implementare una missione, una cutscene, un dialogo | [`docs/storia/`](docs/storia/) — è l'indice: apri **un capitolo alla volta**, sono ~2900 righe |
 | scrivere una data, un'età o un conteggio dentro una scena | [`docs/storia/10-continuita.md`](docs/storia/10-continuita.md) **prima** di scriverla |
 | disegnare un pannello, un personaggio a pixel o una nuova espressione | `docs/storico/17-pannelli-e-cutscene.md` (§5.28) |
+| **implementare una missione**: fasi, blip, punti, dialoghi, ripresa | `docs/storico/18-missioni-m1-m2.md` (§5.29) |
 | verificare headless, usare `probe.mjs`, le scene o le skill | [`docs/strumenti.md`](docs/strumenti.md) |
 | capire *perché* una parte esistente è fatta così | [`docs/storico/`](docs/storico/) |
 
@@ -73,6 +73,7 @@ commenti resta valido: si risolve qui.
 | §5.26 Vita degli NPC | `docs/storico/15-vita-degli-npc.md` |
 | §5.27 Impianto della campagna | `docs/storico/16-impianto-della-campagna.md` |
 | §5.28 Pannelli, pixel art e cutscene iniziale | `docs/storico/17-pannelli-e-cutscene.md` |
+| §5.29 Impianto missioni, M1, M2 e il 병원 | `docs/storico/18-missioni-m1-m2.md` |
 | §6 Backlog | `docs/backlog.md` |
 | §8 Parametri | `docs/parametri.md` |
 | §9 Strumenti (`.claude/`) | `docs/strumenti.md` |
@@ -89,8 +90,8 @@ Stato: **Fase 1, Fase 1.5, Fase 2 (tutte e tre le tappe) e le prime tre tappe de
 completate e collaudate**, più la revisione della guida AI del traffico (§5.10), i due giri di
 arretrati (§5.12 e §5.21), l'audio procedurale del §5.13, il salvataggio del §5.15, il giro
 menu-musica-autosave del §5.18-5.20, le tre regioni collegate e ricostruite del §5.22-5.24,
-l'impianto della campagna (§5.27) e la sua prima tappa a schermo (§5.28). ~27.400 righe in
-53 moduli. 60 fps con ~44 veicoli e ~93
+l'impianto della campagna (§5.27), la sua prima tappa a schermo (§5.28) e le prime due missioni
+giocabili (§5.29). ~33.000 righe in 64 moduli. 60 fps con ~44 veicoli e ~93
 pedoni attivi, e restano 60 anche sotto raffica continua di SMG. Dentro un edificio il costo è
 trascurabile: la città non gira. Il ciclo giorno-notte costa **1,5 ms di JS per frame nel caso
 peggiore** (notte con temporale) — ma i veli a schermo intero non sono misurabili onestamente
@@ -160,6 +161,16 @@ via o lo resusciti.
 pixel art, cinque personaggi disegnati cella per cella con quattro espressioni a testa, un tema
 musicale suo, e `ESC` che salta sempre. I tre indizi che semina tornano tutti più avanti, ed è
 la ragione per cui saltarla non costa niente.
+
+**E adesso si gioca** (§5.29). Appena il motore è acceso parte **M1**: un blip alla volta e il
+pizzo di martedì da riscuotere in tre posti, di cui uno ha la serranda sigillata da una perizia.
+Poi **M2**, tre pegni scaduti a piedi e Jo Ok-bun, cieca da nove anni, che il registro del
+quartiere ce l'ha in testa. Una missione è una **fila di fasi**: morire non riporta all'inizio
+ma rimette dov'eri, i pannelli non si rivedono mai, e il salvataggio si ricorda a che punto è la
+storia in centoventidue byte. I dialoghi non coprono lo schermo: la città resta lì sotto, ferma.
+E al **병원 «성심»** il direttore ha una battuta diversa a ogni risveglio — quattro sono un
+pannello, dal decimo in poi dice il numero, e quel numero è lo stesso che M12 stamperà sulle
+fatture.
 
 La Fase 2 era divisa in tre tappe, concordate con l'utente: **A** combattimento base,
 **B** polizia e ricercato a 5 livelli, **C** armi pesanti ed esplosivi. **Sono tutte fatte.**

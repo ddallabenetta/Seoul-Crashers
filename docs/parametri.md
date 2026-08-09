@@ -234,3 +234,15 @@
 | Scala di un pixel-sprite | `pixelkit.unitScale` | **intera**, sempre: con una scala frazionaria alcuni quadrati escono di un pixel più larghi |
 | Mezzo busto in un pannello che parla | `intro.bust` | finisce a `0,62` dell'altezza e ne occupa `0,46`: sopra il riquadro delle battute |
 | Contorno chiaro delle figure | `pixelkit.RIM` | `#4d5768`, **sempre acceso**: senza, il cast sparisce nei fondi notturni |
+| **— missioni, dialoghi e 병원 (§5.29) —** | | |
+| Versione del formato di salvataggio | `save.VERSION` | 3 (dal 2 del §5.27): ci è entrata la campagna. Lo scalino `2 → 3` aggiunge un `story` vuoto, che è esattamente «la storia non era ancora cominciata» |
+| Peso della storia nel salvataggio | `missions.snapshot` | ~122 byte a metà campagna: missione, fase, taccuino e tre elenchi |
+| Modalità del dialogo | `modes.MODES` (`dialogue`) | mondo 0,4 · radio 0,5 — si abbassa **meno** di una cutscene, perché la città resta a schermo sotto il riquadro |
+| Guardia sul primo tasto di un dialogo | `dialogue.update` | 0,25 s: senza, la `E` con cui si è aperto salta la prima battuta |
+| Portata di un punto di missione | `missions.POINT_REACH` | 58 px, larga come la porta di un negozio (`shops.DOOR_REACH`): più stretta e si gira attorno all'obiettivo senza trovarlo |
+| Pizzo di martedì | `m1.PIZZO_BILIARDO` · `m1.PIZZO_BAR` | 210.000 ₩ e 260.000 ₩. Messi in fila devono restare **molto meno di quello che serve**: è la battuta di Chun-sik |
+| La cassetta del 철마파 | `m2.PREZZO_CASSETTA` | 120.000 ₩, e si paga solo se si hanno: senza soldi il capocortile la lascia andare, ed è la terza delle tre strade |
+| Durata della rapina al banco | `m2` fase `rapina` | 3 s al cassetto, poi via. Chi vuole fermarli li ferma in quei tre secondi |
+| Pannello del 병원 che si chiude da solo | `hospital.ward` (`hold`) | 7 s (11 e 13 per le scene lunghe): mai qualcosa da saltare a memoria |
+| Risvegli con un pannello | `hospital` | il 1°, il 3°, il 10° e il primo dopo M12. Gli altri sono una riga in coda al messaggio dell'ospedale |
+| Conto delle morti | `stats.deaths` | **non è un contatore nuovo**: è quello che il gioco tiene dal §5.15, e lo leggono sia il 병원 sia M12 |

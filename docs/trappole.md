@@ -327,3 +327,33 @@ frazionaria alcuni quadrati escono larghi *n* e altri *n+1*. `pixelkit.unitScale
 difetto apposta, e le destinazioni si arrotondano a intero. Attenzione anche a giudicare uno
 screenshot ridimensionato: un pannello perfettamente netto sembra sfocato in anteprima, e si
 verifica con `probe.mjs --zoom`.
+
+**Un `id` numerico che passa da JSON torna una stringa, e una `Map` non se ne accorge.**
+`shops.sealed` è indicizzata sull'indice della vetrina in `city.shops`; `Object.fromEntries`
+lo scrive `"42"` e `new Map(Object.entries(...))` lo rilegge come stringa, quindi
+`isSealed(42)` rispondeva **no** e la serranda col sigillo di perizia si riapriva al primo
+caricamento. Non si vede in nessuna prova che non passi da un salvataggio e ritorno. Chi
+serializza una `Map` con chiavi numeriche le riconverte al ripristino, sempre (§5.29).
+
+**`shops.forceExit` non sposta il giocatore, e fuori da un negozio le coordinate di una pianta
+sono in mezzo al mare.** Chiude l'interno e basta: chi lo chiama deve mettere il giocatore da
+qualche parte, ed è quello che fa `stepOutside`. Usarlo da solo lascia Jae-min a `(240, 310)`,
+cioè nell'angolo nord-ovest della mappa, dove `updateOnFoot` lo fa annegare — e il sintomo che
+si vede è tutt'altro (una fase di missione che non risponde più, perché `pl.dying`). Vale per
+gli script di prova quanto per il codice (§5.29).
+
+**Chi esce dalla porta di un negozio non diventa «sparito»: diventa un pedone di città.**
+`spillOutside` rimette `p.gone = false` e lo passa a `game.pedSystem.peds` (§5.21). Una scena
+che aspetta che qualcuno se ne vada non può quindi guardare `gone`: deve guardare se è ancora
+in `floor.people`. La rapina di M2 è rimasta appesa esattamente su questo (§5.29).
+
+**Il bancone disegnato dopo la figura le arriva alla fronte.** In un pannello i mobili in primo
+piano vanno disegnati **dopo** il fondo e **prima** delle persone che ci stanno dietro. Non si
+vede nel sorgente, dove le due chiamate sembrano indipendenti: si vede a schermo, e il sintomo
+è un personaggio che diventa un cappello (§5.29).
+
+**Un piano di negozio è chiuso quasi sempre, e una missione ci arriva a qualunque ora.** Il
+당구장 apre alle 15, il 술집 alle 17, il 노래방 alle 16: una fase che manda lì il giocatore alle
+otto del mattino trova una porta che non si apre e si pianta. Non è un caso limite — è il caso
+normale, perché l'ora la decide il giocatore. Si dichiara `shops.hold(shopId)` nel `prepare`
+della missione, che è il contrario di `seal` e sta nel salvataggio come lei (§5.29).

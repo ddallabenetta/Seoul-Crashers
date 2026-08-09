@@ -40,6 +40,16 @@ export const MODES = [
     worldRuns: false, playerRuns: false, duck: 0.12, radioDuck: 0, cursor: 'default',
   },
   {
+    // Il dialogo di missione: era **l'esempio** con cui questa tabella era stata
+    // scritta, e adesso esiste (`ui/dialogue.js`). Mondo fermo e giocatore fermo
+    // come in un menu, ma la città resta a schermo sotto il riquadro — quindi si
+    // abbassa meno di una cutscene, che invece il mondo lo copre del tutto. La
+    // radio scende a metà e non a zero: due battute non valgono uno stacco.
+    id: 'dialogue',
+    when: (game) => !!game.dialogue?.active,
+    worldRuns: false, playerRuns: false, duck: 0.4, radioDuck: 0.5, cursor: 'default',
+  },
+  {
     // Il titolo: il mondo gira eccome (è l'attract mode), il giocatore no.
     id: 'title',
     when: (game) => !game.started,

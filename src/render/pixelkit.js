@@ -206,6 +206,68 @@ const HEADS = {
     '......############......',
     '.........#ssss#.........',
   ],
+  // Jo Ok-bun. Settantotto anni, permanente grigia stretta, testa piccola. Gli
+  // **occhi chiusi stanno nella griglia**, non nell'espressione: è cieca da nove
+  // anni, e in tutti i pannelli in cui compare non li apre. Chi la disegna in un
+  // pannello nuovo usi `fermo` o `parla` — `giu` le riscrive gli occhi con la
+  // pelle e le riapre la faccia.
+  jo: [
+    '........................',
+    '.....##############.....',
+    '...##hhhhhhhhhhhhhh##...',
+    '..#hhhhhhhhhhhhhhhhhh#..',
+    '..#hHhhhhhhhhhhhhhhHh#..',
+    '..#hhHhhhhhhhhhhhhhhh#..',
+    '..#hhhhhhhhhhhhhhhhhh#..',
+    '..#shhhhhhhhhhhhhhhhs#..',
+    '..#sshhhhhhhhhhhhhhss#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssssssssssssssSS#..',
+    '..#ss###ssssssss###ss#..',
+    '..#ss####ssssss####ss#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssssss##ssssssss#..',
+    '..#sssssssdd#ssssssss#..',
+    '..#ssssssssssssssssss#..',
+    '..#sssssss####sssssss#..',
+    '..#ssssssssssssssssss#..',
+    '...#ssssssssssssssss#...',
+    '...#ssssssssssssssss#...',
+    '....##ssssssssssss##....',
+    '......############......',
+    '.........#ssss#.........',
+  ],
+
+  // Jeong Han-su, direttore del 병원. Gli **occhiali sono la sua faccia**: una
+  // montatura in tre righe, che a questa scala è l'unica cosa che si legge da
+  // lontano. Capelli grigi con le stempiature alte, bocca dritta: non commenta e
+  // non si commuove, ed è quello che deve dire prima di aprire bocca.
+  jeong: [
+    '........................',
+    '.......##########.......',
+    '.....##hhhhhhhhhh##.....',
+    '...##hhhhhhhhhhhhhh##...',
+    '..#shhhhhhhhhhhhhhhhs#..',
+    '..#sshhhhhhhhhhhhhhss#..',
+    '..#sssHhhhhhhhhhhHsss#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssssssssssssssSS#..',
+    '..#saaaaaassssaaaaaas#..',
+    '..#saw##wasaasaw##was#..',
+    '..#saaaaaassssaaaaaas#..',
+    '..#ssssssss##ssssssss#..',
+    '..#sssssssdd#ssssssss#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssss######ssssss#..',
+    '..#ssssssssssssssssss#..',
+    '...#ssssssssssssssss#...',
+    '...#ssssssssssssssss#...',
+    '....##ssssssssssss##....',
+    '......############......',
+    '.........#ssss#.........',
+  ],
 };
 
 // --- le tinte ------------------------------------------------------------------
@@ -257,6 +319,21 @@ export const CAST = {
     coat: '#232833', coatHi: '#333a48', shirt: '#e4e9f1', pants: '#232833',
     // La cicatrice. Chiara sulla pelle, o non è un indizio: è un neo.
     accent: '#f0d3bb', build: 11, name: 'Seo Dong-hyeok',
+  },
+  jo: {
+    head: 'jo',
+    hair: '#8e8b93', hairHi: '#c3c0c9',
+    coat: '#3a3038', coatHi: '#4e4149', shirt: '#d6cfc0', pants: '#2b242b',
+    // L'ottone del banco dei pegni: è il colore della sua insegna e del suo mestiere.
+    accent: '#c9a24a', build: 7, name: 'Jo Ok-bun',
+  },
+  jeong: {
+    head: 'jeong',
+    hair: '#6a6270', hairHi: '#9c96a4',
+    // Il camice. È l'unico personaggio del cast vestito di chiaro, e in un pannello
+    // di corsia è quello che lo separa dal letto.
+    coat: '#dbe1ea', coatHi: '#f1f4f9', shirt: '#93a8bd', pants: '#39424f',
+    accent: '#5fe0a8', build: 9, name: 'Jeong Han-su',
   },
 };
 

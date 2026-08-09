@@ -56,7 +56,7 @@ export const AUTO_GENS = 3;
  * lì non c'è niente da migrare, perché una Seoul diversa rende le coordinate
  * salvate prive di significato e il giocatore rinascerebbe dentro un palazzo.
  */
-const VERSION = 2;
+const VERSION = 3;
 const SEED = 20260730;
 
 /**
@@ -83,6 +83,13 @@ const MIGRATIONS = {
     };
     delete d.interiors;
     d.actors = {};
+    return d;
+  },
+  // 2 -> 3: la campagna. Uno slot di prima è una partita in cui la storia non era
+  // ancora cominciata, e questo è esattamente quello che dice un `story` vuoto —
+  // niente missione in corso, nessun pannello visto, nessun fatto acquisito.
+  2: (d) => {
+    d.story = { active: null, phase: 0, state: {}, done: [], seen: [], flags: [] };
     return d;
   },
 };
@@ -169,6 +176,10 @@ export function snapshot(game) {
     stats: { ...game.stats, districts: [...game.stats.districts] },
     shops: game.shops.snapshot(),
     actors: game.actors.snapshot(),
+    // Dove sei arrivato nella storia. Il conto delle morti che il 병원 e M12 leggono
+    // **non è qui**: è `stats.deaths`, che il salvataggio porta da sempre e che è
+    // già lo stesso numero — averne due sarebbe averne uno sbagliato.
+    story: game.missions.snapshot(),
   };
 }
 
@@ -217,6 +228,11 @@ export function apply(game, data) {
   game.dayCycle.restore(data.clock);
   game.wanted.restore(data.wanted);
   game.shops.restore(data.shops);
+  // **Prima degli attori.** Rientrare in una fase vuol dire rieseguire il suo
+  // `prepare`, che è il posto in cui i personaggi di quella missione vengono
+  // *definiti*: al contrario, `actors.restore` scriverebbe le morti su definizioni
+  // che ancora non esistono e chi era morto tornerebbe dietro al banco.
+  game.missions.restore(data.story, game);
   game.actors.restore(data.actors);
 
   const districts = new Set(data.stats.districts);

@@ -26,8 +26,10 @@
 // pedone, e ci arriva dal bus (`pedKilled`). Un attore morto non ricompare mai più, e
 // quel fatto entra nel salvataggio.
 //
-// **Non gira dentro un edificio.** Lì `game.peds` è scambiato con la gente del piano
-// (§3): aggiungerci un attore di strada lo farebbe comparire dentro un 노래방.
+// **Un attore di strada non gira dentro un edificio.** Lì `game.peds` è scambiato
+// con la gente del piano (§3): aggiungercelo lo farebbe comparire dentro un 노래방.
+// Chi invece *sta* dentro un edificio si dichiara tale (`indoor`), e allora non è
+// lo streaming a occuparsene ma il piano: vedi `populate`.
 import { createPed } from './pedestrians.js';
 
 // Oltre questo raggio non si crea; l'anello di despawn dello streaming è più largo,
@@ -99,12 +101,55 @@ export class ActorSystem {
     });
   }
 
+  /**
+   * I personaggi che stanno **su questo piano**, da aggiungere alla sua gente.
+   *
+   * Un attore d'interno non passa da `update`: lo streaming non arriva dentro un
+   * edificio, e il piano si ricostruisce a ogni visita (`shops.refreshCrowd`).
+   * Quello che *non* si ricostruisce è il pedone di un attore — lo si tiene, e
+   * quindi ci si ritrova le stesse ferite, la stessa posizione e lo stesso morto
+   * a terra della visita prima, che è tutto il punto di avere un nome.
+   *
+   * `x`/`y` sono in coordinate della **pianta**, non della città (§3). Chi non le
+   * sa in anticipo — ed è il caso normale, perché le piante sono generate — passa
+   * `place(floor)` e le riceve la prima volta che quel piano viene aperto: da lì
+   * restano scritte nella definizione, o il personaggio si sposterebbe a ogni visita.
+   */
+  populate(shopId, level, floor, game) {
+    const out = [];
+    for (const d of this.defs.values()) {
+      if (!d.indoor || d.shop !== shopId || (d.level || 0) !== level) continue;
+      // Un attore morto resta per terra come i clienti stesi (`floor.kept`): a
+      // sparire è chi non c'è mai stato, non chi ci hai lasciato.
+      if (d.dead) { if (d.ped) out.push(d.ped); continue; }
+      let p = d.ped;
+      if (!p || p.gone) {
+        if (d.place && d.x === undefined) Object.assign(d, d.place(floor));
+        p = createPed(d.kind, d.x, d.y, this.rng);
+        p.actor = d.id;
+        p.angle = d.angle;
+        p.faceA = d.angle;
+        p.state = d.state;
+        p.indoor = true;
+        // `staff` tiene un personaggio fuori dalla folla di passaggio: non se ne
+        // va alla chiusura e non lo si ritrova diverso alla visita dopo.
+        p.staff = true;
+        p.role = d.role || 'keeper';
+        p.home = { x: d.x, y: d.y };
+        d.ped = p;
+      }
+      out.push(p);
+    }
+    return out;
+  }
+
   update(dt, game) {
     // Dentro un edificio `game.peds` è la gente del piano: un attore di strada
     // aggiunto lì comparirebbe dentro il negozio.
     if (game.indoors || !this.defs.size) return;
     const pl = game.player;
     for (const d of this.defs.values()) {
+      if (d.indoor) continue;
       if (d.dead) { d.ped = null; continue; }
       if (d.ped && !d.ped.gone) continue;
       d.ped = null;

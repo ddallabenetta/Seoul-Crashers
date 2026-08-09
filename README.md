@@ -55,6 +55,24 @@ anche al primo avvio. Quello che semina torna tutto più avanti, quindi saltarla
 perdere niente. Sotto suona un tema suo, e alla fine si apre sul gioco vero: stesso vicolo, la
 mattina dopo, con l'asfalto ancora bagnato e l'auto di tuo padre parcheggiata lì davanti.
 
+## Le missioni
+
+Da lì parte la storia, e comincia **appena accendi il motore**. C'è **un obiettivo alla volta**,
+con un puntino sulla minimappa e sulla mappa, e una riga sotto l'orologio che dice cosa stai
+facendo: nessun elenco di commissioni sparse per la città. Quando serve interagire — riscuotere,
+raccogliere, leggere un cartello — il suggerimento compare in basso come per le porte dei negozi.
+
+**Le prime due ci sono.** In *«Il cappotto di un altro»* si gira Hongdae e Myeongdong per
+riscuotere il pizzo di martedì in tre posti: al terzo trovi una serranda con sopra un sigillo, e
+quella serranda resta abbassata per tutto il resto della partita. In *«Quello che resta in
+pegno»* si va a piedi, per vicoli e scalinate, a recuperare tre pegni scaduti per una signora di
+settantotto anni che tiene un banco dei pegni e ha il registro del quartiere in testa.
+
+I dialoghi **non ti tolgono la scena**: il mondo si ferma, la città resta lì sotto e si avanza a
+`Spazio`. Le tavole a fumetto arrivano solo in apertura e in chiusura. **Se muori o ti arrestano
+non ricominci la missione**: riparti dall'ultimo passo, e i pannelli già visti non te li rivedi.
+E la partita si ricorda a che punto eri, anche se la ricarichi tre giorni dopo.
+
 ## Il menu iniziale
 
 Il gioco si apre su un titolo con Seoul che gira dietro — traffico, pedoni e luci sono già
@@ -360,8 +378,13 @@ Alcune scelte tecniche che spiegano il risultato a schermo:
 
 ## Stato
 
+**Campagna, tappa B — completata.** Le prime due missioni, giocabili dall'inizio alla fine, e
+l'impianto che le regge: un obiettivo alla volta, fasi che si riprendono dopo una morte,
+dialoghi in scena, avanzamento nel salvataggio. E il **병원**, dove il direttore ha una battuta
+diversa ogni volta che ci si risveglia — e non se ne ripete mai una.
+
 **Campagna, tappa A — completata.** I pannelli, la cutscene iniziale «12년» (ventotto tavole,
-saltabile) e la pixel art dei personaggi: cinque volti disegnati cella per cella con quattro
+saltabile) e la pixel art dei personaggi: sette volti disegnati cella per cella con quattro
 espressioni a testa, un tema musicale suo e il tasto di salto.
 
 **Fase 1 — completata.** Città esplorabile, guida, traffico, pedoni, camera 2.5D, minimappa
