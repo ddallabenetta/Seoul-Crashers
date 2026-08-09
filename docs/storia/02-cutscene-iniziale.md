@@ -70,7 +70,7 @@ un'unica riga arancione all'orizzonte. Sul vetro, il riflesso della faccia di Ja
 spento, gli occhi bassi. È la prima volta che si vede, ed è giusto che si veda così.
 
 > Narratore: `06:41 · 12.000 metri sopra il Mar Giallo.`
-> `Volo da Los Angeles. Atterra fra due ore.`
+> `Volo da Los Angeles. Atterra fra un'ora.`
 
 **4 · La stessa inquadratura, sotto.** L'ala, e sotto l'ala Seoul che comincia: la griglia
 delle luci, il taglio nero del **한강** in mezzo. Sul fiume, tre ponti accesi.
@@ -305,7 +305,7 @@ pioggia è finita, l'asfalto è ancora bagnato, e l'auto del padre è parcheggia
 Il primo comando che il giocatore può dare è **accendere la radio**. Se lo fa entro il primo
 minuto, Kkachi dice una riga sola:
 
-> Kkachi: «Bene. Adesso mettiamo in ordine. Guida.»
+> 91.45: «Bene. Adesso mettiamo in ordine. Guida.»
 
 Se non lo fa, la stessa riga arriva quando sale in macchina la prima volta. Se il giocatore
 scende, cammina e non guida, **Kkachi non parla** — e questo è il modo in cui il gioco insegna,

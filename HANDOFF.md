@@ -11,14 +11,18 @@ schermo: si sceglie «Nuova partita» e partono ventotto tavole, con una musica 
 saltarle. Le tappe precedenti sono §5.8-5.27.
 
 > 📌 **Il prossimo lavoro è la tappa B**: impianto delle missioni (blip singolo, fasi, ripresa
-> dall'ultima fase) più **M1 e M2**. L'ordine di tutte le tappe sta **in testa a
-> [`docs/backlog.md`](docs/backlog.md) (§6.0)**, che è la prima cosa da leggere prima di
-> cominciare, e le nove decisioni d'impianto prese con l'utente stanno in
+> dall'ultima fase) più **M1 e M2** — e, agganciato lì perché si accumula per tutta la partita,
+> il **filo del 병원** ([`docs/storia/09-ospedale.md`](docs/storia/09-ospedale.md)): una battuta
+> diversa a ogni morte, e il conto delle morti che M12 stampa sulle fatture. L'ordine di tutte
+> le tappe sta **in testa a [`docs/backlog.md`](docs/backlog.md) (§6.0)**, che è la prima cosa
+> da leggere prima di cominciare, e le nove decisioni d'impianto prese con l'utente stanno in
 > [`docs/storia/08-domande-aperte.md`](docs/storia/08-domande-aperte.md): leggi quelle, non
 > ricavarle dal copione. Resta aperta una domanda sola (se le missioni si rigiocano) e non
-> blocca niente. **Chi disegna pannelli nuovi parte da §5.28**: il cast a pixel, le quattro
-> espressioni e le tre regole di scrittura dei dialoghi ci sono già, e le tavole si guardano
-> con `cutscene-sheet.scene` *prima* di dire che funzionano. Il resto del §6 resta ordinato per
+> blocca niente. **Chi disegna pannelli nuovi parte da §5.28**: il cast a pixel e le quattro
+> espressioni ci sono già, le **sei regole di scrittura** (tre di disegno, tre di
+> comprensibilità) stanno in testa a [`docs/storia/README.md`](docs/storia/README.md) con la
+> tabella delle parole già tradotte, e le tavole si guardano con `cutscene-sheet.scene`
+> *prima* di dire che funzionano. Il resto del §6 resta ordinato per
 > impatto: le voci più concrete sono il sorpasso, l'arresto che ti carica in volante e il
 > **corridoio fra Seoul e Busan**, che dal §5.25 è geografia percorribile ma non ha ancora
 > niente da fare — ed è la superficie naturale delle attività secondarie.
@@ -34,7 +38,8 @@ saltarle. Le tappe precedenti sono §5.8-5.27.
 | diagnosticare un comportamento strano — **prima di indagare da zero** | [`docs/trappole.md`](docs/trappole.md) |
 | tarare un numero (velocità, densità, danno, luce, audio, maglia) | [`docs/parametri.md`](docs/parametri.md) |
 | sapere cosa viene dopo e cosa è già stato deciso | [`docs/backlog.md`](docs/backlog.md) |
-| scrivere o implementare una missione, una cutscene, un dialogo | [`docs/storia/`](docs/storia/) — è l'indice: apri **un capitolo alla volta**, sono ~2000 righe |
+| scrivere o implementare una missione, una cutscene, un dialogo | [`docs/storia/`](docs/storia/) — è l'indice: apri **un capitolo alla volta**, sono ~2900 righe |
+| scrivere una data, un'età o un conteggio dentro una scena | [`docs/storia/10-continuita.md`](docs/storia/10-continuita.md) **prima** di scriverla |
 | disegnare un pannello, un personaggio a pixel o una nuova espressione | `docs/storico/17-pannelli-e-cutscene.md` (§5.28) |
 | verificare headless, usare `probe.mjs`, le scene o le skill | [`docs/strumenti.md`](docs/strumenti.md) |
 | capire *perché* una parte esistente è fatta così | [`docs/storico/`](docs/storico/) |

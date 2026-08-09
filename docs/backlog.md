@@ -15,11 +15,19 @@ sigillate, marcatori, testo su più righe). Quello che resta è **contenuto**, i
 | ~~1~~ | ~~**A**~~ | ~~primitive dei pannelli + la cutscene iniziale~~ — **fatta**, §5.28 | — |
 | 2 | **B** | impianto missioni: blip singolo, fasi, ripresa dall'ultima fase + **M1 e M2** | due missioni intere, una in strada e una in un interno |
 | 3 | **C** | **cortili persistenti** (nel salvataggio, con effetto sul commercio) | si prende un cortile, si esce, si ricarica, è ancora tuo |
-| 4 | **D** | Kkachi: stazione `91.45`, tabella con predicato, le otto chiamate dell'Atto I | si gira per Seoul con la radio accesa |
+| 4 | **D** | Kkachi: stazione `91.45`, tabella con predicato, le otto chiamate dell'Atto I **e le dodici righe di servizio** | si gira per Seoul con la radio accesa |
 | 5 | **E** | Atto I completo (M3, M4) + R1 | il primo ribaltamento in mano al giocatore |
 | 6 | **F** | Atto II (M5-M8) + R2, R3 + le otto chiamate dell'Atto II | l'atto che chiede più cose nuove al motore |
-| 7 | **G** | Atto III (M9-M12) + R4 + le otto chiamate dell'Atto III | il viaggio: ha bisogno di tutto quello di prima |
+| 7 | **G** | Atto III (M9-M12) + R4 + le otto chiamate dell'Atto III **e l'incontro facoltativo di Busan** | il viaggio: ha bisogno di tutto quello di prima |
 | 8 | **H** | i tre finali, i titoli di coda, la scena dopo | e a quel punto la Fase 3 è chiusa |
+
+**Fuori dalla fila, e va fatto presto: il filo del 병원**
+([`storia/09-ospedale.md`](storia/09-ospedale.md)). È l'unico contenuto della campagna che
+**si accumula per tutta la partita** — una battuta diversa a ogni morte, e il conto delle morti
+che M12 stampa sulle fatture. Non dipende da nessuna tappa (il risveglio esiste dal §5.16 ed
+emette già `respawn`), chiede solo **un intero nel salvataggio**, e se arriva alla tappa H
+tutte le morti fatte prima sono state mute per niente. Va agganciato alla **B**, insieme al
+primo pezzo d'impianto che tocca il salvataggio.
 
 **Cosa l'impianto del §5.27 ha già tolto di mezzo**, e che quindi nessuna di queste tappe deve
 più affrontare: gli inneschi delle missioni (bus, `game.on('pedKilled', …)`), una modalità nuova
@@ -34,9 +42,13 @@ sarebbe fermata al punto 4 su 5 (`game.shops.seal(...)`).
 personaggi); un pannello resta **una funzione**, una cutscene resta **un file**. Il cast a
 pixel c'è — Jae-min, Chun-sik, il tassista, il commesso, Seo Dong-hyeok — con quattro
 espressioni e sette pose; aggiungere un personaggio è una griglia 24×24 e una riga di palette.
-Le **tre regole di scrittura dei dialoghi** (si dice in chiaro una volta, il narratore traduce
+Le **regole di scrittura dei dialoghi** (si dice in chiaro una volta, il narratore traduce
 l'hangul che porta trama, gli indizi si rendono visibili e mai spiegati) sono in testa a
-`story/intro.js` e vanno rispettate dalle aperture delle missioni.
+`story/intro.js` e vanno rispettate dalle aperture delle missioni. **Il copione dei tre atti è
+già stato riscritto su quelle regole**: chi implementa un'apertura trova le battute nella forma
+definitiva, con le `(nota)` dove il giocatore va aiutato a *guardare* e la tabella delle parole
+già tradotte in testa a [`storia/README.md`](storia/README.md) — glossare una seconda volta la
+stessa parola è un errore, non una gentilezza.
 
 **Due debiti che l'apertura lascia alla tappa D.** La riga di Kkachi del passaggio di consegne
 è un `hud.toast` finché non esiste la stazione `91.45`. E la scena chiede ancora una **regia

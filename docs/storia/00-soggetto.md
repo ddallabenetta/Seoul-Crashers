@@ -35,9 +35,10 @@ frase che il giocatore ha già sentito da un altro personaggio, con la stessa id
 
 - **Un'eredità è un nome, e un nome lo può indossare chiunque.** Il bomber con l'artigliata
   della tigre bianca passa di dosso in dosso per tutto il gioco: dal padre a Jae-min nella
-  cutscene iniziale, da Jae-min a Dulchae nell'Atto II, e alla fine addosso a un ragazzino
-  che nessuno ha ancora nominato. È l'oggetto-tema del gioco. *Nel gioco esiste già: si cambia
-  colore al 옷가게.* Non è un caso, è la spina dorsale.
+  cutscene iniziale, poi in M8 si scopre che ce ne sono **due**, in M12 Dulchae lascia il suo
+  su una transenna, e dopo i titoli è addosso a qualcuno che nessuno ha mai nominato. È
+  l'oggetto-tema del gioco. *Nel gioco esiste già: si cambia colore al 옷가게.* Non è un caso,
+  è la spina dorsale.
 - **La riqualificazione è un modo educato di dire oblio.** Ryu non vuole uccidere nessuno:
   vuole che nessuno *risulti*. La sua arma non è una pistola, è una perizia.
 - **Geni contro nomi.** Dong-hyeok ha avuto tre figli e ne ha cresciuto uno solo: quello non
@@ -86,9 +87,10 @@ insieme la parte più strana della storia senza chiedere niente di nuovo al moto
   non risponde — e **questo è nel copione**, non un difetto («stanotte non ti sento, la città
   è muta»).
 - **L'ospedale conta.** Ogni volta che il giocatore muore si risveglia al 병원, e dal §5.16
-  esiste già il conto della cauzione. Il direttore **Jeong Han-su** ti saluta ogni volta e
-  ogni volta ha una battuta diversa: alla terza smette di essere gentile, alla decima ti dice
-  quante volte sei stato lì. Alla fine dell'Atto III si scopre chi paga quel conto.
+  esiste già il conto. Il direttore **Jeong Han-su** ti saluta ogni volta e ogni volta ha una
+  battuta diversa: alla terza smette di essere gentile, alla decima ti dice quante volte sei
+  stato lì. Alla fine dell'Atto III si scopre chi paga quel conto. **Le battute sono scritte,
+  tutte, in [`09-ospedale.md`](09-ospedale.md)**, compreso cosa succede a chi non muore mai.
 - **L'arresto è una missione, non una punizione.** M7 chiede di **farsi prendere**. Nelle sei
   ore di cella Kkachi non c'è (in cella non c'è la macchina), ed è l'unico pezzo di gioco in
   cui il giocatore è solo davvero.

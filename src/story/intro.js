@@ -139,7 +139,9 @@ export const INTRO = [
       ctx.ellipse(cx, cy, rx + P.h * 0.03, ry + P.h * 0.03, 0, 0, Math.PI * 2);
       ctx.stroke();
       vignette(P, 0.55);
-      narrator(P, '06:41 · 12.000 metri sopra il Mar Giallo.\nVolo da Los Angeles. Atterra fra due ore.');
+      // «Fra un'ora», non due: al pannello 5 è alle 08:10 in sala arrivi, e con
+      // due ore ci sarebbe prima dell'atterraggio.
+      narrator(P, '06:41 · 12.000 metri sopra il Mar Giallo.\nVolo da Los Angeles. Atterra fra un\'ora.');
     },
   },
   {

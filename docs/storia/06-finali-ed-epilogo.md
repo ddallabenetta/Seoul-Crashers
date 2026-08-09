@@ -7,9 +7,21 @@
 
 ## La scelta
 
-Ventesimo piano, notte, temporale. Sul tavolo tre cose: il registro rimesso insieme (i nove
-oggetti di Jo più i nove di Nam), il fascicolo dei diciassette anni di Ha-eun, e il calendario
-delle firme di Jeju. In tasca, un accendino che il giocatore ha in mano dalla missione 2.
+Ventesimo piano, notte, temporale. Sul tavolo tre cose, e il pannello le nomina una per una
+prima di chiedere qualsiasi cosa — perché la scelta è fra queste, e chi non sa cosa sta
+guardando non sta scegliendo:
+
+> Narratore: `Il registro del quartiere, rimesso insieme: i nove oggetti di Jo e i nove di`
+> `Nam, in fila. Trent'anni di chi deve cosa a chi.`
+> `Il fascicolo di Yoon Ha-eun: diciassette anni di indagini.`
+> `Il calendario delle firme di Jeju: dodici anni di una mano tenuta al caldo.`
+
+Per accendere c'è solo quello che c'è sul tavolo: **l'accendino è uno dei nove oggetti del
+registro**, quello che Jo Ok-bun pesava in mano al primo pannello di M2. Chi è tornato da lei
+dopo M6 ha in tasca **quello inciso** ([`07-radio-kkachi.md`](07-radio-kkachi.md), «le visite
+che cambiano») e brucia il registro con l'accendino che Dong-hyeok ha impegnato il giorno che
+si è preso il bambino. Meccanicamente non cambia niente; è l'unica cosa che cambia
+nell'immagine.
 
 Il gioco si ferma e mette tre righe. **Nessuna è marcata come quella giusta**, nessuna ha un
 punteggio, e il pannello non dice cosa comporta nessuna delle tre.
@@ -33,14 +45,15 @@ ventesimo piano, davanti a un uomo che gli sta spiegando che è esattamente quel
 1. Le carte che prendono fuoco nel cestino. La luce arancione sul vetro, e fuori il temporale.
 2. Ryu che guarda il fuoco **e non lo spegne**. È la sua tesi, messa in atto da un altro.
    > Ryu: «Ecco. Non ha fatto altro che il mio lavoro, con più stile.»
-3. Hongdae all'alba: le gru sono ferme. Non perché qualcuno le ha fermate — perché senza
-   registro **non si sa più chi possiede cosa**, e senza quello non si demolisce niente. Ci
-   vorranno anni di cause. Il quartiere ha comprato altro tempo. Di nuovo.
+3. Hongdae all'alba: le gru sono ferme.
+   > Narratore: `Per demolire bisogna sapere di chi è. Nessuno lo sa più: ci vorranno anni di`
+   > `cause. Il quartiere ha comprato altro tempo. Di nuovo.`
 4. Jo Ok-bun sulla sua sedia in mezzo alla strada, che chiede a Jae-min cosa c'è scritto sul
    cartello nuovo. Lui le dice: `sospensione dei lavori`. Lei annuisce.
    > Jo: «E i miei scaffali?»
    > Jae-min: «Non ci sono più.»
-   > Jo: «Allora non c'è più niente.» *(pausa)* «Va bene. Non doveva pagare nessuno.»
+   > Jo: «Allora non c'è più niente da ricordare.» *(pausa)* «Va bene. Adesso non deve più
+   > pagare nessuno.»
 5. Chun-sik che apre il 당구장 come tutti i martedì. Il tavolo con tre tazze. **Ne riempie
    due.**
 6. Jae-min in piedi in mezzo a Hongdae, con la gente che passa. Ha ancora il bomber. Sulla
@@ -58,9 +71,13 @@ Kkachi**: 91.45, per undici ore, a ciclo continuo, con la voce che il quartiere 
 **Sette pannelli.**
 
 1. Il 피시방, i nove dischi, il ventilatore da tavolo, Mi-rae che collega un cavo.
+   > Mi-rae: «Undici ore per leggerlo tutto. Poi ricomincia da capo.»
+   > Jae-min: «E quando lo spegniamo?»
+   > Mi-rae: «Quando lo ha sentito qualcuno che conta. Cioè mai. Cioè lo lasciamo acceso.»
 2. Il quadrante di una radio in un taxi. Poi in un 편의점. Poi in un'officina. Poi in cento
    posti insieme: **tutta la città sulla stessa frequenza**, che è l'unica volta in cui succede.
-3. La voce di Dong-hyeok che legge i nomi. Tutti. Compresi i suoi.
+3. La voce di Dong-hyeok che legge i nomi: chi deve, quanto, e a chi. Uno per uno, per undici
+   ore. Fra i nomi c'è anche il suo.
 4. Le conseguenze, in un pannello solo diviso in sei riquadri: Ryu portato via da una macchina
    della procura (e che si toglie gli occhiali mentre sale, cioè: sta dicendo la verità a
    qualcuno che non sentiremo); Pyo Man-deok arrestato; Nam Ji-uk che parte per il Giappone;
@@ -84,15 +101,16 @@ segnalata dal gioco:
 
 1. ha ascoltato almeno **venti delle ventiquattro chiamate radio facoltative**
    ([`07-radio-kkachi.md`](07-radio-kkachi.md));
-2. è tornato dal 전당포 di Jo Ok-bun **dopo M6** e le ha fatto «la domanda giusta»
-   (chiedere di 구만기 col proprio nome);
+2. è tornato dal 전당포 di Jo Ok-bun **dopo M6** e le ha fatto «la domanda giusta»: chiederle
+   di 구만기 dicendole che quel nome è inciso sul suo orologio. È la sola domanda del gioco
+   che il giocatore deve comporre da solo, ed è composta di due cose che ha già in mano;
 3. **non ha ucciso Dulchae** in nessuna delle tre occasioni in cui il gioco lo rende possibile
    (M8, l'assedio di M12, e l'incontro facoltativo di Busan).
 
 **Cosa fa** — Jae-min non brucia e non trasmette. Prende dal registro **una pagina sola**,
 quella del 1992 con la riga `구만기 · 유아 1 · 백호 인수`, e la strappa. Poi va al comune,
 mette in mano a un impiegato la cartellina di Jeju e chiede la cancellazione di un nome dal
-registro di famiglia: il proprio. La riga resta a uno solo dei due.
+registro di famiglia: il proprio. Il nome `서재민` resta a uno solo dei due, e non a lui.
 
 **Cinque pannelli.**
 
@@ -102,10 +120,11 @@ registro di famiglia: il proprio. La riga resta a uno solo dei due.
 3. Dulchae seduto su un muretto davanti al 피시방, con in mano un documento in cui adesso c'è
    un uomo solo.
    > Dulchae: «Perché?»
-   > Jae-min: «Perché tu lo hai portato per dodici anni e io per zero. È tuo. Io ho l'altra
+   > Jae-min: «Perché tu quel nome lo hai portato dodici anni e io zero. È tuo. Io ho l'altra
    > cosa.»
    > Dulchae: «Quale?»
    > Jae-min: «Mi ricordo la cucina.»
+   > *(nota)* Dulchae in quella cucina non c'era.
 4. I due seduti sullo stesso muretto, che non parlano. **Nessuno dei due ha le mani in tasca.**
 5. Il registro, intero, riportato a Jo Ok-bun in una cassetta della frutta. Lei ci mette le
    mani dentro e comincia a rimetterlo in ordine per peso.
@@ -144,6 +163,15 @@ Ogni tanto, fra i nomi, una riga di stato che dipende dalla partita:
 **2 ·** Un monitor con la forma d'onda che si muove. Nessuno nella stanza.
 **3 ·** Il quadrante di una radio in una macchina qualunque, guidata da qualcuno che non
 vediamo, che scorre le stazioni e si ferma da sola fra 91.4 e 91.5.
+
+> *(nota)* Nello specchietto si vede una spalla sola, e sulla spalla la banda rossa.
+
+*(È il bomber, e chi lo porta non ha ancora un nome — non lo avrà. Il giubbotto è passato dal
+padre a Jae-min nella cutscene iniziale, in M8 si è scoperto che ce n'erano due, in M12 Dulchae
+ha lasciato il suo piegato su una transenna, e adesso lo porta qualcuno che nel gioco non è mai
+comparso. È l'oggetto-tema ([`00-soggetto.md`](00-soggetto.md), §3), e questo pannello è il
+posto in cui il titolo della scena — «seconda generazione» — smette di essere un modo di dire.
+La spalla si vede per un secondo e non la commenta nessuno.)*
 
 **4 · La voce che risponde**, e cambia col finale:
 
