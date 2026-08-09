@@ -362,7 +362,7 @@ export class MapView {
     ctx.fillStyle = 'rgba(235,240,250,0.4)';
     ctx.font = `${L.compact ? '500 11px' : '500 12px'} system-ui, sans-serif`;
     ctx.fillText(L.controls ? 'pinza/trascina: zoom e sposta' : 'rotella: zoom · trascina: sposta', px, ly + 4, infoW);
-    ctx.fillText(L.controls ? 'M o ESC: chiudi · tocca una voce per orientarti' : 'M o ESC: chiudi', px, ly + 22, infoW);
+    ctx.fillText(L.controls ? 'indietro: chiudi · tocca una voce per orientarti' : 'M o ESC: chiudi', px, ly + 22, infoW);
 
     ctx.restore();
   }

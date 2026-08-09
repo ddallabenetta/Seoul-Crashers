@@ -290,8 +290,8 @@ class Game {
     if (loaded) return;
     if (this.mobileControls?.active) {
       this.hud.toast('Stick sinistro: muoviti · stick destro: mira e spara', 5);
-      this.hud.toast('E interagisce · ↻ cambia arma · M apre la mappa', 6.5);
-      this.hud.toast('F svuota la cassa · tieni premuto R per spegnere la radio', 8);
+      this.hud.toast('L\'icona luminosa mostra l\'azione disponibile', 6.5);
+      this.hud.toast('La radio compare quando sali su un mezzo', 8);
     } else {
       this.hud.toast('E per rubare un\'auto · M per la mappa', 5);
       this.hud.toast('Mouse per mirare e sparare · 1-6 per l\'arma', 6.5);

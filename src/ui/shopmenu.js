@@ -283,7 +283,7 @@ export class ShopMenu {
     ctx.textAlign = 'center';
     ctx.fillStyle = 'rgba(235,240,250,0.4)';
     ctx.font = `${L.compact ? '500 10px' : '500 12px'} system-ui, sans-serif`;
-    ctx.fillText(L.controls ? 'su/giù · tocca · E/Invio compra · ESC esci' : 'W / S — scegli · E — compra · ESC — esci', x + pw / 2, y + ph - (L.compact ? 12 : 18), pw - 24);
+    ctx.fillText(L.controls ? 'su/giù · tocca per comprare · indietro per uscire' : 'W / S — scegli · E — compra · ESC — esci', x + pw / 2, y + ph - (L.compact ? 12 : 18), pw - 24);
     if (this.items.length > shown) {
       ctx.textAlign = 'right';
       ctx.fillStyle = hexA(accent, 0.55);

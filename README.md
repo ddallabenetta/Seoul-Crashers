@@ -52,8 +52,10 @@ Poi apri <http://localhost:8123>.
 Su telefoni e tablet l'interfaccia si adatta automaticamente sia in verticale sia in
 orizzontale, rispettando notch e area del gesto di sistema. Lo stick sinistro muove o sterza;
 quello destro mira e spara. I pulsanti a schermo coprono interazione, azione alternativa,
-scatto, guida e quota, mirino, cambio arma, mappa, pausa e radio. Un tocco su `R` cambia
-stazione, una pressione prolungata la spegne.
+scatto, guida e quota, mirino, cambio arma, mappa e pausa usando pittogrammi invece dei
+tasti della tastiera. L'icona contestuale si illumina e cambia forma solo quando si può
+interagire davvero; l'icona della radio compare esclusivamente a bordo di un mezzo. Un
+tocco sulla radio cambia stazione, una pressione prolungata la spegne.
 
 Menu, negozi, salvataggi e metro si usano con il dock da 44 px in fondo allo schermo oppure
 toccando direttamente le voci. Nella mappa si trascina con un dito e si pizzica con due;

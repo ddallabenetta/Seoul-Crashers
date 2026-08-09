@@ -452,7 +452,7 @@ export class MetroSystem {
     ctx.fillStyle = 'rgba(235,241,250,0.48)';
     ctx.font = `${L.compact ? '500 10px' : '500 12px'} system-ui, sans-serif`;
     const footer = L.controls
-      ? 'su/giù · E/Invio sali · ESC resta in banchina'
+      ? 'su/giù · conferma per salire · indietro resta in banchina'
       : 'W/S o frecce: scegli · E/Invio: sali · ESC: resta in banchina';
     ctx.fillText(ellipsisText(ctx, footer, pw - 54), x + (L.compact ? 18 : 30), y + ph - (L.compact ? 12 : 24), pw - 54);
     ctx.restore();

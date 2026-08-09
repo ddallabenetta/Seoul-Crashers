@@ -29,13 +29,13 @@ export const CONTROLS = [
 const TOUCH_CONTROLS = [
   ['Stick sinistro', 'muoviti · sterza'],
   ['Stick destro', 'mira · spara · drive-by'],
-  ['E', 'interagisci · sali/scendi · entra'],
-  ['F / H', 'azione alternativa · clacson'],
-  ['⇧ / Space', 'corri · frena · quota giù/su'],
-  ['Mira', 'fucile di precisione'],
-  ['↻', 'arma successiva'],
-  ['M / Ⅱ', 'mappa · pausa'],
-  ['R', 'tocca: stazione · tieni: spegni'],
+  ['Icona luminosa', 'azione disponibile · sali/scendi · entra'],
+  ['Icona secondaria', 'azione alternativa · clacson'],
+  ['Corsa / quota', 'corri · frena · sali/scendi di quota'],
+  ['Mirino', 'fucile di precisione'],
+  ['Cambio arma', 'arma successiva'],
+  ['Mappa / pausa', 'apri i relativi pannelli'],
+  ['Radio', 'solo a bordo · tocca: stazione · tieni: spegni'],
   ['Pinza / trascina', 'zoom e spostamento mappa'],
 ];
 
@@ -284,7 +284,10 @@ export class PauseMenu {
       else this.drawSaves(ctx, game, x + 12, py, panelW - 24, ph, L);
       ctx.fillStyle = 'rgba(235,240,250,0.45)';
       ctx.font = '500 11px system-ui, sans-serif';
-      ctx.fillText(this.focus === 'items' ? 'ESC · chiudi menu' : 'ESC · torna alle voci', x + 18, h - safeBottom - 10);
+      const backHint = L.controls
+        ? (this.focus === 'items' ? 'indietro · chiudi menu' : 'indietro · torna alle voci')
+        : (this.focus === 'items' ? 'ESC · chiudi menu' : 'ESC · torna alle voci');
+      ctx.fillText(backHint, x + 18, h - safeBottom - 10);
       return;
     }
 

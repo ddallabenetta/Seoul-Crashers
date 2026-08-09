@@ -70,8 +70,8 @@ export class Hud {
       this.drawSpeedo(ctx, game, w - (L.compact ? 104 : 132), L.compact ? h - L.safeBottom - 86 : h - 112, speedScale);
       this.drawRadio(ctx, game, w - L.safeX, L.compact ? h - L.safeBottom - 132 : h - 154, L);
     }
-    // Sui controlli touch l'arma corrente è già nel pannello vitale e il tasto
-    // ↻ la cambia: la fila desktop da sei slot coprirebbe leve e pulsanti.
+    // Sui controlli touch l'arma corrente è già nel pannello vitale e l'icona
+    // dedicata la cambia: la fila desktop da sei slot coprirebbe leve e pulsanti.
     if (!L.controls) this.drawWeaponBar(ctx, game, w, h, L, mapY);
     const vitW = L.compact ? Math.min(238, Math.max(168, w * (L.portrait ? 0.55 : 0.38))) : 262;
     this.drawVitals(ctx, game, L.safeX, L.safeTop, { w: vitW, h: L.compact ? 56 : 62 });
@@ -960,17 +960,13 @@ export class Hud {
     ctx.restore();
   }
 
-  /**
-   * Autoradio: sta sopra il tachimetro, allineata al suo bordo destro. Si vede
-   * anche da spenta — è l'unico posto in cui il tasto `R` si racconta da solo,
-   * e una radio che non si sa di avere è una radio che nessuno accende.
-   */
+  /** Autoradio: sta sopra il tachimetro, allineata al suo bordo destro. */
   drawRadio(ctx, game, right, y, L = null) {
     const r = game.radio;
     if (!r) return;
     const on = r.on;
     const maxW = L?.compact ? Math.max(116, Math.min(190, L.w * 0.42)) : 230;
-    const text = on ? ellipsisText(ctx, r.label, maxW) : (L?.compact ? 'R · radio' : 'R  —  radio');
+    const text = on ? ellipsisText(ctx, r.label, maxW) : (L?.controls ? 'radio' : 'R  —  radio');
     ctx.save();
     ctx.font = '600 12px system-ui, "Apple SD Gothic Neo", sans-serif';
     const tw = Math.min(maxW, ctx.measureText(text).width);
@@ -1030,23 +1026,30 @@ export class Hud {
   drawHints(ctx, game, w, h, L = uiLayout(w, h, game)) {
     const p = game.player;
     const lines = [];
+    const actionText = (a, fallback = 'E') => L.controls
+      ? a.text
+      : `${a.key || fallback}  —  ${a.text}`;
     // Prima quelle della missione: quando un punto di missione e una porta stanno
     // nello stesso metro quadro, quello che il giocatore è venuto a fare va in cima.
-    for (const a of game.missions ? game.missions.actions : []) lines.push(`${a.key || 'E'}  —  ${a.text}`);
-    for (const a of game.shops ? game.shops.actions : []) lines.push(`${a.key}  —  ${a.text}`);
+    for (const a of game.missions ? game.missions.actions : []) lines.push(actionText(a));
+    for (const a of game.shops ? game.shops.actions : []) lines.push(actionText(a));
     const metroHint = game.metro?.hint(game);
-    if (metroHint) lines.push(metroHint);
+    if (metroHint) lines.push(L.controls
+      ? metroHint.replace(/^\s*E\s*[—-]\s*/i, '')
+      : metroHint);
     if (!game.indoors) {
       if (p.onFoot) {
         const v = p.findNearbyVehicle(game);
-        if (v) lines.push(`E  —  sali in ${VEHICLE_TYPES[v.kind].label}`);
+        if (v) lines.push(L.controls
+          ? `sali in ${VEHICLE_TYPES[v.kind].label}`
+          : `E  —  sali in ${VEHICLE_TYPES[v.kind].label}`);
       } else if (VEHICLE_TYPES[p.vehicle.kind].air) {
         // Comandi di volo: sono l'unica cosa in tutto il gioco che non si indovina
         // dai tasti di guida, quindi restano scritti finché si è a bordo.
-        lines.push('SPAZIO  —  sali   ·   SHIFT  —  scendi');
-        if (p.vehicle.z <= 6) lines.push('E  —  scendi');
+        lines.push(L.controls ? 'controlli quota: salita · discesa' : 'SPAZIO  —  sali   ·   SHIFT  —  scendi');
+        if (p.vehicle.z <= 6) lines.push(L.controls ? 'scendi dal mezzo' : 'E  —  scendi');
       } else if (Math.abs(p.vehicle.speed) < 40) {
-        lines.push('E  —  scendi');
+        lines.push(L.controls ? 'scendi dal mezzo' : 'E  —  scendi');
       }
     }
     if (!lines.length) return;

@@ -1,6 +1,8 @@
-// I controlli touch sono un adattatore sottile di Input. Non conoscono il mondo:
-// ogni bottone emette lo stesso fronte di tasto/mouse della tastiera e del
-// puntatore desktop, così menu e partita condividono il contratto.
+import { VEHICLE_TYPES } from '../render/sprites.js';
+
+// I controlli touch emettono gli stessi fronti della tastiera, ma raccontano il
+// mondo con icone contestuali: il giocatore vede l'azione, non il tasto desktop
+// che la implementa. Missioni, negozi, metro e veicoli restano le fonti di verità.
 
 const STYLE = `
 #mobile-controls {
@@ -63,6 +65,26 @@ const STYLE = `
   transform: translateY(-118px);
 }
 #mobile-controls .mc-actions button { min-height: 44px; padding-inline: 5px; }
+#mobile-controls .mc-icon {
+  display: block; width: 25px; height: 25px; margin: auto;
+  fill: none; stroke: currentColor; stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round; pointer-events: none;
+}
+#mobile-controls .mc-context {
+  opacity: .3; color: rgba(244,247,251,.7);
+  transition: opacity .14s ease, color .14s ease, background .14s ease,
+    border-color .14s ease, box-shadow .14s ease;
+}
+#mobile-controls .mc-context.available {
+  opacity: 1; color: #eafaff; background: rgba(24,122,153,.72);
+  border-color: rgba(105,224,255,.86);
+  box-shadow: 0 0 0 1px rgba(105,224,255,.18), 0 0 15px rgba(56,214,255,.48);
+}
+#mobile-controls .mc-context[aria-disabled="true"] { cursor: default; }
+#mobile-controls button.selected {
+  color: #8ceaff; border-color: rgba(100,213,255,.72);
+  background: rgba(24,105,134,.72); box-shadow: 0 0 12px rgba(56,214,255,.3);
+}
 #mobile-controls .mc-actions button[data-action="pause"],
 #mobile-controls .mc-actions button[data-action="map"] { background: rgba(8,12,18,.54); }
 #mobile-controls .mc-nav {
@@ -97,22 +119,50 @@ const STYLE = `
 }
 `;
 
+const svg = (body) => `<svg class="mc-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${body}</svg>`;
+
+// Pittogrammi a tratto: restano nitidi a ogni DPR e prendono il colore dello
+// stato del bottone. Nessuna icona contiene lettere o dipende da un font emoji.
+const ICONS = {
+  interact: svg('<path d="M8.5 11V5.5a1.5 1.5 0 0 1 3 0V10"/><path d="M11.5 9V4.5a1.5 1.5 0 0 1 3 0V10"/><path d="M14.5 9V6a1.5 1.5 0 0 1 3 0v5"/><path d="M17.5 10a1.5 1.5 0 0 1 3 0v3.5c0 4.1-2.7 7-6.7 7h-1.1c-2.2 0-3.5-.8-4.8-2.4L4.2 13.5a1.6 1.6 0 0 1 2.4-2.1l1.9 1.9"/>'),
+  carIn: svg('<path d="M3 14.5v-3l2-4h10l2 4v5H3z"/><path d="M5 7.5 6.5 5h7L15 7.5M5.5 14.5h.01M14.5 14.5h.01M5 16.5V19M15 16.5V19"/><path d="M18 9h4m-2-2 2 2-2 2"/>'),
+  carOut: svg('<path d="M7 14.5v-3l2-4h10l2 4v5H7z"/><path d="M9 7.5 10.5 5h7L19 7.5M9.5 14.5h.01M18.5 14.5h.01M9 16.5V19M19 16.5V19"/><path d="M6 9H2m2-2L2 9l2 2"/>'),
+  door: svg('<path d="M5 21h14M7 21V3h10v18M14 12h.01"/><path d="M2 12h4m-2-2 2 2-2 2"/>'),
+  shop: svg('<path d="M4 10v10h16V10M3 8l2-4h14l2 4"/><path d="M3 8a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 2 0M9 20v-6h6v6"/>'),
+  stairs: svg('<path d="M3 19h5v-4h4v-4h4V7h5"/><path d="m15 4 3-3 3 3M18 1v6"/>'),
+  bed: svg('<path d="M3 5v15M21 10v10M3 17h18M6 10h13a2 2 0 0 1 2 2v5H3v-4a3 3 0 0 1 3-3zM6 10V7h5a2 2 0 0 1 2 2v1"/>'),
+  train: svg('<rect x="5" y="3" width="14" height="16" rx="3"/><path d="M8 7h8M8 12h.01M16 12h.01M8 19l-2 3M16 19l2 3M8 16h8"/>'),
+  mission: svg('<path d="M5 22V3M5 4h11l-2 3 2 3H5"/><circle cx="5" cy="3" r="1"/>'),
+  cash: svg('<path d="M4 7h16v10H4z"/><path d="M7 10h.01M17 14h.01"/><circle cx="12" cy="12" r="2.5"/><path d="M7 4h13v10M4 10H2v10h15v-3"/>'),
+  alternate: svg('<path d="m13 2-8 12h7l-1 8 8-12h-7z"/>'),
+  horn: svg('<path d="M4 10h5l7-4v12l-7-4H4zM4 10v4M19 9l2-2M19 15l2 2M19 12h3"/>'),
+  sprint: svg('<circle cx="15" cy="4" r="2"/><path d="m13 7-3 4 4 2 2 4M13 7l4 3 3 1M10 11l-3 4-4 1M14 13l-4 7"/>'),
+  brake: svg('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><path d="M5.5 6.5 3 4M18.5 6.5 21 4M5.5 17.5 3 20M18.5 17.5 21 20"/>'),
+  climbUp: svg('<path d="m6 15 6-6 6 6M6 20l6-6 6 6"/>'),
+  climbDown: svg('<path d="m6 4 6 6 6-6M6 9l6 6 6-6"/>'),
+  scope: svg('<circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/><circle cx="12" cy="12" r="1"/>'),
+  weapon: svg('<path d="M5 11h9l3 3v3h-4l-2-3H8l-1 5H4l1-8zM7 8l8-3 2 2-6 4"/><path d="M3 6a9 9 0 0 1 16-2M18 1l1 3-3 1M21 18a9 9 0 0 1-16 2M6 23l-1-3 3-1"/>'),
+  map: svg('<path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3zM9 3v15M15 6v15"/>'),
+  pause: svg('<path d="M8 5v14M16 5v14"/>'),
+  radio: svg('<rect x="3" y="7" width="18" height="13" rx="2"/><path d="m6 7 10-4M7 11h6M7 15h4"/><circle cx="17" cy="14" r="2.5"/>'),
+};
+
 const ACTIONS = [
-  ['interact', 'E', 'Interagisci'],
-  ['alternate', 'F', 'Azione alternativa'],
-  ['sprint', '⇧', 'Scatto / discesa'],
-  ['brake', 'Space', 'Freno / salita'],
-  ['scope', 'Mira', 'Mira di precisione'],
-  ['weapon', '↻', 'Cambia arma'],
-  ['map', 'M', 'Mappa'],
-  ['pause', 'Ⅱ', 'Pausa'],
-  ['radio', 'R', 'Radio (tieni premuto per spegnere)'],
+  ['interact', 'interact', 'Interagisci'],
+  ['alternate', 'alternate', 'Azione alternativa'],
+  ['sprint', 'sprint', 'Scatto'],
+  ['brake', 'brake', 'Freno a mano'],
+  ['scope', 'scope', 'Mira di precisione'],
+  ['weapon', 'weapon', 'Cambia arma'],
+  ['map', 'map', 'Mappa'],
+  ['pause', 'pause', 'Pausa'],
+  ['radio', 'radio', 'Radio (tieni premuto per spegnere)'],
 ];
 
 const NAV = [
   ['nav-up', '▲', 'Naviga su', 'ArrowUp'],
   ['nav-left', '◀', 'Naviga a sinistra', 'ArrowLeft'],
-  ['nav-confirm', 'OK', 'Conferma', 'Enter'],
+  ['nav-confirm', '✓', 'Conferma', 'Enter'],
   ['nav-right', '▶', 'Naviga a destra', 'ArrowRight'],
   ['nav-down', '▼', 'Naviga giù', 'ArrowDown'],
   ['nav-back', '↩', 'Indietro', 'Escape'],
@@ -183,8 +233,10 @@ export class MobileControls {
     const actions = document.createElement('div');
     actions.className = 'mc-actions';
     play.appendChild(actions);
-    for (const [id, label, aria] of ACTIONS) {
-      const button = this._button(actions, id, label, aria, 'mc-held');
+    for (const [id, icon, aria] of ACTIONS) {
+      const contextual = id === 'interact' || id === 'alternate' ? ' mc-context' : '';
+      const button = this._button(actions, id, '', aria, `mc-held${contextual}`);
+      this._setIcon(button, icon);
       this._bindAction(button, id);
     }
     this._bindStick(left, 'left');
@@ -217,6 +269,7 @@ export class MobileControls {
   _bindKey(button, code, source) {
     const begin = (e) => {
       e.preventDefault(); e.stopPropagation();
+      if (button.dataset.available === 'false') return;
       try { button.setPointerCapture?.(e.pointerId); } catch (_) { /* niente */ }
       if (this._held.get(source)) return;
       const actualCode = typeof code === 'function' ? code() : code;
@@ -240,6 +293,7 @@ export class MobileControls {
     // il gesto del puntatore (`detail` è diverso da zero in quel caso).
     button.addEventListener('click', (e) => {
       if (e.detail !== 0) return;
+      if (button.dataset.available === 'false') return;
       const actualCode = typeof code === 'function' ? code() : code;
       this.input.press(actualCode, source);
       this.input.release(actualCode, source);
@@ -248,7 +302,11 @@ export class MobileControls {
 
   _bindAction(button, id) {
     if (id === 'weapon') {
-      const action = (e) => { e.preventDefault(); e.stopPropagation(); this.input.virtualWheel(1); };
+      const action = (e) => {
+        e.preventDefault(); e.stopPropagation();
+        if (button.dataset.available === 'false') return;
+        this.input.virtualWheel(1);
+      };
       button.addEventListener('pointerdown', action);
       button.addEventListener('click', (e) => { if (e.detail === 0) action(e); });
       return;
@@ -295,6 +353,7 @@ export class MobileControls {
     };
     const begin = (e) => {
       e.preventDefault(); e.stopPropagation();
+      if (button.dataset.available === 'false') return;
       try { button.setPointerCapture?.(e.pointerId); } catch (_) { /* niente */ }
       if (state.held) return;
       state.held = true;
@@ -316,6 +375,7 @@ export class MobileControls {
     button.addEventListener('lostpointercapture', end);
     button.addEventListener('click', (e) => {
       if (e.detail !== 0) return;
+      if (button.dataset.available === 'false') return;
       this.input.press('KeyR', source);
       this.input.release('KeyR', source);
     });
@@ -325,6 +385,7 @@ export class MobileControls {
   _bindMouse(button, buttonCode, source) {
     const begin = (e) => {
       e.preventDefault(); e.stopPropagation();
+      if (button.dataset.available === 'false') return;
       try { button.setPointerCapture?.(e.pointerId); } catch (_) { /* niente */ }
       if (this._held.get(source)) return;
       this._held.set(source, true);
@@ -343,7 +404,9 @@ export class MobileControls {
     button.addEventListener('pointercancel', end);
     button.addEventListener('lostpointercapture', end);
     button.addEventListener('click', (e) => {
-      if (e.detail === 0) { this.input.setRight(true, source); this.input.setRight(false, source); }
+      if (e.detail === 0 && button.dataset.available !== 'false') {
+        this.input.setRight(true, source); this.input.setRight(false, source);
+      }
     });
     void buttonCode;
   }
@@ -426,37 +489,125 @@ export class MobileControls {
 
   _show(layer, show) { if (layer) layer.hidden = !show; }
 
-  _labels(mode) {
+  _setIcon(button, name) {
+    if (!button || button.dataset.icon === name) return;
+    button.innerHTML = ICONS[name] || ICONS.interact;
+    button.dataset.icon = name;
+  }
+
+  _setButton(id, { icon, label, visible = true, available = true, selected = false }) {
+    const button = this.buttons.get(id);
+    if (!button) return;
+    button.hidden = !visible;
+    button.dataset.available = available ? 'true' : 'false';
+    button.setAttribute('aria-disabled', available ? 'false' : 'true');
+    button.classList.toggle('available', available);
+    button.classList.toggle('selected', selected);
+    button.setAttribute('aria-label', label);
+    button.title = label;
+    this._setIcon(button, icon);
+  }
+
+  _actionFor(key) {
+    const matches = (a) => String(a?.key || 'E').toUpperCase() === key;
+    const mission = this.game.missions?.actions?.find(matches);
+    if (mission) return { action: mission, source: 'mission' };
+    const shop = this.game.shops?.actions?.find(matches);
+    if (shop) return { action: shop, source: 'shop' };
+    return null;
+  }
+
+  _iconForAction(text, source, fallback = 'interact') {
+    if (source === 'mission') return 'mission';
+    const s = String(text || '').toLocaleLowerCase('it');
+    if (/metro|treno|banchina|tornell/.test(s)) return 'train';
+    if (/sali al|scendi al|piano|scala/.test(s)) return 'stairs';
+    if (/dormi|letto/.test(s)) return 'bed';
+    if (/vendi|cassa|contanti|paga/.test(s)) return 'cash';
+    if (/listino|negozio|entra in|compra/.test(s)) return 'shop';
+    if (/esci|porta|retro/.test(s)) return 'door';
+    return fallback;
+  }
+
+  _interactionState(player, vehicle) {
+    const ready = !!player && !player.dying && player.enterCooldown <= 0;
+    if (vehicle) {
+      const airborne = !!VEHICLE_TYPES[player.vehicle.kind]?.air && player.vehicle.z > 6;
+      return {
+        icon: 'carOut', available: ready && !airborne,
+        label: airborne ? 'Atterra prima di scendere' : 'Scendi dal mezzo',
+      };
+    }
+
+    const contextual = this._actionFor('E');
+    if (contextual) {
+      return {
+        icon: this._iconForAction(contextual.action.text, contextual.source),
+        available: ready,
+        label: contextual.action.text || 'Interagisci',
+      };
+    }
+
+    const metroHint = this.game.metro?.hint?.(this.game);
+    if (/^\s*E\s*[—-]/i.test(metroHint || '')) {
+      return {
+        icon: 'train', available: ready,
+        label: String(metroHint).replace(/^\s*E\s*[—-]\s*/i, ''),
+      };
+    }
+
+    const nearby = !this.game.indoors && !this.game.metro?.inside
+      && !this.game.shops?.near && player?.onFoot
+      ? player.findNearbyVehicle?.(this.game)
+      : null;
+    if (nearby) return { icon: 'carIn', available: ready, label: 'Sali sul mezzo' };
+    return { icon: 'interact', available: false, label: 'Nessuna interazione disponibile' };
+  }
+
+  _syncActions(mode) {
     const player = this.game.player;
     const vehicle = !!(player && !player.onFoot && player.vehicle);
-    const alternate = this.buttons.get('alternate');
-    const brake = this.buttons.get('brake');
-    const sprint = this.buttons.get('sprint');
-    const scope = this.buttons.get('scope');
-    if (alternate) {
-      alternate.textContent = vehicle ? 'H' : 'F';
-      alternate.setAttribute('aria-label', vehicle ? 'Clacson' : 'Azione alternativa');
-      alternate.title = vehicle ? 'Clacson' : 'Azione alternativa';
-    }
-    if (brake) {
-      brake.hidden = !vehicle;
-      brake.textContent = vehicle && player.vehicle?.air ? 'Space' : 'Freno';
-      brake.setAttribute('aria-label', vehicle && player.vehicle?.air ? 'Sali' : 'Freno a mano');
-    }
-    if (sprint) {
-      sprint.hidden = vehicle && !player.vehicle?.air;
-      sprint.textContent = vehicle && player.vehicle?.air ? 'Shift' : '⇧';
-      sprint.setAttribute('aria-label', vehicle && player.vehicle?.air ? 'Scendi' : 'Scatto');
-      sprint.title = vehicle && player.vehicle?.air ? 'Scendi' : 'Scatto';
-    }
-    if (scope) scope.hidden = vehicle;
-    const radio = this.buttons.get('radio');
-    if (radio) {
-      radio.setAttribute('aria-label', 'Radio: tocca per cambiare, tieni premuto per spegnere');
-      radio.title = 'Tocca: cambia stazione · Tieni premuto: spegni';
-    }
-    // Mappa, pausa e radio restano visibili in partita: servono anche senza
-    // un'arma o un'interazione vicina. Le etichette cambiano col contesto.
+    const air = !!(vehicle && VEHICLE_TYPES[player.vehicle.kind]?.air);
+    const interaction = this._interactionState(player, vehicle);
+    this._setButton('interact', { ...interaction, visible: true });
+
+    const alternate = vehicle ? null : this._actionFor('F');
+    this._setButton('alternate', vehicle
+      ? { icon: 'horn', label: 'Clacson', visible: true, available: true }
+      : {
+          icon: alternate
+            ? this._iconForAction(alternate.action.text, alternate.source, 'alternate')
+            : 'alternate',
+          label: alternate?.action?.text || 'Nessuna azione secondaria disponibile',
+          visible: !!alternate, available: !!alternate && player?.enterCooldown <= 0,
+        });
+
+    this._setButton('brake', {
+      icon: air ? 'climbUp' : 'brake',
+      label: air ? 'Sali di quota' : 'Freno a mano',
+      visible: vehicle, available: vehicle,
+    });
+    this._setButton('sprint', {
+      icon: air ? 'climbDown' : 'sprint',
+      label: air ? 'Scendi di quota' : 'Scatto',
+      visible: !vehicle || air, available: !vehicle || air,
+    });
+    this._setButton('scope', {
+      icon: 'scope', label: 'Mira di precisione',
+      visible: !vehicle && !!player?.spec?.scope,
+      available: !vehicle && !!player?.spec?.scope,
+      selected: !!player?.scoping,
+    });
+    this._setButton('weapon', { icon: 'weapon', label: 'Cambia arma' });
+    this._setButton('map', { icon: 'map', label: 'Apri la mappa' });
+    this._setButton('pause', { icon: 'pause', label: 'Pausa' });
+    this._setButton('radio', {
+      icon: 'radio',
+      label: this.game.radio?.on
+        ? `Radio: ${this.game.radio.label} · tocca per cambiare, tieni premuto per spegnere`
+        : 'Accendi la radio · tieni premuto per spegnere',
+      visible: vehicle, available: vehicle, selected: vehicle && !!this.game.radio?.on,
+    });
     void mode;
   }
 
@@ -478,7 +629,7 @@ export class MobileControls {
     if (hint) hint.textContent = mode === 'dialogue'
       ? 'Tocca la battuta per continuare'
       : 'Tocca la scena per continuare';
-    this._labels(mode);
+    this._syncActions(mode);
   }
 
   /** Chiamato dal gioco quando la scheda sparisce: libera stato e grafica. */

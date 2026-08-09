@@ -301,7 +301,7 @@ export class StartMenu {
     if (!L.short) {
       ctx.fillStyle = 'rgba(235,240,250,0.42)';
       ctx.font = '500 11px system-ui, sans-serif';
-      ctx.fillText(L.controls ? 'tocco · scegli  Invio · conferma  ESC · esci' : 'W/S · scegli  Invio · conferma  F4 · muto', x + 18, h - safeBottom - 10);
+      ctx.fillText(L.controls ? 'tocca una voce · conferma o torna indietro' : 'W/S · scegli  Invio · conferma  F4 · muto', x + 18, h - safeBottom - 10);
     }
   }
 }
