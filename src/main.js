@@ -26,6 +26,7 @@ import { ProjectileSystem } from './entities/projectiles.js';
 import { WantedSystem } from './entities/wanted.js';
 import { PoliceSystem } from './entities/police.js';
 import { ShopSystem, won } from './entities/shops.js';
+import { TurfSystem } from './entities/turfs.js';
 import { autosave, tickAutosave } from './core/save.js';
 import { InteriorScene } from './render/interiorscene.js';
 import { MetroScene } from './render/metroscene.js';
@@ -215,6 +216,10 @@ class Game {
     this.wanted = new WantedSystem();
     this.police = new PoliceSystem(this.city, this.rng);
     this.shops = new ShopSystem(this.city);
+    // I cortili. È l'unico sistema che riscrive un dato di generazione — il
+    // padrone di un territorio — e l'unico pezzo di mondo che una partita cambia
+    // in modo permanente (§5.31).
+    this.turfs = new TurfSystem(this.city);
     this.interiorScene = new InteriorScene(this.scene);
     this.hud = new Hud(this.city, this.mapTexture);
     this.mapView = new MapView(this.city, this.mapTexture);
@@ -420,6 +425,7 @@ class Game {
     this.player.district = this.city.districtAt(this.player.x, this.player.y);
     this.wanted.reset();
     this.shops.reset();
+    this.turfs.reset(this);
     this.actors.reset();
     this.missions.reset(this);
     this.markers.length = 0;
@@ -938,6 +944,11 @@ class Game {
     // spostato il blip, e l'itinerario che si disegna in questo frame è quello
     // della meta nuova. Dentro un edificio si ferma da sé (`route.update`).
     this.route.update(dt, this);
+    // Poi i cortili, e **prima dei negozi** per la stessa ragione delle missioni:
+    // dentro lo stesso recinto stanno il banco della banda e la busta del cortile,
+    // e chi consuma il tasto per primo alza `enterCooldown`. I due tasti sono
+    // diversi apposta (`E` il banco, `F` la busta), ma l'ordine resta quello.
+    this.turfs.update(dt, this);
     // I negozi girano poi: decidono se il frame si svolge in strada o dentro
     // un edificio, e il giocatore deve muoversi già nello spazio giusto.
     if (this.metro.inside) {

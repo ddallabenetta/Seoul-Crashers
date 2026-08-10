@@ -55,21 +55,31 @@ export function findShop(game, biz, opts = {}) {
   return pick(district, minDist) || pick(district, 0) || pick(null, minDist) || pick(null, 0);
 }
 
-/** Il cortile di una banda più vicino a `near`, dentro Seoul. */
+/**
+ * Il cortile di una banda più vicino a `near`, dentro Seoul.
+ *
+ * Dal §5.31 un cortile può aver cambiato padrone, e una missione che cerca «il
+ * cortile del 철마파» non deve restare senza obiettivo perché il giocatore se
+ * l'era preso il giorno prima: se nessuno è più di quella banda si ripiega sul
+ * **padrone di nascita**, che è dove la storia lo colloca comunque.
+ */
 export function findTurf(game, gangId, near = game.city.spawn) {
-  let best = null;
-  let bestD = Infinity;
-  for (const t of game.city.turfs || []) {
-    if (t.gang !== gangId) continue;
-    const cx = t.cx;
-    const cy = t.cy;
-    if (game.city.areaAt?.(cx, cy)?.id !== 'seoul') continue;
-    const d = dist(cx, cy, near.x, near.y);
-    if (d >= bestD) continue;
-    bestD = d;
-    best = { turf: t, x: cx, y: cy };
-  }
-  return best;
+  const pick = (of) => {
+    let best = null;
+    let bestD = Infinity;
+    for (const t of game.city.turfs || []) {
+      if (of(t) !== gangId) continue;
+      const cx = t.cx;
+      const cy = t.cy;
+      if (game.city.areaAt?.(cx, cy)?.id !== 'seoul') continue;
+      const d = dist(cx, cy, near.x, near.y);
+      if (d >= bestD) continue;
+      bestD = d;
+      best = { turf: t, x: cx, y: cy };
+    }
+    return best;
+  };
+  return pick((t) => t.gang) || pick((t) => t.gang0);
 }
 
 /**

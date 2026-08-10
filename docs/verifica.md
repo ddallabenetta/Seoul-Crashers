@@ -168,6 +168,19 @@ non c'è, o si è dentro un edificio (lì l'itinerario si ferma apposta, §3). L
 con le asserzioni e il costo del caso peggiore, è
 `.claude/tools/scenes/itinerario.scene` (§9).
 
+Per i cortili (§5.31):
+
+```js
+// chi comanda dove, e quanto c'è da riscuotere
+game.city.turfs.map((t) => `${t.place}: ${t.hangul}${t.held ? ' (tuo)' : ''} · ${Math.round(t.pot)}`)
+// prova a freddo: un cortile passa di mano senza sparare un colpo
+game.turfs.claim(game.city.turfs[0], 'baekho', game, 'deal')
+```
+
+Se il tag a terra resta del colore di prima, non è la `claim`: è la cache dei tile del terreno
+(§4). La verifica completa, con il round-trip del salvataggio e le asserzioni, è
+`.claude/tools/scenes/cortili.scene` (§9).
+
 Per le regioni e la metro (§5.22-5.24):
 
 ```js

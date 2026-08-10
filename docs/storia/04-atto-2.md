@@ -48,12 +48,13 @@ martedì torna fra sei giorni. L'unico che presta a chi non può restituire è P
 2. **Tre cortili, tre modi.** Ognuno si può prendere in maniera diversa e il gioco non dice
    quale sia giusto:
    - **entrare sparando** (veloce, alza il ricercato, la banda ti odia dopo);
-   - **comprare** il capocortile (costa metà dei contanti, nessuno muore);
+   - **comprare** il capocortile: costa metà dei contanti che Jae-min ha addosso, e nessuno
+     muore;
    - **portargli via il lavoro**: rubare le tre auto che stavano smontando e rivenderle al
      전당포 (lento, divertente, e il 철마파 se ne va da solo).
 
-   È la missione in cui **il territorio cambia padrone** — la cosa che oggi il gioco non sa
-   fare (§6: «un territorio non cambia mai padrone. È materia della storia»).
+   È la missione in cui **il territorio cambia padrone**, e da qui in poi resta di chi l'ha
+   preso: il motore lo sa fare dal §5.31, salvataggio ed effetto sul banco compresi.
 3. **Il ritorno da Pyo**, che paga. E mentre conta, sbaglia:
 
    > Pyo: «Tieni, figlio di Man-gi.» *(mezzo secondo)* «…di Dong-hyeok. Figlio di Dong-hyeok.»
@@ -87,10 +88,12 @@ sui trenta con un bambino in braccio.
 
 > Narratore: `L'uomo nella foto non ha cicatrici. Non è Seo Dong-hyeok.`
 
-**Poggia su** — cortili e bande (§5.12, §5.26) · guerra fra bande (§5.26) · furto e rivendita
-di veicoli al 전당포 (§5.8) · ricercato (§5.5).
-**Chiederebbe** — **la proprietà persistente di un cortile** (stato sul turf, nel salvataggio,
-con effetto sul commercio): è la richiesta più concreta che la storia fa al motore.
+**Poggia su** — cortili e bande (§5.12, §5.26) · **proprietà persistente di un cortile**
+(§5.31: `turfs.claim` e l'evento `turfClaimed`, con le prime due delle tre strade già
+giocabili in città) · guerra fra bande (§5.26) · furto e rivendita di veicoli al 전당포 (§5.8) ·
+ricercato (§5.5).
+**Chiederebbe** — solo la terza strada, che è composizione di cose che esistono: le tre auto da
+rubare e rivendere finché il 철마파 se ne va, e in fondo una `claim`.
 
 ---
 
@@ -326,7 +329,7 @@ stesso bomber, nove posti diversi, dodici anni.
 **4 ·** Mi-rae che gli mette in mano un telefono.
 
 > Mi-rae: «Oggi è il nove. Alle due del pomeriggio uno con il tuo giubbotto ritira una busta a
-> 명동, e il nove lo fa da sempre.»
+> 명동. Lo fa il nove di ogni mese, da sempre.»
 > Jae-min: «Perché mi aiuti?»
 > Mi-rae: «Perché il nove di ogni mese arrivavano dei soldi anche a me, sempre dallo stesso
 > conto. Il mese scorso non sono arrivati. O mio padre è morto, o ha smesso di volermi bene, e
@@ -358,8 +361,9 @@ restava fra chi scriveva e sé stesso.)*
 
 **5 ·** I due in piedi, uno di fronte all'altro. Stesso bomber. Stessa altezza. Uno ha la mano
 destra in tasca.
-**6 ·** Dulchae la tira fuori. **Non c'è una pistola: c'è un portafoglio.** Lo apre e mostra
-la carta d'identità.
+**6 ·** L'altro la tira fuori. **Non c'è una pistola: c'è un portafoglio.** Lo apre e mostra
+la carta d'identità. *(Un nome, qui, non ce l'ha ancora: glielo dà il narratore al pannello
+dopo, ed è lì che va detto una volta sola.)*
 
 > `서재민`
 >

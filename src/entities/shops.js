@@ -344,9 +344,10 @@ export function stockFor(bizId, game) {
 }
 
 /**
- * Il banco di una banda. Tre mestieri su quattro passano da qui — il quarto
- * (철마파) compra mezzi e non ha un listino da leggere, si tratta col mezzo
- * davanti e il tasto `F`, come al 전당포.
+ * Il banco di una banda. Tre mestieri su quattro hanno un listino da leggere; il
+ * quarto (철마파) compra mezzi e basta, si tratta col mezzo davanti e il tasto
+ * `F` come al 전당포 — ma il suo banco si apre lo stesso, perché **il cortile è
+ * in vendita anche lì** (§5.31).
  *
  * Le armi comprate da una banda **finiscono in borsa, non in mano**: chi entra in
  * un territorio con un ferro in pugno diventa un bersaglio (`pedestrians.watchTurfs`),
@@ -355,6 +356,13 @@ export function stockFor(bizId, game) {
  */
 export function gangStock(turf, game) {
   const m = gangMarket(turf.gang, marketOf(turf.district));
+  // Il cortile stesso, ed è l'unica riga di questo banco che cambia il padrone del
+  // posto in cui la stai leggendo. Sta **in fondo** e non in cima: è la voce più
+  // cara del listino, e chi apre un banco per comprare munizioni non deve trovare
+  // ₩320.000 sotto la riga già selezionata. Il prezzo e il passaggio di mano li sa
+  // `entities/turfs.js`, che qui non viene importato — è lui a dipendere da noi.
+  const yard = game.turfs?.stockItem(turf, game);
+  const coda = yard ? [yard] : [];
   switch (turf.gang) {
     case 'baekho': {
       // Sono la fonte, quindi hanno anche quello che un 총포상 non tiene in
@@ -366,7 +374,7 @@ export function gangStock(turf, game) {
         ammoItem('sniper', m), ammoItem('minigun', m),
       ];
       for (const it of list) bagged(it);
-      return list;
+      return [...list, ...coda];
     }
     case 'heuksa': {
       const list = [
@@ -375,7 +383,7 @@ export function gangStock(turf, game) {
         healItem('kit', 'kit di pronto soccorso', '구급상자', 26000, 100, m),
       ];
       for (const it of list) bagged(it);
-      return list;
+      return [...list, ...coda];
     }
     case 'hwangso': {
       const pct = Math.round(m.pawn * 100);
@@ -399,10 +407,10 @@ export function gangStock(turf, game) {
           },
         });
       }
-      return list;
+      return [...list, ...coda];
     }
     default:
-      return [];
+      return coda;
   }
 }
 
@@ -1251,9 +1259,9 @@ export class ShopSystem {
    * porta d'ingresso a un mercato che i negozi non hanno.
    *
    * I 철마파 fanno eccezione e comprano mezzi: lì si arriva **guidando**, e il
-   * tasto è `F` come al banco dei pegni. Un pannello che elenca l'auto che hai
-   * parcheggiato dietro sarebbe una lista di un elemento solo, e `E` sul 거래책
-   * ruberebbe il tasto a chi vuole solo risalire in macchina.
+   * tasto è `F` come al banco dei pegni. Il loro `E` però non è più muto dal
+   * §5.31: il listino sarà anche vuoto, ma il **cortile** è in vendita come
+   * dappertutto, e senza questa riga sarebbero gli unici a non potersi comprare.
    */
   updateTurf(game) {
     const pl = game.player;
@@ -1286,16 +1294,22 @@ export class ShopSystem {
           run: () => game.hud.toast(`${turf.hangul} — «portala qui davanti e ferma»${cop ? ', ma non una volante' : ''}`, 2.6),
         });
       }
-      return;
     }
 
     if (!pl.onFoot || pl.weapon !== 'fists' || game.wanted.level > 0) return;
+    // Un banco senza niente sopra non si apre (`ui/shopmenu.js`): dai 철마파 la
+    // riga c'è solo finché il cortile non è tuo, e a quel punto il suggerimento
+    // sparisce da sé invece di aprire un pannello vuoto.
+    const stock = gangStock(turf, game);
+    if (!stock.length) return;
     // Come per la porta di un negozio: il giocatore deve saperlo *prima* di
-    // premere `E`, o si ritrova in macchina invece che davanti al listino.
+    // premere `E`, o si ritrova in macchina invece che davanti al listino. E deve
+    // sapere *cosa* ci trova: dai 철마파 il banco non vende niente, quindi
+    // annunciare «auto rubate» prometterebbe un listino che non c'è.
     this.near = turf;
     this.actions.push({
       key: 'E',
-      text: `${turf.hangul} — ${turf.trade}`,
+      text: turf.gang === 'cheolma' ? `${turf.hangul} — il cortile è in vendita` : `${turf.hangul} — ${turf.trade}`,
       run: () => game.shopMenu.showStock(gangCounter(turf), () => gangStock(turf, game), game),
     });
   }

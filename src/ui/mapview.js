@@ -121,22 +121,32 @@ export class MapView {
 
     // Territori delle bande: rettangolo tratteggiato e nome della banda. Sulla
     // mappa piena servono a decidere dove *non* passare, o dove andare a cercare.
+    // Quelli tuoi sono pieni e dicono che sono tuoi: da lì in poi la carta non
+    // serve più a evitarli ma a passare a riscuotere (§5.31).
     for (const t of city.turfs || []) {
       if (sparseLabels) continue;
+      const mine = !!game.turfs?.mine(t);
       const a = toScreen(t.x, t.y);
       const b = toScreen(t.x + t.w, t.y + t.h);
+      const rw = Math.max(5, b.x - a.x);
+      const rh = Math.max(5, b.y - a.y);
       ctx.save();
-      ctx.globalAlpha = 0.55;
+      if (mine) {
+        ctx.globalAlpha = 0.28;
+        ctx.fillStyle = t.color;
+        ctx.fillRect(a.x, a.y, rw, rh);
+      }
+      ctx.globalAlpha = mine ? 0.85 : 0.55;
       ctx.strokeStyle = t.color;
       ctx.lineWidth = 2;
-      ctx.setLineDash([6, 4]);
-      ctx.strokeRect(a.x, a.y, Math.max(5, b.x - a.x), Math.max(5, b.y - a.y));
+      if (!mine) ctx.setLineDash([6, 4]);
+      ctx.strokeRect(a.x, a.y, rw, rh);
       ctx.setLineDash([]);
       ctx.globalAlpha = 0.9;
       ctx.fillStyle = t.color;
       ctx.font = `700 ${Math.max(8, 10 * Math.min(2, zoom))}px system-ui, "Apple SD Gothic Neo", sans-serif`;
       ctx.textAlign = 'center';
-      ctx.fillText(t.hangul, (a.x + b.x) / 2, a.y - 3);
+      ctx.fillText(mine ? `${t.hangul} · tuo` : t.hangul, (a.x + b.x) / 2, a.y - 3);
       ctx.restore();
     }
 

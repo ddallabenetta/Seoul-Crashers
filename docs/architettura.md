@@ -69,6 +69,7 @@ src/entities/
   police.js           pattuglie, volanti, sbarchi, posti di blocco, chiodi, SWAT, elicottero
   projectiles.js      esplosivi con proiettili veri: granate, molotov, mine, onda d'urto
   shops.js            interni: entrata/uscita, piani, gente dentro, casse, listini, officine
+  turfs.js            i cortili delle bande: chi comanda, come si conquista, la busta
   life.js             la vita degli altri: voli e navigazione con un pilota, campagna che
                       lavora e rincasa, capannelli che parlano, rapine e guerre fra bande
   actors.js           i personaggi nominati: definizione che sopravvive allo streaming
@@ -571,6 +572,17 @@ che guarda **dov'è** — vivo, non ostile, dentro il suo recinto — e non `sta
 Lo stato sembra più sicuro e chiude il banco al primo spavento: un'auto che accosta, un
 tamponamento a due isolati, un allarme lontano. E siccome dai 철마파 ci si arriva **guidando**,
 la versione con lo stato si rompeva esattamente nel caso per cui esisteva.
+
+**Il padrone di un cortile è scritto sul cortile** (§5.31). `entities/turfs.js` non tiene una
+tabella di proprietà: `claim()` riscrive i campi che il territorio aveva già — `gang`, `name`,
+`hangul`, `color`, `trade` — e in un colpo solo cambiano il tag sull'asfalto, i rettangoli sulle
+due carte, l'anello sotto i piedi dei suoi, il listino del banco e la banda dei prossimi uomini
+che nascono lì. Una seconda verità sul padrone avrebbe voluto dire insegnare a sei punti diversi
+che quella che leggono non è più quella giusta. Il campo che il modulo aggiunge è uno solo,
+`held`: **«del 백호파» non vuol dire «tuo»**, perché i cortili che la banda del padre ha dalla
+seed non rispondono a Jae-min. Nel salvataggio va solo la differenza dal padrone di nascita
+(`gang0`), e il tag a terra sta dentro un tile in cache — chi cambia padrone butta i tile che il
+cortile tocca (`ground.invalidateRect`), non tutta la cache.
 
 **Il fuoco si esaurisce da solo, il tetto è solo una rete.** Ogni pozza può generarne un'altra,
 ma la figlia nasce più corta e più debole della madre (`× 0.62` di vita) e sotto 1,8 s smette

@@ -384,3 +384,18 @@ ogni volta che se ne aggiunge uno.
 colori, mentre in gioco nessuno mandava quell'evento. Un fatto del mondo si prova **facendolo
 succedere** — qui salendo davvero su un'auto vuota — o l'asserzione verifica il pezzo che non si
 è rotto.
+
+**Quello che è dipinto per terra sta dentro un tile in cache, e non cambia da solo.** Il tag di
+un cortile che passa di mano (§5.31) resta del colore di prima finché la cache dei tile non gira
+— cioè finché non si attraversa mezza città e i 96 tile non si esauriscono. Nel sorgente la
+`claim` sembra completa: si vede solo a schermo, e solo tornando indietro di due isolati. Chi
+tocca il disegno del terreno butta i tile che il rettangolo tocca
+(`ground.invalidateRect`), non tutta la cache — e vale per qualunque cosa `ground.js` disegni in
+funzione di uno stato di partita.
+
+**«Della tua banda» non è «tuo», e confonderli regala una rendita.** I territori del 백호파
+nascono dalla seed, quindi legare la proprietà del giocatore a `t.gang === 'baekho'` gli mette in
+mano cinque cortili al primo minuto di partita — e smentisce l'Atto I, che è la storia di una
+banda che *non* gli obbedisce ancora. Tuo è quello che ti sei preso, e serve un campo suo
+(`t.held`, §5.31). Vale anche al contrario: una guerra fra NPC può portare un cortile al 백호파
+senza che tu ci fossi, e quello è della banda.
