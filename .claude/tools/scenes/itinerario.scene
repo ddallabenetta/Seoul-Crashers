@@ -1,0 +1,96 @@
+// L'itinerario verso il blip (§5.30), e non misura soltanto: **asserisce**.
+//
+// Ogni voce `false` è un difetto. Le voci sono scelte perché ognuna corrisponde a
+// un modo in cui una strada disegnata su una carta può mentire in silenzio: un
+// percorso che finisce vicino alla meta invece che sulla meta, un salto fra due
+// punti che a schermo è una linea attraverso un isolato, una retta spacciata per
+// strada dove le strade non arrivano, un blip tolto che lascia la linea appesa.
+//
+//   node .claude/tools/probe.mjs --seconds 8 --quiet \
+//     --script .claude/tools/scenes/itinerario.scene \
+//     --eval "Object.entries(window.__OUT).filter(([k, v]) => v === false).map(([k]) => k)"
+//
+// `[]` vuol dire tutto a posto. Per vedere i numeri, `--eval "window.__OUT"`.
+const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
+const { dist } = await import('/src/core/math.js');
+const g = game;
+const R = g.route;
+const out = {};
+window.__OUT = out;
+
+const area = (id) => (g.city.areas || []).find((a) => a.id === id);
+const mid = (a) => ({ x: (a.x0 + a.x1) / 2, y: (a.y0 + a.y1) / 2 });
+
+// --- un blip lontano dentro Seoul ------------------------------------------------
+const far = g.setMarker('mission', g.player.x + 2400, g.player.y + 2600, { label: '당구장' });
+await wait(0.9);
+out.aria = Math.round(dist(g.player.x, g.player.y, far.x, far.y));
+out.strada = Math.round(R.length);
+out.punti = R.points.length;
+out.suStrada = R.direct === false;
+out.parteDalGiocatore = dist(R.points[0].x, R.points[0].y, g.player.x, g.player.y) < 1;
+out.finisceSulBlip = dist(R.points.at(-1).x, R.points.at(-1).y, far.x, far.y) < 1;
+// Una strada più corta della distanza in linea d'aria è impossibile; una più
+// lunga del doppio e mezzo vuol dire che il percorso sta girando a vuoto.
+out.lunghezzaSensata = R.length >= out.aria && R.length < out.aria * 2.6;
+// Nessun salto: gli archi della maglia stanno sotto i 900 px, le provinciali di
+// campagna arrivano a ~1700. Oltre, due punti consecutivi non sono un arco.
+let salto = 0;
+for (let i = 1; i < R.points.length; i++) {
+  salto = Math.max(salto, dist(R.points[i - 1].x, R.points[i - 1].y, R.points[i].x, R.points[i].y));
+}
+out.saltoMax = Math.round(salto);
+out.nessunSalto = salto < 1800;
+
+// --- il caso peggiore: Seoul → Busan, dieci volte di fila -------------------------
+const busan = area('busan');
+if (busan) {
+  const b = mid(busan);
+  g.setMarker('mission', b.x, b.y, { label: '부산' });
+  const t0 = performance.now();
+  for (let i = 0; i < 10; i++) R.build(g, R.pick(g));
+  out.msPerCalcolo = +((performance.now() - t0) / 10).toFixed(3);
+  out.busanSuStrada = R.direct === false;
+  out.busanPunti = R.points.length;
+  // Il ricalcolo gira dentro un frame: mezzo millisecondo è il tetto oltre il
+  // quale l'itinerario smette di essere gratis.
+  out.calcoloGratis = out.msPerCalcolo < 0.5;
+}
+
+// --- Jeju non si raggiunge su gomma ------------------------------------------------
+const jeju = area('jeju');
+if (jeju) {
+  const j = mid(jeju);
+  g.setMarker('mission', j.x, j.y, { label: '제주' });
+  R.build(g, R.pick(g));
+  // Nessun arco del grafo arriva sull'isola (§3): la carta deve dirlo con una
+  // retta, non inventarsi un ponte.
+  out.jejuInLineaDAria = R.direct === true;
+  out.jejuDueSoliPunti = R.points.length === 2;
+}
+
+// --- dentro un negozio l'itinerario si ferma ---------------------------------------
+g.setMarker('mission', far.x, far.y, { label: '당구장' });
+await wait(0.6);
+const primaDiEntrare = R.points.length;
+const vetrina = g.city.shops.reduce((b, s) => (
+  dist(s.x, s.y, g.player.x, g.player.y) < dist(b.x, b.y, g.player.x, g.player.y) ? s : b));
+g.player.x = vetrina.x + vetrina.nx * 18;
+g.player.y = vetrina.y + vetrina.ny * 18;
+g.player.onFoot = true;
+g.player.enterCooldown = 0;
+g.shops.enter(vetrina, g);
+await wait(0.8);
+// Le coordinate di una pianta sono piccole e in città cadono nell'angolo
+// nord-ovest (§3): un itinerario ricalcolato da lì partirebbe da Gimpo.
+out.dentroNonRicalcola = g.indoors && R.points.length === primaDiEntrare
+  && dist(R.points[0].x, R.points[0].y, vetrina.x, vetrina.y) < 400;
+g.shops.leave(g);
+await wait(0.5);
+
+// --- senza blip non resta niente appeso --------------------------------------------
+g.clearMarker('mission');
+await wait(0.4);
+out.senzaBlipNienteLinea = R.points.length === 0 && R.target === null;
+out.fps = Math.round(g.loop.fps);
+return out;

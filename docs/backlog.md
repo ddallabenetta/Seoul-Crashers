@@ -38,6 +38,14 @@ pannelli già visti che non si rivedono, i personaggi nominati **dentro** un edi
 **ricerca deterministica di un indirizzo** (`story/places.js`: la storia non piazza niente).
 Aggiungere una missione adesso è un file sotto `src/story/` e una riga in `story/campaign.js`.
 
+**Cosa il §5.30 ha già tolto di mezzo**: come si **arriva** a una meta. Il blip è un rombo che
+si vede su tutte e due le carte, fuori dal ritaglio della minimappa diventa una punta con la
+distanza, e sotto ci passa la strada da fare (A* sul grafo, `world/route.js`). Una missione non
+deve fare niente per ottenerlo: gli basta chiamare `ctx.mark(x, y, { label })` come già fanno
+M1 e M2 — l'etichetta è il nome che comparirà sulla carta. I punti in strada di una fase che
+**non** stanno sotto al blip compaiono da soli: il giorno che una fase avrà due mete, la carta
+è già pronta e non c'è da tornarci.
+
 **Cosa l'impianto del §5.27 ha già tolto di mezzo**, e che quindi nessuna di queste tappe deve
 più affrontare: gli inneschi delle missioni (bus, `game.on('pedKilled', …)`), una modalità nuova
 per un dialogo (una riga in `core/modes.js`), lo stato nuovo nel salvataggio (il proprio

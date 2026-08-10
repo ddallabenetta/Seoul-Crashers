@@ -10,6 +10,7 @@ import { DynamicGrid } from './core/spatial.js';
 import { KMH, clamp, dist } from './core/math.js';
 import { createRegion, REGION_IDS } from './world/regions.js';
 import { buildMapTexture } from './world/maptexture.js';
+import { RouteGuide } from './world/route.js';
 import { DayCycle } from './world/daycycle.js';
 import { Camera } from './render/camera.js';
 import { Scene } from './render/scene.js';
@@ -205,6 +206,10 @@ class Game {
     // `story/campaign.js`, che è l'unico file che le conosce tutte e dodici.
     this.missions = new MissionSystem();
     this.missions.attach(this);
+    // La strada da fare fino al blip. Non è un sistema del mondo: non muove
+    // niente e nessuno lo interroga durante un frame di gioco — lo leggono solo
+    // la minimappa e la carta, che sono le due superfici su cui esiste.
+    this.route = new RouteGuide(this.city);
     this.pickups = new PickupSystem(this.city, this.rng);
     this.projectiles = new ProjectileSystem();
     this.wanted = new WantedSystem();
@@ -329,6 +334,9 @@ class Game {
     this.projectiles.clear();
     this.fx.clear();
     this.pickups.reset();
+    // L'itinerario è disegnato fra due punti che stanno per non voler più dire
+    // niente (una partita caricata, un treno per Busan): si rifà al primo frame.
+    this.route?.clear();
   }
 
   /**
@@ -573,12 +581,17 @@ class Game {
     v.protect = true;
     this.hud.toast(`${VEHICLE_TYPES[v.kind].label} acquisita`, 1.8);
     // Rubare un'auto vuota in un vicolo non lo denuncia nessuno; strapparla dalle
-    // mani di qualcuno sotto gli occhi di un testimone sì, e a una pattuglia ancora di più.
-    if (!v.occupiedTheft) return;
-    const cop = this.police.cops.some((p) => !p.dead && dist(p.x, p.y, v.x, v.y) < 420);
-    if (cop) this.wanted.report('copTheft', this);
-    else if (this.pedGrid.queryCircle(v.x, v.y, 320).some((p) => !p.dead)) {
-      this.wanted.report('theft', this);
+    // mani di qualcuno sotto gli occhi di un testimone sì, e a una pattuglia ancora
+    // di più. **È una condizione del ricercato, non dell'evento**: qui c'era un
+    // `return` anticipato, e siccome l'`emit` sta in fondo salire su un'auto vuota
+    // non lo mandava a nessuno. Salire sulla berlina del padre — che è ferma e
+    // vuota da una notte — non faceva partire M1, mentre rubarne una in corsa sì.
+    if (v.occupiedTheft) {
+      const cop = this.police.cops.some((p) => !p.dead && dist(p.x, p.y, v.x, v.y) < 420);
+      if (cop) this.wanted.report('copTheft', this);
+      else if (this.pedGrid.queryCircle(v.x, v.y, 320).some((p) => !p.dead)) {
+        this.wanted.report('theft', this);
+      }
     }
     this.emit('enterVehicle', v);
   }
@@ -921,6 +934,10 @@ class Game {
     // alza `enterCooldown`, che è quello che fa desistere l'altro. Quando il
     // giocatore è lì per la missione, la missione vince.
     this.missions.update(dt, this);
+    // Subito dopo, e prima dei negozi: una fase che è appena cambiata ha già
+    // spostato il blip, e l'itinerario che si disegna in questo frame è quello
+    // della meta nuova. Dentro un edificio si ferma da sé (`route.update`).
+    this.route.update(dt, this);
     // I negozi girano poi: decidono se il frame si svolge in strada o dentro
     // un edificio, e il giocatore deve muoversi già nello spazio giusto.
     if (this.metro.inside) {

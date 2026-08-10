@@ -357,3 +357,30 @@ vede nel sorgente, dove le due chiamate sembrano indipendenti: si vede a schermo
 otto del mattino trova una porta che non si apre e si pianta. Non è un caso limite — è il caso
 normale, perché l'ora la decide il giocatore. Si dichiara `shops.hold(shopId)` nel `prepare`
 della missione, che è il contrario di `seal` e sta nel salvataggio come lei (§5.29).
+
+**Un'etichetta appoggiata a un blip schiacciato sul bordo finisce fuori dal ritaglio, o sopra il
+blip stesso.** La minimappa ha gli angoli arrotondati e i marcatori fuori vista vengono clampati:
+la distanza scritta *sotto* la punta, in un angolo, o si taglia o la copre. Va spostata **verso
+il centro** della carta e clampata anche lei, e la punta va tenuta più dentro del raggio
+dell'angolo (§5.30). Nel sorgente le due chiamate sembrano innocue: si vede solo a schermo, e
+solo con la meta nell'angolo giusto.
+
+**Un percorso disegnato fra due nodi del grafo parte all'indietro se il primo nodo è alle
+spalle.** L'incrocio più vicino al giocatore può essere quello appena superato, e quello più
+vicino alla meta può stare oltre la porta: la carta mostra due segmenti che tornano indietro e
+sembrano un errore di pathfinding, mentre l'A* ha ragione. Si tagliano i due capi confrontando
+le distanze (`route.build`, §5.30).
+
+**Un `emit` in fondo a un callback che ha un `return` anticipato non parte mai per metà dei
+casi.** `Game.onEnterVehicle` usciva prima dell'`emit` quando l'auto era vuota — il ramo serviva
+a non denunciare il furto di una macchina parcheggiata, che è una regola del **ricercato**, non
+dell'evento. Conseguenza: salire sulla berlina del padre, ferma e vuota davanti al portone, non
+faceva partire M1, mentre rubarne una in corsa sì. La condizione va annidata, e l'`emit` resta
+l'ultima riga come in tutti gli altri callback (§5.27). Vale la pena rileggerli con questo occhio
+ogni volta che se ne aggiunge uno.
+
+**Una scena che manda l'evento a mano prova l'ascoltatore, non la catena.**
+`game.emit('enterVehicle', {})` in `missioni-run.scene` faceva avanzare la fase e passava con i
+colori, mentre in gioco nessuno mandava quell'evento. Un fatto del mondo si prova **facendolo
+succedere** — qui salendo davvero su un'auto vuota — o l'asserzione verifica il pezzo che non si
+è rotto.

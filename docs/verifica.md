@@ -151,6 +151,23 @@ Sono tre generatori deterministici con firme topologiche distinte: Busan e Jeju 
 `generateCity`. Seoul ha 16 fermate; le altre due 7 ciascuna. Ogni fermata deve avere una
 `entrance.visible`, un prop `metro_entrance` solido e un arrivo asciutto, libero e fuori strada.
 
+Per l'itinerario verso il blip (§5.30):
+
+```js
+// dove sta portando la carta, quanto è lunga la strada e da quanti tratti è fatta
+({ meta: game.route.target, punti: game.route.points.length,
+   strada: Math.round(game.route.length), inLineaDAria: game.route.direct })
+// prova a freddo: un blip lontano e il percorso ricalcolato a mano
+game.setMarker('mission', game.player.x + 2400, game.player.y + 2600, { label: '당구장' });
+game.route.build(game, game.route.pick(game));
+```
+
+`direct: true` **non è un difetto**: vuol dire che le strade non ci arrivano, ed è la risposta
+giusta per Jeju e per un blip in mezzo al mare. `punti: 0` con una missione attiva sì: o il blip
+non c'è, o si è dentro un edificio (lì l'itinerario si ferma apposta, §3). La verifica completa,
+con le asserzioni e il costo del caso peggiore, è
+`.claude/tools/scenes/itinerario.scene` (§9).
+
 Per le regioni e la metro (§5.22-5.24):
 
 ```js
