@@ -581,12 +581,17 @@ class Game {
     v.protect = true;
     this.hud.toast(`${VEHICLE_TYPES[v.kind].label} acquisita`, 1.8);
     // Rubare un'auto vuota in un vicolo non lo denuncia nessuno; strapparla dalle
-    // mani di qualcuno sotto gli occhi di un testimone sì, e a una pattuglia ancora di più.
-    if (!v.occupiedTheft) return;
-    const cop = this.police.cops.some((p) => !p.dead && dist(p.x, p.y, v.x, v.y) < 420);
-    if (cop) this.wanted.report('copTheft', this);
-    else if (this.pedGrid.queryCircle(v.x, v.y, 320).some((p) => !p.dead)) {
-      this.wanted.report('theft', this);
+    // mani di qualcuno sotto gli occhi di un testimone sì, e a una pattuglia ancora
+    // di più. **È una condizione del ricercato, non dell'evento**: qui c'era un
+    // `return` anticipato, e siccome l'`emit` sta in fondo salire su un'auto vuota
+    // non lo mandava a nessuno. Salire sulla berlina del padre — che è ferma e
+    // vuota da una notte — non faceva partire M1, mentre rubarne una in corsa sì.
+    if (v.occupiedTheft) {
+      const cop = this.police.cops.some((p) => !p.dead && dist(p.x, p.y, v.x, v.y) < 420);
+      if (cop) this.wanted.report('copTheft', this);
+      else if (this.pedGrid.queryCircle(v.x, v.y, 320).some((p) => !p.dead)) {
+        this.wanted.report('theft', this);
+      }
     }
     this.emit('enterVehicle', v);
   }

@@ -370,3 +370,17 @@ spalle.** L'incrocio più vicino al giocatore può essere quello appena superato
 vicino alla meta può stare oltre la porta: la carta mostra due segmenti che tornano indietro e
 sembrano un errore di pathfinding, mentre l'A* ha ragione. Si tagliano i due capi confrontando
 le distanze (`route.build`, §5.30).
+
+**Un `emit` in fondo a un callback che ha un `return` anticipato non parte mai per metà dei
+casi.** `Game.onEnterVehicle` usciva prima dell'`emit` quando l'auto era vuota — il ramo serviva
+a non denunciare il furto di una macchina parcheggiata, che è una regola del **ricercato**, non
+dell'evento. Conseguenza: salire sulla berlina del padre, ferma e vuota davanti al portone, non
+faceva partire M1, mentre rubarne una in corsa sì. La condizione va annidata, e l'`emit` resta
+l'ultima riga come in tutti gli altri callback (§5.27). Vale la pena rileggerli con questo occhio
+ogni volta che se ne aggiunge uno.
+
+**Una scena che manda l'evento a mano prova l'ascoltatore, non la catena.**
+`game.emit('enterVehicle', {})` in `missioni-run.scene` faceva avanzare la fase e passava con i
+colori, mentre in gioco nessuno mandava quell'evento. Un fatto del mondo si prova **facendolo
+succedere** — qui salendo davvero su un'auto vuota — o l'asserzione verifica il pezzo che non si
+è rotto.

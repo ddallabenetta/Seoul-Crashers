@@ -64,6 +64,21 @@ async function entraSulBlip() {
   return ok;
 }
 
+/**
+ * Si sale sull'auto ferma più vicina — vuota, senza nessuno al volante, come la
+ * berlina del padre davanti al portone. È il modo in cui comincia una partita
+ * vera, e l'unico che percorre tutta la catena `player → onEnterVehicle → emit`.
+ */
+function salaSuUnAutoVuota() {
+  if (pl.vehicle) pl.exitVehicle(game, true);
+  const v = game.vehicles
+    .filter((q) => !q.driver && !q.dead)
+    .sort((a, b) => Math.hypot(a.x - pl.x, a.y - pl.y) - Math.hypot(b.x - pl.x, b.y - pl.y))[0];
+  if (!v) return false;
+  pl.enterVehicle(v, game);
+  return true;
+}
+
 /** I punti che valgono **qui**: `points` è di tutta la fase, non di questo piano. */
 const puntiQui = () => M.points.filter((p) => M.pointHere(p, game));
 
@@ -113,8 +128,16 @@ M.start('m1', game);
 nota('start');
 out.m1Parte = fase() === 'm1/motore';
 
-game.emit('enterVehicle', {});
+// **Si sale su un'auto vera, e vuota**, invece di mandare l'evento a mano: la
+// berlina del padre è ferma da una notte e non ha nessuno dentro, e per un pezzo
+// `onEnterVehicle` mandava l'evento *solo* per un furto a mano armata. Un
+// `game.emit('enterVehicle', {})` provava l'ascoltatore e non la catena, quindi
+// non poteva vederlo (`docs/trappole.md`).
+out.m1SaleSullAutoFerma = salaSuUnAutoVuota();
 await wait(0.15);
+// L'invariante che il `game.emit` a mano non poteva vedere: **il motore acceso
+// di un'auto vuota accende la storia**.
+out.autoFermaAccendeM1 = fase() !== 'm1/motore';
 out.m1Apertura = await saltaPannelli();
 nota('apertura saltata');
 out.m1VaAlBiliardo = fase() === 'm1/biliardo' && !!blip();
@@ -144,9 +167,11 @@ await esci();
   const b = blip();
   const stall = vetrinaSulBlip();
   out.m1SerrandaSigillata = !!stall && game.shops.isSealed(stall.id);
-  pl.x = b.x; pl.y = b.y; pl.onFoot = true; pl.enterCooldown = 0;
+  // Senza blip la missione non è arrivata fin qui: si riporta `false`, non si
+  // muore su `b.x`. Una scena che asserisce deve dire *quale* voce è rotta.
+  if (b) { pl.x = b.x; pl.y = b.y; pl.onFoot = true; pl.enterCooldown = 0; }
   await wait(0.2);
-  out.m1LeggeIlSigillo = await usaPunto('sigillo');
+  out.m1LeggeIlSigillo = !!b && await usaPunto('sigillo');
 }
 nota('mercato');
 
@@ -159,7 +184,7 @@ out.m1Completata = M.isDone('m1');
 
 // ---- 2. M2 parte da sé, e la catena è in `campaign.js` ------------------------
 out.m2ParteDaSola = fase() === 'm2/innesco';
-game.emit('enterVehicle', {});
+out.m2SaleSullAutoFerma = salaSuUnAutoVuota();
 await wait(0.15);
 out.m2VaAlBanco = fase() === 'm2/banco' && !!blip();
 out.m2EntraAlBanco = await entraSulBlip();
