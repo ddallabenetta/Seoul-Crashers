@@ -117,6 +117,10 @@ export class ShopMenu {
     if (it.price > 0) game.shops.spent += it.price;
     this.say(msg, true);
     game.audio?.cash(it.price >= 0);
+    // Sul bus, come ogni altro fatto del mondo (§5.27): chi vuole sapere che hai
+    // comprato qualcosa — una missione, una riga di Kkachi — si iscrive qui
+    // invece di guardare il portafoglio a ogni frame.
+    game.emit('shopBuy', it, game.shops.floor);
     // Il banco dei pegni compra, e il ricettatore di 황소파 pure: dopo una vendita
     // la lista è un'altra. Finita la merce, il banco chiude da solo.
     this.items = this.restock();

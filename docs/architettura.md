@@ -18,6 +18,9 @@ src/core/
   audio.js            sintetizzatore WebAudio: colpi secchi + letti continui, mix, muto
   music.js            musica generata: tema del menu, caccia, apertura, stacchi — e la regia
   radio.js            stazioni coreane in streaming (`<audio>`, fuori dal grafo audio)
+                      più la `91.45`, che non è uno stream e non si rompe mai
+  kkachi.js           까치: la tabella con predicato, le regole del copione, il conto
+                      delle chiamate — e nemmeno una battuta
   save.js             salvataggio su localStorage: 3 slot + autosave, fotografia e ripristino
   math.js             angoli, damp, circleRectPush, pointSegment, KMH, PX_PER_M
   rng.js              mulberry32 deterministico (stessa seed = stessa Seoul)
@@ -86,6 +89,7 @@ src/ui/
   text.js             a capo automatico e paragrafi: corpo fisso, misura condivisa
   cutscene.js         il lettore di pannelli: avanzamento, stacchi, salto con ESC
   dialogue.js         due che parlano senza uscire dal gioco: mondo fermo, città a schermo
+  radiocall.js        il riquadro di 까치: quadrante, una battuta, e sotto il fruscio
 
 src/story/
   campaign.js         chi c'è e in che ordine: l'unico file che conosce tutte le missioni
@@ -93,6 +97,7 @@ src/story/
   places.js           dove succedono le cose: la storia non piazza indirizzi, li cerca
   m1.js · m2.js       una missione per file: le sue fasi e i suoi pannelli
   hospital.js         il 병원 «성심»: una battuta a ogni morte, e quattro pannelli
+  kkachi.js           quello che 까치 dice e quando: le chiamate e le righe di servizio
 
 .claude/              strumenti per chi sviluppa (non fa parte del gioco), vedi §9
   tools/probe.mjs     avvia il gioco headless, esegue scene, misura, screenshot
@@ -423,6 +428,21 @@ tavola toglie l'unica cosa che li distingue da un pannello. `ui/dialogue.js` è 
 `core/modes.js` aveva previsto e che nessuno aveva scritto: mondo fermo e giocatore fermo come in
 un menu, ma la città resta disegnata sotto il riquadro — quindi si abbassa meno di una cutscene
 (`duck` 0,4 contro 0,12). Non si salta: due battute si leggono.
+
+**E una radio non è né l'una né l'altra: parla mentre guidi** (§5.32). 까치 sulla `91.45` è la
+terza forma di parola del gioco, e l'unica che **non ferma niente**: nessuna modalità in
+`core/modes.js`, nessun tasto per avanzare, le battute scorrono a velocità di lettura e il
+mondo continua. `core/kkachi.js` è il motore e **non conosce nessuna battuta**; `story/kkachi.js`
+è la tabella e non sa come vengono scelte — stessa divisione di `missions.js` / `m1.js`, e per la
+stessa ragione: sedici chiamate in arrivo con le tappe F e G, e nessuna deve toccare il motore.
+Una riga è `{ id, when(game, k), lines }`, e i predicati si guardano due volte al secondo **solo
+mentre Kkachi può parlare**. Quello che un predicato non può leggere dallo stato del gioco — «con
+testimoni», «uscendo dal 병원» — lo legge dai **fatti recenti**: la tabella si iscrive al bus e
+scrive `k.mark(tag)`, il predicato chiede `k.since(tag)`. Nessun sistema del gioco sa che esiste
+una radio che lo guarda, ed è il secondo dei due mestieri per cui il bus del §5.27 era stato
+scritto. Le regole del copione che valgono per tutte le chiamate stanno **nel motore** — solo in
+macchina e solo su quella frequenza, la radio vera che vince sempre, e «interrotta = persa», che
+è vera perché la chiamata si segna **all'inizio** e non alla fine.
 
 **Un personaggio nominato può stare dentro un edificio, e allora non è lo streaming a
 occuparsene** (§5.29). Una definizione `indoor` non passa da `actors.update` — lì `game.peds` è

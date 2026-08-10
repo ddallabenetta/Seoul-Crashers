@@ -5,27 +5,28 @@ resta corto apposta.** Il contenuto vero sta in `docs/`, e si apre un documento 
 non tutti. Il `README.md` descrive il gioco e i comandi; qui c'è quello che serve a
 *sviluppare*. Avvio e vincoli stanno in `CLAUDE.md`, che si carica da solo.
 
-Ultimo aggiornamento: **i cortili persistenti** (§5.31, tappa C) — un territorio adesso **cambia
-padrone e se lo ricorda**: si prende sgombrandolo e restandoci dentro, si compra al banco della
-banda, si perde in una guerra, e il banco cambia mestiere insieme al tag. Prima c'era
-l'itinerario sulla carta (§5.30) e prima ancora la tappa B della campagna (§5.29): l'impianto
-delle missioni, **M1 e M2** giocabili dall'inizio alla fine, e il **filo del 병원**. Le tappe
-precedenti sono §5.8-5.28.
+Ultimo aggiornamento: **까치 sulla `91.45`** (§5.32, tappa D) — in cima alla manopola della radio
+c'è adesso una stazione che non trasmette niente e parla soltanto a te: le **otto chiamate
+dell'Atto I**, le **dodici righe di salita in macchina**, e le tre battute di trama che stavano
+appese a un toast. Prima c'erano i cortili persistenti (§5.31, tappa C), l'itinerario sulla carta
+(§5.30) e la tappa B (§5.29): l'impianto delle missioni, **M1 e M2** e il **filo del 병원**. Le
+tappe precedenti sono §5.8-5.28.
 
-> 📌 **Il prossimo lavoro è la tappa D** (Kkachi): la stazione `91.45`, la tabella con predicato,
-> le otto chiamate dell'Atto I e le dodici righe di servizio. Ha **quattro righe già in attesa**:
-> le tre di M1 e M2 e quella dell'apertura sono `hud.toast` finché la stazione non esiste.
-> L'ordine di tutte le tappe sta **in
-> testa a [`docs/backlog.md`](docs/backlog.md) (§6.0)**, che è la prima cosa da leggere prima di
+> 📌 **Il prossimo lavoro è la tappa E**: l'Atto I completo — **M3 e M4** più il raccordo R1 — e
+> con loro il primo ribaltamento messo in mano al giocatore. Chiede due cose che il motore non ha
+> ancora: un **pedinamento con soglia di distanza** («ti ha visto / l'hai perso»), che torna in
+> M6 e M9, e un **oggetto di missione trasportabile**. L'ordine di tutte le tappe sta **in testa
+> a [`docs/backlog.md`](docs/backlog.md) (§6.0)**, che è la prima cosa da leggere prima di
 > cominciare, e le nove decisioni d'impianto prese con l'utente stanno in
 > [`docs/storia/08-domande-aperte.md`](docs/storia/08-domande-aperte.md): leggi quelle, non
 > ricavarle dal copione. Resta aperta una domanda sola (se le missioni si rigiocano) e non
 > blocca niente. **Chi scrive una missione nuova parte da §5.29**: un file sotto `src/story/`,
-> una riga in `story/campaign.js`, e il motore fa il resto. **Chi disegna pannelli parte da
-> §5.28**, e li guarda con `cutscene-sheet.scene` *prima* di dire che funzionano — metà delle
-> tavole di questa tappa sono state rifatte dopo il primo provino. Il resto del §6 resta
-> ordinato per impatto: sorpasso, arresto che ti carica in volante, e il **corridoio fra Seoul e
-> Busan**, che è la superficie naturale delle attività secondarie.
+> una riga in `story/campaign.js`, e il motore fa il resto. **Chi scrive una battuta di Kkachi
+> parte da §5.32**: una riga in `story/kkachi.js`, con la sua `// origine:`. **Chi disegna
+> pannelli parte da §5.28**, e li guarda con `cutscene-sheet.scene` *prima* di dire che
+> funzionano. Il resto del §6 resta ordinato per impatto: sorpasso, arresto che ti carica in
+> volante, e il **corridoio fra Seoul e Busan**, che è la superficie naturale delle attività
+> secondarie.
 
 ---
 
@@ -44,6 +45,7 @@ precedenti sono §5.8-5.28.
 | **implementare una missione**: fasi, blip, punti, dialoghi, ripresa | `docs/storico/18-missioni-m1-m2.md` (§5.29) |
 | disegnare su mappa o minimappa, o toccare il percorso verso il blip | `docs/storico/19-itinerario-sulla-carta.md` (§5.30) |
 | toccare la proprietà di un cortile, il suo banco o la sua busta | `docs/storico/20-cortili-persistenti.md` (§5.31) |
+| **scrivere una battuta di Kkachi**, o toccare la radio e la `91.45` | `docs/storico/21-kkachi.md` (§5.32) |
 | verificare headless, usare `probe.mjs`, le scene o le skill | [`docs/strumenti.md`](docs/strumenti.md) |
 | capire *perché* una parte esistente è fatta così | [`docs/storico/`](docs/storico/) |
 
@@ -79,6 +81,7 @@ commenti resta valido: si risolve qui.
 | §5.29 Impianto missioni, M1, M2 e il 병원 | `docs/storico/18-missioni-m1-m2.md` |
 | §5.30 Itinerario sulla carta | `docs/storico/19-itinerario-sulla-carta.md` |
 | §5.31 Cortili persistenti | `docs/storico/20-cortili-persistenti.md` |
+| §5.32 까치 sulla `91.45` | `docs/storico/21-kkachi.md` |
 | §6 Backlog | `docs/backlog.md` |
 | §8 Parametri | `docs/parametri.md` |
 | §9 Strumenti (`.claude/`) | `docs/strumenti.md` |
@@ -96,7 +99,7 @@ completate e collaudate**, più la revisione della guida AI del traffico (§5.10
 arretrati (§5.12 e §5.21), l'audio procedurale del §5.13, il salvataggio del §5.15, il giro
 menu-musica-autosave del §5.18-5.20, le tre regioni collegate e ricostruite del §5.22-5.24,
 l'impianto della campagna (§5.27), la sua prima tappa a schermo (§5.28) e le prime due missioni
-giocabili (§5.29) e i cortili persistenti (§5.31). ~35.000 righe in 68 moduli. 60 fps con ~44 veicoli e ~93
+giocabili (§5.29), i cortili persistenti (§5.31) e 까치 sulla `91.45` (§5.32). ~36.400 righe in 71 moduli. 60 fps con ~44 veicoli e ~93
 pedoni attivi, e restano 60 anche sotto raffica continua di SMG. Dentro un edificio il costo è
 trascurabile: la città non gira. Il ciclo giorno-notte costa **1,5 ms di JS per frame nel caso
 peggiore** (notte con temporale) — ma i veli a schermo intero non sono misurabili onestamente
@@ -120,8 +123,9 @@ scelta — e `F4` è il muto.
 
 **E in macchina c'è la radio, con stazioni coreane vere** (§5.14): `R` accende e cambia
 stazione, `Shift+R` spegne, e nei 편의점 aperti la si sente bassa di sottofondo. È **l'unica
-cosa del gioco che parla con la rete**, non lo fa finché non premi `R`, e quando la rete non
-c'è il gioco si comporta esattamente come prima.
+cosa del gioco che parla con la rete**, non lo fa finché non premi `R` — e dal §5.32 nemmeno
+allora, perché la prima tacca è 까치 e quella non è uno stream. Quando la rete non c'è il gioco
+si comporta esattamente come prima, e adesso la radio non si spegne nemmeno: una stazione resta.
 
 **La partita si salva, e la polizia adesso ti prende vivo.** Tre slot in `localStorage` dal
 menu di pausa (§5.15) più **uno automatico a tre generazioni** (§5.20, §5.21): dentro c'è solo
@@ -183,6 +187,15 @@ perde in una guerra come lo si è preso. Quello che cambia non è solo il tag a 
 cambia mestiere insieme al padrone** (prendere il ricettatore del 황소파 vuol dire un'armeria in
 più e un ricettatore in meno) e il cortile mette da parte una busta da riscuotere di persona. È
 il primo pezzo di **città** che entra nel salvataggio, e ci entra in 92 byte.
+
+**E qualcuno ti parla, se lo cerchi** (§5.32). Sulla `91.45` c'è 까치: le otto chiamate
+dell'Atto I, dodici righe quando sali in macchina, e le battute della storia che prima erano
+messaggi in un angolo. **Chi non accende la radio non sente mai una parola** — nessun avviso,
+nessun punto esclamativo, ed è la regola, non una svista. Kkachi esiste solo col motore acceso,
+tace quando ti stanno addosso, e una chiamata interrotta è una chiamata persa per sempre: venti
+su ventiquattro sono una delle tre condizioni del finale nascosto, quindi il conto sta nel
+salvataggio. Le sue righe non portano un nome ma il quadrante della frequenza, e sotto c'è il
+fruscio — che è tutto quello che ha al posto di una voce.
 
 **E adesso si sa dove andare** (§5.30). La meta della missione è un rombo con l'alone su tutte
 e due le carte, con il suo nome sulla mappa piena e, quando esce dal ritaglio della minimappa,

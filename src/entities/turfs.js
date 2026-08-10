@@ -156,7 +156,10 @@ export class TurfSystem {
     // resta del colore di prima finché la cache non gira da sola, cioè finché non
     // si attraversa mezza città (§4).
     game.scene?.ground?.invalidateRect(t);
-    game.emit('turfClaimed', t, gangId, how);
+    // `wasMine` esce con l'evento perché dopo questa riga non c'è più modo di
+    // saperlo: il cortile è già del padrone nuovo. Serve a chi deve raccontare
+    // una perdita, non a chi conta le prese (Kkachi, §5.32).
+    game.emit('turfClaimed', t, gangId, how, wasMine);
 
     if (held) {
       // L'insegna vecchia si mostra solo se era di un'altra banda: «백호파 → 백호파»

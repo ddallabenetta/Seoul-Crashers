@@ -1,6 +1,12 @@
 # 까치 — le chiamate radio
 
 > Indice: [`README.md`](README.md). Chi (o cosa) sia Kkachi: [`01-personaggi.md`](01-personaggi.md).
+>
+> **Implementato dalla tappa D** (§5.32, [`../storico/21-kkachi.md`](../storico/21-kkachi.md)):
+> la stazione, le sei regole, le **otto chiamate dell'Atto I** e tutte le righe di servizio.
+> Restano da scrivere le sedici chiamate degli Atti II e III (tappe F e G) e le tre «visite che
+> cambiano», che vanno con le missioni a cui appartengono. Chi ne aggiunge una: una riga in
+> `src/story/kkachi.js`, con la sua `// origine:` — la colonna qui sotto **è** quel commento.
 
 Il «codec» di Seoul Crashers. Ventiquattro conversazioni facoltative, più una manciata di
 righe di servizio. Non sono missioni: sono il posto dove il gioco respira, fa ridere e

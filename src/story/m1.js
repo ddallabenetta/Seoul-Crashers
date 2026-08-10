@@ -329,7 +329,7 @@ export const M1 = {
         ctx.state.t += dt;
         if (ctx.state.t < 14 || ctx.state.said) return;
         ctx.state.said = 1;
-        ctx.toast('91.45 — «Tre ponti da qui a Myeongdong. Hongdae l\'hanno periziata a marzo.»', 6);
+        ctx.radio({ kkachi: true, text: '«Tre ponti da qui a Myeongdong. Hongdae l\'hanno periziata a marzo.»' });
       },
     },
 

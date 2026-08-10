@@ -1,0 +1,183 @@
+// 까치 sulla `91.45` (§5.32): la stazione, la tabella con predicato e le regole
+// del copione, provate sul gioco vero.
+//
+// Non misura niente — **asserisce**. Ogni voce `false` è un difetto, e ognuna
+// corrisponde a un modo in cui questa radio può smettere di essere un
+// personaggio e diventare un pop-up: una battuta che arriva a piedi, una
+// chiamata che torna dopo essere stata interrotta, una riga che commenta un
+// inseguimento, un'ora detta a caso.
+//
+//   node .claude/tools/probe.mjs --seconds 1 --quiet \
+//     --script .claude/tools/scenes/kkachi.scene \
+//     --eval "Object.entries(window.__OUT).filter(([k,v]) => v===false).map(([k])=>k)"
+//
+// `[]` vuol dire tutto a posto. Per vedere anche i valori, `--eval "window.__OUT"`.
+//
+// Quattro asserzioni sono invarianti e non si interpretano:
+//   · `nienteReteSuNoveUnoQuattroCinque` — la stazione di 까치 non deve chiedere
+//     niente a nessuno, o il §5.14 è stato rotto da questa tappa
+//   · `zittoAPiedi` — è la regola 1, cioè il personaggio
+//   · `persaNonTornaMai` — è la regola 5, e senza il conto del finale C è finto
+//   · `zittoSottoLeStelle` — la caccia ha già la sua musica (§5.19)
+const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
+const S = await import('/src/core/save.js');
+const out = {};
+const pl = game.player;
+const K = game.kkachi;
+const R = game.radio;
+game.audio.unlock();
+
+/** Sull'auto ferma più vicina, per intero: `player → onEnterVehicle → emit`. */
+function sali() {
+  if (pl.vehicle) pl.exitVehicle(game, true);
+  const v = game.vehicles
+    .filter((q) => !q.driver && !q.dead)
+    .sort((a, b) => Math.hypot(a.x - pl.x, a.y - pl.y) - Math.hypot(b.x - pl.x, b.y - pl.y))[0];
+  if (!v) return false;
+  pl.enterVehicle(v, game);
+  return true;
+}
+
+/** Aspetta che parta una battuta, o si arrende. */
+async function ascolta(secondi = 6) {
+  for (let t = 0; t < secondi; t += 0.25) {
+    if (K.talking) return true;
+    await wait(0.25);
+  }
+  return false;
+}
+
+// ---- 1. LA STAZIONE ----------------------------------------------------------
+// `91.45` è la prima tacca della manopola e non è uno stream: la radio ci si
+// accende sopra senza mandare un pacchetto a nessuno. È il §5.14 che regge, non
+// una comodità: la rete resta l'unica cosa opzionale del gioco.
+out.primaTaccaEKkachi = !!R.stations[0]?.kkachi;
+R.next(game);
+out.siAccendeSuKkachi = R.isKkachi === true;
+out.nienteReteSuNoveUnoQuattroCinque = R.discovered === false;
+out.nonHaUnFlusso = R.stations[0].url === null;
+
+// ---- 2. LA REGOLA 1: SOLO IN MACCHINA -----------------------------------------
+pl.onFoot = true;
+if (pl.vehicle) pl.exitVehicle(game, true);
+await wait(0.8);
+out.zittoAPiedi = K.canSpeak(game) === false && !K.talking;
+
+// ---- 3. LA REGOLA 6: LA RADIO VERA VINCE ---------------------------------------
+// Si mette una stazione qualunque accanto a 까치 e ci si sintonizza sopra **senza
+// far passare un frame**: la radio non prova nemmeno ad aprirla, e quello che si
+// misura è solo che Kkachi si fa da parte.
+R.stations.push({ name: 'stazione vera (finta)', url: 'https://example.invalid/x.mp3', tag: 'test' });
+const finta = R.stations.length - 1;
+R.pending = finta;
+out.taceSuUnaStazioneVera = K.canSpeak(game) === false;
+R.pending = 0;
+R.stations.length = finta;
+
+// ---- 4. UNA RIGA DI SERVIZIO, SALENDO -------------------------------------------
+// Dodici righe, la prima condizione vera vince, e l'ora che dice è quella vera:
+// il copione scrive «Le sei e dieci», che alle 07:40 sarebbe una bugia.
+game.dayCycle.hour = 6.5;
+game.dayCycle.paused = true;
+out.salito = sali();
+out.rigaDiServizioSalendo = await ascolta(6);
+const primaRiga = K.line?.text || '';
+out.rigaDiServizioEDiKkachi = !!K.line?.kkachi && !K.line?.who;
+out.oraDettaEQuellaVera = primaRiga.startsWith('Le sei e mezza.');
+out.fruscioSiSente = (game.audio.stats.letti?.fruscio ?? 0) > 0;
+out.riquadroAschermo = K.visible === true;
+// Non si ripete: la stessa battuta due volte di fila è quella che fa spegnere la radio.
+const primoId = K._last;
+while (K.talking) await wait(0.3);
+game.dayCycle.paused = false;
+
+// ---- 5. UNA CHIAMATA: IL PONTE DEL 한강 -------------------------------------------
+// La prima delle otto dell'Atto I. Il predicato è geografico, quindi si prova
+// portandocisi sopra davvero — non chiamando la funzione che lo valuta.
+const ponte = game.city.river.bridges[0];
+out.ponteTrovato = !!ponte;
+const v = pl.vehicle;
+pl.x = ponte.x;
+pl.y = (game.city.river.y0 + game.city.river.y1) / 2;
+if (v) { v.x = pl.x; v.y = pl.y; }
+game.camera.snapTo(pl.x, pl.y);
+K.serviceT = 0;   // le righe di servizio non devono rubarle il turno
+out.chiamataSulPonte = await ascolta(5) && K.call?.id === 'a1-ponte';
+out.chiamataHaPiuBattute = (K.call?.lines?.length || 0) === 3;
+out.chiamataSenzaNome = K.line?.kkachi === true;
+
+// ---- 6. LA REGOLA 5: INTERROTTA = PERSA --------------------------------------------
+// Si scende a metà conversazione. Non riparte, non si rimette in fila, e il conto
+// delle perse cresce — è quello che i titoli di coda stamperanno.
+const persePrima = K.missed;
+pl.exitVehicle(game, true);
+await wait(0.6);
+out.persaScendendo = !K.talking && K.missed === persePrima + 1;
+out.nonContataFraLeAscoltate = K.heard === 0;
+sali();
+K.serviceT = 0;
+await wait(3);
+out.persaNonTornaMai = K.call?.id !== 'a1-ponte' && K.done.has('a1-ponte');
+
+// ---- 7. LA REGOLA DELLE CINQUE STELLE ------------------------------------------------
+// Kkachi non commenta gli inseguimenti: niente di nuovo finché ci sono stelle
+// addosso. Una conversazione già cominciata invece va avanti — non stava
+// commentando niente.
+while (K.talking) await wait(0.3);
+game.wanted.level = 5;
+K.serviceT = 999;
+K.boardT = 0;
+const prima = K.done.size;
+await wait(3);
+out.zittoSottoLeStelle = !K.talking && K.done.size === prima;
+game.wanted.reset();
+game.police.standDown(game, true);
+
+// ---- 7bis. LE BATTUTE DELLA STORIA ---------------------------------------------------
+// Le tre righe che dal §5.29 stavano appese a un toast passano di qui, e valgono
+// la regola 2 come tutte le altre: **a radio spenta non le dice nessuno**. È
+// l'unico punto in cui la trama accetta di non essere sentita.
+while (K.talking) await wait(0.3);
+R.off(game);
+await wait(0.4);
+K.say(game, { kkachi: true, text: '«Bene. Adesso mettiamo in ordine. Guida.»' });
+await wait(2);
+out.storiaTaceARadioSpenta = !K.talking && K.direct.length === 1;
+R.next(game);
+out.storiaEsceQuandoAccendi = await ascolta(4)
+  && /mettiamo in ordine/.test(K.line?.text || '');
+out.storiaNonContaFraLeVentiquattro = K.heard === 0;
+
+// ---- 8. IL SALVATAGGIO ------------------------------------------------------------
+// Le chiamate andate e i due conti stanno nello slot: senza, «venti su
+// ventiquattro» sarebbe una condizione che si azzera a ogni ricarica.
+const snap = JSON.parse(JSON.stringify(S.snapshot(game)));
+out.slotContieneKkachi = Array.isArray(snap.kkachi?.done) && snap.kkachi.done.includes('a1-ponte');
+K.reset();
+out.resetSvuota = K.done.size === 0 && K.heard === 0 && K.missed === 0;
+K.restore(snap.kkachi);
+out.ricaricaRicorda = K.done.has('a1-ponte') && K.missed === snap.kkachi.missed;
+
+// Uno slot della tappa C (v4) non si butta: si migra, e chi lo ricarica ha le
+// ventiquattro ancora tutte davanti.
+const vecchio = JSON.parse(JSON.stringify(snap));
+vecchio.v = 4;
+delete vecchio.kkachi;
+try {
+  window.localStorage.setItem('seoul.save.0', JSON.stringify(vecchio));
+  const letto = S.readSlot(0);
+  out.slotV4SiMigra = !!letto && letto.v === 5 && letto.kkachi.done.length === 0;
+  window.localStorage.removeItem('seoul.save.0');
+} catch (e) {
+  out.slotV4SiMigra = `errore: ${e.message}`;
+}
+
+// ---- 9. UNA PARTITA NUOVA NON EREDITA NIENTE -----------------------------------------
+game.newGame();
+out.nuovaPartitaAzzera = K.done.size === 0 && K.heard === 0 && K.direct.length === 0;
+out.tabellaRestaRegistrata = K.calls.length === 8 && K.service.length >= 16;
+out.primaRigaDetta = primaRiga;
+out.primoIdDiServizio = primoId;
+
+window.__OUT = out;
+return out;

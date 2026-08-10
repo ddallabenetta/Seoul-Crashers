@@ -399,3 +399,20 @@ mano cinque cortili al primo minuto di partita — e smentisce l'Atto I, che è 
 banda che *non* gli obbedisce ancora. Tuo è quello che ti sei preso, e serve un campo suo
 (`t.held`, §5.31). Vale anche al contrario: una guerra fra NPC può portare un cortile al 백호파
 senza che tu ci fossi, e quello è della banda.
+
+**Una finestra temporale che non si azzera mai è una condizione sempre falsa.** Le dodici righe
+di salita in macchina di 까치 (§5.32) valgono solo entro dodici secondi da quando Kkachi torna a
+poter parlare, e il cronometro partiva già scaduto: incrementato a ogni frame e mai rimesso a
+zero, non era «da quanto è salito» ma «da quando gira il gioco». Risultato: nel sorgente la
+tabella è completa, le dodici righe sono scritte, e a schermo non ne esce **nessuna**, per
+sempre e senza un errore da nessuna parte. Il momento in cui azzerare non è un evento del bus —
+la portiera e la manopola sono due porte per la stessa cosa — ma **il fronte di salita della
+condizione stessa** (`canSpeak` che passa da falso a vero), che si legge nel ramo `else` senza
+iscriversi a niente.
+
+**`drawParagraph` vuole la baseline della prima riga, non il bordo alto del blocco.** Costruire
+l'altezza di un riquadro come «padding + testata + altezza del testo» dà una scatola che sembra
+giusta nel sorgente e ha l'ultima riga fuori dal fondo, insieme a tutto quello che ci si voleva
+mettere sotto (§5.32: la banda del fruscio finiva sull'asfalto). L'altezza torna solo partendo
+dalla baseline dell'**ultima** riga e aggiungendo discendenti e margine — e si vede in uno
+screenshot ritagliato sul riquadro, mai nel codice.

@@ -164,6 +164,7 @@ export class AudioSystem {
         mare: +b.sea.g.toFixed(2), motore: +b.engine.g.toFixed(2), traffico: +b.traffic.g.toFixed(2),
         sirena: +b.siren.g.toFixed(2), rotore: +b.rotor.g.toFixed(2), fuoco: +b.fire.g.toFixed(2),
         gomme: +b.skid.g.toFixed(2), canne: +b.spin.g.toFixed(2),
+        fruscio: +b.kkachi.g.toFixed(3),
       } : null,
       spazio: this.space, verso: this.wantSpace, riverbero: +this._revG.toFixed(3),
       musica: this.music ? this.music.stats : null,
@@ -716,6 +717,22 @@ export class AudioSystem {
         return { bp };
       }, 0.15),
 
+      // Fruscio di banda della `91.45`. **È la voce di 까치**: i pannelli sono
+      // muti per decisione (`08-domande-aperte.md`, punto 1), quindi quello che
+      // rende riconoscibile quella radio non è un timbro ma il fondo — e i
+      // silenzi che il copione scrive esistono solo se sotto c'è questo.
+      // Non passa dal riverbero: una radio non sta in nessuna stanza.
+      kkachi: this.bed((node) => {
+        node.connect(this.amb);
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.value = 2100;
+        bp.Q.value = 0.8;
+        bp.connect(node);
+        loopNoise(bp, 1.5, false);
+        return { bp };
+      }, 0.25),
+
       // Canne della minigun che prendono giro: sale prima del primo colpo, ed è
       // metà del carattere dell'arma.
       spin: this.bed((node) => {
@@ -863,6 +880,15 @@ export class AudioSystem {
     this.updateVehicles(dt, game, duck);
     this.updatePolice(dt, game, duck);
     this.updateFires(dt, game, duck);
+
+    // La banda di 까치. Sale **nei silenzi**: mentre c'è una battuta a schermo
+    // resta sotto, e fra una battuta e l'altra torna a essere l'unica cosa che si
+    // sente. Segue il volume della radio, non quello dell'ambiente: è la stessa
+    // manopola che alza le stazioni vere (§5.14).
+    const kk = game.kkachi;
+    if (kk?.visible) {
+      beds.kkachi.target = duck * this.mix.radio * (kk.line?.text ? 0.02 : 0.05);
+    }
 
     // Canne della minigun: `spin` è già la manopola, qui diventa tono e volume.
     if (pl.spin > 0.01 && pl.onFoot) {
@@ -1310,6 +1336,22 @@ export class AudioSystem {
   }
 
   /** Interfaccia: 'move' scorrere, 'ok' confermare, 'deny' rifiutare, 'open'/'close'. */
+  /**
+   * Lo scatto della portante che apre e chiude una chiamata di 까치. Passa dal
+   * bus dell'ambiente e non da quello dell'interfaccia: non è un clic di menu, è
+   * una cosa che succede dentro il cruscotto e deve abbassarsi con tutto il resto
+   * quando il mondo si abbassa.
+   */
+  squelch(open = true) {
+    const out = this._at(null, null, 0.26, 0.22, this.amb);
+    if (!out) return;
+    const bp = this._filter(out, 'bandpass', open ? 1400 : 2600, 1.2, {
+      f1: open ? 2600 : 1200, sweep: 0.09,
+    });
+    this._noise(bp, { dur: 0.1, peak: 0.55, rate: 1.4 });
+    this._tone(out, { type: 'square', f0: open ? 1150 : 720, dur: 0.04, peak: 0.05 });
+  }
+
   ui(kind = 'move') {
     const out = this._at(null, null, 0.3, 0.3, this.uiBus);
     if (!out) return;

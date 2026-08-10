@@ -185,6 +185,13 @@ export class MissionSystem {
         if (i >= 0) this.points.splice(i, 1);
       },
       toast: (text, seconds = 3.4) => game.hud.toast(text, seconds),
+      /**
+       * Una battuta sulla `91.45` (§5.32). **Non è un toast con un'altra faccia**:
+       * la sente solo chi ha la radio accesa sulla frequenza di 까치, e se non
+       * l'ha accesa non la sente nessuno. Una fase che ne dipende va scritta in
+       * modo da chiudersi lo stesso — Kkachi commenta, non comanda.
+       */
+      radio: (lines, opts) => game.kkachi.say(game, lines, opts),
       /** La riga dell'HUD sotto il titolo della missione. */
       say: (text) => { this.hint = text; },
       /** Un dialogo in strada: mondo fermo, e si avanza a mano. */

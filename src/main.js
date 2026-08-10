@@ -6,6 +6,7 @@ import { Events } from './core/events.js';
 import { resolveMode } from './core/modes.js';
 import { AudioSystem } from './core/audio.js';
 import { Radio } from './core/radio.js';
+import { KkachiSystem } from './core/kkachi.js';
 import { DynamicGrid } from './core/spatial.js';
 import { KMH, clamp, dist } from './core/math.js';
 import { createRegion, REGION_IDS } from './world/regions.js';
@@ -39,6 +40,7 @@ import { MetroSystem } from './ui/metro.js';
 import { Cutscene } from './ui/cutscene.js';
 import { MobileControls } from './ui/mobilecontrols.js';
 import { Dialogue } from './ui/dialogue.js';
+import { drawRadioCall } from './ui/radiocall.js';
 import { MissionSystem } from './core/missions.js';
 import { INTRO, handoff } from './story/intro.js';
 import { registerCampaign, beginCampaign } from './story/campaign.js';
@@ -87,6 +89,9 @@ class Game {
     // La radio è l'unica cosa del gioco che parla con la rete, e non lo fa
     // finché il giocatore non la accende (§5.14).
     this.radio = new Radio(this.audio);
+    // 까치, sulla `91.45`. È una stazione della manopola qui sopra e un lettore
+    // di battute a predicato: quello che dice non lo sa (`story/kkachi.js`).
+    this.kkachi = new KkachiSystem();
     this.stats = {
       distance: 0,
       topSpeed: 0,
@@ -306,6 +311,9 @@ class Game {
       this.hud.toast('E per rubare un\'auto · M per la mappa', 5);
       this.hud.toast('Mouse per mirare e sparare · 1-6 per l\'arma', 6.5);
       this.hud.toast('E sulla porta di un negozio per entrare · F svuota la cassa', 8);
+      // Che esista una radio è un comando, non un avviso di Kkachi: la regola 2
+      // del copione vieta di segnalare *lui*, non di dire dov'è la manopola.
+      this.hud.toast('R accende la radio quando sei alla guida', 9.5);
     }
   }
 
@@ -428,6 +436,7 @@ class Game {
     this.turfs.reset(this);
     this.actors.reset();
     this.missions.reset(this);
+    this.kkachi.reset();
     this.markers.length = 0;
     this.dayCycle.reset();
     this.radio.off(this);
@@ -578,8 +587,13 @@ class Game {
   // di Kkachi — si iscrive invece di farsi aggiungere un `if` qui dentro.
   onDistrictChange(d) {
     this.hud.showDistrict(d);
-    this.stats.districts.add(this.districtKey(d));
-    this.emit('districtChange', d);
+    // **Nuovo prima di segnarlo**, e non è pignoleria: chi ascolta l'evento lo
+    // riceve quando la zona è già in elenco, e una riga di Kkachi che dice «qui
+    // non ci sei mai stato» non avrebbe più modo di saperlo.
+    const key = this.districtKey(d);
+    const first = !this.stats.districts.has(key);
+    this.stats.districts.add(key);
+    this.emit('districtChange', d, first);
   }
 
   onEnterVehicle(v) {
@@ -592,14 +606,17 @@ class Game {
     // `return` anticipato, e siccome l'`emit` sta in fondo salire su un'auto vuota
     // non lo mandava a nessuno. Salire sulla berlina del padre — che è ferma e
     // vuota da una notte — non faceva partire M1, mentre rubarne una in corsa sì.
+    let witness = false;
     if (v.occupiedTheft) {
       const cop = this.police.cops.some((p) => !p.dead && dist(p.x, p.y, v.x, v.y) < 420);
+      witness = cop || this.pedGrid.queryCircle(v.x, v.y, 320).some((p) => !p.dead);
       if (cop) this.wanted.report('copTheft', this);
-      else if (this.pedGrid.queryCircle(v.x, v.y, 320).some((p) => !p.dead)) {
-        this.wanted.report('theft', this);
-      }
+      else if (witness) this.wanted.report('theft', this);
     }
-    this.emit('enterVehicle', v);
+    // `witness` esce insieme all'evento perché **chi l'ha visto lo sa solo qui**:
+    // un istante dopo la griglia dei pedoni è già un'altra, e ricalcolarlo altrove
+    // vorrebbe dire riscrivere questa regola una seconda volta (§4).
+    this.emit('enterVehicle', v, witness);
   }
 
   onExitVehicle(v) {
@@ -988,6 +1005,10 @@ class Game {
     // porta, e infatti `shops` svuota la lista a ogni passaggio (mine comprese).
     this.projectiles.update(dt, this);
     this.fx.update(dt, this);
+    // Kkachi guarda la sua tabella due volte al secondo, e solo mentre il mondo
+    // gira: un menu aperto mette in pausa la battuta, scendere dall'auto la perde
+    // (regola 5). Sta qui in fondo perché non muove niente — legge e basta.
+    this.kkachi.update(dt, this);
     this.hud.update(dt);
     tickAutosave(dt, this);
 
@@ -1114,6 +1135,9 @@ class Game {
       return;
     }
     this.hud.draw(ctx, this);
+    // Sopra l'HUD e sotto i menu: è una cosa che succede in strada, non un
+    // pannello. Il mondo continua a girare mentre si legge.
+    drawRadioCall(ctx, this);
     this.mapView.draw(ctx, this);
     this.menu.draw(ctx, this);
     this.shopMenu.draw(ctx, this);

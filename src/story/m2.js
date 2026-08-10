@@ -353,7 +353,7 @@ export const M2 = {
       enter(ctx) {
         ctx.unmark();
         const go = () => {
-          ctx.toast('91.45 — «Prima di chiedere a un vivo, chiedi a uno scaffale.»', 6);
+          ctx.radio({ kkachi: true, text: '«Prima di chiedere a un vivo, chiedi a uno scaffale.»' });
           ctx.next();
         };
         ctx.on('enterVehicle', go);
