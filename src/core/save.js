@@ -56,7 +56,7 @@ export const AUTO_GENS = 3;
  * lì non c'è niente da migrare, perché una Seoul diversa rende le coordinate
  * salvate prive di significato e il giocatore rinascerebbe dentro un palazzo.
  */
-const VERSION = 4;
+const VERSION = 5;
 const SEED = 20260730;
 
 /**
@@ -97,6 +97,14 @@ const MIGRATIONS = {
   // vuota: ogni territorio è ancora della banda con cui è nato dalla seed.
   3: (d) => {
     d.turfs = { owners: {}, pots: {}, held: [], told: false };
+    return d;
+  },
+  // 4 -> 5: la `91.45` (§5.32). In una partita di prima quella stazione non
+  // esisteva, quindi nessuna chiamata è andata e nessuna è stata persa — che è
+  // esattamente quello che dicono tre campi vuoti. Chi ricarica uno slot vecchio
+  // si ritrova le ventiquattro ancora tutte davanti, ed è giusto così.
+  4: (d) => {
+    d.kkachi = { done: [], heard: 0, missed: 0 };
     return d;
   },
 };
@@ -191,6 +199,10 @@ export function snapshot(game) {
     // **non è qui**: è `stats.deaths`, che il salvataggio porta da sempre e che è
     // già lo stesso numero — averne due sarebbe averne uno sbagliato.
     story: game.missions.snapshot(),
+    // Le chiamate di 까치 già andate e i due conti. Il secondo (`heard`) è una
+    // delle tre condizioni del finale C, quindi è uno stato di partita a tutti
+    // gli effetti e non un contatore di comodo (§5.32).
+    kkachi: game.kkachi.snapshot(),
   };
 }
 
@@ -246,6 +258,7 @@ export function apply(game, data) {
   // che ancora non esistono e chi era morto tornerebbe dietro al banco.
   game.missions.restore(data.story, game);
   game.actors.restore(data.actors);
+  game.kkachi.restore(data.kkachi);
 
   const districts = new Set(data.stats.districts);
   Object.assign(game.stats, data.stats, { districts });

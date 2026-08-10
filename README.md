@@ -395,7 +395,14 @@ Alcune scelte tecniche che spiegano il risultato a schermo:
   prima di contarle sull'HUD. In strada non suona niente, perché in strada c'è già Seoul; in
   macchina c'è la radio, e la radio vince sempre. Volume suo nel mixer.
 
-- **La radio è vera.** In macchina `R` accende l'autoradio e ci trovi **stazioni coreane in
+- **Sulla `91.45` c'è qualcuno.** La prima tacca dell'autoradio è 까치, che non trasmette
+  musica: commenta il ponte che stai attraversando, la pioggia, l'ora, l'auto che hai appena
+  rubato e chi ti ha visto rubarla. Parla **solo in macchina, e solo se la radio è accesa su
+  quella frequenza**: non ti avvisa che esiste, non mette un punto esclamativo da nessuna
+  parte, e se scendi a metà di una conversazione quella conversazione l'hai persa. Si può
+  finire il gioco senza sapere che c'è — e sarebbe una partita più sola, che è il punto.
+
+- **La radio è vera.** Girando la manopola oltre 까치 ci trovi **stazioni coreane in
   streaming**, prese da una directory pubblica che non chiede nessuna chiave; nei 편의점
   aperti la stessa stazione si sente bassa di sottofondo. È l'unica cosa del gioco che parla
   con la rete, non lo fa finché non premi `R`, e se la rete non c'è tutto il resto funziona
@@ -404,6 +411,14 @@ Alcune scelte tecniche che spiegano il risultato a schermo:
   la puoi fissare tu, in `localStorage` sotto `seoul.radio.stations`.
 
 ## Stato
+
+**Campagna, tappa D — completata.** 까치, sulla `91.45`: le otto conversazioni dell'Atto I, una
+riga ogni volta che sali in macchina, e le battute della storia che prima erano messaggi in un
+angolo dello schermo. Chi non accende mai la radio non ne sente nemmeno una.
+
+**Campagna, tappa C — completata.** Un cortile cambia padrone e se lo ricorda: si prende
+sgombrandolo e restandoci dentro, si compra al banco della sua banda, si perde in una guerra —
+e il banco cambia mestiere insieme al tag.
 
 **Campagna, tappa B — completata.** Le prime due missioni, giocabili dall'inizio alla fine, e
 l'impianto che le regge: un obiettivo alla volta, fasi che si riprendono dopo una morte,
@@ -471,7 +486,8 @@ registratore di cassa. Quattro volumi nel menu di pausa, `F4` per il silenzio.
 
 **Fase 3, la radio — completata.** Autoradio con stazioni coreane vere, in streaming e senza
 chiavi API: `R` accende e cambia stazione, `Shift+R` spegne, il nome scorre sopra il
-tachimetro e nei locali che ce l'hanno la si sente bassa. Volume suo nel mixer.
+tachimetro e nei locali che ce l'hanno la si sente bassa. Volume suo nel mixer. La prima tacca
+è la `91.45`, che non ha bisogno della rete: lì c'è 까치.
 
 **Fase 3, salvataggio e arresto — completata.** Tre slot su `localStorage` dal menu di pausa,
 con dentro solo quello che la seed non sa rifare (meno di mille byte a slot). E una sconfitta

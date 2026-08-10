@@ -261,3 +261,15 @@
 | Prezzo di un cortile | `turfs.YARD_PRICE` | ₩320.000 × `goods` del quartiere, arrotondati a 5.000. Si ripaga in tre o quattro buste piene, ed è la via **senza morti** |
 | Salto d'orologio che la busta non conta | `turfs.CLOCK_JUMP` | 26 ore: oltre non è tempo passato, è un caricamento o un viaggio in metro |
 | Tasto della busta | `turfs.offerPot` | **`F`**, non `E`: `F` è già il tasto dei soldi, e `E` dentro il proprio recinto apre il banco della banda |
+| **— 까치 sulla `91.45` (§5.32) —** | | |
+| Versione del formato di salvataggio | `save.VERSION` | 5 (dal 4 del §5.31): ci sono entrate le chiamate radio. Lo scalino `4 → 5` aggiunge tre campi vuoti, che è esattamente «quella stazione non esisteva» |
+| Peso di 까치 nel salvataggio | `kkachi.snapshot` | gli id delle chiamate andate più due interi. Le **ascoltate** sono una delle tre condizioni del finale C, le **perse** compaiono solo nei titoli di coda |
+| Ogni quanto si guardano i predicati | `kkachi.POLL` | 0,5 s, e **solo mentre Kkachi può parlare**: fuori dall'auto la tabella non si valuta |
+| Durata di una battuta a schermo | `kkachi.READ_BASE` · `READ_PER_CHAR` | 1,9 s + 42 ms per carattere, fra 2,4 e 9 s. Si tara sulla battuta **più lunga** del copione, non sulla più corta |
+| Fruscio fra due battute · coda finale | `kkachi.GAP` · `TAIL` | 0,45 s · 1,1 s. Senza il primo, due righe di fila sembrano un pannello |
+| Finestra della «salita in macchina» | `kkachi.BOARD_WINDOW` | 12 s da quando torna a poter parlare — cioè dalla portiera **o** dalla manopola: sono la stessa cosa e si contano una volta sola |
+| Attesa fra due righe di servizio | `kkachi.SERVICE_REST` | 75 s, e ogni riga ha il suo `rest` (la cella 3600, il cortile 600, il motore acceso 240, la rete 1800) |
+| Scadenza di una battuta della storia | `kkachi.DIRECT_LIFE` | 240 s. Scaduta non la dice nessuno: è la regola 2 del copione applicata alla trama |
+| Livello del fruscio | `audio.updateBeds` (`beds.kkachi`) | 0,02 sotto una battuta · 0,05 nei silenzi, per `mix.radio`. Misurati: 0,016 e 0,04 contro 0,05 del fondo urbano e 0,04 del motore |
+| Soglia del «pieno» | `story/kkachi.PIENO` | ₩60.000, che sono esattamente i contanti di partenza: la riga S11 esce alla prima spesa, non al primo minuto |
+| Distanza oltre cui un cortile perso si racconta | `story/kkachi.LONTANO` | 1200 px: sotto l'hai visto succedere, e te l'ha già detto il cartello a terra |

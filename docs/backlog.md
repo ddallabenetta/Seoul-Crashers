@@ -15,7 +15,7 @@ sigillate, marcatori, testo su più righe). Quello che resta è **contenuto**, i
 | ~~1~~ | ~~**A**~~ | ~~primitive dei pannelli + la cutscene iniziale~~ — **fatta**, §5.28 | — |
 | ~~2~~ | ~~**B**~~ | ~~impianto missioni + M1 e M2~~, e con loro **il filo del 병원** — **fatta**, §5.29 | — |
 | ~~3~~ | ~~**C**~~ | ~~**cortili persistenti** (nel salvataggio, con effetto sul commercio)~~ — **fatta**, §5.31 | — |
-| 4 | **D** | Kkachi: stazione `91.45`, tabella con predicato, le otto chiamate dell'Atto I **e le dodici righe di servizio** | si gira per Seoul con la radio accesa |
+| ~~4~~ | ~~**D**~~ | ~~Kkachi: stazione `91.45`, tabella con predicato, le otto chiamate dell'Atto I e le dodici righe di servizio~~ — **fatta**, §5.32 | — |
 | 5 | **E** | Atto I completo (M3, M4) + R1 | il primo ribaltamento in mano al giocatore |
 | 6 | **F** | Atto II (M5-M8) + R2, R3 + le otto chiamate dell'Atto II | l'atto che chiede più cose nuove al motore |
 | 7 | **G** | Atto III (M9-M12) + R4 + le otto chiamate dell'Atto III **e l'incontro facoltativo di Busan** | il viaggio: ha bisogno di tutto quello di prima |
@@ -76,12 +76,26 @@ definitiva, con le `(nota)` dove il giocatore va aiutato a *guardare* e la tabel
 già tradotte in testa a [`storia/README.md`](storia/README.md) — glossare una seconda volta la
 stessa parola è un errore, non una gentilezza.
 
-**I debiti che l'Atto I lascia alla tappa D.** Sono diventati **quattro** righe di Kkachi
-appese a un `hud.toast` finché non esiste la stazione `91.45`: il passaggio di consegne
-dell'apertura, i tre ponti di M1, e l'innesco di M2 («Prima di chiedere a un vivo, chiedi a uno
-scaffale.»). Sono l'unico punto di quelle scene che la tappa D dovrà tornare a toccare. E resta
-la **regia sonora** dell'apertura (fruscio di banda, la voce che conta, il cane, la sirena
-lontana): la musica c'è, gli effetti no, e conviene farli dove nasce il timbro del fruscio.
+**Cosa la tappa D (§5.32) ha già tolto di mezzo.** 까치 esiste, sulla `91.45`, ed è una
+**tabella con predicato**: aggiungere una chiamata è una riga in `story/kkachi.js` —
+`{ id, when(game, k), lines }` — e il motore non va toccato. Le sedici chiamate degli Atti II e
+III (tappe F e G) sono quindi contenuto puro. Sono già pagate anche le tre righe di Kkachi che
+stavano appese a un `hud.toast` (apertura, M1, M2: erano tre e non quattro — la quarta era il
+pannello del quadrante di M1, che era già un pannello vero), il conto delle chiamate ascoltate
+nel salvataggio — che è **una delle tre condizioni del finale C** e adesso c'è — e l'avviso del
+cortile portato via mentre eri altrove. Chi scrive una chiamata trova in testa a quel file la
+regola che conta: **ogni battuta è copiata da qualcun altro**, e il commento `// origine:` è la
+prova, non una nota.
+
+**Quello che la tappa D lascia indietro:**
+- **la regia sonora dell'apertura** (fruscio di banda sotto la voce che conta, il cane, la
+  sirena lontana). Il timbro del fruscio adesso c'è ed è quello giusto (`audio.beds.kkachi`),
+  quindi resta da fare un **aggancio dei suoni ai pannelli** — `ui/cutscene.js` non ce l'ha — e
+  tre suoni nuovi;
+- **l'ottava chiamata dell'Atto I aspetta M3**: il predicato è già definitivo
+  (`missions.isDone('m3')`) e resta falso finché non c'è la tappa E;
+- **le «visite che cambiano»** (Jo dopo M6, Chun-sik dopo M9, il commesso dopo M8) stanno nello
+  stesso capitolo del copione ma non sono chiamate radio: restano alle tappe delle loro missioni.
 
 **Tre cose che M1 e M2 lasciano indietro** (§5.29), e nessuna blocca la tappa C:
 - **un oggetto di missione trasportabile.** I tre pegni di M2 sono tre caselle in un taccuino,
@@ -91,6 +105,17 @@ lontana): la musica c'è, gli effetti no, e conviene farli dove nasce il timbro 
 - **Jo che risponde in modo diverso dopo M6** (le «visite che cambiano»,
   [`storia/07-radio-kkachi.md`](storia/07-radio-kkachi.md)): oggi il banco dice sempre le stesse
   cose una volta finita M2.
+
+**Rimasto indietro da 까치** (§5.32):
+- **Le chiamate perse non si vedono da nessuna parte.** Il conto c'è (`kkachi.missed`) e per
+  copione compare **solo** nei titoli di coda, che sono la tappa H: fino ad allora è un numero
+  che nessuno legge.
+- **Il fruscio non sa dove sei.** Suona identico in galleria, sotto un cavalcavia e in mezzo al
+  campo. È lo stesso difetto della radio vera («non gracchia in galleria», sotto), e adesso ci
+  sarebbe un letto su cui farlo.
+- **Kkachi non tace quando parla qualcun altro.** Un dialogo di missione mette in pausa la sua
+  battuta, ma appena finisce riprende da dove era: due voci in due secondi diversi va bene, la
+  regia vera vorrebbe che aspettasse un momento.
 
 ---
 
@@ -110,8 +135,8 @@ copione completo della campagna — dodici missioni in tre atti, cutscene inizia
 finali e ventiquattro chiamate radio — sta in [`storia/`](storia/), scritto e non implementato.
 **E l'impianto è deciso**, con l'utente: pannelli solo testo, cutscene saltabile, un blip solo
 sulla missione attiva, fallimento che riparte dall'ultima fase, un pannello = una funzione,
-cortili persistenti, tre finali, Kkachi come tabella con predicato, storia prima delle attività
-secondarie. Le decisioni e le **otto tappe** di lavoro stanno in
+cortili persistenti, tre finali, Kkachi come tabella con predicato (fatta, §5.32), storia prima
+delle attività secondarie. Le decisioni e le **otto tappe** di lavoro stanno in
 [`storia/08-domande-aperte.md`](storia/08-domande-aperte.md); l'**impianto è pronto** (§5.27) e
 l'ordine delle tappe è quello del §6.0, qui sopra. Resta aperta una domanda sola: se le missioni
 si rigiocano.
@@ -129,9 +154,6 @@ il §5.21 altre undici — fra cui le due che erano tornate in cima.
   **l'ultimo debito grosso del traffico** (dettagli più sotto).
 
 **Rimasto indietro dai cortili** (§5.31):
-- **Nessuno ti avvisa se te ne portano via uno.** Una guerra può cambiare il padrone di un
-  cortile tuo mentre sei a Busan, e lo scopri tornando. Il posto giusto per dirlo è **Kkachi**
-  (tappa D): è una riga di tabella con predicato, non un sistema nuovo.
 - **Le guardie del cortile tuo non sono tue.** Ci stanno e non ti sparano, ma non ti seguono,
   non si possono chiamare e non difendono niente più di prima.
 - **Comprare un cortile è una riga di listino, non una trattativa.** Funziona e si capisce, ma

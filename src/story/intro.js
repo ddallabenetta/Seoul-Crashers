@@ -1062,10 +1062,11 @@ export function handoff(game) {
     said = true;
     offRadio();
     offCar();
-    // Kkachi non ha ancora un posto suo in cui parlare: la tabella con predicato e
-    // la stazione 91.45 sono la tappa D. Per adesso è un toast, ed è l'unico punto
-    // della cutscene che quella tappa dovrà tornare a toccare.
-    game.hud.toast('91.45 — «Bene. Adesso mettiamo in ordine. Guida.»', 6);
+    // Adesso Kkachi ha un posto suo in cui parlare (§5.32): la battuta va sulla
+    // `91.45` come tutte le altre, e **chi non ha acceso la radio non la sente**.
+    // È la regola 2 del copione, e vale anche per la trama: la scena insegna che
+    // quella voce sta nel cruscotto solo se il prezzo di non cercarla è reale.
+    game.kkachi.say(game, { kkachi: true, text: '«Bene. Adesso mettiamo in ordine. Guida.»' });
   };
   const offRadio = game.on('radioOn', (inCar) => { if (inCar) say(); });
   const offCar = game.on('enterVehicle', say);

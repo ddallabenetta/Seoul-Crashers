@@ -24,7 +24,13 @@
 // Questo taglia fuori le tre grandi coreane (KBS, MBC, SBS), che trasmettono in
 // HLS con un token: restano le decine di stazioni indipendenti dell'elenco, che
 // per il fondo di un gioco sono anche più interessanti.
+//
+// **E poi c'è `91.45`**, che non è nessuna di queste cose: non ha un URL, non
+// apre una connessione e non può rompersi. È 까치 (`core/kkachi.js`), sta in
+// cima alla manopola e la radio ci si accende sopra — il che vuol dire che il
+// gioco adesso non parla con la rete finché non si preme `R` **due** volte.
 import { clamp } from './math.js';
+import { FREQ } from './kkachi.js';
 
 // Mirror pubblici della directory. Si provano in ordine: se il primo non
 // risponde entro il timeout si passa al successivo.
@@ -50,11 +56,20 @@ const TUNE_SETTLE = 0.45;
 // salta. Senza, una stazione morta blocca la radio per sempre.
 const STALL_LIMIT = 11;
 
+/**
+ * La stazione di 까치. Non è uno stream: `url` a `null` vuol dire che l'elemento
+ * `<audio>` non la tocca mai, quindi non può essere lenta, muta né rotta. Quello
+ * che si sente sopra la sua portante lo mette `core/kkachi.js`, ed è un fruscio.
+ */
+const KKACHI = { name: `${FREQ} · 까치`, url: null, tag: 'FM', kkachi: true };
+
 export class Radio {
   /** @param audio l'`AudioSystem`: da lì arrivano volume generale e muto. */
   constructor(audio) {
     this.audio = audio;
-    this.stations = [];
+    // Prima di tutte, comprese quelle scritte a mano: la manopola parte da qui e
+    // accendere la radio non deve dipendere da un elenco che va scaricato.
+    this.stations = [{ ...KKACHI }];
     this.tuned = -1;      // stazione caricata nell'elemento
     this.pending = -1;    // stazione scelta dal giocatore (−1 = spenta)
     this.el = null;
@@ -73,6 +88,11 @@ export class Radio {
 
   get on() {
     return this.pending >= 0;
+  }
+
+  /** Accesa **e** sulla frequenza di 까치: è la regola 6 in una riga sola. */
+  get isKkachi() {
+    return this.on && !!this.stations[this.pending]?.kkachi;
   }
 
   /** Etichetta per l'HUD: dice sempre a che punto è, anche quando non suona. */
@@ -119,11 +139,16 @@ export class Radio {
   }
 
   /**
-   * Chiede l'elenco alla directory. **Parte solo quando il giocatore accende la
-   * radio**: finché non tocca `R`, il gioco non manda un pacchetto a nessuno.
+   * Chiede l'elenco alla directory. **Parte solo quando il giocatore vuole
+   * lasciare `91.45`**: finché resta su 까치 — cioè finché non preme `R` la
+   * seconda volta — il gioco non manda un pacchetto a nessuno.
+   *
+   * `then` è quello che si voleva fare con l'elenco in mano, di solito «vai
+   * avanti di una stazione». Sta qui perché la ricerca è asincrona e chi l'ha
+   * chiesta è già tornato indietro da un pezzo.
    */
-  async discover() {
-    if (this.discovered) return;
+  async discover(then = null) {
+    if (this.discovered) { if (then) then(); return; }
     this.discovered = true;
     this.state = 'cerco';
     for (const host of DIRECTORY) {
@@ -155,44 +180,62 @@ export class Radio {
         break;
       } catch { /* mirror giù o rete assente: si prova il prossimo */ }
     }
-    if (!this.stations.length) {
+    if (!this.stations.some((s) => !s.kkachi)) {
       this.note = 'nessuna stazione raggiungibile';
-      this.state = 'off';
-      this.pending = -1;
+      // **La radio non si spegne più**: `91.45` c'è comunque, e spegnerla perché
+      // la rete non risponde toglierebbe l'unica stazione che non ne ha mai
+      // avuto bisogno. Si resta dov'è, e a dirlo ci pensa Kkachi.
+      this.state = 'acceso';
       this.toast('Radio: non riesco a raggiungere l\'elenco delle stazioni');
       return;
     }
     // Se la partita scorsa era su una stazione che c'è ancora, si riparte da lì.
+    // `> 0` e non `>= 0`: la posizione zero è 까치, ed è da lì che si sta
+    // cercando di andarsene — riportarcisi sarebbe premere `R` per restare fermi.
     const back = this._wanted ? this.stations.findIndex((s) => s.name === this._wanted) : -1;
-    this.pending = back >= 0 ? back : 0;
-    this.state = 'sintonizzo';
-    this._settle = 0;
+    if (back > 0) { this.pending = back; this.state = 'sintonizzo'; this._settle = 0; return; }
+    if (then) then();
   }
 
   // --- comandi ----------------------------------------------------------------
 
-  /** `R`: accende, oppure passa alla stazione dopo. */
+  /** `R`: accende su `91.45`, oppure passa alla stazione dopo. */
   next(game, dir = 1) {
     this._game = game;
+    // Si accende **sempre** su 까치, e senza toccare la rete: è la prima riga
+    // della manopola, ed è la sola che c'è di sicuro.
+    if (!this.on) { this.tuneTo(0); return; }
+    if (this.state === 'cerco') return;
     if (!this.discovered) {
-      this.pending = 0;
       this.toast('Radio: cerco le stazioni…');
-      this.discover();
+      this.discover(() => this.step(dir));
       return;
     }
-    if (!this.stations.length) {
-      this.toast('Radio: nessuna stazione disponibile');
-      return;
-    }
+    this.step(dir);
+  }
+
+  /** Una tacca di manopola, saltando quelle che non hanno risposto. */
+  step(dir) {
     const n = this.stations.length;
-    let i = this.pending < 0 ? 0 : (this.pending + dir + n) % n;
+    if (n <= 1) {
+      this.toast('Radio: nessun\'altra stazione');
+      return;
+    }
+    let i = (this.pending + dir + n) % n;
     // Le stazioni che non hanno risposto si saltano invece di sparire: al giro
     // dopo può darsi che siano tornate, ma non ci si inciampa scorrendo.
     for (let k = 0; k < n && this.stations[i].broken; k++) i = (i + dir + n) % n;
+    this.tuneTo(i);
+  }
+
+  tuneTo(i) {
+    const s = this.stations[i];
+    if (!s) return;
     this.pending = i;
-    this.state = 'sintonizzo';
-    this._settle = TUNE_SETTLE;
-    this.toast(`Radio: ${this.stations[i].name}`);
+    // `91.45` non si sintonizza: non c'è niente da agganciare, quindi è già accesa.
+    this.state = s.kkachi ? 'acceso' : 'sintonizzo';
+    this._settle = s.kkachi ? 0 : TUNE_SETTLE;
+    this.toast(`Radio: ${s.name}`);
     this.save();
   }
 
@@ -223,6 +266,15 @@ export class Radio {
 
     if (this.pending < 0) {
       if (this.el && !this.el.paused) this.el.pause();
+      return;
+    }
+    // `91.45` non è uno stream: niente da caricare, niente da far suonare, niente
+    // che possa non rispondere. Quello che si sente lo mette `core/kkachi.js`.
+    if (this.stations[this.pending].kkachi) {
+      if (this.el && !this.el.paused) this.el.pause();
+      this.tuned = this.pending;
+      this.state = 'acceso';
+      this.note = '';
       return;
     }
     // Si carica solo quando qualcuno può sentirla: accendere la radio a piedi in
@@ -307,20 +359,23 @@ export class Radio {
   fail(why) {
     if (!this.on) return;
     const s = this.stations[this.tuned] || this.stations[this.pending];
-    if (s) s.broken = true;
+    // `91.45` non può fallire: non ha una sorgente. L'`error` che arriva qui
+    // mentre si passa da un'altra stazione a 까치 è quello dell'elemento che
+    // viene staccato, e segnarla rotta la toglierebbe dalla manopola per sempre.
+    if (!s || s.kkachi) return;
+    s.broken = true;
     this.note = why;
     this._stall = 0;
-    const left = this.stations.filter((o) => !o.broken).length;
+    const left = this.stations.filter((o) => !o.broken && !o.kkachi).length;
     if (!left) {
-      this.pending = -1;
-      this.tuned = -1;
-      this.state = 'off';
-      if (this.el) this.el.pause();
+      // Si torna su 까치 invece di spegnersi: la radio resta accesa perché una
+      // stazione c'è sempre, e che le altre non rispondano lo dice lei.
       this.toast('Radio: nessuna stazione risponde');
+      this.tuneTo(0);
       return;
     }
-    this.toast(`Radio: ${s ? s.name : 'stazione'} ${why}, passo alla prossima`);
-    this.next(this._game);
+    this.toast(`Radio: ${s.name} ${why}, passo alla prossima`);
+    this.step(1);
   }
 
   toast(text) {

@@ -7,6 +7,7 @@
 import { M1 } from './m1.js';
 import { M2 } from './m2.js';
 import { attachHospital } from './hospital.js';
+import { attachKkachi } from './kkachi.js';
 
 const CAMPAGNA = [M1, M2];
 
@@ -23,6 +24,9 @@ export function registerCampaign(game) {
   // Il filo del 병원 non è una missione e non sta nella catena: si accumula per
   // conto suo a ogni morte, dalla prima all'ultima (`09-ospedale.md`).
   attachHospital(game);
+  // E nemmeno 까치: le sue ventiquattro chiamate non sono missioni e non hanno un
+  // ordine: sono una tabella di predicati che guarda il mondo (`07-radio-kkachi.md`).
+  attachKkachi(game);
   game.on('missionDone', (id) => {
     const next = DOPO[id];
     if (next) game.missions.start(next, game);
