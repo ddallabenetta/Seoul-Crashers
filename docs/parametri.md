@@ -252,3 +252,12 @@
 | Punta sul bordo della minimappa | `hud._drawMinimap` (`pad`) | 16 px dentro il bordo: il ritaglio ha gli angoli arrotondati di raggio 9 e una punta appoggiata al vertice si taglia a metà |
 | Spessore della linea di percorso | `hud.drawRoutePath` (`width`) | 3 px sulla minimappa · 3,4 × zoom (fino a 1,6) sulla carta piena; bordo scuro +2,6, tratteggio che scorre a `width × 9` px/s |
 | Secondo punto di una fase sulla carta | `hud` · `mapview` | disegnato solo oltre i 60 px dal blip: il caso normale è che coincidano, e due rombi sovrapposti sono rumore |
+| **— cortili persistenti (§5.31) —** | | |
+| Versione del formato di salvataggio | `save.VERSION` | 4 (dal 3 del §5.29): ci sono entrati i cortili. Lo scalino `3 → 4` aggiunge una tabella vuota, che è esattamente «nessun cortile ha mai cambiato padrone» |
+| Peso dei cortili nel salvataggio | `turfs.snapshot` | 92 byte con un cortile preso e una busta da riscuotere; **0 righe** in una partita che non ne ha mai toccato uno |
+| Presa di un cortile | `turfs.TAKE_TIME` | 6 s **dentro il recinto** e sgombro. Uno dei loro ancora in piedi entro 60 px dal bordo fa tornare indietro la barra al doppio della velocità |
+| Busta di un cortile | `turfs.POT_PER_HOUR` · `POT_CAP_HOURS` | ₩2.000 per **ora di gioco** (= un minuto vero), piegati da `MARKETS[distretto].goods`, con tetto a ₩40.000 — la taglia della cassa di un negozio, ma senza stelle addosso |
+| Soglia sotto cui la busta si lascia lì | `turfs.POT_MIN` | ₩1.500: sotto, il suggerimento lo dice e `E` non paga |
+| Prezzo di un cortile | `turfs.YARD_PRICE` | ₩320.000 × `goods` del quartiere, arrotondati a 5.000. Si ripaga in tre o quattro buste piene, ed è la via **senza morti** |
+| Salto d'orologio che la busta non conta | `turfs.CLOCK_JUMP` | 26 ore: oltre non è tempo passato, è un caricamento o un viaggio in metro |
+| Tasto della busta | `turfs.offerPot` | **`F`**, non `E`: `F` è già il tasto dei soldi, e `E` dentro il proprio recinto apre il banco della banda |

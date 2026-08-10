@@ -512,6 +512,10 @@ export class MobileControls {
     const matches = (a) => String(a?.key || 'E').toUpperCase() === key;
     const mission = this.game.missions?.actions?.find(matches);
     if (mission) return { action: mission, source: 'mission' };
+    // Stesso ordine dell'HUD (`hud.drawHints`): la busta di un cortile tuo e il
+    // 거래책 della banda stanno nello stesso recinto, e vince chi viene prima.
+    const turf = this.game.turfs?.actions?.find(matches);
+    if (turf) return { action: turf, source: 'shop' };
     const shop = this.game.shops?.actions?.find(matches);
     if (shop) return { action: shop, source: 'shop' };
     return null;
@@ -523,7 +527,7 @@ export class MobileControls {
     if (/metro|treno|banchina|tornell/.test(s)) return 'train';
     if (/sali al|scendi al|piano|scala/.test(s)) return 'stairs';
     if (/dormi|letto/.test(s)) return 'bed';
-    if (/vendi|cassa|contanti|paga/.test(s)) return 'cash';
+    if (/vendi|cassa|contanti|paga|busta/.test(s)) return 'cash';
     if (/listino|negozio|entra in|compra/.test(s)) return 'shop';
     if (/esci|porta|retro/.test(s)) return 'door';
     return fallback;

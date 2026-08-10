@@ -5,17 +5,17 @@ resta corto apposta.** Il contenuto vero sta in `docs/`, e si apre un documento 
 non tutti. Il `README.md` descrive il gioco e i comandi; qui c'è quello che serve a
 *sviluppare*. Avvio e vincoli stanno in `CLAUDE.md`, che si carica da solo.
 
-Ultimo aggiornamento: **l'itinerario sulla carta** (§5.30) — il blip della missione adesso è un
-rombo che si vede, fuori dal ritaglio diventa una punta con la distanza, e **la strada per
-arrivarci è disegnata** su minimappa e mappa piena (A* sul grafo, `world/route.js`). Prima
-c'era la tappa B della campagna (§5.29): l'impianto delle missioni, **M1 e M2** giocabili
-dall'inizio alla fine, e il **filo del 병원**. Le tappe precedenti sono §5.8-5.28.
+Ultimo aggiornamento: **i cortili persistenti** (§5.31, tappa C) — un territorio adesso **cambia
+padrone e se lo ricorda**: si prende sgombrandolo e restandoci dentro, si compra al banco della
+banda, si perde in una guerra, e il banco cambia mestiere insieme al tag. Prima c'era
+l'itinerario sulla carta (§5.30) e prima ancora la tappa B della campagna (§5.29): l'impianto
+delle missioni, **M1 e M2** giocabili dall'inizio alla fine, e il **filo del 병원**. Le tappe
+precedenti sono §5.8-5.28.
 
-> 📌 **Il prossimo lavoro è la tappa C**: i **cortili persistenti** — la proprietà di un turf
-> nel salvataggio, con effetto sul commercio. Va prima delle missioni che la usano, perché M5 la
-> dà per scontata ed è l'unica cosa della storia che cambia il mondo in modo permanente. Poi la
-> **D** (Kkachi), che ha quattro righe già in attesa: le tre di M1 e M2 e quella dell'apertura
-> sono `hud.toast` finché non esiste la stazione `91.45`. L'ordine di tutte le tappe sta **in
+> 📌 **Il prossimo lavoro è la tappa D** (Kkachi): la stazione `91.45`, la tabella con predicato,
+> le otto chiamate dell'Atto I e le dodici righe di servizio. Ha **quattro righe già in attesa**:
+> le tre di M1 e M2 e quella dell'apertura sono `hud.toast` finché la stazione non esiste.
+> L'ordine di tutte le tappe sta **in
 > testa a [`docs/backlog.md`](docs/backlog.md) (§6.0)**, che è la prima cosa da leggere prima di
 > cominciare, e le nove decisioni d'impianto prese con l'utente stanno in
 > [`docs/storia/08-domande-aperte.md`](docs/storia/08-domande-aperte.md): leggi quelle, non
@@ -43,6 +43,7 @@ dall'inizio alla fine, e il **filo del 병원**. Le tappe precedenti sono §5.8-
 | disegnare un pannello, un personaggio a pixel o una nuova espressione | `docs/storico/17-pannelli-e-cutscene.md` (§5.28) |
 | **implementare una missione**: fasi, blip, punti, dialoghi, ripresa | `docs/storico/18-missioni-m1-m2.md` (§5.29) |
 | disegnare su mappa o minimappa, o toccare il percorso verso il blip | `docs/storico/19-itinerario-sulla-carta.md` (§5.30) |
+| toccare la proprietà di un cortile, il suo banco o la sua busta | `docs/storico/20-cortili-persistenti.md` (§5.31) |
 | verificare headless, usare `probe.mjs`, le scene o le skill | [`docs/strumenti.md`](docs/strumenti.md) |
 | capire *perché* una parte esistente è fatta così | [`docs/storico/`](docs/storico/) |
 
@@ -77,6 +78,7 @@ commenti resta valido: si risolve qui.
 | §5.28 Pannelli, pixel art e cutscene iniziale | `docs/storico/17-pannelli-e-cutscene.md` |
 | §5.29 Impianto missioni, M1, M2 e il 병원 | `docs/storico/18-missioni-m1-m2.md` |
 | §5.30 Itinerario sulla carta | `docs/storico/19-itinerario-sulla-carta.md` |
+| §5.31 Cortili persistenti | `docs/storico/20-cortili-persistenti.md` |
 | §6 Backlog | `docs/backlog.md` |
 | §8 Parametri | `docs/parametri.md` |
 | §9 Strumenti (`.claude/`) | `docs/strumenti.md` |
@@ -94,7 +96,7 @@ completate e collaudate**, più la revisione della guida AI del traffico (§5.10
 arretrati (§5.12 e §5.21), l'audio procedurale del §5.13, il salvataggio del §5.15, il giro
 menu-musica-autosave del §5.18-5.20, le tre regioni collegate e ricostruite del §5.22-5.24,
 l'impianto della campagna (§5.27), la sua prima tappa a schermo (§5.28) e le prime due missioni
-giocabili (§5.29). ~33.000 righe in 64 moduli. 60 fps con ~44 veicoli e ~93
+giocabili (§5.29) e i cortili persistenti (§5.31). ~35.000 righe in 68 moduli. 60 fps con ~44 veicoli e ~93
 pedoni attivi, e restano 60 anche sotto raffica continua di SMG. Dentro un edificio il costo è
 trascurabile: la città non gira. Il ciclo giorno-notte costa **1,5 ms di JS per frame nel caso
 peggiore** (notte con temporale) — ma i veli a schermo intero non sono misurabili onestamente
@@ -174,6 +176,13 @@ storia in centoventidue byte. I dialoghi non coprono lo schermo: la città resta
 E al **병원 «성심»** il direttore ha una battuta diversa a ogni risveglio — quattro sono un
 pannello, dal decimo in poi dice il numero, e quel numero è lo stesso che M12 stamperà sulle
 fatture.
+
+**E un cortile può diventare tuo** (§5.31). Un territorio non è più un dato di generazione: si
+prende sgombrandolo e restandoci dentro sei secondi, si compra al banco della sua banda, e si
+perde in una guerra come lo si è preso. Quello che cambia non è solo il tag a terra — **il banco
+cambia mestiere insieme al padrone** (prendere il ricettatore del 황소파 vuol dire un'armeria in
+più e un ricettatore in meno) e il cortile mette da parte una busta da riscuotere di persona. È
+il primo pezzo di **città** che entra nel salvataggio, e ci entra in 92 byte.
 
 **E adesso si sa dove andare** (§5.30). La meta della missione è un rombo con l'alone su tutte
 e due le carte, con il suo nome sulla mappa piena e, quando esce dal ritaglio della minimappa,

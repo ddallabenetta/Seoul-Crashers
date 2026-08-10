@@ -1,0 +1,126 @@
+// Cortili persistenti (§5.31): il giro completo, sul gioco vero.
+//
+// Non misura niente — **asserisce**. Ogni voce `false` è un difetto, e le voci
+// sono scelte perché ognuna corrisponde a un modo in cui la proprietà di un
+// cortile può marcire in silenzio: un tag che non cambia colore, un banco che
+// continua a vendere la merce di chi se n'è andato, una busta che si riempie da
+// sola all'infinito, un salvataggio che si ricarica su una Seoul della seed.
+//
+//   node .claude/tools/probe.mjs --seconds 1 --quiet \
+//     --script .claude/tools/scenes/cortili.scene \
+//     --eval "Object.entries(window.__OUT).filter(([k,v]) => v===false).map(([k])=>k)"
+//
+// `[]` vuol dire tutto a posto. Per vedere anche i valori, `--eval "window.__OUT"`.
+//
+// Tre asserzioni non si interpretano, sono invarianti:
+//   · `restaTuoDopoRicarica` — è la prova della tappa C, quella scritta nel §6.0
+//   · `nuovaPartitaRimetteLaSeed` — una partita nuova non eredita le conquiste
+//     di quella prima, o il mondo di due giocatori diversi è lo stesso mondo
+//   · `bustaHaUnTetto` — senza tetto, sparire per una settimana pagherebbe più
+//     che passare tutti i giorni
+const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
+const S = await import('/src/core/save.js');
+const shops = await import('/src/entities/shops.js');
+const out = {};
+const pl = game.player;
+const T = game.turfs;
+
+// Un cortile che non è del giocatore, in Seoul, e possibilmente vicino a dove si
+// parte: dev'esserci qualcosa da conquistare o la scena non prova niente.
+const yard = game.city.turfs.find((t) => t.gang !== 'baekho'
+  && game.city.areaAt?.(t.cx, t.cy)?.id === 'seoul');
+out.cortileTrovato = !!yard;
+out.partenza = { banda: yard.gang, mestiere: yard.trade, dove: yard.place, distretto: yard.district };
+
+// ---- 1. PRESA A MANI PROPRIE ------------------------------------------------
+// Si arriva dentro il recinto, si toglie di mezzo chi c'è (qui a mano: la scena
+// prova la conquista, non la sparatoria) e si aspetta la barra.
+pl.x = yard.cx;
+pl.y = yard.cy;
+pl.onFoot = true;
+pl.vehicle = null;
+game.camera.snapTo(pl.x, pl.y);
+await wait(0.6);
+for (const p of game.peds) if (p.turf === yard) { p.dead = true; p.hp = 0; }
+const prima = { gang: yard.gang, colore: yard.color, mestiere: yard.trade };
+await wait(1.5);
+out.barraSale = T.progress > 0 && T.progress < 1;
+await wait(6);
+out.preso = !!yard.held && yard.gang === 'baekho';
+out.tagCambiaColore = yard.color !== prima.colore;
+out.bandaCambiata = yard.gang !== prima.gang;
+
+// ---- 2. EFFETTO SUL COMMERCIO ------------------------------------------------
+// Il banco segue il padrone: dove si trattava in usura o in contrabbando adesso
+// si comprano armi, ai prezzi del 백호파 (§5.8, `gangMarket`).
+const listino = shops.gangStock(yard, game).map((i) => i.label);
+out.bancoDelNuovoPadrone = listino.some((l) => /pistola|fucile|mitra/i.test(l));
+out.mestiereCambiato = yard.trade !== prima.mestiere;
+// E il cortile non è più in vendita: è già tuo.
+out.nonSiRicompra = T.stockItem(yard, game) === null;
+
+// ---- 3. LA BUSTA -------------------------------------------------------------
+// Cresce sull'orologio, non sui secondi veri: si sposta l'ora e si guarda.
+yard.pot = 0;
+game.dayCycle.hour = (game.dayCycle.hour + 3) % 24;
+T.earn(game);
+out.bustaCresce = yard.pot > 0;
+const dopoTreOre = Math.round(yard.pot);
+// Un anno di gioco in un colpo solo: la busta deve fermarsi al tetto.
+for (let i = 0; i < 40; i++) { game.dayCycle.hour = (game.dayCycle.hour + 12) % 24; T.earn(game); }
+out.bustaHaUnTetto = yard.pot <= 40000;
+out.busta = { treOre: dopoTreOre, alTetto: Math.round(yard.pot) };
+// Si riscuote con `F` — `E` dentro il proprio recinto apre il banco della banda.
+const soldiPrima = pl.money;
+const pieno = Math.round(yard.pot);
+T.update(0.016, game);
+out.suggerimentoDellaBusta = T.actions.some((a) => a.key === 'F' && /busta/.test(a.text));
+T.actions[0].run();
+out.bustaRiscossa = pl.money === soldiPrima + pieno && yard.pot === 0;
+
+// ---- 4. IL SALVATAGGIO -------------------------------------------------------
+// La prova della tappa C: si prende un cortile, si esce, si ricarica, è ancora tuo.
+yard.pot = 9000;
+const snap = S.snapshot(game);
+out.pesoByte = JSON.stringify(snap.turfs).length;
+out.formato = snap.v;
+game.newGame();
+await wait(0.3);
+out.nuovaPartitaRimetteLaSeed = yard.gang === yard.gang0 && !yard.held && yard.pot === 0;
+S.apply(game, JSON.parse(JSON.stringify(snap)));
+await wait(0.3);
+out.restaTuoDopoRicarica = !!yard.held && yard.gang === 'baekho';
+// Non `=== 9000`: fra la ricarica e questa riga passano tre decimi di secondo, e
+// tre decimi di secondo sono già un pezzetto di busta.
+out.bustaRicaricata = Math.abs(yard.pot - 9000) < 300;
+
+// ---- 5. LO SLOT VECCHIO ------------------------------------------------------
+// Uno slot scritto prima di questa tappa non va buttato: non aveva cortili
+// conquistati, ed è esattamente quello che dice una tabella vuota.
+const v3 = JSON.parse(JSON.stringify(snap));
+v3.v = 3;
+delete v3.turfs;
+localStorage.setItem('seoul.save.0', JSON.stringify(v3));
+const letto = S.readSlot(0);
+out.slotV3Migrato = !!letto && letto.v === snap.v && !!letto.turfs
+  && Object.keys(letto.turfs.owners).length === 0;
+localStorage.removeItem('seoul.save.0');
+
+// ---- 6. SI PUÒ ANCHE COMPRARE ------------------------------------------------
+// L'altra via, quella senza morti: la riga in cima al listino del loro banco.
+const altro = game.city.turfs.find((t) => !t.held && t.gang !== 'baekho');
+const riga = T.stockItem(altro, game);
+out.cortileInVendita = !!riga && riga.price > 0;
+out.prezzo = riga ? riga.price : null;
+pl.money = riga.price;
+const esito = riga.buy(game);
+pl.money -= riga.price;
+out.compratoEPagato = !!esito && !!altro.held && pl.money === 0;
+
+// ---- 7. E SI PUÒ PERDERE -----------------------------------------------------
+// Una guerra persa cambia padrone anche al contrario (`entities/life.js`).
+game.turfs.claim(altro, 'heuksa', game, 'war');
+out.perdutoInGuerra = !altro.held && altro.gang === 'heuksa';
+
+window.__OUT = out;
+return Object.entries(out).filter(([, v]) => v === false).map(([k]) => k);

@@ -72,6 +72,27 @@ export class GroundRenderer {
     return t;
   }
 
+  /**
+   * Butta i tile che toccano un rettangolo. Serve a chi cambia qualcosa di
+   * **dipinto per terra**: oggi il tag di un cortile che passa di mano (§5.31).
+   * Senza, il colore di prima resta finché la cache non gira da sola — cioè
+   * finché non si attraversa mezza città e i 96 tile non si esauriscono.
+   */
+  invalidateRect(r) {
+    const x0 = Math.floor(r.x / TILE);
+    const y0 = Math.floor(r.y / TILE);
+    const x1 = Math.floor((r.x + r.w) / TILE);
+    const y1 = Math.floor((r.y + r.h) / TILE);
+    for (let ty = y0; ty <= y1; ty++) {
+      for (let tx = x0; tx <= x1; tx++) {
+        const key = `${tx},${ty}`;
+        if (!this.tiles.delete(key)) continue;
+        const i = this.order.indexOf(key);
+        if (i >= 0) this.order.splice(i, 1);
+      }
+    }
+  }
+
   districtAt(x, y) {
     const city = this.city;
     return city.districtAt ? city.districtAt(x, y) : districtAtNorm(x / city.w, y / city.h);

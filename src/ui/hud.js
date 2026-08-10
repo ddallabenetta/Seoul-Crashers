@@ -92,6 +92,7 @@ export class Hud {
     if (game.debug) this.drawDebug(ctx, game, w, h);
     this.drawDamage(ctx, game, w, h, L);
     this.drawArrest(ctx, game, w, h, L);
+    this.drawTurfTake(ctx, game, w, h, L);
     this.drawCrosshair(ctx, game);
     this.drawFade(ctx, game, w, h);
 
@@ -536,6 +537,36 @@ export class Hud {
     ctx.restore();
   }
 
+  /**
+   * Il cortile che stai prendendo (§5.31). Stessa barra del fermo, e per la stessa
+   * ragione: sei secondi in cui non succede niente a schermo sarebbero sei secondi
+   * in cui il giocatore se ne va convinto che non ci sia niente da fare. Le due
+   * non si sovrappongono mai — con le manette addosso non si conquista niente.
+   */
+  drawTurfTake(ctx, game, w, h, L = uiLayout(w, h, game)) {
+    const t = game.turfs ? game.turfs.progress : 0;
+    if (t <= 0 || (game.police && game.police.bustProgress > 0)) return;
+    const turf = game.turfs.taking;
+    const bw = L.compact ? Math.min(250, w - L.safeX * 2) : 232;
+    const x = (w - bw) / 2;
+    const y = Math.min(h * 0.6, h - L.safeBottom - (L.compact ? 90 : 60));
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `${L.compact ? '900 15px' : '900 19px'} system-ui, "Apple SD Gothic Neo", sans-serif`;
+    ctx.fillText('점령 · IL CORTILE', w / 2, y - 12);
+    ctx.fillStyle = 'rgba(10,12,15,0.72)';
+    roundPath(ctx, x, y, bw, 9, 4);
+    ctx.fill();
+    ctx.fillStyle = turf ? turf.color : '#e8e2d0';
+    roundPath(ctx, x, y, Math.max(5, bw * t), 9, 4);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(235,240,250,0.7)';
+    ctx.font = `${L.compact ? '600 10px' : '600 12px'} system-ui, sans-serif`;
+    ctx.fillText(ellipsisText(ctx, 'resta nel recinto finché il tag non cambia', bw), w / 2, y + 24, bw);
+    ctx.restore();
+  }
+
   drawDamage(ctx, game, w, h, L = uiLayout(w, h, game)) {
     const p = game.player;
     const low = clamp(1 - p.hp / (p.maxHp * 0.3), 0, 1);
@@ -719,16 +750,30 @@ export class Hud {
     }
     // Territori delle bande: un rettangolo del loro colore. Chi ci passa dentro
     // armato se ne accorge in fretta; la minimappa serve a passarci apposta.
+    // Quelli tuoi sono **pieni** invece che tratteggiati: a colpo d'occhio la
+    // carta dice dove si può entrare come a casa propria (§5.31).
     for (const t of this.city.turfs || []) {
       const a = toMap(t.x, t.y);
       const b = toMap(t.x + t.w, t.y + t.h);
       if (b.x < x || a.x > x + MINIMAP || b.y < y || a.y > y + MINIMAP) continue;
+      const rw = Math.max(4, b.x - a.x);
+      const rh = Math.max(4, b.y - a.y);
       ctx.save();
-      ctx.globalAlpha = 0.5;
-      ctx.strokeStyle = t.color;
-      ctx.lineWidth = 1.6;
-      ctx.setLineDash([4, 3]);
-      ctx.strokeRect(a.x, a.y, Math.max(4, b.x - a.x), Math.max(4, b.y - a.y));
+      if (game.turfs?.mine(t)) {
+        ctx.globalAlpha = 0.3;
+        ctx.fillStyle = t.color;
+        ctx.fillRect(a.x, a.y, rw, rh);
+        ctx.globalAlpha = 0.75;
+        ctx.strokeStyle = t.color;
+        ctx.lineWidth = 1.6;
+        ctx.strokeRect(a.x, a.y, rw, rh);
+      } else {
+        ctx.globalAlpha = 0.5;
+        ctx.strokeStyle = t.color;
+        ctx.lineWidth = 1.6;
+        ctx.setLineDash([4, 3]);
+        ctx.strokeRect(a.x, a.y, rw, rh);
+      }
       ctx.restore();
     }
     // Fermate metro e nodi interurbani: restano visibili anche senza aprire la
@@ -1090,6 +1135,7 @@ export class Hud {
     // Prima quelle della missione: quando un punto di missione e una porta stanno
     // nello stesso metro quadro, quello che il giocatore è venuto a fare va in cima.
     for (const a of game.missions ? game.missions.actions : []) lines.push(actionText(a));
+    for (const a of game.turfs ? game.turfs.actions : []) lines.push(actionText(a));
     for (const a of game.shops ? game.shops.actions : []) lines.push(actionText(a));
     const metroHint = game.metro?.hint(game);
     if (metroHint) lines.push(L.controls

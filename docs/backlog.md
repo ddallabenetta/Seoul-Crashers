@@ -14,7 +14,7 @@ sigillate, marcatori, testo su più righe). Quello che resta è **contenuto**, i
 | --- | --- | --- | --- |
 | ~~1~~ | ~~**A**~~ | ~~primitive dei pannelli + la cutscene iniziale~~ — **fatta**, §5.28 | — |
 | ~~2~~ | ~~**B**~~ | ~~impianto missioni + M1 e M2~~, e con loro **il filo del 병원** — **fatta**, §5.29 | — |
-| 3 | **C** | **cortili persistenti** (nel salvataggio, con effetto sul commercio) | si prende un cortile, si esce, si ricarica, è ancora tuo |
+| ~~3~~ | ~~**C**~~ | ~~**cortili persistenti** (nel salvataggio, con effetto sul commercio)~~ — **fatta**, §5.31 | — |
 | 4 | **D** | Kkachi: stazione `91.45`, tabella con predicato, le otto chiamate dell'Atto I **e le dodici righe di servizio** | si gira per Seoul con la radio accesa |
 | 5 | **E** | Atto I completo (M3, M4) + R1 | il primo ribaltamento in mano al giocatore |
 | 6 | **F** | Atto II (M5-M8) + R2, R3 + le otto chiamate dell'Atto II | l'atto che chiede più cose nuove al motore |
@@ -37,6 +37,15 @@ pannelli già visti che non si rivedono, i personaggi nominati **dentro** un edi
 (`shops.hold`, senza cui ogni missione dipenderebbe dalla saracinesca di un negozio), e la
 **ricerca deterministica di un indirizzo** (`story/places.js`: la storia non piazza niente).
 Aggiungere una missione adesso è un file sotto `src/story/` e una riga in `story/campaign.js`.
+
+**Cosa la tappa C (§5.31) ha già tolto di mezzo.** Un cortile **cambia padrone e se lo ricorda**:
+`game.turfs.claim(turf, gang, game, how)` sposta il tag a terra, il colore sulle due carte, il
+mestiere del banco e chi ci sta di guardia, e l'evento `turfClaimed` lo dice al bus. M5 non deve
+scrivere niente di tutto questo — deve **contare fino a tre** e scegliere come si arriva a ogni
+`claim`; delle sue tre strade, entrare sparando e comprare il capocortile sono già meccanica di
+città, e portargli via il lavoro è una fase che finisce con una `claim`. Il salvataggio se lo
+porta dietro da solo (v4, 92 byte) e `places.findTurf` non resta più senza obiettivo se il
+giocatore si è preso tutti i cortili di quella banda.
 
 **Cosa il §5.30 ha già tolto di mezzo**: come si **arriva** a una meta. Il blip è un rombo che
 si vede su tutte e due le carte, fuori dal ritaglio della minimappa diventa una punta con la
@@ -118,6 +127,17 @@ il §5.21 altre undici — fra cui le due che erano tornate in cima.
   un'animazione e un pezzo di regia della camera. **È la voce più visibile rimasta.**
 - **Nessuno sorpassa.** Sull'arteria le due corsie per senso restano inutilizzate, ed è
   **l'ultimo debito grosso del traffico** (dettagli più sotto).
+
+**Rimasto indietro dai cortili** (§5.31):
+- **Nessuno ti avvisa se te ne portano via uno.** Una guerra può cambiare il padrone di un
+  cortile tuo mentre sei a Busan, e lo scopri tornando. Il posto giusto per dirlo è **Kkachi**
+  (tappa D): è una riga di tabella con predicato, non un sistema nuovo.
+- **Le guardie del cortile tuo non sono tue.** Ci stanno e non ti sparano, ma non ti seguono,
+  non si possono chiamare e non difendono niente più di prima.
+- **Comprare un cortile è una riga di listino, non una trattativa.** Funziona e si capisce, ma
+  il capocortile che si fa da parte non dice niente: è la scena che M5 avrà e la città no.
+- **Un cortile non produce lavoro, solo una busta.** È la superficie naturale delle attività
+  secondarie (consegne, corse), quando ci saranno.
 
 **Rimasto indietro dal salvataggio** (§5.15, §5.18, §5.20, §5.21):
 - **La folla degli interni non si ricorda i clienti stesi**: il personale sì, chi era di
@@ -246,13 +266,8 @@ il §5.21 altre undici — fra cui le due che erano tornate in cima.
 
 **Rimasto indietro dalla mappa** (§5.9) e dagli esplosivi (§5.7):
 - ~~Nessun traffico aereo o navale~~ · ~~le bande non si fanno la guerra~~ · ~~in campagna non
-  c'è nessuno~~ — **fatte con il §5.26**, con quattro cose ancora aperte:
-  - **un territorio non cambia mai padrone.** Una guerra fra bande adesso si vede e fa dei
-    morti, ma il cortile resta di chi era: conquistarlo vuol dire uno stato persistente sul
-    turf (e quindi nel salvataggio) e un effetto sul commercio. **Deciso: si fa**, ed è la
-    tappa C della campagna — prima delle missioni che la usano, perché M5
-    (`storia/04-atto-2.md`) la dà per scontata ed è l'unica cosa della storia che cambia il
-    mondo in modo permanente;
+  c'è nessuno~~ — **fatte con il §5.26**, e ~~un territorio non cambia mai padrone~~ —
+  **fatta con il §5.31**. Restano tre cose aperte:
   - **le rapine non riguardano il giocatore.** Passare di lì mentre succede è uno spettacolo,
     non un'occasione: non si può derubare il rapinatore, denunciarlo o farsi assumere. La
     superficie naturale sono le attività secondarie;

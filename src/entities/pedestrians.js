@@ -220,19 +220,26 @@ export class PedestrianSystem {
    * volutamente bassa — arma diversa dai pugni, oppure già ricercato — perché una
    * banda che ti lascia passeggiare in mezzo ai suoi affari non è una banda.
    * Passarci disarmati e in fretta si può: è l'unica via per andare a trattare.
+   *
+   * **Nel cortile tuo si entra come si vuole** (§5.31): con la mazza in mano, con
+   * le stelle addosso, di corsa. Una banda che punta la pistola al proprio capo è
+   * il primo modo in cui una conquista si trasformerebbe in una punizione.
    */
   watchTurfs(game, dt = 0) {
     const pl = game.player;
     for (const t of this.city.turfs || []) refreshDealer(t, this.peds, dt);
     if (pl.dying) return;
-    const provoking = pl.weapon !== 'fists' || (game.wanted && game.wanted.level > 0);
+    const armed = pl.weapon !== 'fists' || (game.wanted && game.wanted.level > 0);
     for (const t of this.city.turfs || []) {
+      const mine = !!game.turfs?.mine(t);
+      const provoking = armed && !mine;
       const inside = pl.x > t.x - 40 && pl.x < t.x + t.w + 40 && pl.y > t.y - 40 && pl.y < t.y + t.h + 40;
       if (inside && !t.warned) {
         t.warned = true;
         // Il mestiere della banda si legge entrando: è l'unico posto in cui il
         // giocatore può scoprire che qui si commercia, e perché adesso non può.
-        game.hud.toast(`${t.hangul} · ${t.trade} — ${t.place}`, 3);
+        if (mine) game.hud.toast(`${t.hangul} · ${t.place} — è tuo`, 3);
+        else game.hud.toast(`${t.hangul} · ${t.trade} — ${t.place}`, 3);
         if (provoking) game.hud.toast('Con questa addosso non trattano', 2.8);
       } else if (!inside && t.warned && dist(pl.x, pl.y, t.cx, t.cy) > 700) {
         t.warned = false;

@@ -56,7 +56,7 @@ export const AUTO_GENS = 3;
  * lì non c'è niente da migrare, perché una Seoul diversa rende le coordinate
  * salvate prive di significato e il giocatore rinascerebbe dentro un palazzo.
  */
-const VERSION = 3;
+const VERSION = 4;
 const SEED = 20260730;
 
 /**
@@ -90,6 +90,13 @@ const MIGRATIONS = {
   // niente missione in corso, nessun pannello visto, nessun fatto acquisito.
   2: (d) => {
     d.story = { active: null, phase: 0, state: {}, done: [], seen: [], flags: [] };
+    return d;
+  },
+  // 3 -> 4: i cortili cambiano padrone (§5.31). In una partita di prima nessuno
+  // ne aveva mai cambiato uno, che è esattamente quello che dice una tabella
+  // vuota: ogni territorio è ancora della banda con cui è nato dalla seed.
+  3: (d) => {
+    d.turfs = { owners: {}, pots: {}, held: [], told: false };
     return d;
   },
 };
@@ -175,6 +182,10 @@ export function snapshot(game) {
     wanted: game.wanted.snapshot(),
     stats: { ...game.stats, districts: [...game.stats.districts] },
     shops: game.shops.snapshot(),
+    // I cortili che hanno cambiato padrone, e le buste non ancora riscosse. È
+    // l'unico posto in cui il salvataggio contiene un pezzo di **città** invece
+    // che un pezzo di giocatore, e ci sta perché la seed non lo sa rifare (§5.31).
+    turfs: game.turfs.snapshot(),
     actors: game.actors.snapshot(),
     // Dove sei arrivato nella storia. Il conto delle morti che il 병원 e M12 leggono
     // **non è qui**: è `stats.deaths`, che il salvataggio porta da sempre e che è
@@ -228,6 +239,7 @@ export function apply(game, data) {
   game.dayCycle.restore(data.clock);
   game.wanted.restore(data.wanted);
   game.shops.restore(data.shops);
+  game.turfs.restore(data.turfs, game);
   // **Prima degli attori.** Rientrare in una fase vuol dire rieseguire il suo
   // `prepare`, che è il posto in cui i personaggi di quella missione vengono
   // *definiti*: al contrario, `actors.restore` scriverebbe le morti su definizioni

@@ -1170,6 +1170,14 @@ export class LifeSystem {
     }
     const raiders = ev.crew.filter((p) => alive(p) && p.state === 'errand');
     const guards = ev.guards.filter((p) => alive(p) && p.state === 'errand');
+    // **Chi vince si tiene il cortile** (§5.31). Prima di questa riga una guerra
+    // faceva sei morti e non cambiava niente: il tag a terra restava di chi era.
+    // Vale anche al contrario — se il cortile è tuo e non sei lì a difenderlo, la
+    // sera te lo ritrovi di un'altra banda.
+    if (!ev.taken && !guards.length && raiders.length) {
+      ev.taken = true;
+      game.turfs?.claim(ev.turf, ev.gang.id, game, 'war');
+    }
     if (!raiders.length || !guards.length) {
       // Una parte è a terra: chi resta si prende qualche secondo e poi si scioglie.
       // Se però la volante è già per strada le si lascia il tempo di arrivare: una
