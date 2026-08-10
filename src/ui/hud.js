@@ -1,5 +1,5 @@
 // HUD: minimappa, tachimetro, salute e arma, cartello del distretto, suggerimenti.
-import { KMH, clamp } from '../core/math.js';
+import { KMH, PX_PER_M, clamp, dist } from '../core/math.js';
 import { MAP_W, MAP_H } from '../world/maptexture.js';
 import { VEHICLE_TYPES, getHeroPortrait, getWeaponIcon } from '../render/sprites.js';
 import { WEAPONS, WEAPON_SLOTS } from '../entities/weapons.js';
@@ -274,6 +274,15 @@ export class Hud {
       ctx.arc(m.x, m.y, 2.4, 0, 6.2832);
       ctx.fill();
     }
+    // I punti della missione su questo piano. Dentro un edificio la pianta è
+    // l'unica mappa che c'è: il blip in strada resta fuori dalla porta, e senza
+    // questo il terzo pegno di una stanza di sei metri si cerca a tentoni.
+    for (const pt of game.missions?.points || []) {
+      if (!game.missions.pointHere(pt, game)) continue;
+      const s = to(pt.x, pt.y);
+      drawMissionPin(ctx, s.x, s.y, { r: 5, time: game.time });
+    }
+
     const m = to(pl.x, pl.y);
     ctx.save();
     ctx.translate(m.x, m.y);
@@ -358,10 +367,28 @@ export class Hud {
     ctx.strokeStyle = 'rgba(255,210,63,0.28)';
     ctx.lineWidth = 1;
     ctx.stroke();
+    // Quanto manca alla meta, in cima al riquadro: è la stessa cifra che porta la
+    // punta sul bordo della minimappa, e da sola dice se conviene cercare un'auto.
+    // Dentro un edificio non si scrive: quelle coordinate non sono di questa mappa.
+    const tgt = game.route?.target;
+    const away = tgt && !game.indoors
+      ? fmtDistance(dist(game.player.x, game.player.y, tgt.x, tgt.y))
+      : null;
+    let awayW = 0;
+    ctx.textAlign = 'left';
+    if (away) {
+      ctx.font = `${L.compact ? '700 10px' : '700 11px'} system-ui, sans-serif`;
+      awayW = ctx.measureText(away).width + 12;
+      ctx.textAlign = 'right';
+      ctx.fillStyle = 'rgba(255,210,63,0.8)';
+      ctx.fillText(away, x + w - 11, y + (L.short ? 15 : 18));
+      ctx.textAlign = 'left';
+    }
     ctx.fillStyle = '#ffd23f';
     ctx.font = `${L.compact ? '700 10px' : '700 12px'} system-ui, "Apple SD Gothic Neo", sans-serif`;
     const title = `${def.hangul ? `${def.hangul} · ` : ''}${def.title}`;
-    ctx.fillText(ellipsisText(ctx, title, w - 22), x + 11, y + (L.short ? 15 : 18), w - 22);
+    const titleW = w - 22 - awayW;
+    ctx.fillText(ellipsisText(ctx, title, titleW), x + 11, y + (L.short ? 15 : 18), titleW);
     ctx.fillStyle = 'rgba(238,242,248,0.82)';
     ctx.font = `${L.compact ? '600 10px' : '600 12px'} system-ui, "Apple SD Gothic Neo", sans-serif`;
     hintLines.forEach((l, i) => ctx.fillText(ellipsisText(ctx, l, w - 22), x + 11, y + (L.short ? 29 : 33) + i * lineH, w - 22));
@@ -834,13 +861,44 @@ export class Hud {
       }
     }
 
-    // Marker missione / obiettivi
+    // La strada da fare, **sotto** i blip: la linea porta l'occhio, il rombo dice
+    // dove si ferma. Sopra, il tratteggio la coprirebbe.
+    drawRoutePath(ctx, game.route, toMap, { width: 3, time: game.time });
+
+    // Gli altri punti della fase in corso, quelli che stanno in strada. Il caso
+    // normale è che coincidano col blip (si riscuote dove si entra): si disegnano
+    // solo quando sono davvero un secondo posto.
+    for (const pt of game.missions?.points || []) {
+      if (pt.shop !== undefined) continue;
+      if ((game.markers || []).some((mk) => dist(mk.x, mk.y, pt.x, pt.y) < 60)) continue;
+      const m = toMap(pt.x, pt.y);
+      if (m.x < x || m.x > x + MINIMAP || m.y < y || m.y > y + MINIMAP) continue;
+      drawMissionPin(ctx, m.x, m.y, { r: 4.4, time: game.time, color: 'rgba(255,210,63,0.8)' });
+    }
+
+    // Il blip della missione: dentro il ritaglio è un rombo, fuori una punta sul
+    // bordo che guarda la meta con sotto quanto manca.
     for (const mk of game.markers || []) {
       const m = toMap(mk.x, mk.y);
-      ctx.fillStyle = mk.color || '#ffd23f';
-      ctx.beginPath();
-      ctx.arc(clamp(m.x, x + 4, x + MINIMAP - 4), clamp(m.y, y + 4, y + MINIMAP - 4), 4, 0, 6.2832);
-      ctx.fill();
+      // La punta sta 16 px dentro il bordo: nell'angolo il ritaglio è arrotondato
+      // (raggio 9) e una punta appoggiata al vertice si taglia a metà.
+      const pad = 16;
+      const color = mk.color || '#ffd23f';
+      if (m.x >= x + pad && m.x <= x + MINIMAP - pad && m.y >= y + pad && m.y <= y + MINIMAP - pad) {
+        drawMissionPin(ctx, m.x, m.y, { r: 6, time: game.time, color });
+        continue;
+      }
+      drawEdgeArrow(
+        ctx,
+        clamp(m.x, x + pad, x + MINIMAP - pad),
+        clamp(m.y, y + pad, y + MINIMAP - pad),
+        Math.atan2(mk.y - p.y, mk.x - p.x),
+        {
+          color,
+          text: fmtDistance(dist(p.x, p.y, mk.x, mk.y)),
+          left: x + 6, right: x + MINIMAP - 6, top: y + 14, bottom: y + MINIMAP - 6,
+        },
+      );
     }
 
     // Giocatore
@@ -1232,6 +1290,127 @@ function star(ctx, cx, cy, r) {
     else ctx.lineTo(x, y);
   }
   ctx.closePath();
+}
+
+/** Una distanza in pixel di mondo, come la leggerebbe qualcuno che ci cammina. */
+export function fmtDistance(px) {
+  const m = px / PX_PER_M;
+  return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`;
+}
+
+/**
+ * L'itinerario verso il blip, uguale sulla minimappa e sulla carta piena — è la
+ * stessa polilinea, cambia solo la trasformazione e lo spessore.
+ *
+ * Tre passate sulla stessa traccia: il bordo scuro perché una linea gialla su
+ * una strada gialla sparisce, il pieno smorzato che dice *dove* si passa, e
+ * sopra il tratteggio che **scorre verso la meta**. Su una carta ferma quel
+ * movimento è l'unica cosa che dice da che parte si va, e costa un numero.
+ */
+export function drawRoutePath(ctx, route, toScreen, opts = {}) {
+  const pts = route?.points;
+  if (!pts || pts.length < 2) return;
+  const w = opts.width || 3;
+  const color = opts.color || '#ffd23f';
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  const a = toScreen(pts[0].x, pts[0].y);
+  ctx.moveTo(a.x, a.y);
+  for (let i = 1; i < pts.length; i++) {
+    const s = toScreen(pts[i].x, pts[i].y);
+    ctx.lineTo(s.x, s.y);
+  }
+  ctx.strokeStyle = 'rgba(6,8,12,0.6)';
+  ctx.lineWidth = w + 2.6;
+  ctx.stroke();
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = 0.3;
+  ctx.lineWidth = w;
+  ctx.stroke();
+  // Quando le strade non ci arrivano (Jeju, o un blip in mezzo al mare) resta la
+  // retta: si tratteggia più corta, così non si legge come una strada.
+  ctx.globalAlpha = 0.95;
+  ctx.setLineDash(route.direct ? [w * 1.6, w * 2.2] : [w * 3, w * 2.6]);
+  ctx.lineDashOffset = -(opts.time || 0) * w * 9;
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * La meta: rombo pieno con l'alone che pulsa. Il rombo distingue il punto di una
+ * missione da tutto il resto della carta — i quadrati sono negozi e commissariati,
+ * i cerchi metro e volanti — e l'alone è quello che lo fa trovare in mezzo alle
+ * insegne senza doverlo ingrandire.
+ */
+export function drawMissionPin(ctx, x, y, opts = {}) {
+  const r = opts.r || 6;
+  const color = opts.color || '#ffd23f';
+  const t = opts.time || 0;
+  ctx.save();
+  const pulse = 0.5 + 0.5 * Math.sin(t * 3.2);
+  ctx.globalAlpha = 0.16 + 0.2 * (1 - pulse);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y, r * (1.7 + pulse * 0.9), 0, 6.2832);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.beginPath();
+  ctx.moveTo(x, y - r);
+  ctx.lineTo(x + r * 0.78, y);
+  ctx.lineTo(x, y + r);
+  ctx.lineTo(x - r * 0.78, y);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(8,10,14,0.85)';
+  ctx.lineWidth = 1.3;
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(10,12,16,0.9)';
+  ctx.beginPath();
+  ctx.arc(x, y, r * 0.24, 0, 6.2832);
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * Il blip fuori dal ritaglio. Un cerchio schiacciato sul bordo dice che c'è
+ * qualcosa ma non da che parte: qui la punta guarda la meta e sotto c'è quanto
+ * manca, che è l'informazione per cui si guarda la minimappa mentre si guida.
+ */
+export function drawEdgeArrow(ctx, x, y, angle, opts = {}) {
+  const color = opts.color || '#ffd23f';
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.fillStyle = color;
+  ctx.strokeStyle = 'rgba(8,10,14,0.85)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(7, 0);
+  ctx.lineTo(-4.5, 5);
+  ctx.lineTo(-2, 0);
+  ctx.lineTo(-4.5, -5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+  if (!opts.text) return;
+  // La distanza va **verso il centro** della carta, non sotto la punta: sul bordo
+  // basso "sotto" è fuori dal ritaglio, e in un angolo copre la punta stessa.
+  ctx.save();
+  ctx.font = '700 9px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  const tw = ctx.measureText(opts.text).width;
+  const tx = clamp(x - Math.cos(angle) * 17, (opts.left ?? -Infinity) + tw / 2, (opts.right ?? Infinity) - tw / 2);
+  const ty = clamp(y - Math.sin(angle) * 17, opts.top ?? -Infinity, opts.bottom ?? Infinity);
+  ctx.fillStyle = 'rgba(8,10,14,0.72)';
+  roundPath(ctx, tx - tw / 2 - 3, ty - 8, tw + 6, 11, 3);
+  ctx.fill();
+  ctx.fillStyle = color;
+  ctx.fillText(opts.text, tx, ty);
+  ctx.restore();
 }
 
 export function roundPath(ctx, x, y, w, h, r) {

@@ -39,6 +39,8 @@ src/world/
   daycycle.js         orologio, tabella della luce ora per ora, meteo a catena di Markov
   interiors.js        catalogo delle attività (con gli orari) + pianta di ogni piano
   roadgraph.js        nodi/archi, corsie, semafori, prenotazione incrocio
+  route.js            A* sul grafo verso il blip, e quando rifarlo: la strada che
+                      minimappa e carta disegnano
   maptexture.js       texture 1100×1100 della mappa, con hillshade (minimappa + mappa piena)
 
 src/render/
@@ -454,6 +456,19 @@ un fatto) e **ricreato al suo posto** quando si torna, perché la posizione sta 
 quello che non si ricrea è la **morte**, che sta anch'essa nella definizione, arriva dal bus
 (`pedKilled`) e finisce nel salvataggio. Non gira dentro un edificio, dove `game.peds` è scambiato
 con la gente del piano.
+
+**La strada verso il blip è l'unico posto in cui il grafo viene percorso davvero** (§5.30). Il
+traffico sceglie a ogni incrocio e la polizia va greedy verso il bersaglio: a chi insegue basta,
+a una carta no — su questa maglia il greedy si infila nei monconi. `world/route.js` fa un A*
+vero (insieme chiuso, costi da `edge.len`, euristica euclidea) e costa 0,26 ms nel caso peggiore,
+perché il grafo dell'intera Corea è sotto il migliaio di nodi. Quello che va tarato non è il
+conto ma **quante volte lo si rifà**: tre soglie (0,4 s, 45 px del giocatore, 12 px del blip), e
+un blip nuovo si traccia subito. `RouteGuide` **non è un sistema del mondo** — non muove niente
+e nessuno lo interroga durante un frame: lo leggono la minimappa e la carta, che sono le due
+superfici su cui esiste. Dentro un edificio si ferma da sé, per la stessa ragione di
+`police.focus`: le coordinate di una pianta cadono nell'angolo nord-ovest della mappa. E quando
+la meta è in un'altra componente del grafo — **Jeju non ha nessun arco che la raggiunga** — resta
+una retta tratteggiata invece di una strada inventata.
 
 **Una porta può essere chiusa senza che sia l'orario.** `shops.sealed` è un fatto capitato a
 *quella* vetrina — la serranda col sigillo di perizia — e non una proprietà dell'attività: un 술집

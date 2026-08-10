@@ -3,7 +3,7 @@ import { MAP_W, MAP_H } from '../world/maptexture.js';
 import { DISTRICTS } from '../world/districts.js';
 import { clamp } from '../core/math.js';
 import { VEHICLE_TYPES } from '../render/sprites.js';
-import { roundPath } from './hud.js';
+import { roundPath, drawRoutePath, drawMissionPin, fmtDistance } from './hud.js';
 import { uiLayout, ellipsisText } from './layout.js';
 
 export class MapView {
@@ -234,16 +234,35 @@ export class MapView {
       }
     }
 
-    // Marker attivi (missioni, negozi)
+    // La strada da fare fino al blip. Va dopo insegne e territori e prima dei
+    // marcatori: sopra la carta perché è quello che si è venuti a vedere, sotto
+    // le mete perché una linea che copre il rombo dice dove passare e non dove
+    // arrivare.
+    drawRoutePath(ctx, game.route, toScreen, { width: 3.4 * Math.min(1.6, zoom), time: game.time });
+
+    // Punti della fase in corso che non stanno sotto al blip (vedi `hud.js`).
+    for (const pt of game.missions?.points || []) {
+      if (pt.shop !== undefined) continue;
+      if ((game.markers || []).some((mk) => Math.hypot(mk.x - pt.x, mk.y - pt.y) < 60)) continue;
+      const s2 = toScreen(pt.x, pt.y);
+      drawMissionPin(ctx, s2.x, s2.y, { r: 5, time: game.time, color: 'rgba(255,210,63,0.8)' });
+    }
+
+    // Marker attivi (missioni, negozi), con l'etichetta del posto: sulla carta
+    // piena c'è lo spazio per dire *cos'è* la meta, e il 당구장 di una missione
+    // altrimenti è un rombo giallo in mezzo a Hongdae.
     for (const mk of game.markers || []) {
-      const s = toScreen(mk.x, mk.y);
+      const s2 = toScreen(mk.x, mk.y);
+      drawMissionPin(ctx, s2.x, s2.y, { r: 7, time: game.time, color: mk.color || '#ffd23f' });
+      if (!mk.label) continue;
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.shadowColor = 'rgba(0,0,0,0.9)';
+      ctx.shadowBlur = 6;
       ctx.fillStyle = mk.color || '#ffd23f';
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, 5, 0, 6.2832);
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(0,0,0,0.6)';
-      ctx.lineWidth = 1.2;
-      ctx.stroke();
+      ctx.font = '700 11px system-ui, "Apple SD Gothic Neo", sans-serif';
+      ctx.fillText(mk.label, s2.x, s2.y - 13);
+      ctx.restore();
     }
 
     // Polizia in caccia
@@ -358,6 +377,17 @@ export class MapView {
     const veh = game.player.vehicle;
     line('mezzo', game.player.onFoot || !veh ? 'a piedi' : VEHICLE_TYPES[veh.kind].label);
     line('contanti', `₩${game.player.money.toLocaleString('it-IT')}`, '#ffd23f');
+    // La riga che spiega la linea gialla: dove porta e quanta strada è. Quando le
+    // strade non ci arrivano lo dice, invece di far sembrare navigabile una retta
+    // sul mare.
+    const tgt = game.route?.target;
+    if (tgt) {
+      line(
+        game.route.direct ? 'obiettivo · in linea d\'aria' : 'obiettivo · strada da fare',
+        `${tgt.label ? `${tgt.label} — ` : ''}${fmtDistance(game.route.length)}`,
+        '#ffd23f',
+      );
+    }
 
     ctx.fillStyle = 'rgba(235,240,250,0.4)';
     ctx.font = `${L.compact ? '500 11px' : '500 12px'} system-ui, sans-serif`;

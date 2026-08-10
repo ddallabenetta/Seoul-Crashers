@@ -246,3 +246,9 @@
 | Pannello del 병원 che si chiude da solo | `hospital.ward` (`hold`) | 7 s (11 e 13 per le scene lunghe): mai qualcosa da saltare a memoria |
 | Risvegli con un pannello | `hospital` | il 1°, il 3°, il 10° e il primo dopo M12. Gli altri sono una riga in coda al messaggio dell'ospedale |
 | Conto delle morti | `stats.deaths` | **non è un contatore nuovo**: è quello che il gioco tiene dal §5.15, e lo leggono sia il 병원 sia M12 |
+| **— itinerario sulla carta (§5.30) —** | | |
+| Ricalcolo dell'itinerario | `route.RECALC` · `MOVED` · `TARGET_MOVED` | 0,4 s · 45 px del giocatore · 12 px del blip. Un blip **nuovo** si traccia subito, senza aspettare `RECALC`: mezzo secondo di ritardo su un cambio di fase si vede |
+| Costo di un percorso | `route.solve` | 0,26 ms nel caso peggiore (Seoul → Busan, 30 incroci) su 951 nodi e 1207 archi. Camminando: 23 ricalcoli e 2,7 ms in venti secondi |
+| Punta sul bordo della minimappa | `hud._drawMinimap` (`pad`) | 16 px dentro il bordo: il ritaglio ha gli angoli arrotondati di raggio 9 e una punta appoggiata al vertice si taglia a metà |
+| Spessore della linea di percorso | `hud.drawRoutePath` (`width`) | 3 px sulla minimappa · 3,4 × zoom (fino a 1,6) sulla carta piena; bordo scuro +2,6, tratteggio che scorre a `width × 9` px/s |
+| Secondo punto di una fase sulla carta | `hud` · `mapview` | disegnato solo oltre i 60 px dal blip: il caso normale è che coincidano, e due rombi sovrapposti sono rumore |

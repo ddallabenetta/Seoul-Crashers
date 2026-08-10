@@ -5,10 +5,11 @@ resta corto apposta.** Il contenuto vero sta in `docs/`, e si apre un documento 
 non tutti. Il `README.md` descrive il gioco e i comandi; qui c'è quello che serve a
 *sviluppare*. Avvio e vincoli stanno in `CLAUDE.md`, che si carica da solo.
 
-Ultimo aggiornamento: **la tappa B della campagna** (§5.29) — l'impianto delle missioni, **M1 e
-M2** giocabili dall'inizio alla fine, e il **filo del 병원**. È la prima cosa della campagna che
-si *gioca*: si finisce l'apertura, si sale in macchina, e da lì il gioco ha un blip e qualcosa
-da fare. Le tappe precedenti sono §5.8-5.28.
+Ultimo aggiornamento: **l'itinerario sulla carta** (§5.30) — il blip della missione adesso è un
+rombo che si vede, fuori dal ritaglio diventa una punta con la distanza, e **la strada per
+arrivarci è disegnata** su minimappa e mappa piena (A* sul grafo, `world/route.js`). Prima
+c'era la tappa B della campagna (§5.29): l'impianto delle missioni, **M1 e M2** giocabili
+dall'inizio alla fine, e il **filo del 병원**. Le tappe precedenti sono §5.8-5.28.
 
 > 📌 **Il prossimo lavoro è la tappa C**: i **cortili persistenti** — la proprietà di un turf
 > nel salvataggio, con effetto sul commercio. Va prima delle missioni che la usano, perché M5 la
@@ -41,6 +42,7 @@ da fare. Le tappe precedenti sono §5.8-5.28.
 | scrivere una data, un'età o un conteggio dentro una scena | [`docs/storia/10-continuita.md`](docs/storia/10-continuita.md) **prima** di scriverla |
 | disegnare un pannello, un personaggio a pixel o una nuova espressione | `docs/storico/17-pannelli-e-cutscene.md` (§5.28) |
 | **implementare una missione**: fasi, blip, punti, dialoghi, ripresa | `docs/storico/18-missioni-m1-m2.md` (§5.29) |
+| disegnare su mappa o minimappa, o toccare il percorso verso il blip | `docs/storico/19-itinerario-sulla-carta.md` (§5.30) |
 | verificare headless, usare `probe.mjs`, le scene o le skill | [`docs/strumenti.md`](docs/strumenti.md) |
 | capire *perché* una parte esistente è fatta così | [`docs/storico/`](docs/storico/) |
 
@@ -74,6 +76,7 @@ commenti resta valido: si risolve qui.
 | §5.27 Impianto della campagna | `docs/storico/16-impianto-della-campagna.md` |
 | §5.28 Pannelli, pixel art e cutscene iniziale | `docs/storico/17-pannelli-e-cutscene.md` |
 | §5.29 Impianto missioni, M1, M2 e il 병원 | `docs/storico/18-missioni-m1-m2.md` |
+| §5.30 Itinerario sulla carta | `docs/storico/19-itinerario-sulla-carta.md` |
 | §6 Backlog | `docs/backlog.md` |
 | §8 Parametri | `docs/parametri.md` |
 | §9 Strumenti (`.claude/`) | `docs/strumenti.md` |
@@ -171,6 +174,13 @@ storia in centoventidue byte. I dialoghi non coprono lo schermo: la città resta
 E al **병원 «성심»** il direttore ha una battuta diversa a ogni risveglio — quattro sono un
 pannello, dal decimo in poi dice il numero, e quel numero è lo stesso che M12 stamperà sulle
 fatture.
+
+**E adesso si sa dove andare** (§5.30). La meta della missione è un rombo con l'alone su tutte
+e due le carte, con il suo nome sulla mappa piena e, quando esce dal ritaglio della minimappa,
+una punta sul bordo che la guarda con scritto quanto manca. Sotto ci passa **la strada da
+fare**: un A* sul grafo stradale, tratteggio che scorre verso la meta, ricalcolato due volte al
+secondo mentre si guida e mai mentre si sta fermi. Dove le strade non arrivano — Jeju — resta
+una retta, e la carta lo dice.
 
 La Fase 2 era divisa in tre tappe, concordate con l'utente: **A** combattimento base,
 **B** polizia e ricercato a 5 livelli, **C** armi pesanti ed esplosivi. **Sono tutte fatte.**
