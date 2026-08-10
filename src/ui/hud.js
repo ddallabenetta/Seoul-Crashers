@@ -6,6 +6,7 @@ import { WEAPONS, WEAPON_SLOTS } from '../entities/weapons.js';
 import { won } from '../entities/shops.js';
 import { uiLayout, ellipsisText } from './layout.js';
 import { wrapLines } from './text.js';
+import { MissionRoute } from '../core/navigation.js';
 
 const MINIMAP = 196;
 const MINIMAP_WORLD = 1000; // porzione di mondo inquadrata
@@ -23,6 +24,7 @@ export class Hud {
     this.messages = [];
     this.venue = null;
     this.venueT = 0;
+    this.route = new MissionRoute(city);
   }
 
   showDistrict(d) {
@@ -672,6 +674,27 @@ export class Hud {
       y: y + MINIMAP / 2 + ((wy - p.y) * MINIMAP) / MINIMAP_WORLD,
     });
 
+    // La strada dell'obiettivo principale, sotto entità e blip. Il clipping del
+    // pannello taglia da sé i tratti lontani e lascia entrare la rotta dal bordo.
+    const route = this.route.get(game);
+    if (route?.length > 1) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(20,22,26,0.78)';
+      ctx.lineWidth = 6.5;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      route.forEach((p2, i) => {
+        const m = toMap(p2.x, p2.y);
+        if (i) ctx.lineTo(m.x, m.y); else ctx.moveTo(m.x, m.y);
+      });
+      ctx.stroke();
+      ctx.strokeStyle = '#ffd23f';
+      ctx.lineWidth = 3.2;
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // Traffico
     ctx.fillStyle = 'rgba(200,205,215,0.55)';
     for (const v of game.vehicles) {
@@ -697,9 +720,9 @@ export class Hud {
       const b = toMap(t.x + t.w, t.y + t.h);
       if (b.x < x || a.x > x + MINIMAP || b.y < y || a.y > y + MINIMAP) continue;
       ctx.save();
-      ctx.globalAlpha = 0.5;
-      ctx.strokeStyle = t.color;
-      ctx.lineWidth = 1.6;
+      ctx.globalAlpha = t.owner === 'player' ? 0.85 : 0.5;
+      ctx.strokeStyle = t.owner === 'player' ? '#ffd23f' : t.color;
+      ctx.lineWidth = t.owner === 'player' ? 2.4 : 1.6;
       ctx.setLineDash([4, 3]);
       ctx.strokeRect(a.x, a.y, Math.max(4, b.x - a.x), Math.max(4, b.y - a.y));
       ctx.restore();
@@ -839,8 +862,17 @@ export class Hud {
       const m = toMap(mk.x, mk.y);
       ctx.fillStyle = mk.color || '#ffd23f';
       ctx.beginPath();
-      ctx.arc(clamp(m.x, x + 4, x + MINIMAP - 4), clamp(m.y, y + 4, y + MINIMAP - 4), 4, 0, 6.2832);
+      ctx.arc(
+        clamp(m.x, x + 5, x + MINIMAP - 5),
+        clamp(m.y, y + 5, y + MINIMAP - 5),
+        mk.mission ? 5 : 4, 0, 6.2832
+      );
       ctx.fill();
+      if (mk.mission) {
+        ctx.strokeStyle = 'rgba(12,14,18,0.9)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
     }
 
     // Giocatore

@@ -5,26 +5,14 @@ resta corto apposta.** Il contenuto vero sta in `docs/`, e si apre un documento 
 non tutti. Il `README.md` descrive il gioco e i comandi; qui c'è quello che serve a
 *sviluppare*. Avvio e vincoli stanno in `CLAUDE.md`, che si carica da solo.
 
-Ultimo aggiornamento: **la tappa B della campagna** (§5.29) — l'impianto delle missioni, **M1 e
-M2** giocabili dall'inizio alla fine, e il **filo del 병원**. È la prima cosa della campagna che
-si *gioca*: si finisce l'apertura, si sale in macchina, e da lì il gioco ha un blip e qualcosa
-da fare. Le tappe precedenti sono §5.8-5.28.
+Ultimo aggiornamento: **campagna completa e navigazione** (§5.30) — M1-M12, R1-R4, Kkachi,
+cortili persistenti, tre finali e scena dopo i titoli. La carta mostra tutte le mete note e la
+minimappa traccia la strada verso l'obiettivo principale.
 
-> 📌 **Il prossimo lavoro è la tappa C**: i **cortili persistenti** — la proprietà di un turf
-> nel salvataggio, con effetto sul commercio. Va prima delle missioni che la usano, perché M5 la
-> dà per scontata ed è l'unica cosa della storia che cambia il mondo in modo permanente. Poi la
-> **D** (Kkachi), che ha quattro righe già in attesa: le tre di M1 e M2 e quella dell'apertura
-> sono `hud.toast` finché non esiste la stazione `91.45`. L'ordine di tutte le tappe sta **in
-> testa a [`docs/backlog.md`](docs/backlog.md) (§6.0)**, che è la prima cosa da leggere prima di
-> cominciare, e le nove decisioni d'impianto prese con l'utente stanno in
-> [`docs/storia/08-domande-aperte.md`](docs/storia/08-domande-aperte.md): leggi quelle, non
-> ricavarle dal copione. Resta aperta una domanda sola (se le missioni si rigiocano) e non
-> blocca niente. **Chi scrive una missione nuova parte da §5.29**: un file sotto `src/story/`,
-> una riga in `story/campaign.js`, e il motore fa il resto. **Chi disegna pannelli parte da
-> §5.28**, e li guarda con `cutscene-sheet.scene` *prima* di dire che funzionano — metà delle
-> tavole di questa tappa sono state rifatte dopo il primo provino. Il resto del §6 resta
-> ordinato per impatto: sorpasso, arresto che ti carica in volante, e il **corridoio fra Seoul e
-> Busan**, che è la superficie naturale delle attività secondarie.
+> 📌 **Il prossimo lavoro torna al backlog generale**: attività secondarie nel corridoio
+> Seoul-Busan, sorpasso e regia dell'arresto sono le voci più grandi. Per la campagna leggi
+> §5.30 e il copione in `docs/storia/`; per verificare la catena usa
+> `.claude/tools/check-campaign.mjs` e `missioni-run.scene`.
 
 ---
 
@@ -74,6 +62,7 @@ commenti resta valido: si risolve qui.
 | §5.27 Impianto della campagna | `docs/storico/16-impianto-della-campagna.md` |
 | §5.28 Pannelli, pixel art e cutscene iniziale | `docs/storico/17-pannelli-e-cutscene.md` |
 | §5.29 Impianto missioni, M1, M2 e il 병원 | `docs/storico/18-missioni-m1-m2.md` |
+| §5.30 Campagna completa e navigazione | `docs/storico/19-campagna-completa-e-navigazione.md` |
 | §6 Backlog | `docs/backlog.md` |
 | §8 Parametri | `docs/parametri.md` |
 | §9 Strumenti (`.claude/`) | `docs/strumenti.md` |
@@ -86,12 +75,10 @@ Web game d'azione top-down 2.5D ambientato a Seoul, stile *GTA: Chinatown Wars*.
 Canvas 2D puro, moduli ES nativi, **zero dipendenze, nessun build step**. Tutta la grafica
 (sprite, facciate, terreno, mappa) è generata da codice a runtime: non esistono asset esterni.
 
-Stato: **Fase 1, Fase 1.5, Fase 2 (tutte e tre le tappe) e le prime tre tappe della Fase 3
-completate e collaudate**, più la revisione della guida AI del traffico (§5.10), i due giri di
+Stato: **Fase 1, Fase 1.5, Fase 2 e la campagna della Fase 3 completate**, più la revisione della guida AI del traffico (§5.10), i due giri di
 arretrati (§5.12 e §5.21), l'audio procedurale del §5.13, il salvataggio del §5.15, il giro
 menu-musica-autosave del §5.18-5.20, le tre regioni collegate e ricostruite del §5.22-5.24,
-l'impianto della campagna (§5.27), la sua prima tappa a schermo (§5.28) e le prime due missioni
-giocabili (§5.29). ~33.000 righe in 64 moduli. 60 fps con ~44 veicoli e ~93
+l'impianto della campagna (§5.27-5.29) e la storia completa (§5.30). 60 fps con ~44 veicoli e ~93
 pedoni attivi, e restano 60 anche sotto raffica continua di SMG. Dentro un edificio il costo è
 trascurabile: la città non gira. Il ciclo giorno-notte costa **1,5 ms di JS per frame nel caso
 peggiore** (notte con temporale) — ma i veli a schermo intero non sono misurabili onestamente
@@ -172,10 +159,15 @@ E al **병원 «성심»** il direttore ha una battuta diversa a ogni risveglio 
 pannello, dal decimo in poi dice il numero, e quel numero è lo stesso che M12 stamperà sulle
 fatture.
 
+**E la trama si chiude** (§5.30). La catena prosegue da M3 fino a M12, attraversa Busan e
+Jeju, alza il flag dell'ospedale e apre tre finali. Kkachi vive su 91.45 con 24 chiamate; i
+cortili cambiano padrone e restano nel salvataggio. La carta completa mostra tutte le mete note,
+mentre la minimappa conserva un solo obiettivo e ne calcola la strada sul grafo.
+
 La Fase 2 era divisa in tre tappe, concordate con l'utente: **A** combattimento base,
 **B** polizia e ricercato a 5 livelli, **C** armi pesanti ed esplosivi. **Sono tutte fatte.**
-La Fase 3 (contenuti) è cominciata da **negozi e interni** (§5.8), poi la mappa (§5.9) e il
-ciclo giorno-notte (§5.11); il §5.12 ha chiuso gli arretrati. **Restano le missioni**, §6.
+La Fase 3 (contenuti) è cominciata da **negozi e interni** (§5.8), poi la mappa (§5.9), il
+ciclo giorno-notte (§5.11) e la campagna (§5.30). Restano attività secondarie e rifiniture, §6.
 
 ---
 

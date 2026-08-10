@@ -15,6 +15,8 @@ src/core/
   modes.js            in che modalità gira il gioco e cosa concede (`game.mode`, `paused`)
   missions.js         fasi, blip, punti, ripresa: il motore delle missioni, che della
                       campagna non sa niente
+  navigation.js       A* sul grafo stradale per la rotta dell'obiettivo principale
+  kkachi.js           91.45: 24 chiamate predicate, servizio, ascoltate/perse
   audio.js            sintetizzatore WebAudio: colpi secchi + letti continui, mix, muto
   music.js            musica generata: tema del menu, caccia, apertura, stacchi — e la regia
   radio.js            stazioni coreane in streaming (`<audio>`, fuori dal grafo audio)
@@ -88,7 +90,9 @@ src/story/
   campaign.js         chi c'è e in che ordine: l'unico file che conosce tutte le missioni
   intro.js            «12년», i 28 pannelli dell'apertura e il passaggio di consegne
   places.js           dove succedono le cose: la storia non piazza indirizzi, li cerca
-  m1.js · m2.js       una missione per file: le sue fasi e i suoi pannelli
+  m1.js … m12.js      una missione per file: le sue fasi e i suoi pannelli
+  storykit.js         pannelli e forme di fase comuni alle missioni successive
+  finals.js           scelta A/B/C, titoli di coda e scena dopo
   hospital.js         il 병원 «성심»: una battuta a ogni morte, e quattro pannelli
 
 .claude/              strumenti per chi sviluppa (non fa parte del gioco), vedi §9
@@ -413,6 +417,16 @@ regole della campagna sono cablate lì e non nelle missioni — **un blip solo**
 `busted`, non a `playerDeath`: quando arrivano quei due il giocatore è già stato spostato), **una
 cutscene non si rivede mai** (`seen`, che sta nel salvataggio). Nel salvataggio va la *posizione*
 nella storia, non la storia: ~122 byte, e il ripristino **rientra nella fase** invece di saltarla.
+
+La carta e la minimappa leggono due viste dello stesso obiettivo (§5.30). `ctx.mark` conserva
+il solo blip attivo; `ctx.mapPoint` aggiunge invece tutte le mete note della fase alla carta
+completa. `core/navigation.js` aggancia giocatore e marker ai nodi più vicini e usa A* sul
+grafo stradale. Il percorso viene disegnato sia da `MapView` sia dall'HUD, ma una componente
+disconnessa restituisce `null`: Jeju non produce mai una falsa linea attraverso il mare.
+
+`core/kkachi.js` possiede la stazione virtuale 91.45: chiamate e righe di servizio sono tabelle
+con predicato, mentre `Radio` continua a possedere soltanto sintonia e stazioni reali. Ascoltate
+e perse hanno un proprio snapshot; gli interni e la metro escludono la frequenza narrativa.
 
 **Un dialogo non è una cutscene: è la stessa scena, ferma** (§5.29). Metà del copione delle
 missioni sono scambi di due righe *nel posto in cui succedono*, e coprire quel posto con una

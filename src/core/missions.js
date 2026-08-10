@@ -48,6 +48,7 @@ export class MissionSystem {
     this.flags = new Set();      // fatti della storia che sopravvivono alla missione
     this.subs = [];              // disiscrizioni della fase corrente
     this.points = [];            // punti interattivi della fase corrente
+    this.mapPoints = [];         // destinazioni note mostrate solo sulla carta completa
     this.actions = [];           // quelli a portata, ricostruiti ogni frame per l'HUD
     this.hint = null;            // la riga che l'HUD mostra sotto il titolo
   }
@@ -158,6 +159,7 @@ export class MissionSystem {
     for (const off of this.subs) off();
     this.subs.length = 0;
     this.points.length = 0;
+    this.mapPoints.length = 0;
     this.actions.length = 0;
     this.hint = null;
   }
@@ -177,9 +179,17 @@ export class MissionSystem {
       /** Iscrizione al bus che si disfa al cambio di fase. */
       on: (name, fn) => { this.subs.push(game.on(name, fn)); },
       /** Il blip. Uno, e si sposta. */
-      mark: (x, y, opts = {}) => game.setMarker(MARKER, x, y, { color: '#ffd23f', ...opts }),
+      mark: (x, y, opts = {}) => game.setMarker(MARKER, x, y, {
+        color: '#ffd23f', primary: true, mission: true, ...opts,
+      }),
       unmark: () => game.clearMarker(MARKER),
       point: (p) => { this.points.push(p); return p; },
+      /** Più mete note possono stare sulla carta, ma il blip attivo resta uno. */
+      mapPoint: (p) => { this.mapPoints.push(p); return p; },
+      dropMapPoint: (id) => {
+        const i = this.mapPoints.findIndex((p) => p.id === id);
+        if (i >= 0) this.mapPoints.splice(i, 1);
+      },
       drop: (id) => {
         const i = this.points.findIndex((p) => p.id === id);
         if (i >= 0) this.points.splice(i, 1);
@@ -316,6 +326,7 @@ export class MissionSystem {
     this.flags.clear();
     this.subs.length = 0;
     this.points.length = 0;
+    this.mapPoints.length = 0;
     this.actions.length = 0;
     this.hint = null;
     game.clearMarker(MARKER);

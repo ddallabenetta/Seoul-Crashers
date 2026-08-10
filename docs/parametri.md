@@ -219,7 +219,7 @@
 ---
 | **— impianto della campagna (§5.27) —** | | |
 | Abbassamento dell'audio per modalità | `modes.MODES` | menu 0,22 · gioco 1 — e la radio ha il suo (`radioDuck`: menu 0,4), perché è la musica che ha scelto il giocatore |
-| Versione del formato di salvataggio | `save.VERSION` | 2. Si alza quando cambia la **forma** dei dati, e ogni scalino vuole una riga in `MIGRATIONS` |
+| Versione del formato di salvataggio | `save.VERSION` | 5. Gli scalini 3→4 e 4→5 aggiungono turf posseduti e stato Kkachi |
 | Tetto delle migrazioni in fila | `save.migrate` | 32 scalini: è una rete contro una catena scritta male, non un limite di progetto |
 | Raggio di comparsa di un attore | `actors.SPAWN_R` | 1400 px. L'anello di despawn dello streaming è più largo (`ring.despawn × 1,8`), e la differenza è l'isteresi che gli impedisce di lampeggiare |
 | **— pannelli e cutscene (§5.28) —** | | |
@@ -235,7 +235,7 @@
 | Mezzo busto in un pannello che parla | `intro.bust` | finisce a `0,62` dell'altezza e ne occupa `0,46`: sopra il riquadro delle battute |
 | Contorno chiaro delle figure | `pixelkit.RIM` | `#4d5768`, **sempre acceso**: senza, il cast sparisce nei fondi notturni |
 | **— missioni, dialoghi e 병원 (§5.29) —** | | |
-| Versione del formato di salvataggio | `save.VERSION` | 3 (dal 2 del §5.27): ci è entrata la campagna. Lo scalino `2 → 3` aggiunge un `story` vuoto, che è esattamente «la storia non era ancora cominciata» |
+| Versione del formato di salvataggio | `save.VERSION` | 5; lo scalino `2 → 3` ha aggiunto la campagna, i due successivi turf e Kkachi |
 | Peso della storia nel salvataggio | `missions.snapshot` | ~122 byte a metà campagna: missione, fase, taccuino e tre elenchi |
 | Modalità del dialogo | `modes.MODES` (`dialogue`) | mondo 0,4 · radio 0,5 — si abbassa **meno** di una cutscene, perché la città resta a schermo sotto il riquadro |
 | Guardia sul primo tasto di un dialogo | `dialogue.update` | 0,25 s: senza, la `E` con cui si è aperto salta la prima battuta |
@@ -246,3 +246,10 @@
 | Pannello del 병원 che si chiude da solo | `hospital.ward` (`hold`) | 7 s (11 e 13 per le scene lunghe): mai qualcosa da saltare a memoria |
 | Risvegli con un pannello | `hospital` | il 1°, il 3°, il 10° e il primo dopo M12. Gli altri sono una riga in coda al messaggio dell'ospedale |
 | Conto delle morti | `stats.deaths` | **non è un contatore nuovo**: è quello che il gioco tiene dal §5.15, e lo leggono sia il 병원 sia M12 |
+| **— campagna completa e navigazione (§5.30) —** | | |
+| Chiamate Kkachi / soglia finale C | `kkachi.KKACHI_CALLS` / `hiddenReady` | 24 totali · almeno 20 ascoltate |
+| Finestra della minimappa | `hud.MINIMAP_WORLD` | 1000 px di mondo |
+| Sconto nel turf posseduto | `shops.OWNED_BUY` | ×0,85 sul prezzo di acquisto |
+| Tetto ricavo armi nel turf | `shops.OWNED_FENCE_CAP` | ×0,58 del listino, senza arbitraggio compra-vendi |
+| Bonus auto nel turf 철마파 | `shops.OWNED_CAR_BONUS` | ×1,08 sul valore del mezzo |
+| Acquisto di un cortile in M5 | `m5.TAKE_PRICE` | 150.000 ₩ |

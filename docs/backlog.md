@@ -4,28 +4,24 @@
 
 ## 6.0 — MASSIMA PRIORITÀ: le tappe della campagna
 
-**Questo elenco viene prima di tutto il resto di questo file.** L'impianto è pronto (§5.27: bus
-di eventi, tabella delle modalità, migrazioni del salvataggio, personaggi nominati, porte
-sigillate, marcatori, testo su più righe). Quello che resta è **contenuto**, in quest'ordine e
-**una consegna per volta**. Le decisioni d'impianto stanno in
-[`storia/08-domande-aperte.md`](storia/08-domande-aperte.md) e non vanno ricavate dal copione.
+**Le otto tappe sono chiuse.** L'impianto (§5.27-5.29) e il contenuto completo (§5.30) sono
+ora nello stesso ramo: cortili persistenti, Kkachi, M1-M12, raccordi e finali. Le decisioni
+d'impianto restano in [`storia/08-domande-aperte.md`](storia/08-domande-aperte.md).
 
 | # | Tappa | Cosa contiene | Si prova così |
 | --- | --- | --- | --- |
 | ~~1~~ | ~~**A**~~ | ~~primitive dei pannelli + la cutscene iniziale~~ — **fatta**, §5.28 | — |
 | ~~2~~ | ~~**B**~~ | ~~impianto missioni + M1 e M2~~, e con loro **il filo del 병원** — **fatta**, §5.29 | — |
-| 3 | **C** | **cortili persistenti** (nel salvataggio, con effetto sul commercio) | si prende un cortile, si esce, si ricarica, è ancora tuo |
-| 4 | **D** | Kkachi: stazione `91.45`, tabella con predicato, le otto chiamate dell'Atto I **e le dodici righe di servizio** | si gira per Seoul con la radio accesa |
-| 5 | **E** | Atto I completo (M3, M4) + R1 | il primo ribaltamento in mano al giocatore |
-| 6 | **F** | Atto II (M5-M8) + R2, R3 + le otto chiamate dell'Atto II | l'atto che chiede più cose nuove al motore |
-| 7 | **G** | Atto III (M9-M12) + R4 + le otto chiamate dell'Atto III **e l'incontro facoltativo di Busan** | il viaggio: ha bisogno di tutto quello di prima |
-| 8 | **H** | i tre finali, i titoli di coda, la scena dopo | e a quel punto la Fase 3 è chiusa |
+| ~~3~~ | ~~**C**~~ | ~~**cortili persistenti** (nel salvataggio, con effetto sul commercio)~~ — **fatta**, §5.30 | — |
+| ~~4~~ | ~~**D**~~ | ~~Kkachi: `91.45`, 24 chiamate e dodici righe di servizio~~ — **fatta**, §5.30 | — |
+| ~~5~~ | ~~**E**~~ | ~~Atto I completo (M3, M4) + R1~~ — **fatta**, §5.30 | — |
+| ~~6~~ | ~~**F**~~ | ~~Atto II (M5-M8) + R2 e R3~~ — **fatta**, §5.30 | — |
+| ~~7~~ | ~~**G**~~ | ~~Atto III (M9-M12), R4 e incontro facoltativo di Busan~~ — **fatta**, §5.30 | — |
+| ~~8~~ | ~~**H**~~ | ~~tre finali, titoli di coda e scena dopo~~ — **fatta**, §5.30 | — |
 
-**Il filo del 병원 è fatto** ([`storia/09-ospedale.md`](storia/09-ospedale.md), §5.29): è stato
-agganciato alla B come previsto, e da adesso si accumula. Il conto delle morti **non è un
-contatore nuovo** — è `stats.deaths`, che il salvataggio porta dal §5.15 — e M12 dovrà leggere
-quello e nient'altro. La scena dopo M12 è scritta e cablata: aspetta solo che qualcuno alzi il
-flag `m12` (`game.missions.setFlag('m12')`).
+**Il filo del 병원 arriva fino alla fine** ([`storia/09-ospedale.md`](storia/09-ospedale.md)):
+M12 legge direttamente `stats.deaths`, alza il flag `m12` e apre la scelta finale. Il formato
+di salvataggio conserva anche cortili e chiamate Kkachi, con migrazione degli slot precedenti.
 
 **Cosa la tappa B (§5.29) ha già tolto di mezzo**, e che quindi nessuna delle tappe che restano
 deve più affrontare: le **fasi** di una missione e la loro ripresa dopo una morte o un arresto,
@@ -59,27 +55,21 @@ definitiva, con le `(nota)` dove il giocatore va aiutato a *guardare* e la tabel
 già tradotte in testa a [`storia/README.md`](storia/README.md) — glossare una seconda volta la
 stessa parola è un errore, non una gentilezza.
 
-**I debiti che l'Atto I lascia alla tappa D.** Sono diventati **quattro** righe di Kkachi
-appese a un `hud.toast` finché non esiste la stazione `91.45`: il passaggio di consegne
-dell'apertura, i tre ponti di M1, e l'innesco di M2 («Prima di chiedere a un vivo, chiedi a uno
-scaffale.»). Sono l'unico punto di quelle scene che la tappa D dovrà tornare a toccare. E resta
-la **regia sonora** dell'apertura (fruscio di banda, la voce che conta, il cane, la sirena
-lontana): la musica c'è, gli effetti no, e conviene farli dove nasce il timbro del fruscio.
+**Kkachi è ora una stazione virtuale vera.** `91.45` resta disponibile anche senza rete, le
+chiamate sono una tabella con predicato, quelle interrotte finiscono fra le perse e il conto
+entra nei titoli e nelle condizioni del finale C. Restano come rifinitura gli effetti di regia
+sonora dell'apertura (fruscio di banda, cane e sirena lontana).
 
-**Tre cose che M1 e M2 lasciano indietro** (§5.29), e nessuna blocca la tappa C:
+**Una cosa che M1 e M2 lasciano indietro** (§5.29), e non blocca la campagna:
 - **un oggetto di missione trasportabile.** I tre pegni di M2 sono tre caselle in un taccuino,
-  non tre cose in mano: non si vedono addosso e non si possono perdere;
-- **un pedinamento con soglia di distanza** («ti ha visto / l'hai perso»), che M3 chiede subito
-  e che torna in M6 e M9. È la meccanica nuova più leggera dell'atto;
-- **Jo che risponde in modo diverso dopo M6** (le «visite che cambiano»,
-  [`storia/07-radio-kkachi.md`](storia/07-radio-kkachi.md)): oggi il banco dice sempre le stesse
-  cose una volta finita M2.
+  non tre cose in mano: non si vedono addosso e non si possono perdere. Il pedinamento di M3
+  e la visita facoltativa a Jo dopo M6 sono invece implementati.
 
 ---
 
 ## 6. Backlog successivo (già concordato con l'utente)
 
-**Fase 3 — contenuti.** Negozi e interni (§5.8), la mappa (§5.9), il ciclo giorno-notte
+**Fase 3 — rifinitura e attività secondarie.** Negozi e interni (§5.8), la mappa (§5.9), il ciclo giorno-notte
 (§5.11), i due giri di arretrati (§5.12 e §5.21), il salvataggio (§5.15), l'arresto (§5.16),
 il menu iniziale (§5.18), la musica (§5.19) e l'autosave (§5.20) sono fatti; la segnalazione
 sul traffico è chiusa (§5.10) e quella sulle auto attraversabili pure (§5.17, e dal §5.21 vale
@@ -88,16 +78,13 @@ Busan e Jeju, gli interni metro e i collegamenti interurbani**: ingressi solidi 
 corsie, passeggeri e chiosco nelle stazioni e coste rifinite. Dal §5.25 le tre città stanno
 **nella stessa mappa**, disposte come in Corea: a Busan ci si arriva guidando sulla Gyeongbu,
 a Jeju via mare o in volo. Mappa, carta e salvataggi sono unici.
-**Restano le missioni**, che sono il lavoro grosso. **I contenuti però adesso ci sono**: il
-copione completo della campagna — dodici missioni in tre atti, cutscene iniziale, raccordi,
-finali e ventiquattro chiamate radio — sta in [`storia/`](storia/), scritto e non implementato.
-**E l'impianto è deciso**, con l'utente: pannelli solo testo, cutscene saltabile, un blip solo
+**La campagna è completa**: dodici missioni in tre atti, cutscene iniziale, raccordi, finali e
+ventiquattro chiamate radio sono implementati sotto `src/story/`. **L'impianto resta quello
+deciso** con l'utente: pannelli solo testo, cutscene saltabile, un blip solo
 sulla missione attiva, fallimento che riparte dall'ultima fase, un pannello = una funzione,
 cortili persistenti, tre finali, Kkachi come tabella con predicato, storia prima delle attività
-secondarie. Le decisioni e le **otto tappe** di lavoro stanno in
-[`storia/08-domande-aperte.md`](storia/08-domande-aperte.md); l'**impianto è pronto** (§5.27) e
-l'ordine delle tappe è quello del §6.0, qui sopra. Resta aperta una domanda sola: se le missioni
-si rigiocano.
+secondarie. Le attività secondarie, il sorpasso e la regia dell'arresto restano le voci più
+grandi; la domanda sul rigiocare le missioni resta aperta e non blocca il gioco principale.
 
 Quello che segue è quanto resta indietro, in ordine di quanto si sente. È molto più corto di
 prima: il §5.12 ha pagato diciannove voci di questo elenco, il §5.13 ha chiuso l'audio, il

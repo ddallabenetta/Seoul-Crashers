@@ -64,6 +64,7 @@ function collect(ctx, id, label) {
   // Il punto se ne va con l'oggetto: lasciarlo lì vorrebbe dire un suggerimento
   // che offre una scatola di latta che è già in tasca.
   ctx.drop(id);
+  ctx.dropMapPoint(id);
   ctx.state.pegni = [...(ctx.state.pegni || []), id];
   const n = ctx.state.pegni.length;
   ctx.toast(`Pegno recuperato: ${label} · ${n}/3`, 3);
@@ -77,7 +78,10 @@ function aimAtNext(ctx) {
   const game = ctx.game;
   const s = sites(game);
   const where = { giradischi: s.nore, cassetta: s.yard, scatola: s.flat };
-  const pl = game.player;
+  // Dentro un locale il giocatore ha coordinate di pianta: per scegliere la
+  // meta più vicina si usa la porta da cui è entrato, non un punto 200/300 della
+  // Corea nord-occidentale.
+  const pl = game.indoors && game.shops.outside ? game.shops.outside : game.player;
   let best = null;
   let bestD = Infinity;
   for (const p of PEGNI) {
@@ -403,6 +407,13 @@ export const M2 = {
         const game = ctx.game;
         const s = sites(game);
         ctx.state.pegni = ctx.state.pegni || [];
+        const where = { giradischi: s.nore, cassetta: s.yard, scatola: s.flat };
+        for (const p of PEGNI) {
+          const at = where[p.id];
+          if (!taken(ctx, p.id) && at) {
+            ctx.mapPoint({ id: p.id, x: at.x, y: at.y, label: p.hangul, color: '#ffd23f' });
+          }
+        }
         aimAtNext(ctx);
 
         // 1 · il giradischi, al 노래방. Il padrone ha imparato la canzone.

@@ -20,6 +20,7 @@
 //   · `riprendeDallaFase` — morire non riporta all'inizio della missione
 const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
 const S = await import('/src/core/save.js');
+const { MissionRoute } = await import('/src/core/navigation.js');
 const out = {};
 const log = [];
 const M = game.missions;
@@ -118,6 +119,7 @@ await wait(0.15);
 out.m1Apertura = await saltaPannelli();
 nota('apertura saltata');
 out.m1VaAlBiliardo = fase() === 'm1/biliardo' && !!blip();
+out.m1HaStrada = (new MissionRoute(game.city).get(game)?.length || 0) > 2;
 
 const soldi0 = pl.money;
 out.m1EntraBiliardo = await entraSulBlip();
@@ -168,6 +170,7 @@ nota('apertura M2');
 out.m2JoAlBanco = !!game.actors.get('jo');
 out.m2ScenaDelRegistro = await usaPunto('jo');
 nota('registro');
+out.m2TrePuntiCarta = M.mapPoints.length === 3;
 
 // ---- 3. La ripresa: si muore e si torna **nella fase**, non nella missione -----
 const faseAllaMorte = fase();
@@ -240,7 +243,8 @@ out.m2Chiusura = await saltaPannelli();
 nota('chiusura M2');
 out.m2Completata = M.isDone('m2');
 out.nomeInciso = M.flag('kumangi');
-out.nessunaMissioneAppesa = M.active === null && game.markers.length === 0;
+out.m3ParteDaSola = fase() === 'm3/innesco';
+out.unBlipSolo = maxBlip <= 1;
 
 // ---- 6. Il filo del 병원: le battute non si ripetono mai ------------------------
 const dette = [];

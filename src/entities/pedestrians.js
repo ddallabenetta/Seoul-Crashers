@@ -232,12 +232,13 @@ export class PedestrianSystem {
         t.warned = true;
         // Il mestiere della banda si legge entrando: è l'unico posto in cui il
         // giocatore può scoprire che qui si commercia, e perché adesso non può.
-        game.hud.toast(`${t.hangul} · ${t.trade} — ${t.place}`, 3);
-        if (provoking) game.hud.toast('Con questa addosso non trattano', 2.8);
+        const owned = game.shops?.ownsTurf(t);
+        game.hud.toast(`${t.hangul} · ${owned ? 'CORTILE TUO' : t.trade} — ${t.place}`, 3);
+        if (provoking && !owned) game.hud.toast('Con questa addosso non trattano', 2.8);
       } else if (!inside && t.warned && dist(pl.x, pl.y, t.cx, t.cy) > 700) {
         t.warned = false;
       }
-      if (!inside || !provoking) continue;
+      if (!inside || !provoking || game.shops?.ownsTurf(t)) continue;
       for (const p of this.peds) {
         if (p.turf !== t || p.dead || p.hostile) continue;
         p.hostile = true;

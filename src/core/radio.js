@@ -49,12 +49,18 @@ const TUNE_SETTLE = 0.45;
 // Oltre questo tempo senza un byte utile la stazione si considera muta e si
 // salta. Senza, una stazione morta blocca la radio per sempre.
 const STALL_LIMIT = 11;
+export const KKACHI_FREQUENCY = '91.45';
+const KKACHI_STATION = {
+  name: `${KKACHI_FREQUENCY} · 까치`, tag: 'storia', virtual: 'kkachi', url: '',
+};
 
 export class Radio {
   /** @param audio l'`AudioSystem`: da lì arrivano volume generale e muto. */
   constructor(audio) {
     this.audio = audio;
-    this.stations = [];
+    // La frequenza della storia non usa la rete e viene prima delle emittenti
+    // vere. È sempre disponibile, anche quando la directory è irraggiungibile.
+    this.stations = [KKACHI_STATION];
     this.tuned = -1;      // stazione caricata nell'elemento
     this.pending = -1;    // stazione scelta dal giocatore (−1 = spenta)
     this.el = null;
@@ -73,6 +79,10 @@ export class Radio {
 
   get on() {
     return this.pending >= 0;
+  }
+
+  get isKkachi() {
+    return this.stations[this.pending]?.virtual === 'kkachi';
   }
 
   /** Etichetta per l'HUD: dice sempre a che punto è, anche quando non suona. */
@@ -125,7 +135,7 @@ export class Radio {
   async discover() {
     if (this.discovered) return;
     this.discovered = true;
-    this.state = 'cerco';
+    if (!this.stations.length) this.state = 'cerco';
     for (const host of DIRECTORY) {
       try {
         const ctrl = new AbortController();
@@ -163,10 +173,14 @@ export class Radio {
       return;
     }
     // Se la partita scorsa era su una stazione che c'è ancora, si riparte da lì.
-    const back = this._wanted ? this.stations.findIndex((s) => s.name === this._wanted) : -1;
-    this.pending = back >= 0 ? back : 0;
-    this.state = 'sintonizzo';
-    this._settle = 0;
+    // Se nel frattempo il giocatore sta già ascoltando 91.45, scaricare la
+    // directory in sottofondo non gli gira la manopola sotto le dita.
+    if (this.pending < 0) {
+      const back = this._wanted ? this.stations.findIndex((s) => s.name === this._wanted) : -1;
+      this.pending = back >= 0 ? back : 0;
+      this.state = 'sintonizzo';
+      this._settle = 0;
+    }
   }
 
   // --- comandi ----------------------------------------------------------------
@@ -176,7 +190,9 @@ export class Radio {
     this._game = game;
     if (!this.discovered) {
       this.pending = 0;
-      this.toast('Radio: cerco le stazioni…');
+      this.state = 'sintonizzo';
+      this._settle = 0;
+      this.toast(`Radio: ${this.stations[0].name}`);
       this.discover();
       return;
     }
@@ -231,6 +247,14 @@ export class Radio {
       if (this.el && !this.el.paused) this.el.pause();
       return;
     }
+    // 91.45 è testo, non lo stream che era sintonizzato prima. Senza questo
+    // ramo l'elemento della stazione reale veniva rimesso in play al frame dopo
+    // `tune(Kkachi)` e suonava sotto la chiamata.
+    if (this.stations[this.pending]?.virtual === 'kkachi') {
+      if (this.el && !this.el.paused) this.el.pause();
+      if (this.pending !== this.tuned) this.tune(this.pending);
+      return;
+    }
     if (this.pending !== this.tuned) {
       this._settle -= dt;
       if (this._settle <= 0) this.tune(this.pending);
@@ -278,6 +302,13 @@ export class Radio {
   tune(i) {
     const s = this.stations[i];
     if (!s) return;
+    if (s.virtual === 'kkachi') {
+      if (this.el && !this.el.paused) this.el.pause();
+      this.tuned = i;
+      this._stall = 0;
+      this.state = 'acceso';
+      return;
+    }
     if (!this.el) this.makeElement();
     this.tuned = i;
     this._stall = 0;

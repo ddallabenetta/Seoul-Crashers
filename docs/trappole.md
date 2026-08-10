@@ -357,3 +357,23 @@ vede nel sorgente, dove le due chiamate sembrano indipendenti: si vede a schermo
 otto del mattino trova una porta che non si apre e si pianta. Non è un caso limite — è il caso
 normale, perché l'ora la decide il giocatore. Si dichiara `shops.hold(shopId)` nel `prepare`
 della missione, che è il contrario di `seal` e sta nel salvataggio come lei (§5.29).
+
+**Lo stato di una missione va serializzato: un pedone non ci può entrare.** Mettere i quattro
+incursori di M4 in `ctx.state.ambush` faceva finire oggetti runtime, riferimenti e home point
+nello snapshot della storia. Le entità temporanee restano su un campo non persistente della
+definizione (`M4._ambush`); nel taccuino entrano solo numeri, stringhe, booleani e piccoli
+oggetti di coordinate (§5.30).
+
+**Una stazione virtuale deve fermare anche il frame dopo.** Mettere in pausa l'`<audio>` quando
+si sintonizza 91.45 non basta: `Radio.update` vede ancora l'elemento della stazione precedente
+e lo rimette in `play()`. Il ramo virtuale esce prima di qualunque logica di stream e stall.
+
+**Il token di un dialogo è l'array che il lettore monta, non quello che gli passi.**
+`Dialogue.play` filtra le righe e crea un array nuovo; confrontarlo con l'input faceva sembrare
+ogni chiamata Kkachi rimpiazzata al frame successivo, quindi ascoltata *e* persa insieme. Chi
+deve riconoscere il proprietario conserva `dialogue.lines` dopo `play`, oppure usa un token.
+
+**ActorSystem può ripristinare soltanto definizioni che esistono già.** Lo snapshot salva le
+morti, non indirizzi e nomi: caricando dopo M8 senza aver rieseguito M2/M8, Jo e Dulchae non
+esistevano ancora e la loro morte non veniva applicata. I personaggi che portano condizioni
+globali si definiscono al registro della campagna, prima di `actors.restore` (§5.30).

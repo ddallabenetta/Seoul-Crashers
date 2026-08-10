@@ -77,6 +77,23 @@ export class Dialogue {
     if (done) done(game);
   }
 
+  /**
+   * Interrompe una conversazione senza eseguirne la conclusione. Serve alla
+   * radio: cambiare frequenza nel mezzo di una chiamata non può trasformarla in
+   * una chiamata ascoltata, né far scattare l'evento che dipende dall'ultima
+   * battuta.
+   */
+  cancel(game) {
+    if (!this.active) return false;
+    this.active = false;
+    this.lines = null;
+    this.onDone = null;
+    this.i = 0;
+    this.t = 0;
+    game.emit('dialogueEnd');
+    return true;
+  }
+
   draw(ctx, game) {
     if (!this.active) return;
     const line = this.line;

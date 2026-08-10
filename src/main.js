@@ -38,8 +38,9 @@ import { Cutscene } from './ui/cutscene.js';
 import { MobileControls } from './ui/mobilecontrols.js';
 import { Dialogue } from './ui/dialogue.js';
 import { MissionSystem } from './core/missions.js';
+import { KkachiSystem } from './core/kkachi.js';
 import { INTRO, handoff } from './story/intro.js';
-import { registerCampaign, beginCampaign } from './story/campaign.js';
+import { registerCampaign, beginCampaign, resumeCampaign } from './story/campaign.js';
 
 const MAX_PIXELS = 2_900_000;
 // Dentro un edificio non c'è traffico: la griglia dei veicoli si ricostruisce vuota
@@ -218,6 +219,8 @@ class Game {
     this.shopMenu = new ShopMenu();
     this.metro = new MetroSystem();
     this.metroScene = new MetroScene(this.scene);
+    this.kkachi = new KkachiSystem();
+    this.kkachi.attach(this);
     // Dopo l'HUD: il filo del 병원 gli parla addosso al primo risveglio, e una
     // definizione di attore vuole i negozi già in piedi.
     registerCampaign(this);
@@ -287,7 +290,10 @@ class Game {
     this.autoT = undefined;
     this.audio.music?.sting('go');
     this.hud.showDistrict(this.player.district);
-    if (loaded) return;
+    if (loaded) {
+      resumeCampaign(this);
+      return;
+    }
     if (this.mobileControls?.active) {
       this.hud.toast('Stick sinistro: muoviti · stick destro: mira e spara', 5);
       this.hud.toast('L\'icona luminosa mostra l\'azione disponibile', 6.5);
@@ -414,6 +420,7 @@ class Game {
     this.shops.reset();
     this.actors.reset();
     this.missions.reset(this);
+    this.kkachi.reset();
     this.markers.length = 0;
     this.dayCycle.reset();
     this.radio.off(this);
@@ -572,6 +579,10 @@ class Game {
     this.stats.stolen++;
     v.protect = true;
     this.hud.toast(`${VEHICLE_TYPES[v.kind].label} acquisita`, 1.8);
+    // Salire su un mezzo è un fatto anche quando era parcheggiato: M1, Kkachi e
+    // le righe di servizio ascoltano il motore, non il reato. La denuncia invece
+    // resta limitata a chi è stato tirato giù dal sedile.
+    this.emit('enterVehicle', v);
     // Rubare un'auto vuota in un vicolo non lo denuncia nessuno; strapparla dalle
     // mani di qualcuno sotto gli occhi di un testimone sì, e a una pattuglia ancora di più.
     if (!v.occupiedTheft) return;
@@ -580,7 +591,6 @@ class Game {
     else if (this.pedGrid.queryCircle(v.x, v.y, 320).some((p) => !p.dead)) {
       this.wanted.report('theft', this);
     }
-    this.emit('enterVehicle', v);
   }
 
   onExitVehicle(v) {
@@ -854,8 +864,10 @@ class Game {
     // scritti dalla battuta prima resterebbero appesi.
     if (this.dialogue.active) {
       this.dialogue.update(dt, this);
+      this.updateRadioKeys();
       this.audio.update(dt, this);
       this.radio.update(dt, this);
+      this.kkachi.update(dt, this);
       this.hud.update(dt);
       input.endFrame();
       return;
@@ -889,6 +901,7 @@ class Game {
     // stacco netto suona come un guasto) e i suoni dei menu restano a volume pieno.
     this.audio.update(dt, this);
     this.radio.update(dt, this);
+    this.kkachi.update(dt, this);
     const cursor = this.mode.cursor;
     if (this.canvas.style.cursor !== cursor) this.canvas.style.cursor = cursor;
 

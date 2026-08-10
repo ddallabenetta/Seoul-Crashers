@@ -5,6 +5,7 @@ import { clamp } from '../core/math.js';
 import { VEHICLE_TYPES } from '../render/sprites.js';
 import { roundPath } from './hud.js';
 import { uiLayout, ellipsisText } from './layout.js';
+import { MissionRoute } from '../core/navigation.js';
 
 export class MapView {
   constructor(city, texture) {
@@ -16,6 +17,7 @@ export class MapView {
     this.panY = 0;
     this.dragging = false;
     this.lastMouse = { x: 0, y: 0 };
+    this.route = new MissionRoute(city);
   }
 
   toggle() {
@@ -126,17 +128,17 @@ export class MapView {
       const a = toScreen(t.x, t.y);
       const b = toScreen(t.x + t.w, t.y + t.h);
       ctx.save();
-      ctx.globalAlpha = 0.55;
-      ctx.strokeStyle = t.color;
+      ctx.globalAlpha = t.owner === 'player' ? 0.82 : 0.55;
+      ctx.strokeStyle = t.owner === 'player' ? '#ffd23f' : t.color;
       ctx.lineWidth = 2;
       ctx.setLineDash([6, 4]);
       ctx.strokeRect(a.x, a.y, Math.max(5, b.x - a.x), Math.max(5, b.y - a.y));
       ctx.setLineDash([]);
       ctx.globalAlpha = 0.9;
-      ctx.fillStyle = t.color;
+      ctx.fillStyle = t.owner === 'player' ? '#ffd23f' : t.color;
       ctx.font = `700 ${Math.max(8, 10 * Math.min(2, zoom))}px system-ui, "Apple SD Gothic Neo", sans-serif`;
       ctx.textAlign = 'center';
-      ctx.fillText(t.hangul, (a.x + b.x) / 2, a.y - 3);
+      ctx.fillText(`${t.hangul}${t.owner === 'player' ? ' · TUO' : ''}`, (a.x + b.x) / 2, a.y - 3);
       ctx.restore();
     }
 
@@ -234,16 +236,61 @@ export class MapView {
       }
     }
 
+    // Percorso dell'obiettivo principale. Sulla carta completa resta più tenue
+    // che sulla minimappa: qui contano soprattutto tutte le mete note.
+    const route = this.route.get(game);
+    if (route?.length > 1) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,210,63,0.58)';
+      ctx.lineWidth = Math.max(2, 3 * Math.min(1.7, zoom));
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      route.forEach((p2, i) => {
+        const s2 = toScreen(p2.x, p2.y);
+        if (i) ctx.lineTo(s2.x, s2.y); else ctx.moveTo(s2.x, s2.y);
+      });
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Tutte le mete note della fase compaiono sulla carta, senza trasformarsi
+    // in altrettanti blip sulla minimappa.
+    for (const point of game.missions?.mapPoints || []) {
+      const s2 = toScreen(point.x, point.y);
+      ctx.save();
+      ctx.translate(s2.x, s2.y);
+      ctx.rotate(Math.PI / 4);
+      ctx.fillStyle = point.color || '#ffd23f';
+      ctx.fillRect(-5, -5, 10, 10);
+      ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+      ctx.lineWidth = 1.4;
+      ctx.strokeRect(-5, -5, 10, 10);
+      ctx.restore();
+      if (point.label) {
+        ctx.fillStyle = 'rgba(245,247,250,0.9)';
+        ctx.font = '700 9px system-ui, "Apple SD Gothic Neo", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(point.label, s2.x, s2.y + 17);
+      }
+    }
+
     // Marker attivi (missioni, negozi)
     for (const mk of game.markers || []) {
       const s = toScreen(mk.x, mk.y);
       ctx.fillStyle = mk.color || '#ffd23f';
       ctx.beginPath();
-      ctx.arc(s.x, s.y, 5, 0, 6.2832);
+      ctx.arc(s.x, s.y, mk.mission ? 7 : 5, 0, 6.2832);
       ctx.fill();
       ctx.strokeStyle = 'rgba(0,0,0,0.6)';
-      ctx.lineWidth = 1.2;
+      ctx.lineWidth = mk.mission ? 2 : 1.2;
       ctx.stroke();
+      if (mk.label) {
+        ctx.fillStyle = 'rgba(250,250,252,0.95)';
+        ctx.font = '700 10px system-ui, "Apple SD Gothic Neo", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(mk.label, s.x, s.y - 12);
+      }
     }
 
     // Polizia in caccia

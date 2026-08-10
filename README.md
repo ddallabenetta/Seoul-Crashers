@@ -84,16 +84,15 @@ mattina dopo, con l'asfalto ancora bagnato e l'auto di tuo padre parcheggiata l�
 
 ## Le missioni
 
-Da lì parte la storia, e comincia **appena accendi il motore**. C'è **un obiettivo alla volta**,
-con un puntino sulla minimappa e sulla mappa, e una riga sotto l'orologio che dice cosa stai
-facendo: nessun elenco di commissioni sparse per la città. Quando serve interagire — riscuotere,
-raccogliere, leggere un cartello — il suggerimento compare in basso come per le porte dei negozi.
+Da lì parte la storia, e comincia **appena accendi il motore**. C'è **un obiettivo attivo alla
+volta**, con un puntino e la strada da seguire sulla minimappa; la carta completa mostra anche
+le altre mete già note della fase. Una riga sotto l'orologio dice cosa stai facendo. Quando
+serve interagire — riscuotere, raccogliere, leggere un cartello — il suggerimento compare in
+basso come per le porte dei negozi.
 
-**Le prime due ci sono.** In *«Il cappotto di un altro»* si gira Hongdae e Myeongdong per
-riscuotere il pizzo di martedì in tre posti: al terzo trovi una serranda con sopra un sigillo, e
-quella serranda resta abbassata per tutto il resto della partita. In *«Quello che resta in
-pegno»* si va a piedi, per vicoli e scalinate, a recuperare tre pegni scaduti per una signora di
-settantotto anni che tiene un banco dei pegni e ha il registro del quartiere in testa.
+**Tutte e dodici ci sono.** Dai tre incassi e dai pegni di Hongdae la storia passa per il porto,
+i cortili delle bande, gli archivi di Gangnam, la Gyeongbu, Busan e Jeju, fino all'assedio del
+quartiere e a tre finali. Gli obiettivi facoltativi non hanno un blip: bisogna trovarli.
 
 I dialoghi **non ti tolgono la scena**: il mondo si ferma, la città resta lì sotto e si avanza a
 `Spazio`. Le tavole a fumetto arrivano solo in apertura e in chiusura. **Se muori o ti arrestano
@@ -227,9 +226,8 @@ venduto a un consorzio immobiliare che sta ripulendo i quartieri vecchi con la s
 riqualificazione: prima gli sgomberi, poi le gru, poi le torri di vetro di Gangnam.
 
 Tre atti, dodici missioni, sette zone: dai vicoli di Hongdae fino ai piani alti dove
-il crimine indossa un completo. (Missioni e cutscene a fumetti sono l'ultimo pezzo che manca —
-vedi *Stato* più sotto. Le bande però ci sono già, e con loro si può trattare: basta entrare
-nel loro cortile a mani vuote.)
+il crimine indossa un completo. La campagna è giocabile dall'apertura ai tre finali; le bande
+controllano cortili che possono cambiare padrone e restano tuoi anche dopo un caricamento.
 
 Il copione della campagna — le dodici missioni, la cutscene iniziale, i finali — è scritto per
 intero in [`docs/storia/`](docs/storia/). **Non apritelo se volete giocarci:** è pieno di
@@ -403,7 +401,13 @@ Alcune scelte tecniche che spiegano il risultato a schermo:
   (KBS, MBC, SBS) trasmettono in HLS con un token e restano fuori; la tua stazione preferita
   la puoi fissare tu, in `localStorage` sotto `seoul.radio.stations`.
 
+- **E 91.45 non viene dalla rete.** È Kkachi: 24 chiamate facoltative che reagiscono a luogo,
+  ora, meteo e storia. Cambiare stazione a metà le conta fra quelle perse.
+
 ## Stato
+
+**Campagna, tappe C-H — completate.** Cortili persistenti, Kkachi, Atto I-III, raccordi,
+tre finali, titoli e scena dopo. Mappa degli obiettivi e percorso stradale sulla minimappa.
 
 **Campagna, tappa B — completata.** Le prime due missioni, giocabili dall'inizio alla fine, e
 l'impianto che le regge: un obiettivo alla volta, fasi che si riprendono dopo una morte,
@@ -500,4 +504,7 @@ alle sette e poi rincasa, capannelli di gente che parla, rapine con la volante c
 mentre sono ancora dentro e guerre fra bande nei cortili. Un modulo solo e nessuna entità
 nuova — un pilota è un veicolo, un rapinatore è un pedone.
 
-**Fase 3, il resto — da fare.** Le 12 missioni con cutscene a fumetti e le attività secondarie.
+**Fase 3, campagna — completata.** Dodici missioni in tre atti, quattro raccordi, 24 chiamate
+facoltative su 91.45, tre finali e una scena dopo i titoli. Sulla carta compaiono tutte le mete
+note della fase; la minimappa traccia la strada fino all'obiettivo principale. Restano le
+attività secondarie e le voci di rifinitura elencate nel backlog.

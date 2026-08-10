@@ -112,14 +112,14 @@ progetto (§7), e **si consegna una per volta**.
 
 | Tappa | Cosa contiene | Si prova così |
 | --- | --- | --- |
-| **A** | primitive dei pannelli + **la cutscene iniziale** (28 pannelli, saltabile) | si avvia il gioco e si guarda |
-| **B** | impianto missioni: blip singolo, fasi, ripresa dall'ultima fase + **M1 e M2** | due missioni intere, una in strada e una in un interno |
-| **C** | **cortili persistenti** (nel salvataggio, con effetto sul commercio) | si prende un cortile, si esce, si ricarica, è ancora tuo |
-| **D** | Kkachi: stazione `91.45`, tabella con predicato, le otto chiamate dell'Atto I e le dodici righe di servizio | si gira per Seoul con la radio accesa |
-| **E** | Atto I completo (M3, M4) + R1 | il primo ribaltamento in mano al giocatore |
-| **F** | Atto II (M5-M8) + R2, R3 + le otto chiamate dell'Atto II | l'atto che chiede più cose nuove al motore |
-| **G** | Atto III (M9-M12) + R4 + le otto chiamate dell'Atto III e l'incontro facoltativo di Busan | il viaggio: ha bisogno di tutto quello di prima |
-| **H** | i tre finali, i titoli di coda, la scena dopo | e a quel punto la Fase 3 è chiusa |
+| ~~**A**~~ | ~~primitive dei pannelli + cutscene iniziale~~ — fatta | avvio e cutscene |
+| ~~**B**~~ | ~~impianto missioni + M1 e M2~~ — fatta | scena `missioni-run` |
+| ~~**C**~~ | ~~cortili persistenti~~ — fatta | snapshot/restore e commercio |
+| ~~**D**~~ | ~~Kkachi 91.45, 24 chiamate e servizio~~ — fatta | radio in auto |
+| ~~**E**~~ | ~~Atto I (M3, M4) + R1~~ — fatta | catena missioni |
+| ~~**F**~~ | ~~Atto II (M5-M8) + R2 e R3~~ — fatta | catena missioni |
+| ~~**G**~~ | ~~Atto III (M9-M12), R4 e Busan~~ — fatta | viaggio e terminal |
+| ~~**H**~~ | ~~finali, titoli e scena dopo~~ — fatta | tre rami finali |
 
 **Cambia una cosa rispetto alla prima stesura:** i cortili persistenti salgono in tappa C,
 prima delle missioni che li usano, per la ragione scritta al punto 7.
@@ -128,4 +128,4 @@ prima delle missioni che li usano, per la ragione scritta al punto 7.
 agganciato alla **B**, perché si accumula per tutta la partita e alla H sarebbe tardi. Costa un
 intero nel salvataggio e nient'altro.
 
-**Si comincia dalla A.**
+**Le otto tappe sono concluse (§5.30).**

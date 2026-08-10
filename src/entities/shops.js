@@ -137,6 +137,14 @@ const SMUGGLE = 1.18;      // 흑사파: quello che nei negozi non c'è si paga
 const CHOP = 1.42;         // 철마파: quanto più del 전당포 vale un mezzo rubato
 const FENCE_BONUS = 0.14;  // 황소파: quanti punti sopra la ricompra del quartiere
 const FENCE_CAP = 0.56;
+const OWNED_BUY = 0.85;       // il banco nel tuo cortile non applica il margine della banda
+const OWNED_FENCE_CAP = 0.58; // resta sotto l'arma nuova più economica (0.598 del listino)
+const OWNED_CAR_BONUS = 1.08;
+
+/** Chiave deterministica: i cortili non hanno bisogno di un id salvato nella città. */
+export function turfKey(turf) {
+  return `${turf.gang}:${Math.round(turf.cx)}:${Math.round(turf.cy)}`;
+}
 
 /**
  * Il mercato con cui tratta una banda. È il mercato del distretto con una sola
@@ -355,6 +363,23 @@ export function stockFor(bizId, game) {
  */
 export function gangStock(turf, game) {
   const m = gangMarket(turf.gang, marketOf(turf.district));
+  const owned = !!game.shops?.ownsTurf(turf);
+  const finish = (list) => {
+    if (!owned) return list;
+    for (const item of list) {
+      if (item.price > 0) {
+        item.price = roundPrice(item.price * OWNED_BUY);
+        item.mul = (item.mul || 1) * OWNED_BUY;
+      } else if (item.price < 0) {
+        const ownedPawn = Math.min(OWNED_FENCE_CAP, m.pawn + 0.02);
+        item.price = -roundPrice(Math.abs(item.price) * ownedPawn / Math.max(0.01, m.pawn));
+        item.mul = ownedPawn / MARKET_BASE.pawn;
+      }
+      const detail = item.detail;
+      item.detail = (g) => `cortile tuo · ${detail ? detail(g) : 'prezzo interno'}`;
+    }
+    return list;
+  };
   switch (turf.gang) {
     case 'baekho': {
       // Sono la fonte, quindi hanno anche quello che un 총포상 non tiene in
@@ -366,7 +391,7 @@ export function gangStock(turf, game) {
         ammoItem('sniper', m), ammoItem('minigun', m),
       ];
       for (const it of list) bagged(it);
-      return list;
+      return finish(list);
     }
     case 'heuksa': {
       const list = [
@@ -375,7 +400,7 @@ export function gangStock(turf, game) {
         healItem('kit', 'kit di pronto soccorso', '구급상자', 26000, 100, m),
       ];
       for (const it of list) bagged(it);
-      return list;
+      return finish(list);
     }
     case 'hwangso': {
       const pct = Math.round(m.pawn * 100);
@@ -399,7 +424,7 @@ export function gangStock(turf, game) {
           },
         });
       }
-      return list;
+      return finish(list);
     }
     default:
       return [];
@@ -443,6 +468,7 @@ export class ShopSystem {
     this.robbed = 0;
     this.spent = 0;
     this.sold = 0;
+    this.ownedTurfs = new Set();
     // Allarme silenzioso: chi ha visto la rapina, e quanto manca alla telefonata.
     this.alarmT = 0;
     this.alarmCaller = null;
@@ -472,6 +498,8 @@ export class ShopSystem {
     this.robbed = 0;
     this.spent = 0;
     this.sold = 0;
+    this.ownedTurfs.clear();
+    for (const turf of this.city.turfs || []) turf.owner = null;
     this.alarmT = 0;
     this.alarmCaller = null;
     this.near = null;
@@ -582,6 +610,7 @@ export class ShopSystem {
       sold: this.sold,
       sealed: Object.fromEntries(this.sealed),
       held: [...this.held],
+      ownedTurfs: [...this.ownedTurfs],
       interiors,
     };
   }
@@ -597,6 +626,10 @@ export class ShopSystem {
     // riaprirebbe al primo caricamento.
     this.sealed = new Map(Object.entries(d.sealed || {}).map(([k, v]) => [Number(k), v]));
     this.held = new Set((d.held || []).map(Number));
+    this.ownedTurfs = new Set(d.ownedTurfs || []);
+    for (const turf of this.city.turfs || []) {
+      turf.owner = this.ownedTurfs.has(turfKey(turf)) ? 'player' : null;
+    }
     // Le piante già in cache sono quelle della partita che si sta abbandonando:
     // vanno buttate, o la cassa svuotata di *prima* si sovrapporrebbe a quella
     // del salvataggio.
@@ -1057,6 +1090,10 @@ export class ShopSystem {
       }
     }
 
+    // Agganci narrativi facoltativi. Il negozio offre soltanto il punto di
+    // estensione: chi parla, quando e perché resta sotto `story/`.
+    for (const provide of game.storyShopActions || []) provide(this, f, game);
+
     for (const a of this.actions) {
       if (game.input.wasPressed(`Key${a.key}`) && pl.enterCooldown <= 0) {
         pl.enterCooldown = 0.35;
@@ -1210,7 +1247,9 @@ export class ShopSystem {
    */
   sellVehicle(v, place, game, gang = null) {
     const m = marketOf(place.district);
-    const price = this.vehiclePrice(v, gang ? gangMarket(gang, m) : m);
+    let gm = gang ? gangMarket(gang, m) : m;
+    if (gang === 'cheolma' && this.ownsTurf(place)) gm = { ...gm, cars: gm.cars * OWNED_CAR_BONUS };
+    const price = this.vehiclePrice(v, gm);
     game.player.money += price;
     this.sold++;
     game.stats.soldCars = (game.stats.soldCars || 0) + 1;
@@ -1243,6 +1282,29 @@ export class ShopSystem {
     return canDeal(turf, turf.dealer) ? turf.dealer : null;
   }
 
+  ownsTurf(turf) {
+    return !!turf && this.ownedTurfs.has(turfKey(turf));
+  }
+
+  claimTurf(turf, game) {
+    if (!turf) return false;
+    const key = turfKey(turf);
+    if (this.ownedTurfs.has(key)) return false;
+    this.ownedTurfs.add(key);
+    turf.owner = 'player';
+    game?.emit?.('turfClaimed', turf);
+    game?.hud?.toast(`${turf.hangul} · cortile conquistato`, 3.4);
+    game?.audio?.ui('ok');
+    return true;
+  }
+
+  releaseTurf(turf, game) {
+    if (!turf || !this.ownedTurfs.delete(turfKey(turf))) return false;
+    turf.owner = null;
+    game?.emit?.('turfLost', turf);
+    return true;
+  }
+
 
   /**
    * Trattare con una banda. **Solo a mani vuote e senza stelle**: è la stessa
@@ -1273,7 +1335,8 @@ export class ShopSystem {
     if (turf.gang === 'cheolma') {
       const { v, cop } = this.vehicleAtDoor(dealer, game);
       if (v) {
-        const price = this.vehiclePrice(v, gangMarket('cheolma', marketOf(turf.district)));
+        const m = gangMarket('cheolma', marketOf(turf.district));
+        const price = this.vehiclePrice(v, this.ownsTurf(turf) ? { ...m, cars: m.cars * OWNED_CAR_BONUS } : m);
         this.actions.push({
           key: 'F',
           text: `${turf.hangul} — vendi ${VEHICLE_TYPES[v.kind].label} · ${won(price)}`,
@@ -1295,7 +1358,7 @@ export class ShopSystem {
     this.near = turf;
     this.actions.push({
       key: 'E',
-      text: `${turf.hangul} — ${turf.trade}`,
+      text: `${turf.hangul} — ${this.ownsTurf(turf) ? 'cortile tuo · ' : ''}${turf.trade}`,
       run: () => game.shopMenu.showStock(gangCounter(turf), () => gangStock(turf, game), game),
     });
   }

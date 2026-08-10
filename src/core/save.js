@@ -56,7 +56,7 @@ export const AUTO_GENS = 3;
  * lì non c'è niente da migrare, perché una Seoul diversa rende le coordinate
  * salvate prive di significato e il giocatore rinascerebbe dentro un palazzo.
  */
-const VERSION = 3;
+const VERSION = 5;
 const SEED = 20260730;
 
 /**
@@ -90,6 +90,19 @@ const MIGRATIONS = {
   // niente missione in corso, nessun pannello visto, nessun fatto acquisito.
   2: (d) => {
     d.story = { active: null, phase: 0, state: {}, done: [], seen: [], flags: [] };
+    return d;
+  },
+  // 3 -> 4: i cortili conquistati sono parte del commercio e vivono insieme ai
+  // negozi. Una partita vecchia non ne possedeva nessuno.
+  3: (d) => {
+    d.shops = d.shops || {};
+    d.shops.ownedTurfs = d.shops.ownedTurfs || [];
+    return d;
+  },
+  // 4 -> 5: chiamate ascoltate e perse sulla frequenza 91.45. Non sono flag di
+  // missione: venti chiamate sono una condizione del finale nascosto.
+  4: (d) => {
+    d.kkachi = { heard: [], missed: [], usedMetro: false };
     return d;
   },
 };
@@ -180,6 +193,7 @@ export function snapshot(game) {
     // **non è qui**: è `stats.deaths`, che il salvataggio porta da sempre e che è
     // già lo stesso numero — averne due sarebbe averne uno sbagliato.
     story: game.missions.snapshot(),
+    kkachi: game.kkachi?.snapshot() || { heard: [], missed: [], usedMetro: false },
   };
 }
 
@@ -228,6 +242,7 @@ export function apply(game, data) {
   game.dayCycle.restore(data.clock);
   game.wanted.restore(data.wanted);
   game.shops.restore(data.shops);
+  game.kkachi?.restore(data.kkachi);
   // **Prima degli attori.** Rientrare in una fase vuol dire rieseguire il suo
   // `prepare`, che è il posto in cui i personaggi di quella missione vengono
   // *definiti*: al contrario, `actors.restore` scriverebbe le morti su definizioni
