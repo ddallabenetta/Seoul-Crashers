@@ -1,0 +1,389 @@
+// M3, M4 e il raccordo R1 giocati davvero (§5.33), e con loro le due meccaniche
+// nuove: il **pedinamento** e l'**oggetto trasportabile**.
+//
+// Come `missioni-run.scene`, non misura: **asserisce**. Ogni voce `false` è un
+// difetto, e le voci sono scelte perché ognuna corrisponde a un modo in cui questa
+// tappa può marcire in silenzio — un'auto della storia che non arriva mai, un
+// pedinamento che non fallisce quando dovrebbe, dei fogli che si perdono per
+// sempre, un appuntamento notturno che si può aspettare solo guardando l'orologio.
+//
+//   node .claude/tools/probe.mjs --seconds 1 --quiet \
+//     --script .claude/tools/scenes/atto-1.scene \
+//     --eval "Object.entries(window.__OUT).filter(([k,v]) => v===false).map(([k])=>k)"
+//
+// `[]` vuol dire tutto a posto; `window.__LOG` è la fila delle fasi attraversate.
+//
+// Cinque asserzioni non si interpretano, sono invarianti:
+//   · `unBlipSolo` — i marcatori a schermo non passano mai da uno
+//   · `corriereArriva` — un'auto mandata dalla storia raggiunge la sua meta
+//   · `pedinamentoSiPerde` — chi resta indietro perde davvero il contatto
+//   · `fogliRestanoDoveSeiCaduto` — morire con la prova in mano la lascia lì, e
+//     non la cancella
+//   · `fogliTornanoDalSalvataggio` — quello che hai in mano sta nel salvataggio
+const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
+const S = await import('/src/core/save.js');
+const MOD3 = await import('/src/story/m3.js');
+const MOD4 = await import('/src/story/m4.js');
+const out = {};
+const log = [];
+const M = game.missions;
+const pl = game.player;
+
+const fase = () => `${M.active}/${M.phaseDef && M.phaseDef.id}`;
+const nota = (k) => log.push(`${k} → ${fase()} · ${game.dayCycle.hour.toFixed(2)}h`);
+const blip = () => game.markers.find((m) => m.id === 'mission');
+
+let maxBlip = 0;
+const contaBlip = () => { maxBlip = Math.max(maxBlip, game.markers.length); };
+
+function teleport(x, y) {
+  if (game.shops.active) game.shops.leave(game);
+  pl.x = x;
+  pl.y = y;
+  pl.onFoot = !pl.vehicle;
+  if (pl.vehicle) { pl.vehicle.x = x; pl.vehicle.y = y; pl.vehicle.speed = 0; }
+  pl.enterCooldown = 0;
+  game.camera.snapTo(x, y);
+}
+
+async function alBlip(off = 0) {
+  const b = blip();
+  if (!b) return false;
+  teleport(b.x + off, b.y);
+  await wait(0.3);
+  return true;
+}
+
+function vetrinaSulBlip() {
+  const b = blip();
+  if (!b) return null;
+  let best = null;
+  let bd = 1e9;
+  for (const s of game.city.shops) {
+    const d = Math.hypot(s.x - b.x, s.y - b.y);
+    if (d < bd) { bd = d; best = s; }
+  }
+  return bd < 6 ? best : null;
+}
+
+async function entraSulBlip() {
+  const s = vetrinaSulBlip();
+  if (!s) return false;
+  if (game.shops.active) game.shops.leave(game);
+  teleport(s.x + s.nx * 18, s.y + s.ny * 18);
+  const ok = game.shops.enter(s, game);
+  await wait(0.3);
+  return ok;
+}
+
+function salaSuUnAutoVuota() {
+  if (pl.vehicle) pl.exitVehicle(game, true);
+  const v = game.vehicles
+    .filter((q) => !q.driver && !q.dead && !q.moored)
+    .sort((a, b) => Math.hypot(a.x - pl.x, a.y - pl.y) - Math.hypot(b.x - pl.x, b.y - pl.y))[0];
+  if (!v) return false;
+  pl.enterVehicle(v, game);
+  return true;
+}
+
+const puntiQui = () => M.points.filter((p) => M.pointHere(p, game));
+
+async function chiudiDialogo() {
+  let g = 0;
+  while (game.dialogue.active && g++ < 60) { game.dialogue.finish(game); await wait(0.06); }
+  await wait(0.2);
+}
+
+async function usaPunto(id = null) {
+  contaBlip();
+  const p = id ? M.points.find((q) => q.id === id) : puntiQui()[0];
+  if (!p) return false;
+  // Un punto che vuole i piedi per terra li vuole davvero: l'HUD non lo mostra a
+  // chi è seduto in macchina, ed è quello che qui si sta provando.
+  if (p.onFoot !== false && pl.vehicle) pl.exitVehicle(game, true);
+  teleport(p.x, p.y);
+  await wait(0.2);
+  const visto = M.actions.some((a) => a.id === p.id);
+  p.run(M.context(game));
+  await chiudiDialogo();
+  return visto;
+}
+
+async function saltaPannelli() {
+  if (!game.cutscene.active) return false;
+  game.cutscene.skip(game);
+  let g = 0;
+  while (game.cutscene.active && g++ < 40) await wait(0.1);
+  await wait(0.15);
+  return true;
+}
+
+/** Aspetta che la fase cambi, fino a `secondi`. Ritorna la fase raggiunta. */
+async function finoA(atteso, secondi = 8) {
+  const t0 = Date.now();
+  while (fase() !== atteso && Date.now() - t0 < secondi * 1000) {
+    if (game.dialogue.active) await chiudiDialogo();
+    await wait(0.15);
+  }
+  if (game.dialogue.active) await chiudiDialogo();
+  return fase();
+}
+
+// ---- 1. M3: l'appuntamento delle quattro ---------------------------------------
+game.newGame();
+// La manopola della radio va messa in alto **prima** di tutto: la fase del
+// pedinamento può partire da sé nel frame in cui comincia, e alzarla dopo
+// vorrebbe dire misurare la propria mano invece della scena.
+game.audio.setVolume('radio', 0.7);
+const volumePrima = game.audio.mix.radio;
+M.done.add('m1');
+M.done.add('m2');
+M.start('m3', game);
+nota('start m3');
+out.m3Parte = fase() === 'm3/innesco';
+
+out.m3SaleInAuto = salaSuUnAutoVuota();
+await wait(0.2);
+out.m3VaAllIncrocio = fase() === 'm3/incrocio' && !!blip();
+
+// L'incrocio del 편의점: ci si arriva guidando, qui ci si teletrasporta.
+out.m3ArrivaAllIncrocio = await alBlip();
+out.m3ChiedeLOra = (await finoA('m3/ora', 3)) === 'm3/ora';
+nota('all\'incrocio');
+
+// **L'appuntamento si può aspettare.** Sono le otto e mezza del mattino: senza
+// `ctx.waitUntil` questa missione chiederebbe diciannove minuti veri di attesa.
+game.dayCycle.hour = 15;
+await wait(0.3);
+const oraPrima = game.dayCycle.hour;
+out.m3PuntoDiAttesa = !!M.points.find((p) => p.id === 'aspetta');
+await usaPunto('aspetta');
+await wait(0.3);
+out.m3AspettaLOra = game.dayCycle.hour < 4 && game.dayCycle.hour >= 3 && oraPrima > 12;
+out.m3Piove = game.dayCycle.rain > 0.2;
+out.m3Apertura = await saltaPannelli();
+nota('apertura M3');
+out.m3Attesa = fase() === 'm3/attesa';
+
+// Le quattro: arriva il furgone del 백호파.
+game.dayCycle.hour = 3.99;
+out.m3ScattaAlleQuattro = (await finoA('m3/consegna', 6)) === 'm3/consegna';
+nota('le quattro');
+// **L'auto della storia guida davvero**: ha un itinerario di nodi, non una linea
+// retta, ed è la cosa nuova che il traffico ha imparato in questa tappa.
+await wait(0.6);
+const furgone = MOD3.M3._furgone;
+out.corriereHaUnItinerario = !!(furgone && furgone.ai && furgone.ai.plan && furgone.ai.plan.length > 1);
+out.corriereGuidato = !!(furgone && furgone.driver === 'ai' && furgone.ai.scripted);
+// Lo si porta a destinazione a mano: farlo guidare per davvero costa un minuto
+// di orologio vero, e quello che si sta provando è che *arrivi*, non che sappia
+// svoltare (quello lo prova `traffic-census`).
+if (furgone) { furgone.x = blip().x + 20; furgone.y = blip().y + 20; furgone.ai.arrived = true; }
+out.corriereArriva = (await finoA('m3/ritiro', 8)) === 'm3/ritiro';
+nota('consegna fatta');
+
+const berlina0 = MOD3.M3._berlina;
+if (berlina0) { berlina0.x = blip().x + 20; berlina0.y = blip().y - 20; berlina0.ai.arrived = true; }
+game.dayCycle.hour = 4.2;
+out.ritiroFatto = (await finoA('m3/pedinamento', 10)) === 'm3/pedinamento';
+nota('ritiro fatto');
+
+// ---- 2. Il pedinamento ---------------------------------------------------------
+let persi = 0;
+let scoperti = 0;
+game.on('tailLost', () => { persi++; });
+game.on('tailSpotted', () => { scoperti++; });
+await alBlip(120);
+await wait(0.8);
+out.pedinamentoParte = game.tail.active;
+out.pedinamentoHaUnaMeta = !!(MOD3.M3._berlina && MOD3.M3._berlina.ai.arrive);
+// «Abbassa.» E la manopola scende davvero — quella vera, non un effetto.
+out.volumeAbbassato = game.audio.mix.radio <= 0.12 && volumePrima > 0.5;
+out.volumeDopo = game.audio.mix.radio;
+
+// Si resta indietro: dopo `LOSE_TIME` secondi fuori portata, la si perde.
+const berlina = MOD3.M3._berlina;
+if (berlina) { berlina.x += 4000; berlina.y += 1200; }
+let g = 0;
+while (!persi && g++ < 90) await wait(0.15);
+out.pedinamentoSiPerde = persi >= 1;
+out.pedinamentoRipartelaFase = fase() === 'm3/pedinamento';
+nota('pedinamento perso');
+
+// E si ricomincia: la berlina ripassa all'incrocio.
+await alBlip(120);
+await wait(1);
+out.pedinamentoRiparte = game.tail.active;
+// Troppo vicino: il serbatoio dell'«ti ha visto» si riempie e la scena salta.
+const b2 = MOD3.M3._berlina;
+if (b2) { teleport(b2.x + 20, b2.y + 20); }
+g = 0;
+while (!scoperti && g++ < 90) {
+  const v = MOD3.M3._berlina;
+  if (v) teleport(v.x + 20, v.y + 20);
+  await wait(0.12);
+}
+out.pedinamentoTiVede = scoperti >= 1;
+nota('pedinamento scoperto');
+
+// Terzo giro, e questa volta arriva: la berlina si mette dov'è diretta.
+await alBlip(120);
+await wait(1);
+const b3 = MOD3.M3._berlina;
+if (b3 && b3.ai.arrive) {
+  b3.x = b3.ai.arrive.x;
+  b3.y = b3.ai.arrive.y;
+  b3.ai.arrived = true;
+  teleport(b3.x + 200, b3.y + 200);
+}
+out.pedinamentoArriva = (await finoA('m3/torre', 10)) === 'm3/torre';
+nota('alla torre');
+
+out.torreScena = await usaPunto('rampa');
+out.m3Chiusura = await saltaPannelli();
+nota('chiusura M3');
+out.m3Completata = M.isDone('m3');
+out.bustaAcquisita = M.flag('busta');
+// La riga di Kkachi scritta nella tappa D con il predicato già definitivo: da
+// adesso è vera, e questa è l'unica prova che quel predicato non era un desiderio.
+{
+  const K = await import('/src/story/kkachi.js');
+  const riga = K.CHIAMATE.find((c) => c.id === 'a1-itaewon');
+  out.kkachiItaewonSiAvvera = !!riga && game.missions.isDone('m3');
+}
+
+// ---- 3. M4: i fogli, e cosa succede se muori mentre li porti --------------------
+out.m4ParteDaSola = fase() === 'm4/chiamata';
+await chiudiDialogo();
+out.m4VaAlPorto = (await finoA('m4/porto', 4)) === 'm4/porto' && !!blip();
+nota('verso il porto');
+game.dayCycle.hour = 23;
+await alBlip();
+out.m4Apertura = (await finoA('m4/registro', 6)) === 'm4/registro' || await saltaPannelli();
+await saltaPannelli();
+await wait(0.3);
+out.m4AllUfficio = fase() === 'm4/registro';
+out.m4OhSeJungCiSta = !!game.actors.get('sejung');
+out.m4PrendeIFogli = await usaPunto('fogli');
+out.fogliInMano = !!game.carry.item && game.carry.item.id === 'fogli';
+nota('fogli in mano');
+
+out.m4Agguato = fase() === 'm4/sparatoria';
+// A piedi: chi sta in macchina non è un bersaglio per un pedone ostile (è la
+// regola di `pedestrians.js`, non una scelta di questa missione), e l'agguato
+// nasce quando il giocatore è al molo — quindi lo si aspetta.
+if (pl.vehicle) pl.exitVehicle(game, true);
+{
+  let k = 0;
+  while (!(MOD4.M4._agguato || []).length && k++ < 40) await wait(0.15);
+}
+out.agguatoInScena = (MOD4.M4._agguato || []).filter((p) => p.hostile && p.armed).length >= 4;
+out.agguatoContati = (MOD4.M4._agguato || []).length;
+
+// **Il salvataggio si porta dietro quello che hai in mano.**
+{
+  const snap = S.snapshot(game);
+  out.fogliNelSalvataggio = !!snap.carry && !!snap.carry.item;
+  // Uno slot della tappa D (v5) non si butta: si migra, e chi lo ricarica non ha
+  // niente in mano — che è esattamente quello che aveva.
+  const vecchio = JSON.parse(JSON.stringify(snap));
+  delete vecchio.carry;
+  vecchio.v = 5;
+  try {
+    window.localStorage.setItem('seoul.save.0', JSON.stringify(vecchio));
+    const letto = S.readSlot(0);
+    out.slotV5SiMigra = !!letto && letto.v === 6 && letto.carry.item === null;
+    window.localStorage.removeItem('seoul.save.0');
+  } catch (e) {
+    out.slotV5SiMigra = `errore: ${e.message}`;
+  }
+  S.apply(game, JSON.parse(JSON.stringify(snap)));
+  await wait(0.4);
+  out.fogliTornanoDalSalvataggio = !!game.carry.item && game.carry.item.id === 'fogli';
+  out.ricaricaTornaNellaFase = fase() === 'm4/sparatoria';
+}
+nota('dopo il salvataggio');
+
+// Si muore con la prova in mano: resta per terra, e il blip ci va sopra.
+const dove = { x: pl.x, y: pl.y };
+pl.hp = 1;
+game.respawnPlayer();
+await wait(0.5);
+await saltaPannelli();
+await wait(0.3);
+out.fogliRestanoDoveSeiCaduto = !!game.carry.dropped && !game.carry.item
+  && Math.hypot(game.carry.dropped.x - dove.x, game.carry.dropped.y - dove.y) < 400;
+out.blipSuiFogli = !!blip() && !!game.carry.dropped
+  && Math.hypot(blip().x - game.carry.dropped.x, blip().y - game.carry.dropped.y) < 4;
+nota('fogli per terra');
+// Si torna a prenderli, e si riprendono da soli come una raccolta a terra.
+if (pl.vehicle) pl.exitVehicle(game, true);
+if (game.carry.dropped) teleport(game.carry.dropped.x, game.carry.dropped.y);
+await wait(0.8);
+out.fogliSiRiprendono = !!game.carry.item;
+
+// La sparatoria si chiude quando restano in piedi al più in uno, e Oh cade a metà.
+// L'agguato nasce quando il giocatore è al molo, non quando la fase comincia: si
+// aspetta che ci sia, poi si porta avanti il cronometro della fase a ogni giro
+// invece di stare sedici secondi veri a guardare.
+{
+  let k = 0;
+  while (fase() === 'm4/sparatoria' && !M.state.caduto && k++ < 80) {
+    M.state.t = 60;
+    await wait(0.1);
+  }
+}
+out.ohSeJungMuoreSenzaPannello = game.actors.isDead('sejung') && !game.cutscene.active;
+// Si stendono **quelli dell'agguato**, non «chi è ostile»: uno che ha smesso di
+// esserlo per un attimo (sei salito in macchina, ti sei allontanato) resta vivo
+// e la fase aspetta lui per due minuti.
+for (const p of MOD4.M4._agguato || []) p.dead = true;
+out.agguatoFinisce = (await finoA('m4/gru', 10)) === 'm4/gru';
+nota('agguato finito');
+
+// La gru: non ci si sale, si allarga la camera. È la manopola che c'è.
+out.gruSiSale = await usaPunto('gru');
+await wait(0.4);
+out.gruAllargaLaCamera = game.camera.targetZoom < 0.7;
+M.state.zoom = 0.05;
+out.gruFinisce = (await finoA('m4/barca', 8)) === 'm4/barca';
+// Tornata a chi guida: il blocco è caduto, il bersaglio torna del giocatore.
+out.cameraTornata = game.camera.zoomHold === 0;
+nota('alla gru');
+
+// La barca, e le tre stelle che mettono in acqua le motovedette.
+out.treStelle = game.wanted.level >= 3;
+{
+  const b = MOD4.M4._barca;
+  out.barcaTrovata = !!b;
+  if (b) {
+    teleport(b.x, b.y);
+    pl.enterVehicle(b, game);
+    await wait(0.3);
+  }
+  const foce = MOD4.M4._sites.foce;
+  if (foce) teleport(foce.x, foce.y);
+  await wait(0.6);
+}
+out.foceRaggiunta = (await finoA('m4/chiusura', 8)).startsWith('m4/');
+out.stelleCadute = game.wanted.level === 0;
+out.m4Chiusura = await saltaPannelli();
+nota('chiusura M4');
+out.m4Completata = M.isDone('m4');
+out.baraAcquisita = M.flag('bara');
+
+// ---- 4. R1: il raccordo -------------------------------------------------------
+out.r1Parte = fase() === 'r1/ritrovo' && !!blip();
+if (pl.vehicle) pl.exitVehicle(game, true);
+out.r1EntraAlBiliardo = await entraSulBlip();
+out.r1Pannelli = await saltaPannelli();
+nota('chiusura R1');
+out.r1Completato = M.isDone('r1');
+out.attoUnoChiuso = M.flag('atto1');
+out.fogliPosati = !game.carry.item && !game.carry.dropped;
+out.nessunaMissioneAppesa = M.active === null && game.markers.length === 0;
+
+out.unBlipSolo = maxBlip <= 1;
+window.__LOG = log;
+window.__OUT = out;
+return out;

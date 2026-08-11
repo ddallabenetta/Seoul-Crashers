@@ -49,8 +49,10 @@ lontano, senza un solo ricordo del quartiere — da appendere alle demolizioni q
 arrivato il momento di dare la colpa a qualcuno. Ha dato via un figlio e ne ha spedito un
 altro in America. Ha creduto di comprare dodici anni. Li ha comprati davvero.
 
-**Il tic:** una cicatrice sulla guancia **destra**. Nel ritratto del funerale sta a sinistra:
-la fotografia è specchiata, ed è il primo indizio del gioco (pannello 11 della cutscene).
+**Il tic:** una cicatrice sulla guancia **destra**. Nel ritratto del funerale sta dall'altra
+parte: la fotografia è specchiata, ed è il primo indizio del gioco (pannello 11 della cutscene).
+A schermo la stampa del funerale la porta **a destra di chi guarda** (§5.28), e la foto vera di
+M4 a sinistra: quello che conta è che le due non coincidano.
 
 ---
 

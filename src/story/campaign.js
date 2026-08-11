@@ -6,18 +6,26 @@
 // dei dodici capitoli — e l'unico da cambiare quando ne arriva uno nuovo.
 import { M1 } from './m1.js';
 import { M2 } from './m2.js';
+import { M3 } from './m3.js';
+import { M4 } from './m4.js';
+import { R1 } from './r1.js';
 import { attachHospital } from './hospital.js';
 import { attachKkachi } from './kkachi.js';
 
-const CAMPAGNA = [M1, M2];
+const CAMPAGNA = [M1, M2, M3, M4, R1];
 
 /**
- * Cosa parte quando finisce cosa. Le missioni di questo atto si susseguono
- * direttamente; dalla tappa E in poi ce ne saranno che aspettano un'ora, un posto
- * o una chiamata di Kkachi, e allora la voce diventerà un predicato invece di un
- * id. Finché sono due, un id è la verità.
+ * Cosa parte quando finisce cosa. **L'Atto I si susseguono tutte e cinque**, e
+ * l'ora di appuntamento non è un'eccezione a questa fila: M3 comincia quando
+ * finisce M2 e poi *aspetta le quattro* dentro di sé (`ctx.waitUntil`), che è la
+ * decisione 3 di `storia/08-domande-aperte.md` — il blip porta dove si aspetta,
+ * l'ora la dice il pannello.
+ *
+ * Il raccordo R1 sta in questa tabella come le missioni: è una missione con una
+ * fase sola e tre pannelli, e fare altrimenti vorrebbe dire un secondo impianto
+ * per quattro scene.
  */
-const DOPO = { m1: 'm2' };
+const DOPO = { m1: 'm2', m2: 'm3', m3: 'm4', m4: 'r1' };
 
 export function registerCampaign(game) {
   for (const m of CAMPAGNA) game.missions.register(m);

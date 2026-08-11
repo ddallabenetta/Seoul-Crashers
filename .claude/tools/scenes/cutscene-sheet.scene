@@ -13,7 +13,7 @@
 // Di suo mostra l'apertura; con una riga davanti mostra le tavole di una missione
 // o del 병원, che sono le altre sequenze che esistono:
 //
-//   echo 'window.__SCENA = "m2";' > /tmp/s.js   # intro · m1 · m2 · ospedale
+//   echo 'window.__SCENA = "m2";' > /tmp/s.js   # intro · m1 · m2 · m3 · m4 · r1 · ospedale
 const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
 const COLS = 5;
 const T = 1.4;      // il tempo dentro il pannello: pioggia e fruscii a regime
@@ -29,7 +29,8 @@ if (quale === 'intro') {
   seq = [...H.PRIMO, ...H.TERZO, ...H.DECIMO, ...H.DOPO_M12];
 } else {
   const M = await import(`/src/story/${quale}.js`);
-  seq = [...M.APERTURA, ...M.CHIUSURA];
+  // Un raccordo non ha un'apertura e una chiusura: ha tre pannelli e basta.
+  seq = M.PANNELLI || [...M.APERTURA, ...M.CHIUSURA];
 }
 await wait(0.15);
 game.loop.stop();

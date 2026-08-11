@@ -24,6 +24,9 @@ export class Camera {
     this.shake = 0;
     this.shakeX = 0;
     this.shakeY = 0;
+    // Secondi di **blocco** dello zoom: mentre corre, nessun altro può cambiare
+    // l'inquadratura (vedi `holdZoom`).
+    this.zoomHold = 0;
     this._t = 0;
   }
 
@@ -48,6 +51,7 @@ export class Camera {
     const ty = target.y + (target.vy || 0) * lead;
     this.x = damp(this.x, tx, 0.11, dt);
     this.y = damp(this.y, ty, 0.11, dt);
+    if (this.zoomHold > 0) this.zoomHold = Math.max(0, this.zoomHold - dt);
     this.zoom = damp(this.zoom, this.targetZoom, 0.22, dt);
 
     if (this.shake > 0.05) {
@@ -105,6 +109,25 @@ export class Camera {
   }
 
   setZoomTarget(z) {
+    // Chi guida e chi imbraccia un fucile riscrivono il bersaglio **a ogni
+    // frame** (`player.update`): senza questa riga una scena non può tenere
+    // un'inquadratura nemmeno per mezzo secondo.
+    if (this.zoomHold > 0) return;
     this.targetZoom = clamp(z, 0.45, 2.2);
+  }
+
+  /**
+   * Inquadratura decisa da una scena, per un po'. È la cima della gru di M4: da
+   * lassù si deve vedere quanto è grande il porto, e l'unico modo di farlo vedere
+   * senza una quota percorribile è allargare la camera e non lasciarla richiudere.
+   */
+  holdZoom(z, seconds) {
+    this.zoomHold = 0;
+    this.setZoomTarget(z);
+    this.zoomHold = Math.max(0, seconds);
+  }
+
+  releaseZoom() {
+    this.zoomHold = 0;
   }
 }

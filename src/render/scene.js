@@ -190,6 +190,13 @@ export class Scene {
         list.push({ t: 5, o: it, d: (it.x - ccx) ** 2 + (it.y - ccy) ** 2 });
       }
     }
+    // Quello che il giocatore si è lasciato dietro morendo (`core/carry.js`).
+    // Passa dalla stessa fila ordinata delle raccolte: per terra è un oggetto
+    // come gli altri, e deve sparire dietro un'auto che gli si ferma sopra.
+    const held = game.carry?.dropped;
+    if (held && held.x > view.x && held.x < view.x + view.w && held.y > view.y && held.y < view.y + view.h) {
+      list.push({ t: 6, o: held, d: (held.x - ccx) ** 2 + (held.y - ccy) ** 2 });
+    }
 
     list.sort((a, b) => b.d - a.d);
 
@@ -201,6 +208,7 @@ export class Scene {
         case 3: this.drawPed(ctx, item.o, cam, game); break;
         case 4: this.drawPlayer(ctx, game.player, cam, game); break;
         case 5: this.drawPickup(ctx, item.o, cam, game); break;
+        case 6: this.drawCarryDrop(ctx, item.o, game); break;
       }
     }
 
@@ -1240,6 +1248,42 @@ export class Scene {
   }
 
   /** Raccolta a terra: alone pulsante e sagoma, così si nota da mezzo isolato. */
+  /**
+   * L'oggetto di missione per terra. Non ha uno sprite in cache come le raccolte:
+   * ce n'è **uno** in tutta la partita e compare solo dopo una morte, quindi si
+   * disegna al momento — due fogli sfalsati e un alone caldo, che è quanto basta
+   * a farlo distinguere da una cassa di munizioni a colpo d'occhio.
+   */
+  drawCarryDrop(ctx, held, game) {
+    const bob = Math.sin(game.time * 2.6) * 1.4;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(held.x, held.y, 2, held.x, held.y, 30);
+    g.addColorStop(0, 'rgba(255,210,63,0.34)');
+    g.addColorStop(1, 'rgba(255,210,63,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(held.x, held.y, 30, 0, 6.2832);
+    ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.translate(held.x, held.y + bob);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(-8, 4, 17, 5);
+    for (const [dx, dy, rot, col] of [[-4, -2, -0.24, '#cfc8b8'], [1, 0, 0.16, '#eef2f8']]) {
+      ctx.save();
+      ctx.translate(dx, dy);
+      ctx.rotate(rot);
+      ctx.fillStyle = col;
+      ctx.fillRect(-7, -5, 14, 10);
+      ctx.fillStyle = 'rgba(60,64,74,0.55)';
+      ctx.fillRect(-5, -3, 10, 1.4);
+      ctx.fillRect(-5, 0, 8, 1.4);
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
   drawPickup(ctx, it, cam, game) {
     const spr = getPickupSprite(it.spec.kind);
     const bob = Math.sin(game.time * 2.6 + it.x * 0.05) * 1.6;

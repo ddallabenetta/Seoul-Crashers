@@ -238,6 +238,70 @@ const HEADS = {
     '.........#ssss#.........',
   ],
 
+  // Yoon Ha-eun, ispettrice della omicidi di 종로. Quarantacinque anni, diciassette
+  // di servizio. **I capelli raccolti sono la sua faccia**: la crocchia esce dal
+  // profilo a destra, ed è l'unica sagoma del cast che sborda dalla testa — a
+  // questa scala si riconosce prima dei lineamenti, che è quello che serve a un
+  // personaggio che compare per due pannelli e torna cinque missioni dopo.
+  // Sopracciglia dritte e bocca dritta: guarda e basta, come nella scena.
+  haeun: [
+    '........................',
+    '.......##########.......',
+    '.....##hhhhhhhhhh##.....',
+    '...##hhhhhhhhhhhhhh##...',
+    '..#hhhhhhhhhhhhhhhhhh#..',
+    '..#hHhhhhhhhhhhhhhhhh#..',
+    '..#hhhhhhhhhhhhhhhhhh#hh',
+    '..#sshhhhhhhhhhhhhhss#hh',
+    '..#ssssssssssssssssss#hh',
+    '..#ssssssssssssssssss#h.',
+    '..#ssssssssssssssssSS#..',
+    '..#s####ssssssss####s#..',
+    '..#ssw##wssssssw##wss#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssssss##ssssssss#..',
+    '..#sssssssdd#ssssssss#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssss######ssssss#..',
+    '..#ssssssssssssssssss#..',
+    '...#ssssssssssssssss#...',
+    '...#ssssssssssssssss#...',
+    '....##ssssssssssss##....',
+    '......############......',
+    '.........#ssss#.........',
+  ],
+
+  // Oh Se-jung, medico legale. Sessantadue anni, e di lui si vedono **i baffi
+  // grigi**: sono la sola cosa che lo separa da Chun-sik in un pannello di notte,
+  // e stanno su una riga che le espressioni non riscrivono (la 16, sopra la
+  // bocca). Stempiature alte e faccia lunga: uno che firma da trent'anni.
+  sejung: [
+    '........................',
+    '.......##########.......',
+    '.....##hhhhhhhhhh##.....',
+    '...##hhhhhhhhhhhhhh##...',
+    '..#sshhhhhhhhhhhhhhss#..',
+    '..#sssHhhhhhhhhhhHsss#..',
+    '..#sssssshhhhhhssssss#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssssssssssssssSS#..',
+    '..#ss###ssssssss###ss#..',
+    '..#ssw##wssssssw##wss#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssssss##ssssssss#..',
+    '..#sssssssdd#ssssssss#..',
+    '..#sssssHHHHHHHHsssss#..',
+    '..#ssssss######ssssss#..',
+    '..#ssssssssssssssssss#..',
+    '...#ssssssssssssssss#...',
+    '...#ssssssssssssssss#...',
+    '....##ssssssssssss##....',
+    '......############......',
+    '.........#ssss#.........',
+  ],
+
   // Jeong Han-su, direttore del 병원. Gli **occhiali sono la sua faccia**: una
   // montatura in tre righe, che a questa scala è l'unica cosa che si legge da
   // lontano. Capelli grigi con le stempiature alte, bocca dritta: non commenta e
@@ -326,6 +390,20 @@ export const CAST = {
     coat: '#3a3038', coatHi: '#4e4149', shirt: '#d6cfc0', pants: '#2b242b',
     // L'ottone del banco dei pegni: è il colore della sua insegna e del suo mestiere.
     accent: '#c9a24a', build: 7, name: 'Jo Ok-bun',
+  },
+  haeun: {
+    head: 'haeun',
+    hair: '#2a2233', hairHi: '#4a3f57',
+    // Il completo. È l'unica del cast vestita da ufficio, e in un pannello di
+    // pioggia notturna la camicia chiara è quello che la stacca dal sedile.
+    coat: '#26303f', coatHi: '#37455a', shirt: '#e2e8f1', pants: '#1f2734',
+    accent: '#5a86c9', build: 8, name: 'Yoon Ha-eun',
+  },
+  sejung: {
+    head: 'sejung',
+    hair: '#8b8792', hairHi: '#c6c2cd',
+    coat: '#3a3f46', coatHi: '#4c525b', shirt: '#cfd6de', pants: '#2c3037',
+    accent: '#9fb4c9', build: 9, name: 'Oh Se-jung',
   },
   jeong: {
     head: 'jeong',

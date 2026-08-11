@@ -346,8 +346,13 @@ e questa scena passa quasi subito le tre stelle. È voluto: al molo 7 non si vie
 **7 ·** Il ritratto del funerale, in ricordo — e adesso, accanto, una fotografia vecchia di
 Dong-hyeok in cui **la cicatrice sta a destra**.
 
-> Narratore: `Nel ritratto del funerale la cicatrice sta a sinistra. In questa foto sta a`
-> `destra. La stampa del funerale è specchiata, e farne una così costa mille won.`
+> Narratore: `Nel ritratto del funerale la cicatrice sta a destra. In questa foto sta a`
+> `sinistra. La stampa del funerale è specchiata, e farne una così costa mille won.`
+>
+> *(Destra e sinistra sono invertite rispetto alla prima stesura, e a ragione: a schermo il
+> ritratto del funerale ha la cicatrice **a destra di chi guarda** dal §5.28 — sta nella griglia
+> di `pixelkit`, ed è il pannello 11 dell'apertura. Il testo dice quello che si vede, non il
+> contrario. Chi tocca `m4-7` guardi quel pannello prima di girare un `flip`.)*
 
 **8 ·** Kkachi, quadrante della radio della barca.
 

@@ -56,7 +56,7 @@ export const AUTO_GENS = 3;
  * lì non c'è niente da migrare, perché una Seoul diversa rende le coordinate
  * salvate prive di significato e il giocatore rinascerebbe dentro un palazzo.
  */
-const VERSION = 5;
+const VERSION = 6;
 const SEED = 20260730;
 
 /**
@@ -105,6 +105,16 @@ const MIGRATIONS = {
   // si ritrova le ventiquattro ancora tutte davanti, ed è giusto così.
   4: (d) => {
     d.kkachi = { done: [], heard: 0, missed: 0 };
+    return d;
+  },
+  // 5 -> 6: l'oggetto di missione trasportabile (§5.33). In una partita di prima
+  // non ce n'era nessuno da avere in mano né da lasciare per terra morendo, che è
+  // esattamente quello che dicono due campi vuoti. Il pedinamento invece **non**
+  // entra qui: comincia e finisce dentro una fase, e una fase si riprende da capo
+  // (§5.29) — salvare a metà di un inseguimento e ritrovarsi a metà sarebbe
+  // l'unico modo di riprendere un pedinamento senza avere davanti chi si pedinava.
+  5: (d) => {
+    d.carry = { item: null, dropped: null };
     return d;
   },
 };
@@ -203,6 +213,10 @@ export function snapshot(game) {
     // delle tre condizioni del finale C, quindi è uno stato di partita a tutti
     // gli effetti e non un contatore di comodo (§5.32).
     kkachi: game.kkachi.snapshot(),
+    // Quello che si ha in mano e quello che si è lasciato per terra morendo
+    // (§5.33). Sta accanto alla storia perché è della storia: fuori da una
+    // missione nessuno porta niente.
+    carry: game.carry.snapshot(),
   };
 }
 
@@ -256,6 +270,9 @@ export function apply(game, data) {
   // `prepare`, che è il posto in cui i personaggi di quella missione vengono
   // *definiti*: al contrario, `actors.restore` scriverebbe le morti su definizioni
   // che ancora non esistono e chi era morto tornerebbe dietro al banco.
+  // **Prima di `missions.restore`**: rientrare in una fase vuol dire riapparecchiarla,
+  // e una fase che aspetta i fogli per terra deve trovarli già per terra.
+  game.carry.restore(data.carry);
   game.missions.restore(data.story, game);
   game.actors.restore(data.actors);
   game.kkachi.restore(data.kkachi);
