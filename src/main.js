@@ -7,6 +7,8 @@ import { resolveMode } from './core/modes.js';
 import { AudioSystem } from './core/audio.js';
 import { Radio } from './core/radio.js';
 import { KkachiSystem } from './core/kkachi.js';
+import { TailSystem } from './core/tail.js';
+import { CarrySystem } from './core/carry.js';
 import { DynamicGrid } from './core/spatial.js';
 import { KMH, clamp, dist } from './core/math.js';
 import { createRegion, REGION_IDS } from './world/regions.js';
@@ -208,6 +210,14 @@ class Game {
     // spostare lo streaming di traffico e pedoni.
     this.actors = new ActorSystem(new Rng(20260809));
     this.actors.attach(this);
+    // Il pedinamento e l'oggetto in mano: due meccaniche che l'Atto I chiede e che
+    // tornano più avanti (M6, M9), quindi stanno nel motore e non in una missione.
+    this.tail = new TailSystem();
+    this.carry = new CarrySystem();
+    // **Prima delle missioni**, e non è indifferente: quando si muore, quello che
+    // si aveva in mano deve toccare terra prima che la fase si riapparecchi, o la
+    // fase cercherebbe per terra una cosa che è ancora in mano a un cadavere.
+    this.carry.attach(this);
     // Le missioni. Il motore non sa niente della trama: la trama gliela registra
     // `story/campaign.js`, che è l'unico file che le conosce tutte e dodici.
     this.missions = new MissionSystem();
@@ -347,6 +357,9 @@ class Game {
     this.projectiles.clear();
     this.fx.clear();
     this.pickups.reset();
+    // Il mezzo pedinato era uno di quelli appena tolti dalla lista: un pedinamento
+    // che sopravvive al mondo insegue un fantasma.
+    this.tail?.stop();
     // L'itinerario è disegnato fra due punti che stanno per non voler più dire
     // niente (una partita caricata, un treno per Busan): si rifà al primo frame.
     this.route?.clear();
@@ -437,6 +450,8 @@ class Game {
     this.actors.reset();
     this.missions.reset(this);
     this.kkachi.reset();
+    this.tail.stop();
+    this.carry.reset();
     this.markers.length = 0;
     this.dayCycle.reset();
     this.radio.off(this);
@@ -956,6 +971,10 @@ class Game {
     // possono stare nello stesso metro quadro, e chi consuma il tasto per primo
     // alza `enterCooldown`, che è quello che fa desistere l'altro. Quando il
     // giocatore è lì per la missione, la missione vince.
+    // Prima delle missioni: se il pedinamento finisce in questo frame, la fase che
+    // lo ascolta lo sa adesso e non al giro dopo.
+    this.tail.update(dt, this);
+    this.carry.update(dt, this);
     this.missions.update(dt, this);
     // Subito dopo, e prima dei negozi: una fase che è appena cambiata ha già
     // spostato il blip, e l'itinerario che si disegna in questo frame è quello

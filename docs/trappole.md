@@ -416,3 +416,35 @@ giusta nel sorgente e ha l'ultima riga fuori dal fondo, insieme a tutto quello c
 mettere sotto (§5.32: la banda del fruscio finiva sull'asfalto). L'altezza torna solo partendo
 dalla baseline dell'**ultima** riga e aggiungendo discendenti e margine — e si vede in uno
 screenshot ritagliato sul riquadro, mai nel codice.
+
+**Uno stato «arrivato» sopravvive alla fase che lo ha messo.** L'auto che ritira la busta in M3
+arriva *davanti al minimarket*, quindi ha `ai.arrived` alzato: la fase dopo — il pedinamento —
+la trovava già arrivata **alla torre di Gangnam** e finiva nel frame in cui cominciava. A schermo
+sembrava che la scena non esistesse, e nel sorgente le due fasi sono corrette tutte e due. Chi
+passa un veicolo (o qualunque oggetto con uno stato) da una fase all'altra lo **riapparecchia**
+in `enter`, o eredita anche la conclusione di quella prima.
+
+**Un agguato che nasce quando comincia la fase non c'è quando arrivi.** I sei uomini del molo 7
+nascevano in `enter`: morendo, la fase rientrava, ne metteva sei nuovi attorno a un piazzale
+vuoto, e lo streaming se li portava via (`gone`) mentre il giocatore era in corsia. Al ritorno la
+sparatoria si chiudeva **da sola** — la condizione «ne resta in piedi al più uno» era vera senza
+che avesse sparato un colpo. Quello che dipende dalla presenza del giocatore va acceso quando il
+giocatore è lì, e messo in pausa quando si allontana. Vale per tutte le scene di città: lo
+streaming è più veloce di te.
+
+**«Ha meno vita di prima» non vuol dire «gliel'hai fatta tu».** Il pedinamento leggeva
+`v.hp < v.maxHp` come «l'hai urtata», e il traffico civile tampona chiunque (§5.10): una prova
+headless si è chiusa con «ti ha visto» mentre il giocatore era fermo a duecento metri. Un danno
+va attribuito, e il modo più economico è guardare **dove sei** quando succede.
+
+**Il giocatore riscrive lo zoom a ogni frame.** `player.update` chiama `setZoomTarget` sempre
+(velocità, mirino del fucile), quindi una scena che vuole allargare la camera per sette secondi
+la vede richiudersi nel frame dopo — e nel sorgente la riga della scena è lì, giusta. Serve un
+**blocco** (`camera.holdZoom`), non una scrittura più insistente.
+
+**Una figura a piedi in fondo al pannello è una figura che non c'è.** Il riquadro delle battute
+(`panelkit.speech`) cresce con il testo e si prende il terzo basso della tavola, il narratore i
+due quinti in alto a sinistra: un personaggio disegnato con `groundY` sul bordo di sotto finisce
+sotto il gradiente e sparisce. Peggio: con cinque voci il riquadro **esce dal pannello** e la
+prima riga finisce oltre il bordo di sopra. Si guarda con `cutscene-panel.scene`, non si indovina
+— e quando non ci sta, si taglia la battuta o si divide la tavola in due (§5.33).

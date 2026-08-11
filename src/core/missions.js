@@ -202,6 +202,28 @@ export class MissionSystem {
         this.seen.add(id);
         game.cutscene.play(game, seq, id, onDone);
       },
+      /**
+       * L'appuntamento. Il copione fa cominciare M3 alle `03:20` e M6 alle
+       * `14:00`, e la decisione presa con l'utente è che **il blip porta dove si
+       * aspetta, non dove si comincia** (`08-domande-aperte.md`, 3): l'ora la
+       * dice il pannello, e chi arriva con dodici ore di anticipo deve poterle
+       * passare senza guardare l'orologio girare per dodici minuti veri.
+       *
+       * L'orologio si fa **girare**, non si sposta (`dayCycle.advance`): il meteo
+       * è una catena di Markov, e aspettare l'alba sotto lo stesso temporale di
+       * mezzanotte vorrebbe dire che il tempo non è passato. La tendina nera è
+       * quella del futon, ed è la stessa apposta — è già il modo in cui questo
+       * gioco dice «sono passate delle ore».
+       */
+      waitUntil: (hour) => {
+        const dc = game.dayCycle;
+        const wait = (((hour - dc.hour) % 24) + 24) % 24;
+        if (wait < 0.02) return 0;
+        dc.advance(wait);
+        game.shops.fade = 2.4;
+        game.player.enterCooldown = 0.5;
+        return wait;
+      },
       next: () => this.advance(game),
       flag: (name, on) => this.setFlag(name, on),
       has: (name) => this.flags.has(name),

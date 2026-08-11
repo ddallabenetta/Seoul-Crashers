@@ -83,6 +83,29 @@ export function findTurf(game, gangId, near = game.city.spawn) {
 }
 
 /**
+ * Il punto davanti al bancone di un piano, apparecchiato appena quel piano viene
+ * aperto. Serve a mezza campagna — si riscuote, si compra, si chiede — e sta qui
+ * e non in una missione perché l'hanno già chiesto in due: `floorShown` è il
+ * varco unico per sapere dove sei (§5.29), e nessuno deve riscriverlo.
+ *
+ * Il punto si toglie e si rimette a ogni ingresso (`drop` prima di `point`): una
+ * missione ripresa tre volte lascerebbe altrimenti tre punti sullo stesso banco.
+ */
+export function tillPoint(ctx, id, addr, text, run) {
+  if (!addr) return;
+  const game = ctx.game;
+  const place = (shop, idx, f) => {
+    if (shop.id !== addr.id || idx !== addr.level || !f.till) return;
+    ctx.drop(id);
+    ctx.point({ id, shop: addr.id, level: addr.level, key: 'E', text, run, reach: 52,
+      x: f.till.x, y: f.till.y + 26 });
+  };
+  ctx.on('floorShown', place);
+  const it = game.shops.active;
+  if (it && game.shops.floor) place(it.shop, it.cur, game.shops.floor);
+}
+
+/**
  * Un punto libero di una pianta, il più vicino possibile a dove lo si vorrebbe.
  *
  * Serve a mettere in piedi un personaggio nominato senza sapere com'è arredata la

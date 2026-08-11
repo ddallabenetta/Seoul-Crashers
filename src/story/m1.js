@@ -18,7 +18,7 @@
 //     copione: la sala è aperta perché è martedì e si conta, e il gioco lo dice
 //     con `shops.hold` — l'indirizzo è aperto perché lo dice la storia.
 import { panelPhase } from '../core/missions.js';
-import { findShop } from './places.js';
+import { findShop, tillPoint } from './places.js';
 import { won } from '../entities/shops.js';
 import {
   CYAN, AMBER, BLOOD,
@@ -51,20 +51,6 @@ function sites(game) {
   });
   M1._sites = { pool, bar, stall };
   return M1._sites;
-}
-
-/** Il punto in cui si riscuote, davanti al bancone del piano giusto. */
-function tillPoint(ctx, id, addr, text, run) {
-  const game = ctx.game;
-  const place = (shop, idx, f) => {
-    if (shop.id !== addr.id || idx !== addr.level || !f.till) return;
-    ctx.drop(id);
-    ctx.point({ id, shop: addr.id, level: addr.level, key: 'E', text, run, reach: 52,
-      x: f.till.x, y: f.till.y + 26 });
-  };
-  ctx.on('floorShown', place);
-  const it = game.shops.active;
-  if (it && game.shops.floor) place(it.shop, it.cur, game.shops.floor);
 }
 
 function pay(ctx, amount, reason) {

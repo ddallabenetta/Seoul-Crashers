@@ -1,24 +1,44 @@
-// Guarda un pannello della cutscene iniziale, fermo, per farci uno screenshot.
+// Guarda **un** pannello, fermo, a grandezza vera, per farci uno screenshot.
 //
-// La cutscene avanza solo quando il giocatore preme qualcosa, quindi un `--seconds`
-// lungo non la fa scorrere: si sceglie il pannello e si aspetta soltanto il tempo
-// che serve alla pioggia e ai fruscii per essere a regime.
+// Il foglio di provino (`cutscene-sheet.scene`) serve a trovare la tavola che non
+// si legge; questa serve a capire perché. I pannelli avanzano solo quando il
+// giocatore preme qualcosa, quindi un `--seconds` lungo non li fa scorrere: si
+// aspetta soltanto il tempo che serve a pioggia e fruscii per essere a regime.
 //
-// `--script` è ripetibile e i file girano nello stesso contesto, quindi il numero
-// del pannello si passa con uno script di una riga davanti a questo:
+// `--script` è ripetibile e i file girano nello stesso contesto, quindi la scelta
+// si passa con uno script di una riga davanti a questo:
 //
 //   echo 'window.__PANEL = 11;' > /tmp/p.js
 //   node .claude/tools/probe.mjs --seconds 1.5 --shot /tmp/p11.png \
 //     --script /tmp/p.js --script .claude/tools/scenes/cutscene-panel.scene
 //
-// Senza, mostra il primo. Il numero è quello del copione (1-28), non l'indice:
-// `docs/storia/02-cutscene-iniziale.md`.
+// Senza `__SCENA` mostra l'apertura, e `__PANEL` è il numero del copione (1-28,
+// `docs/storia/02-cutscene-iniziale.md`). Con `__SCENA` mostra le tavole di una
+// missione o del 병원 — `m1` · `m2` · `m3` · `m4` · `r1` · `ospedale` — e lì
+// `__PANEL` è l'**id** del pannello (`'m4-7'`) oppure la sua posizione (1, 2, 3…).
 const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
-const want = Number(window.__PANEL || 1);
+const want = window.__PANEL ?? 1;
+const quale = window.__SCENA || 'intro';
 
 game.newGame();
-game.playIntro();
-const i = game.cutscene.seq.findIndex((p) => p.id === want);
+let seq;
+if (quale === 'intro') {
+  game.playIntro();
+  seq = game.cutscene.seq;
+} else {
+  if (quale === 'ospedale') {
+    const H = await import('/src/story/hospital.js');
+    seq = [...H.PRIMO, ...H.TERZO, ...H.DECIMO, ...H.DOPO_M12];
+  } else {
+    const M = await import(`/src/story/${quale}.js`);
+    seq = M.PANNELLI || [...M.APERTURA, ...M.CHIUSURA];
+  }
+  game.cutscene.play(game, seq, `prova-${quale}`);
+}
+// Per id, o per posizione: l'apertura numera i pannelli come il copione, una
+// missione li chiama `m4-7`, e chi guarda vuole scrivere quello che ha in mano.
+let i = seq.findIndex((p) => p.id === want);
+if (i < 0 && typeof want === 'number') i = Math.min(seq.length - 1, Math.max(0, want - 1));
 game.cutscene.i = i >= 0 ? i : 0;
 game.cutscene.t = 0;
 game.cutscene.trans = 0;

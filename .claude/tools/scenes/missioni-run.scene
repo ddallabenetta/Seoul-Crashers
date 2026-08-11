@@ -265,7 +265,10 @@ out.m2Chiusura = await saltaPannelli();
 nota('chiusura M2');
 out.m2Completata = M.isDone('m2');
 out.nomeInciso = M.flag('kumangi');
-out.nessunaMissioneAppesa = M.active === null && game.markers.length === 0;
+// Dalla tappa E (§5.33) M2 non è più l'ultima della fila: quello che deve
+// restare vero non è «non è rimasto niente in piedi» ma **la catena** — M3 parte
+// da sé, e il blip resta uno.
+out.m3ParteDopoM2 = M.active === 'm3' && game.markers.length <= 1;
 
 // ---- 6. Il filo del 병원: le battute non si ripetono mai ------------------------
 const dette = [];

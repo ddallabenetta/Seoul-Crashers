@@ -127,7 +127,7 @@ export class TrafficSystem {
    */
   countTraffic() {
     let n = 0;
-    for (const v of this.vehicles) if (v.driver === 'ai' && !(v.ai && v.ai.mode)) n++;
+    for (const v of this.vehicles) if (v.driver === 'ai' && !(v.ai && (v.ai.mode || v.ai.scripted))) n++;
     return n;
   }
 
@@ -318,6 +318,125 @@ export class TrafficSystem {
     return true;
   }
 
+  // --- auto in servizio per la storia ------------------------------------------
+  //
+  // Il traffico sceglie a caso a ogni incrocio, ed è giusto così: nessuno di quei
+  // guidatori sta andando da qualche parte. Una missione invece ha bisogno di
+  // un'auto che **arrivi** — il corriere di M3 parte da un 편의점 di Itaewon e
+  // scende in un parcheggio di Gangnam, e il pedinamento è tutta la scena.
+  //
+  // Il conto è lo stesso A* che disegna l'itinerario sulla carta (§5.30): si fa
+  // **una volta** alla partenza, e da lì l'auto non cerca più niente — a ogni
+  // incrocio guarda quale nodo viene dopo nella fila e prende l'arco che ci porta.
+  // Quello che resta del traffico (semafori, distanza di sicurezza, code, urti)
+  // vale per lei come per tutte, ed è quello che la fa sembrare un'auto e non un
+  // binario: se qualcuno le si mette davanti, frena.
+
+  /**
+   * Un'auto guidata dalla storia, messa sulla corsia più vicina a un punto.
+   *
+   * Nasce `protect`: lo streaming toglie di mezzo chi è lontano (§5.10), e chi
+   * sta pedinando **deve** poter restare indietro trecento metri senza che la
+   * macchina davanti svanisca. Toccherà a chi l'ha creata levarla di mezzo.
+   */
+  spawnScripted(kind, x, y, game, opts = {}) {
+    const graph = this.city.graph;
+    const near = graph.edgesNear(x, y, opts.radius || 420);
+    if (!near.length) return null;
+    let best = null;
+    let bestD = Infinity;
+    for (const e of near) {
+      const p = pointSegment(x, y, e.ax, e.ay, e.bx, e.by);
+      if (p.dist >= bestD) continue;
+      bestD = p.dist;
+      best = { edge: e, t: p.t };
+    }
+    if (!best) return null;
+    const dir = opts.dir || 1;
+    const lane = Math.min(opts.lane || 0, laneCount(best.edge) - 1);
+    const s = Math.max(20, Math.min(best.edge.len - 20, (dir > 0 ? best.t : 1 - best.t) * best.edge.len));
+    const pt = lanePoint(best.edge, dir, lane, s, {});
+    const v = createVehicle(kind, pt.x, pt.y, pt.angle, opts.colorIndex ?? this.rng.int(0, 9));
+    v.driver = 'ai';
+    v.protect = true;
+    v.lightsOn = opts.lightsOn ?? game.isNight;
+    v.ai = {
+      edge: best.edge, dir, lane, s,
+      target: opts.speed || this.cruiseSpeed(best.edge, kind, this.rng),
+      nextChoice: null,
+      waitT: 0,
+      jamT: 0,
+      recoverT: 0,
+      recoverSteer: 0,
+      aggression: opts.aggression || 1,
+      honkT: 0,
+      scripted: true,
+    };
+    this.vehicles.push(v);
+    return v;
+  }
+
+  /**
+   * «Vai lì.» Calcola la fila di incroci una volta e la lascia scritta sull'auto.
+   * Senza grafo — o con una meta in un'altra componente, che a Jeju succede — non
+   * si mente: si restituisce `false`, e chi ha chiamato sa di non avere un'auto
+   * che arriva.
+   */
+  sendTo(v, x, y, game) {
+    const graph = this.city.graph;
+    if (!v.ai || !graph || !game.route) return false;
+    const chain = game.route.solve(graph, graph.nearestNode(v.x, v.y), graph.nearestNode(x, y));
+    if (!chain) return false;
+    v.ai.plan = chain.map((n) => n.id);
+    v.ai.planI = 0;
+    v.ai.arrive = { x, y };
+    v.ai.arrived = false;
+    v.ai.nextChoice = null;
+    v.ai.scripted = true;
+    return true;
+  }
+
+  /**
+   * Il prossimo arco a un incrocio. Senza itinerario è quello di sempre (a caso,
+   * con la preferenza per il dritto); con un itinerario è quello che porta al
+   * nodo dopo.
+   *
+   * **Un itinerario si perde, e non è un guasto**: basta un tamponamento che
+   * gira l'auto e `reacquireLane` la rimette su una strada che nella fila non
+   * c'era. Allora si ricalcola da dove si è finiti — una volta, e verso la stessa
+   * meta. Se nemmeno quello riesce, l'auto torna traffico: meglio un corriere che
+   * sbaglia strada di un corriere piantato in mezzo a un incrocio.
+   */
+  chooseNext(v, node, fromEdge, game) {
+    const ai = v.ai;
+    const graph = this.city.graph;
+    if (ai.plan) {
+      const lane = this.planLane(ai, node);
+      if (lane) return lane;
+      if (ai.arrive && game && this.sendTo(v, ai.arrive.x, ai.arrive.y, game)) {
+        const retry = this.planLane(ai, node);
+        if (retry) return retry;
+      }
+      ai.plan = null;
+    }
+    return graph.nextLane(node, fromEdge, this.rng);
+  }
+
+  /** L'arco che da `node` porta al nodo dopo nella fila, o `null`. */
+  planLane(ai, node) {
+    const plan = ai.plan;
+    if (!plan) return null;
+    // I nodi già passati si consumano qui: la fila è un percorso, non una coda di
+    // ordini, e l'incrocio in cui siamo può essere il terzo come il primo.
+    while (ai.planI < plan.length && plan[ai.planI] === node.id) ai.planI++;
+    const want = plan[ai.planI];
+    if (want === undefined) return null;
+    for (const o of node.out) {
+      if ((o.dir > 0 ? o.edge.b : o.edge.a) === want) return { edge: o.edge, dir: o.dir };
+    }
+    return null;
+  }
+
   // --- guida AI --------------------------------------------------------------
   driveAI(v, dt, game) {
     const ai = v.ai;
@@ -372,13 +491,13 @@ export class TrafficSystem {
 
     // Scelta anticipata del prossimo arco
     if (!ai.nextChoice && ai.s > edge.len - 150) {
-      ai.nextChoice = graph.nextLane(endNode, edge, this.rng);
+      ai.nextChoice = this.chooseNext(v, endNode, edge, game);
     }
 
     // Transizione all'arco successivo. Il progresso va riproiettato subito sul
     // nuovo arco, altrimenti il waypoint finisce fuori strada e l'auto si pianta.
     if (ai.s > edge.len - nodeHalf * 0.35) {
-      const choice = ai.nextChoice || graph.nextLane(endNode, edge, this.rng);
+      const choice = ai.nextChoice || this.chooseNext(v, endNode, edge, game);
       if (choice) {
         ai.edge = choice.edge;
         ai.dir = choice.dir;
@@ -487,6 +606,16 @@ export class TrafficSystem {
 
     if (cap < target) target = Math.max(0, cap);
 
+    // Arrivata. Un'auto della storia non svanisce a destinazione e non ci passa
+    // sopra: rallenta negli ultimi cento metri e si ferma dov'era diretta, che è
+    // l'unico modo perché la scena dopo (una busta che scende, una donna che
+    // ritira) succeda in un posto e non in mezzo alla strada.
+    if (ai.arrive) {
+      const dArr = dist(v.x, v.y, ai.arrive.x, ai.arrive.y);
+      if (dArr < 160) target = Math.min(target, Math.max(0, (dArr - 24) * 1.1));
+      if (dArr < 34) ai.arrived = true;
+    }
+
     // Etichetta diagnostica (visibile in debug): perché questo veicolo rallenta.
     ai.why = forcing ? 'sblocco'
       : waitingAtLight ? 'incrocio'
@@ -511,7 +640,7 @@ export class TrafficSystem {
     }
 
     // Anti-ingorgo: fermo senza motivo (verde libero, nessuno davanti) -> manovra.
-    if (Math.abs(v.speed) < 12 && !waitingAtLight && !queued) {
+    if (Math.abs(v.speed) < 12 && !waitingAtLight && !queued && !ai.arrived) {
       ai.jamT = (ai.jamT || 0) + dt;
       if (ai.jamT > 1.7) {
         ai.jamT = 0;
@@ -612,7 +741,7 @@ export class TrafficSystem {
    */
   boxBlocked(v, spec, endNode, game) {
     const ai = v.ai;
-    const choice = ai.nextChoice || (ai.nextChoice = this.city.graph.nextLane(endNode, ai.edge, this.rng));
+    const choice = ai.nextChoice || (ai.nextChoice = this.chooseNext(v, endNode, ai.edge, game));
     if (!choice) return false;
     const e = choice.edge;
     const exitHalf = (e.axis === 'v' ? endNode.hWidth : endNode.vWidth) / 2;

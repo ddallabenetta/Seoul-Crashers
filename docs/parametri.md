@@ -273,3 +273,16 @@
 | Livello del fruscio | `audio.updateBeds` (`beds.kkachi`) | 0,02 sotto una battuta · 0,05 nei silenzi, per `mix.radio`. Misurati: 0,016 e 0,04 contro 0,05 del fondo urbano e 0,04 del motore |
 | Soglia del «pieno» | `story/kkachi.PIENO` | ₩60.000, che sono esattamente i contanti di partenza: la riga S11 esce alla prima spesa, non al primo minuto |
 | Distanza oltre cui un cortile perso si racconta | `story/kkachi.LONTANO` | 1200 px: sotto l'hai visto succedere, e te l'ha già detto il cartello a terra |
+| **— l'Atto I completo (§5.33) —** | | |
+| Versione del formato di salvataggio | `save.VERSION` | 6 (dal 5 del §5.32): ci è entrato l'oggetto che si porta in mano. Lo scalino `5 → 6` aggiunge due campi vuoti, che è esattamente «non c'era niente da avere in mano» |
+| Fascia del pedinamento | `tail.SPOT` · `tail.LOSE` | 132 px (tre auto in fila) e 620 px (due fanalini che diventano uno). In mezzo non succede niente, ed è dove il giocatore deve stare |
+| Quanto ci mette a fallire | `tail.SPOT_TIME` · `tail.LOSE_TIME` | 4,5 s troppo vicino · 6 s troppo lontano, e si **rientra al doppio** (`tail.RECOVER` = 2): un semaforo perso non deve rovinare una scena da quattro minuti |
+| Cosa ti fa notare oltre alla distanza | `tail.update` | fari accesi di notte ×0,7 · sirene addosso (2 stelle) ×1 · **averla urtata tu** ×1,4 — e solo entro 120 px, o vale il tamponamento di un estraneo |
+| Raccolta dell'oggetto caduto | `carry.REACH` | 30 px, come una raccolta a terra (`pickups.REACH` è 26): ci si passa sopra camminando |
+| Appuntamento e consegna di M3 | `m3.APPUNTAMENTO` · `CONSEGNA` · `RITIRO` | 03:20 · 04:00 · 04:06, con `FINESTRA` 0,6 h di anticipo concesso prima di far aspettare. Quaranta minuti di orologio sono poco più di un minuto vero (§5.11) |
+| Dove scende il volume all'«abbassa» | `m3.ABBASSATO` | 0,12 su `mix.radio` e `mix.music`, e **non risale da solo**: se lo rialza il giocatore dal mixer |
+| Caffè del 편의점 in M3 | `m3.CAFFE` | ₩1.200, lo stesso della battuta del commesso |
+| Notte del molo 7 | `m4.APPUNTAMENTO` | 22:40. Chi arriva di giorno aspetta lì, come all'incrocio di Itaewon |
+| L'agguato del porto | `m4.AGGUATO` · `m4.CADE` | sei uomini · Oh Se-jung cade dopo 16 s di sparatoria. La fase si chiude quando ne resta in piedi al più uno, o dopo 150 s |
+| Stelle della fuga in barca | `m4` fase `barca` | portate a **tre** se non ci si è già arrivati: sono quelle che mettono in acqua le motovedette e in aria l'elicottero (§5.5), e da tre in su non ti ammanettano più (§5.16) |
+| Camera dalla gru | `m4.ZOOM_GRU` · `m4.ZOOM_T` | 0,5 (il minimo consentito è 0,45) per 7 s, tenuta con `camera.holdZoom`: senza il blocco il giocatore la richiude nel frame dopo |

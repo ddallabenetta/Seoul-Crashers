@@ -13,8 +13,12 @@ src/core/
   input.js            tastiera/mouse, stato continuo + fronti (wasPressed)
   events.js           il bus: `game.on/once/off/emit`, da cui passano i fatti del mondo
   modes.js            in che modalità gira il gioco e cosa concede (`game.mode`, `paused`)
-  missions.js         fasi, blip, punti, ripresa: il motore delle missioni, che della
-                      campagna non sa niente
+  missions.js         fasi, blip, punti, ripresa, appuntamenti: il motore delle missioni,
+                      che della campagna non sa niente
+  tail.js             il pedinamento: due soglie di distanza, due serbatoi, e due eventi
+                      sul bus — non sa **chi** stia seguendo chi
+  carry.js            l'oggetto di missione che si porta in mano, e che morendo si perde
+                      per terra invece di sparire
   audio.js            sintetizzatore WebAudio: colpi secchi + letti continui, mix, muto
   music.js            musica generata: tema del menu, caccia, apertura, stacchi — e la regia
   radio.js            stazioni coreane in streaming (`<audio>`, fuori dal grafo audio)
@@ -95,7 +99,8 @@ src/story/
   campaign.js         chi c'è e in che ordine: l'unico file che conosce tutte le missioni
   intro.js            «12년», i 28 pannelli dell'apertura e il passaggio di consegne
   places.js           dove succedono le cose: la storia non piazza indirizzi, li cerca
-  m1.js · m2.js       una missione per file: le sue fasi e i suoi pannelli
+  m1.js … m4.js       una missione per file: le sue fasi e i suoi pannelli
+  r1.js               il raccordo che chiude l'Atto I: una missione con una fase sola
   hospital.js         il 병원 «성심»: una battuta a ogni morte, e quattro pannelli
   kkachi.js           quello che 까치 dice e quando: le chiamate e le righe di servizio
 
@@ -421,6 +426,19 @@ regole della campagna sono cablate lì e non nelle missioni — **un blip solo**
 `busted`, non a `playerDeath`: quando arrivano quei due il giocatore è già stato spostato), **una
 cutscene non si rivede mai** (`seen`, che sta nel salvataggio). Nel salvataggio va la *posizione*
 nella storia, non la storia: ~122 byte, e il ripristino **rientra nella fase** invece di saltarla.
+
+**Chi segue qualcuno e chi porta qualcosa non sono missioni: sono due sistemi** (§5.33).
+`core/tail.js` tiene **due** serbatoi — «l'hai perso» e «ti ha visto» — e quando uno arriva in
+fondo manda `tailLost` o `tailSpotted` sul bus: cosa voglia dire lo decide la missione, che in M3
+rimette la fase e in M9 potrebbe non chiamarlo nemmeno fallimento. `core/carry.js` tiene
+l'**unico** oggetto che si può avere in mano, e la sola cosa che lo distingue da una casella in un
+taccuino è che si perde: morire o farsi arrestare lo lascia per terra nell'ultimo punto buono in
+cui sei stato visto — non addosso al cadavere e non in un limbo — e da lì si torna a prenderlo.
+Tutti e due stanno nel motore perché tornano (M6, M9), e tutti e due sono **uno per volta**, come
+il blip: due vorrebbero dire un inventario e un elenco di bersagli, cioè due cose che questo gioco
+non ha. Sotto, il traffico ha imparato una cosa sola in più: un'auto della storia può ricevere
+**una meta** (`traffic.sendTo`, l'A* del §5.30 calcolato una volta) e a ogni incrocio prendere
+l'arco che ci porta, invece di scegliere a caso come tutte le altre.
 
 **Un dialogo non è una cutscene: è la stessa scena, ferma** (§5.29). Metà del copione delle
 missioni sono scambi di due righe *nel posto in cui succedono*, e coprire quel posto con una

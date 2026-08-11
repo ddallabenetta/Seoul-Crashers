@@ -166,7 +166,9 @@ delete vecchio.kkachi;
 try {
   window.localStorage.setItem('seoul.save.0', JSON.stringify(vecchio));
   const letto = S.readSlot(0);
-  out.slotV4SiMigra = !!letto && letto.v === 5 && letto.kkachi.done.length === 0;
+  // La versione corrente sale a ogni tappa che tocca il salvataggio: quello che
+  // conta è che ci **arrivi**, non che si fermi a quella di allora.
+  out.slotV4SiMigra = !!letto && letto.v >= 5 && letto.kkachi.done.length === 0;
   window.localStorage.removeItem('seoul.save.0');
 } catch (e) {
   out.slotV4SiMigra = `errore: ${e.message}`;

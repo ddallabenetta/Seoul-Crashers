@@ -83,6 +83,25 @@ export class ActorSystem {
     return !!this.defs.get(id)?.dead;
   }
 
+  /**
+   * Lo ammazza il copione, non un proiettile. Oh Se-jung cade a metà della
+   * sparatoria di M4 e **deve cadere anche se in quel momento non è a schermo**:
+   * il suo pedone può essere stato despawnato mentre il giocatore era dall'altra
+   * parte del piazzale, e una morte che dipende da dove guardi non è una morte.
+   *
+   * Se il pedone c'è muore davvero — sangue, tonfo, `pedKilled` sul bus, quindi
+   * anche la definizione si segna morta da sé; se non c'è, si segna la definizione
+   * e basta, che è l'unica cosa che sopravvive comunque (§5.27).
+   */
+  die(id, game, dx = 0, dy = 1) {
+    const d = this.defs.get(id);
+    if (!d || d.dead) return false;
+    const p = this.get(id);
+    if (p && game?.pedSystem) game.pedSystem.kill(p, dx, dy, game, null);
+    else d.dead = true;
+    return true;
+  }
+
   /** Toglie del tutto un personaggio: se n'è andato dalla storia, non è morto. */
   undefine(id) {
     this.defs.delete(id);

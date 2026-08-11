@@ -16,8 +16,8 @@ sigillate, marcatori, testo su più righe). Quello che resta è **contenuto**, i
 | ~~2~~ | ~~**B**~~ | ~~impianto missioni + M1 e M2~~, e con loro **il filo del 병원** — **fatta**, §5.29 | — |
 | ~~3~~ | ~~**C**~~ | ~~**cortili persistenti** (nel salvataggio, con effetto sul commercio)~~ — **fatta**, §5.31 | — |
 | ~~4~~ | ~~**D**~~ | ~~Kkachi: stazione `91.45`, tabella con predicato, le otto chiamate dell'Atto I e le dodici righe di servizio~~ — **fatta**, §5.32 | — |
-| 5 | **E** | Atto I completo (M3, M4) + R1 | il primo ribaltamento in mano al giocatore |
-| 6 | **F** | Atto II (M5-M8) + R2, R3 + le otto chiamate dell'Atto II | l'atto che chiede più cose nuove al motore |
+| ~~5~~ | ~~**E**~~ | ~~Atto I completo (M3, M4) + R1~~, e con loro **pedinamento** e **oggetto trasportabile** — **fatta**, §5.33 | — |
+| 6 | **F** | Atto II (M5-M8) + R2, R3 + le otto chiamate dell'Atto II | l'atto che chiede più cose nuove al motore — **è la prossima** |
 | 7 | **G** | Atto III (M9-M12) + R4 + le otto chiamate dell'Atto III **e l'incontro facoltativo di Busan** | il viaggio: ha bisogno di tutto quello di prima |
 | 8 | **H** | i tre finali, i titoli di coda, la scena dopo | e a quel punto la Fase 3 è chiusa |
 
@@ -92,19 +92,35 @@ prova, non una nota.
   sirena lontana). Il timbro del fruscio adesso c'è ed è quello giusto (`audio.beds.kkachi`),
   quindi resta da fare un **aggancio dei suoni ai pannelli** — `ui/cutscene.js` non ce l'ha — e
   tre suoni nuovi;
-- **l'ottava chiamata dell'Atto I aspetta M3**: il predicato è già definitivo
-  (`missions.isDone('m3')`) e resta falso finché non c'è la tappa E;
+- ~~l'ottava chiamata dell'Atto I aspetta M3~~: **fatto**, §5.33 — quella riga adesso esce, e il
+  predicato non è stato toccato;
 - **le «visite che cambiano»** (Jo dopo M6, Chun-sik dopo M9, il commesso dopo M8) stanno nello
   stesso capitolo del copione ma non sono chiamate radio: restano alle tappe delle loro missioni.
 
-**Tre cose che M1 e M2 lasciano indietro** (§5.29), e nessuna blocca la tappa C:
-- **un oggetto di missione trasportabile.** I tre pegni di M2 sono tre caselle in un taccuino,
-  non tre cose in mano: non si vedono addosso e non si possono perdere;
-- **un pedinamento con soglia di distanza** («ti ha visto / l'hai perso»), che M3 chiede subito
-  e che torna in M6 e M9. È la meccanica nuova più leggera dell'atto;
+**Cosa la tappa E (§5.33) ha già tolto di mezzo**, e che quindi le tappe F e G non devono più
+affrontare — sono le due meccaniche che M1 e M2 avevano lasciato indietro, più tre cose che sono
+saltate fuori scrivendo l'atto:
+
+- **il pedinamento** (`core/tail.js`): due soglie, due serbatoi, due eventi sul bus. M6 e M9 lo
+  accendono con `game.tail.begin(game, mezzo, { label })` e ascoltano `tailLost` / `tailSpotted`;
+  cosa voglia dire fallire lo decidono loro;
+- **l'oggetto trasportabile** (`core/carry.js`): uno per volta, si vede nell'HUD, morendo resta
+  per terra dov'eri, e sta nel salvataggio (v6);
+- **un'auto della storia che arriva davvero** (`traffic.spawnScripted` + `traffic.sendTo`): una
+  meta, l'A* del §5.30 calcolato una volta, e a ogni incrocio l'arco che ci porta;
+- **l'appuntamento** (`ctx.waitUntil`): M6 comincia alle `14:00` e non deve chiedere a nessuno di
+  guardare l'orologio girare;
+- **l'inquadratura tenuta da una scena** (`camera.holdZoom`) e **la morte per copione**
+  (`actors.die`), che serve a chiunque debba far cadere un personaggio a metà di un'altra cosa.
+
+**Quello che la tappa E lascia indietro:**
 - **Jo che risponde in modo diverso dopo M6** (le «visite che cambiano»,
   [`storia/07-radio-kkachi.md`](storia/07-radio-kkachi.md)): oggi il banco dice sempre le stesse
-  cose una volta finita M2.
+  cose una volta finita M2. È della tappa F, che è quella di M6;
+- **la gru non si scala.** È l'unica cosa del copione di M4 che non si è potuta fare: una quota
+  percorribile non c'è, e dalla gru si vede il porto perché la camera si allarga. Il giorno che
+  qualcuno vorrà i tetti, quella scena ne è il primo cliente;
+- **un secondo oggetto in mano insieme al primo**, il giorno che una missione ne chiederà due.
 
 **Rimasto indietro da 까치** (§5.32):
 - **Le chiamate perse non si vedono da nessuna parte.** Il conto c'è (`kkachi.missed`) e per

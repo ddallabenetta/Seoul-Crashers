@@ -93,6 +93,7 @@ export class Hud {
     this.drawDamage(ctx, game, w, h, L);
     this.drawArrest(ctx, game, w, h, L);
     this.drawTurfTake(ctx, game, w, h, L);
+    this.drawTail(ctx, game, w, h, L);
     this.drawCrosshair(ctx, game);
     this.drawFade(ctx, game, w, h);
 
@@ -361,7 +362,12 @@ export class Hud {
     ctx.font = `${L.compact ? '600 10px' : '600 12px'} system-ui, "Apple SD Gothic Neo", sans-serif`;
     const hintLines = hint ? wrapLines(ctx, hint, w - 22).slice(0, L.short ? 1 : 3) : [];
     const lineH = L.compact ? 13 : 15;
-    const h = (L.short ? 22 : 26) + hintLines.length * lineH + (hintLines.length ? 6 : 0);
+    // Quello che si ha in mano (`core/carry.js`). Sta qui e non in un riquadro
+    // suo perché è **della missione**: fuori da una non se ne porta nessuno, e
+    // due riquadri per due righe sono un HUD che cresce a ogni tappa.
+    const held = game.carry?.item ? `◆ in mano: ${game.carry.item.label}` : null;
+    const h = (L.short ? 22 : 26) + hintLines.length * lineH + (hintLines.length ? 6 : 0)
+      + (held ? lineH + 4 : 0);
     ctx.fillStyle = 'rgba(12,14,18,0.72)';
     roundPath(ctx, x, y, w, h, 8);
     ctx.fill();
@@ -393,6 +399,10 @@ export class Hud {
     ctx.fillStyle = 'rgba(238,242,248,0.82)';
     ctx.font = `${L.compact ? '600 10px' : '600 12px'} system-ui, "Apple SD Gothic Neo", sans-serif`;
     hintLines.forEach((l, i) => ctx.fillText(ellipsisText(ctx, l, w - 22), x + 11, y + (L.short ? 29 : 33) + i * lineH, w - 22));
+    if (held) {
+      ctx.fillStyle = '#ffd23f';
+      ctx.fillText(ellipsisText(ctx, held, w - 22), x + 11, y + (L.short ? 29 : 33) + hintLines.length * lineH + 4, w - 22);
+    }
     ctx.restore();
   }
 
@@ -564,6 +574,59 @@ export class Hud {
     ctx.fillStyle = 'rgba(235,240,250,0.7)';
     ctx.font = `${L.compact ? '600 10px' : '600 12px'} system-ui, sans-serif`;
     ctx.fillText(ellipsisText(ctx, 'resta nel recinto finché il tag non cambia', bw), w / 2, y + 24, bw);
+    ctx.restore();
+  }
+
+  /**
+   * Il pedinamento (`core/tail.js`). **Non è una barra che si riempie**: è un
+   * cursore fra due bordi rossi, perché le due cose che il giocatore deve sapere
+   * sono da che parte sta sbagliando e quanto gli manca — e una barra sola dice
+   * solo la seconda.
+   *
+   * La riga sotto nomina la ragione vera quando non è la distanza: i fari accesi
+   * e la lamiera toccata fanno fallire la scena senza che a schermo cambi niente,
+   * ed è il tipo di fallimento che sembra un bug.
+   */
+  drawTail(ctx, game, w, h, L = uiLayout(w, h, game)) {
+    const tail = game.tail;
+    if (!tail || !tail.active || game.indoors) return;
+    if (game.police && game.police.bustProgress > 0) return;
+    const bw = L.compact ? Math.min(250, w - L.safeX * 2) : 232;
+    const x = (w - bw) / 2;
+    const y = Math.min(h * 0.6, h - L.safeBottom - (L.compact ? 90 : 60));
+    const risk = Math.max(tail.heat, tail.slip);
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = risk > 0.05 ? '#ff8a5c' : '#ffffff';
+    ctx.font = `${L.compact ? '900 15px' : '900 19px'} system-ui, "Apple SD Gothic Neo", sans-serif`;
+    ctx.fillText('미행 · PEDINAMENTO', w / 2, y - 12);
+    // La pista, con le due zone rosse ai capi. Larghe quanto il serbatoio che
+    // stanno riempiendo: quella che ti sta fregando cresce mentre ti frega.
+    ctx.fillStyle = 'rgba(10,12,15,0.72)';
+    roundPath(ctx, x, y, bw, 9, 4);
+    ctx.fill();
+    const edge = 0.14;
+    ctx.fillStyle = `rgba(224,74,58,${0.35 + tail.heat * 0.6})`;
+    roundPath(ctx, x, y, bw * (edge + tail.heat * 0.1), 9, 4);
+    ctx.fill();
+    ctx.fillStyle = `rgba(224,74,58,${0.35 + tail.slip * 0.6})`;
+    const rw = bw * (edge + tail.slip * 0.1);
+    roundPath(ctx, x + bw - rw, y, rw, 9, 4);
+    ctx.fill();
+    // Il cursore.
+    const cx = x + bw * Math.max(0.02, Math.min(0.98, tail.gauge));
+    ctx.fillStyle = '#ffd23f';
+    roundPath(ctx, cx - 3, y - 4, 6, 17, 3);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(235,240,250,0.75)';
+    ctx.font = `${L.compact ? '600 10px' : '600 12px'} system-ui, sans-serif`;
+    const why = tail.heat > tail.slip && tail.heat > 0.05
+      ? (game.isNight && !game.player.onFoot && game.player.vehicle?.lightsOn
+        ? 'spegni i fari'
+        : 'stai troppo attaccato')
+      : tail.slip > 0.05 ? 'lo stai perdendo'
+      : `${tail.label ? `${tail.label} · ` : ''}${fmtDistance(tail.d)}`;
+    ctx.fillText(ellipsisText(ctx, why, bw), w / 2, y + 24, bw);
     ctx.restore();
   }
 
