@@ -769,9 +769,11 @@ export const HERO_OUTFITS = [
 ];
 
 /**
- * Sprite del protagonista. `pose` vale 'walk' o 'aim': con un'arma da fuoco in
- * pugno le braccia si tendono in avanti, ed è quello che rende leggibile a schermo
- * la differenza fra camminare e stare puntando qualcuno. `outfit` è il bomber
+ * Sprite del protagonista. `pose` vale 'walk', 'aim' o 'cuffed': con un'arma da
+ * fuoco in pugno le braccia si tendono in avanti, ed è quello che rende leggibile
+ * a schermo la differenza fra camminare e stare puntando qualcuno; ammanettato
+ * (§5.35) le braccia stanno dietro la schiena e i polsi, sopra il bomber, hanno
+ * le manette — è la parte che si deve leggere a un metro e mezzo di zoom. `outfit` è il bomber
  * comprato al negozio di vestiti — entra nella chiave di cache, non nel disegno.
  */
 export function getHeroSprite(frame = 0, pose = 'walk', outfit = 0) {
@@ -781,6 +783,7 @@ export function getHeroSprite(frame = 0, pose = 'walk', outfit = 0) {
     const cx = w / 2, cy = h / 2;
     const ph = Math.sin((frame / PED_FRAMES) * Math.PI * 2);
     const aiming = pose === 'aim';
+    const cuffed = pose === 'cuffed';
 
     // 1) Gambe. Dall'alto il tronco le copre quasi tutte: quello che si deve
     // vedere è il piede che sbuca di lato a ogni passo, non la gamba intera.
@@ -797,7 +800,11 @@ export function getHeroSprite(frame = 0, pose = 'walk', outfit = 0) {
     // convergono sull'arma: è la differenza che si legge da lontano.
     g.strokeStyle = shade(jacket, 0.08);
     g.lineWidth = 3.2;
-    if (aiming) {
+    if (cuffed) {
+      // Le braccia girano dietro: il tronco le copre, restano le mani (più sotto).
+      g.beginPath(); g.moveTo(cx + 0.6, cy + 6.6); g.lineTo(cx - 6.4, cy + 2.4); g.stroke();
+      g.beginPath(); g.moveTo(cx + 0.6, cy - 6.6); g.lineTo(cx - 6.4, cy - 2.4); g.stroke();
+    } else if (aiming) {
       g.beginPath(); g.moveTo(cx + 0.6, cy + 6.6); g.lineTo(cx + 8.6, cy + 4); g.stroke();
       g.beginPath(); g.moveTo(cx + 0.6, cy - 6.6); g.lineTo(cx + 7.4, cy + 1.4); g.stroke();
     } else {
@@ -846,6 +853,21 @@ export function getHeroSprite(frame = 0, pose = 'walk', outfit = 0) {
     g.strokeStyle = 'rgba(0,0,0,0.62)';
     g.lineWidth = 1.4;
     torso(); g.stroke();
+
+    // 4b) Polsi legati sulla schiena. Sopra la banda rossa, o sparirebbero:
+    // due mani color pelle, un anello d'acciaio attorno a ciascuna e la catena.
+    if (cuffed) {
+      for (const s of [-1, 1]) {
+        g.fillStyle = HERO.skin;
+        g.beginPath(); g.arc(cx - 8.1, cy + s * 1.9, 1.7, 0, 6.2832); g.fill();
+        g.strokeStyle = '#a9b4c0';
+        g.lineWidth = 0.9;
+        g.beginPath(); g.arc(cx - 7.1, cy + s * 1.9, 1.6, -1.9, 1.9); g.stroke();
+      }
+      g.strokeStyle = '#aab3bd';
+      g.lineWidth = 1;
+      g.beginPath(); g.moveTo(cx - 7.1, cy - 1.9); g.lineTo(cx - 7.1, cy + 1.9); g.stroke();
+    }
 
     // 5) Code della fascia: corte, dietro la nuca. Bastano a dare movimento senza
     // trasformarsi in due antenne rosse lunghe quanto il personaggio.
@@ -1563,6 +1585,7 @@ export function preloadSprites() {
   for (let f = 0; f < PED_FRAMES; f++) {
     getHeroSprite(f, 'walk');
     getHeroSprite(f, 'aim');
+    getHeroSprite(f, 'cuffed');
   }
   getHeroPortrait();
   getChopperSprite();

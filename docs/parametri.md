@@ -287,3 +287,8 @@
 | Stelle della fuga in barca | `m4` fase `barca` | portate a **tre** se non ci si è già arrivati: sono quelle che mettono in acqua le motovedette e in aria l'elicottero (§5.5), e da tre in su non ti ammanettano più (§5.16) |
 | Camera dalla gru | `m4.ZOOM_GRU` · `m4.ZOOM_T` | 0,5 (il minimo consentito è 0,45) per 7 s, tenuta con `camera.holdZoom`: senza il blocco il giocatore la richiude nel frame dopo |
 | Sorpasso e corsia | `traffic.OVERTAKE` · `LANE` | `true` · slide 1,1 corsie/s · obbligatorio entro 700 px · facoltativo oltre 200 px dall'incrocio, leader ≥ 75 px/s più lento, gap ≥ 180, 3 s fra due cambi · finestra di corsia 26 px (§5.34) |
+| Arresto in volante | `arrest.CUFF_T` · `BOARD_T` · `DRIVE_T` · `FADE_T` · `TIMEOUT` | 0,8 · 0,95 · 2,0 · 0,7 · 12 s: 5-6 s con una volante già lì, 8-11 s con una che arriva da fuori campo. Oltre `TIMEOUT` si chiude con `bustPlayer` (§5.35) |
+| Attesa e tragitto dell'arresto | `arrest.WAIT_CAR` · `WALK_MAX` | 5 s per la volante, 4 s a piedi: oltre, niente teletrasporti, si va alla dissolvenza |
+| Quale volante | `arrest.CAR_REACH` · `KERB_REACH` | 380 px per usarne una già lì · 300 px da una strada oltre i quali non si chiama nessuno. La nuova nasce a 520-780 px, con un A* che non sia più lungo di 1,35× la linea d'aria + 120 px |
+| Camera dell'arresto | `arrest.ZOOM_SCENE` · `ZOOM_DRIVE` | 1,8 (si devono leggere due persone e le manette) poi 2,0 sulla volante che parte, tenuto con `holdZoom` |
+| Dove si ferma la volante | `police.driveEscort` | ~70 px dal punto di strada più vicino al giocatore: frena da lì, o l'arrivo diventa un investimento |

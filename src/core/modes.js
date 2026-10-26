@@ -61,6 +61,14 @@ export const MODES = [
     worldRuns: false, playerRuns: false, duck: 0.22, radioDuck: 0.4, cursor: 'default',
   },
   {
+    // Le manette (`entities/arrest.js`): il mondo gira — traffico, pedoni, la
+    // volante che arriva — ma il giocatore non risponde ai comandi. Sta *sotto*
+    // il menu, o aprire la pausa durante la scena non fermerebbe niente.
+    id: 'arrest',
+    when: (game) => !!game.arrest?.active,
+    worldRuns: true, playerRuns: false, duck: 1, radioDuck: 1, cursor: 'none',
+  },
+  {
     id: 'play',
     when: () => true,
     worldRuns: true, playerRuns: true, duck: 1, radioDuck: 1, cursor: 'none',

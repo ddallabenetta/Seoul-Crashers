@@ -408,7 +408,7 @@ export function toggleAutosave() {
  */
 export function canAutosave(game) {
   if (!autosaveOn() || !game.started) return false;
-  if (game.player.dying || game.player.hp <= 25) return false;
+  if (game.player.dying || game.player.hp <= 25 || game.arrest?.active) return false;
   if (game.wanted.level > 0) return false;
   return !(game.police && game.police.bustProgress > 0);
 }

@@ -202,15 +202,26 @@ export class PoliceSystem {
     const pl = game.player;
     const w = game.wanted;
     this._bustCd = Math.max(0, this._bustCd - dt);
+    // Le manette sono già chiuse: la barra non c'è più e l'agente non ha niente
+    // da stringere. Il resto lo fa `entities/arrest.js`.
+    if (game.arrest.active) {
+      this.arresting = false;
+      this.bustT = 0;
+      return;
+    }
     this.arresting = w.level > 0 && w.level <= ARREST_LEVEL && pl.onFoot && !pl.dying
       && !game.indoors && pl.swingT <= 0 && (WEAPONS[pl.weapon].melee || pl.hp <= BUST_HP);
     if (!this.arresting) {
       this.bustT = 0;
       return;
     }
-    const near = this.cops.some(
-      (p) => !p.dead && p.kind === 'cop' && dist(p.x, p.y, pl.x, pl.y) < BUST_R
-    );
+    let near = null;
+    let nearD = BUST_R;
+    for (const p of this.cops) {
+      if (p.dead || p.kind !== 'cop') continue;
+      const d = dist(p.x, p.y, pl.x, pl.y);
+      if (d < nearD) { nearD = d; near = p; }
+    }
     if (!near) {
       // Si perde il contatto più in fretta di quanto lo si guadagni: due passi
       // indietro devono bastare a togliersi dalle mani di un agente.
@@ -225,7 +236,10 @@ export class PoliceSystem {
     this.bustT += dt;
     if (this.bustT >= BUST_TIME) {
       this.bustT = 0;
-      game.bustPlayer();
+      // L'agente più vicino è quello che ti accompagna. Se la sequenza non può
+      // partire (non succede, ma `bustPlayer` resta il punto unico di chiusura)
+      // si chiude subito come prima.
+      if (!game.arrest.start(game, near)) game.bustPlayer();
     }
   }
 
@@ -302,6 +316,11 @@ export class PoliceSystem {
   siege(dt, game) {
     const shop = game.shops.active && game.shops.active.shop;
     if (!shop) return;
+    // Dentro un negozio `update` non gira, e con lui `updateArrest`: senza questa
+    // riga la barra del fermo restava congelata a metà (e con lei l'autosave).
+    // Entrare in un negozio è una fuga a tutti gli effetti.
+    this.arresting = false;
+    this.bustT = 0;
     if (this.siegeDoor !== shop) {
       this.siegeDoor = shop;
       this.planSiege(shop);
@@ -532,11 +551,12 @@ export class PoliceSystem {
     return this.trySpawnCar(game, kind, tier, this.city.graph.edgesNear(f.x, f.y, 1500));
   }
 
-  trySpawnCar(game, kind, tier, near) {
+  /** `accept(pt, edge, dir)`, se c'è, scarta i punti che non vanno bene a chi chiama. */
+  trySpawnCar(game, kind, tier, near, accept = null, attempts = 24) {
     const rng = this.rng;
     const f = this.focus(game);
     if (!near.length) return null;
-    for (let attempt = 0; attempt < 24; attempt++) {
+    for (let attempt = 0; attempt < attempts; attempt++) {
       const edge = rng.pick(near);
       const dir = rng.chance(0.5) ? 1 : -1;
       const lane = rng.int(0, laneCount(edge) - 1);
@@ -553,6 +573,7 @@ export class PoliceSystem {
         if (dist(o.x, o.y, pt.x, pt.y) < 90) { clear = false; break; }
       }
       if (!clear) continue;
+      if (accept && !accept(pt, edge, dir)) continue;
 
       const v = createVehicle(kind, pt.x, pt.y, pt.angle, 0);
       v.driver = 'cop';
@@ -653,6 +674,10 @@ export class PoliceSystem {
     p.fireT -= dt;
     p.nadeT -= dt;
 
+    // Manette addosso: nessuno spara più, e l'agente che accompagna ha un ordine
+    // suo (`entities/arrest.js`).
+    if (game.arrest.active) return game.arrest.copOrder(p, game);
+
     // Richiamato a bordo: torna alla sua volante e ci sale. Ha la precedenza su
     // tutto il resto, altrimenti bastava un colpo sparato a farlo tornare indietro.
     if (p.board) {
@@ -730,6 +755,12 @@ export class PoliceSystem {
     const w = game.wanted;
     ai.fireT -= dt;
 
+    if (game.arrest.active) {
+      if (v.escort) this.driveEscort(v, dt, game);
+      else { v.throttle = 0; v.steer = 0; v.handbrake = true; }
+      return;
+    }
+
     // Sbarcato l'equipaggio la volante resta ferma coi lampeggianti accesi: una
     // volante *vuota* che continua a speronare non si spiega (§4). Non è però più
     // per sempre — vedi `manageDeployed`.
@@ -797,6 +828,86 @@ export class PoliceSystem {
     } else {
       ai.jamT = 0;
     }
+  }
+
+  /**
+   * La volante che porta via il giocatore (`entities/arrest.js`). Tre stati e
+   * nessuna caccia: `approach` va al ciglio della strada e frena prima di
+   * arrivarci (una volante che frena sulla testa di chi deve caricare non è una
+   * scena), `hold` sta ferma con la sirena accesa, `leave` si butta nel traffico
+   * lungo la strada su cui è. La guida è `followRoads` com'è — i freni davanti a
+   * chi è fermo, l'anti-incastro — quello che cambia è solo il bersaglio.
+   */
+  driveEscort(v, dt, game) {
+    const e = v.escort;
+    const ai = v.copAi;
+    if (e.state === 'hold') {
+      v.throttle = 0;
+      v.steer = 0;
+      v.handbrake = true;
+      return;
+    }
+    if (ai.recoverT > 0) {
+      ai.recoverT -= dt;
+      v.throttle = -0.6;
+      v.steer = ai.recoverSteer;
+      v.handbrake = false;
+      if (ai.recoverT <= 0) this.snapToRoad(v);
+      return;
+    }
+    if (e.state === 'leave') {
+      this.followRoads(v, dt, game, v.x + Math.cos(v.angle) * 1600, v.y + Math.sin(v.angle) * 1600);
+    } else {
+      const to = this.escortWaypoint(v, game);
+      this.followRoads(v, dt, game, to.x, to.y);
+      const d = dist(v.x, v.y, e.x, e.y);
+      e.minD = Math.min(e.minD, d);
+      // Si ferma a ~70 px dal ciglio: chi aspetta è a piedi, sul marciapiede.
+      const want = clamp((d - 70) * 1.6, 0, 300);
+      if (want < 240) {
+        const diff = want - v.speed;
+        v.throttle = diff > 6 ? clamp(diff / 60, 0.2, 1) : clamp(diff / 50, -1, -0.1);
+      }
+      // Arrivata, o passata oltre il punto più vicino senza essersi fermata.
+      if ((Math.abs(v.speed) < 14 && d < 220) || (e.minD < 160 && d > e.minD + 30)) {
+        e.state = 'hold';
+        return;
+      }
+    }
+    if (Math.abs(v.speed) < 12) {
+      ai.jamT += dt;
+      if (ai.jamT > 1.6) {
+        ai.jamT = 0;
+        ai.recoverT = 0.9;
+        ai.recoverSteer = this.rng.chance(0.5) ? 1 : -1;
+      }
+    } else {
+      ai.jamT = 0;
+    }
+  }
+
+  /**
+   * Dove punta la volante che va a prendere il giocatore. `followRoads` sceglie a
+   * ogni incrocio l'arco che *avvicina di più* al bersaglio, ed è un greedy che
+   * regge un inseguimento (il bersaglio è lì e si avvicina) ma non una destinazione
+   * ferma: misurato, una volante su due girava attorno all'isolato. Qui il
+   * bersaglio è **il nodo dopo** su un A* (lo stesso dell'itinerario, §5.30), che
+   * si ricalcola solo quando la volante cambia arco — una manciata di volte per
+   * tutta la scena.
+   */
+  escortWaypoint(v, game) {
+    const e = v.escort;
+    const ai = v.copAi;
+    if (!ai.edge || !e.goal) return e;
+    if (e.edge !== ai.edge || e.dir !== ai.dir) {
+      e.edge = ai.edge;
+      e.dir = ai.dir;
+      const graph = this.city.graph;
+      const here = graph.nodeById(ai.dir > 0 ? ai.edge.b : ai.edge.a);
+      const chain = game.route.solve(graph, here, e.goal);
+      e.next = chain && chain.length > 1 ? chain[1] : null;
+    }
+    return e.next || e;
   }
 
   /**

@@ -110,6 +110,7 @@ export function createPed(kind, x, y, rng) {
     turf: null,       // territorio presidiato: lo guida lo stato `guard`
     dealer: false,    // 거래책: l'uomo con cui si tratta (vedi `spawnTurf`)
     cop: false,       // in servizio: lo stato lo guida `police.copBehavior`
+    escort: false,    // sta portando via il giocatore (`entities/arrest.js`)
     copWeapon: null,
     // Chi ha un compito da `life.js`. `role` dice quale mestiere sta facendo (e
     // quindi che ordini riceve), `ev` il fatto a cui appartiene, `aggro` chi gli
@@ -744,7 +745,9 @@ export class PedestrianSystem {
     // spostata di lato quanto basta a passare e il resto lo fa lo steering. Chi
     // sta sotto una tettoia o davanti al suo banco è arrivato e non deve
     // scansare niente.
-    if (cars.length && targetSpeed > 1) {
+    // `escort`: l'agente che porta via il giocatore va a una portiera, cioè *contro*
+    // una lamiera — scansarla è esattamente quello che non deve fare (§5.35).
+    if (cars.length && targetSpeed > 1 && !p.escort) {
       const goal = this.deflectAroundCars(p, tx, ty, cars);
       if (goal) { tx = goal.x; ty = goal.y; }
     }

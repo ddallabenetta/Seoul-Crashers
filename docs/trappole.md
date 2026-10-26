@@ -450,3 +450,22 @@ due quinti in alto a sinistra: un personaggio disegnato con `groundY` sul bordo 
 sotto il gradiente e sparisce. Peggio: con cinque voci il riquadro **esce dal pannello** e la
 prima riga finisce oltre il bordo di sopra. Si guarda con `cutscene-panel.scene`, non si indovina
 — e quando non ci sta, si taglia la battuta o si divide la tavola in due (§5.33).
+
+**Dentro un negozio `police.update` non gira, e con lui ogni cronometro che ci vive.** La barra del
+fermo (`arresting`/`bustT`) restava congelata a metà mentre si era al riparo, e riprendeva da dov'era
+all'uscita (§5.35). Vale per qualunque stato di polizia che si aggiorna in `update` e non in `siege`:
+quello che deve smettere di contare entrando da una porta va azzerato **in `siege`**.
+
+**`followRoads` non porta a una destinazione ferma.** Sceglie a ogni incrocio l'arco che *avvicina di
+più* al bersaglio: regge un inseguimento (il bersaglio si avvicina da sé) ma su un punto fermo una
+volante su due girava attorno all'isolato. Per mandarla in un posto si passa il **nodo dopo di un A\***
+(`police.escortWaypoint`, ricalcolato solo quando cambia arco) e non il posto (§5.35).
+
+**Una modalità con `playerRuns: false` non ferma niente da sola.** `mode.playerRuns` non lo legge
+nessuno per conto suo: chi vuole il giocatore fermo mentre il mondo gira deve gatare a mano
+`player.update` e **ogni sistema che consuma tasti** (negozi, metro, cortili, missioni) — in
+`main.update` lo fa `live` (§5.35). Un tasto che resta vivo è una porta che si apre sotto le manette.
+
+**Una scena che campiona «ogni mezzo secondo» con `floor(t/500) > tr.length` campiona ogni decimo.**
+Il contatore recupera finché non raggiunge l'orologio, quindi dopo una pausa (una fase che comincia)
+sembra di vedere un agente che cammina a 8 px/s: è un'illusione dello script, non del gioco.

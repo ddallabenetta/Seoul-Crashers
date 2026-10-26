@@ -1184,6 +1184,23 @@ export class AudioSystem {
     this._noise(this._filter(out, 'bandpass', 2400, 5), { dur: 0.04, peak: 0.35, attack: 0.001, t: 0.03 });
   }
 
+  /**
+   * Le manette: tre scatti di cricchetto sempre più fitti e il clack del dente che
+   * aggancia. Sono tutti suoni **corti e acuti** — è quello che le distingue da una
+   * porta — e senza coda: lo spazio lo aggiunge già il bus.
+   */
+  handcuffs() {
+    const out = this._at(null, null, 0.34, 0.5, this.uiBus);
+    if (!out) return;
+    const hi = this._filter(out, 'bandpass', 3400, 6);
+    [0, 0.075, 0.13].forEach((t, i) => {
+      this._noise(hi, { dur: 0.02, peak: 0.5, attack: 0.001, t });
+      this._tone(out, { type: 'triangle', f0: 2300 + i * 350, f1: 1500, dur: 0.035, peak: 0.22, attack: 0.001, t });
+    });
+    this._noise(this._filter(out, 'bandpass', 1500, 3), { dur: 0.05, peak: 0.55, attack: 0.001, t: 0.21 });
+    this._tone(out, { type: 'sine', f0: 330, f1: 180, dur: 0.1, peak: 0.4, attack: 0.001, t: 0.21 });
+  }
+
   /** Tuffo in acqua: la banda sale e poi ricade, come lo spruzzo. */
   splash(x, y, size = 1) {
     const out = this._at(x, y, 0.5 * size, 0.9);
