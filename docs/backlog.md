@@ -166,8 +166,7 @@ il §5.21 altre undici — fra cui le due che erano tornate in cima.
 - **Non ti caricano in volante.** L'arresto c'è (§5.16), ma è uno stacco: manette, nero,
   commissariato. Vedere l'agente che ti ammanetta e la volante che parte vorrebbe
   un'animazione e un pezzo di regia della camera. **È la voce più visibile rimasta.**
-- **Nessuno sorpassa.** Sull'arteria le due corsie per senso restano inutilizzate, ed è
-  **l'ultimo debito grosso del traffico** (dettagli più sotto).
+- ~~Nessuno sorpassa.~~ Fatto in §5.34 (`traffic.OVERTAKE`): la corsia segue la svolta.
 
 **Rimasto indietro dai cortili** (§5.31):
 - **Le guardie del cortile tuo non sono tue.** Ci stanno e non ti sparano, ma non ti seguono,
@@ -257,16 +256,14 @@ il §5.21 altre undici — fra cui le due che erano tornate in cima.
 - **La granata è solo della SWAT e solo a cinque stelle**: niente lanci dal finestrino.
 
 **Rimasto indietro dal traffico** (§5.10):
-- **Nessuno sorpassa.** Sull'arteria le due corsie per senso restano inutilizzate. Un tentativo
-  è già stato fatto e misurato peggiore: manca la scelta della corsia in base alla svolta
-  successiva. **È l'ultimo debito grosso del traffico**, adesso che il ciclo del semaforo è
-  stato misurato (§5.12).
+- **Il sorpasso è fatto (§5.34) ma prudente**: il facoltativo scatta solo sui tratti lunghi, perché
+  gli archi sono corti. Resta il 22% di auto in corsia sbagliata all'incrocio (code ai rossi).
 - **Il traffico non sa niente della quota**: un'auto in salita rallenta per fisica ma non se lo
   aspetta, e alza il gas dopo.
 - **`MAX_TRAFFIC` resta a 44, e adesso si sa che il semaforo non lo sblocca.** §5.10 lo aveva
   sceso da 54 indicando il ciclo del semaforo come la leva per rialzarlo; §5.12 l'ha misurata e
   la leva non c'è (accorciare non dà niente, allungare fa danni). Chi vuole più densità deve
-  cercare la capacità da un'altra parte — il sorpasso, o la priorità fra i mezzi.
+  cercare la capacità da un'altra parte — la priorità fra i mezzi.
 - **Non c'è priorità fra i mezzi**: un autobus (158 px) e uno scooter (44 px) trattano l'incrocio
   allo stesso modo, e il primo lo occupa per il doppio del tempo.
 - **I pedoni aggirano le lamiere ferme ma non si aggirano fra loro**: dal §5.21 un passante

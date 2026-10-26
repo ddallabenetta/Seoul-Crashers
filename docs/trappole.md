@@ -128,6 +128,8 @@ codice spiega il perché nel punto giusto.
 | Un tetto sembra fuori dall'asse ma copre ancora una corsia | il grafo descrive il percorso dei veicoli, non il rettangolo asfaltato; boulevard e strade hanno larghezze diverse | ogni controllo di piazzamento usa le linee attive e la loro `width` tramite `roadclearance.js`, non soltanto nodi o archi centrali |
 | Uscendo dalla metro si riappare dentro la scala | quando l'ingresso è diventato solido, salvarne il centro come posizione esterna ha trasformato una coordinata valida in una collisione | `MetroSystem.enterStation` conserva la posizione reale del giocatore, già verificata dall'interazione |
 | Entrando in metro il giocatore viene espulso di lato | `entry` cade dentro un pilastro/arredo e il primo frame di collisione corregge il punto iniziale | ogni cambio alla pianta 1080×720 va verificato con raggio giocatore: ingresso, uscita e porta del treno liberi e percorso connesso |
+| Il sorpasso peggiora flusso e immobili | cambi facoltativi larghi (leader −40 px/s, nessun limite di gap): tutti nella corsia libera e affiancati all'incrocio. I soli cambi obbligatori non costano niente | `traffic.LANE.slower` · `noOptional` (§5.34) |
+| `ai.lane` non dice dove sta l'auto | con `OVERTAKE` è la corsia *desiderata*; quella fisica è `ai.laneF`, frazionaria, e `lanePoint`/`laneOffset` accettano frazioni | `traffic.laneLogic`, `roadgraph.laneOffset` |
 
 Regola generale emersa: **prima di dare la colpa all'AI, verifica la geometria.** Quasi tutti
 gli "stalli dell'AI" erano problemi di ingombri, corsie o posizionamento.

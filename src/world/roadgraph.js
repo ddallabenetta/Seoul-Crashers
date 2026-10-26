@@ -13,8 +13,9 @@ export function laneCount(edge) {
   return edge.arterial ? 2 : 1;
 }
 
+// `lane` può essere frazionario: è lo scivolamento di un cambio corsia (§5.34).
 export function laneOffset(edge, lane) {
-  if (edge.arterial) return lane === 0 ? 18 : 54;
+  if (edge.arterial) return 18 + 36 * lane;
   return 19;
 }
 
