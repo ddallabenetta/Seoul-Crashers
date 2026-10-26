@@ -5,7 +5,8 @@ resta corto apposta.** Il contenuto vero sta in `docs/`, e si apre un documento 
 non tutti. Il `README.md` descrive il gioco e i comandi; qui c'è quello che serve a
 *sviluppare*. Avvio e vincoli stanno in `CLAUDE.md`, che si carica da solo.
 
-Ultimo aggiornamento: **il sorpasso sulle arterie** (§5.34, tappa T1 del rework): la corsia si sceglie
+Ultimo aggiornamento: **la regia sonora dei pannelli** (§5.37, tappa T6: `bed`/`sfx` sul pannello,
+fruscio, cane e sirena lontana nell'apertura). Prima: **il sorpasso sulle arterie** (§5.34, tappa T1 del rework): la corsia si sceglie
 in base alla svolta, e `traffic.OVERTAKE` lo accende. Prima: **l'Atto I completo** (§5.33, tappa E) — **M3**, **M4** e il raccordo
 **R1** chiudono il primo atto, e con loro entrano le due meccaniche che il copione chiedeva da due
 tappe: il **pedinamento con soglia di distanza** e l'**oggetto di missione trasportabile**. Prima
@@ -44,6 +45,7 @@ l'impianto delle missioni con M1 e M2 (§5.29). Le tappe precedenti sono §5.8-5
 | **implementare una missione**: fasi, blip, punti, dialoghi, ripresa | `docs/storico/18-missioni-m1-m2.md` (§5.29) |
 | disegnare su mappa o minimappa, o toccare il percorso verso il blip | `docs/storico/19-itinerario-sulla-carta.md` (§5.30) |
 | toccare la proprietà di un cortile, il suo banco o la sua busta | `docs/storico/20-cortili-persistenti.md` (§5.31) |
+| dare un suono a un pannello (fruscio, cane, sirena lontana) | `docs/storico/26-regia-sonora.md` (§5.37) |
 | toccare la corsia, il cambio corsia o il car-following del traffico | `docs/storico/23-sorpasso.md` (§5.34) |
 | **pedinare qualcuno**, far portare un oggetto, mandare un'auto in un posto | `docs/storico/22-atto-i-completo.md` (§5.33) |
 | **scrivere una battuta di Kkachi**, o toccare la radio e la `91.45` | `docs/storico/21-kkachi.md` (§5.32) |
@@ -85,6 +87,7 @@ commenti resta valido: si risolve qui.
 | §5.32 까치 sulla `91.45` | `docs/storico/21-kkachi.md` |
 | §5.33 L'Atto I completo: M3, M4, R1, pedinamento e fogli | `docs/storico/22-atto-i-completo.md` |
 | §5.34 Il sorpasso: corsia in base alla svolta | `docs/storico/23-sorpasso.md` |
+| §5.37 La regia sonora dei pannelli: `bed` e `sfx` | `docs/storico/26-regia-sonora.md` |
 | §6 Backlog | `docs/backlog.md` |
 | §8 Parametri | `docs/parametri.md` |
 | §9 Strumenti (`.claude/`) | `docs/strumenti.md` |

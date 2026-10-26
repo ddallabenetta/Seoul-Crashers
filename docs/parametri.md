@@ -287,3 +287,4 @@
 | Stelle della fuga in barca | `m4` fase `barca` | portate a **tre** se non ci si è già arrivati: sono quelle che mettono in acqua le motovedette e in aria l'elicottero (§5.5), e da tre in su non ti ammanettano più (§5.16) |
 | Camera dalla gru | `m4.ZOOM_GRU` · `m4.ZOOM_T` | 0,5 (il minimo consentito è 0,45) per 7 s, tenuta con `camera.holdZoom`: senza il blocco il giocatore la richiude nel frame dopo |
 | Sorpasso e corsia | `traffic.OVERTAKE` · `LANE` | `true` · slide 1,1 corsie/s · obbligatorio entro 700 px · facoltativo oltre 200 px dall'incrocio, leader ≥ 75 px/s più lento, gap ≥ 180, 3 s fra due cambi · finestra di corsia 26 px (§5.34) |
+| Regia sonora dei pannelli | `intro.js` `bed`/`sfx` · `audio.dog` · `beds.sirenFar` | fruscio 0,05 (pannello 1) · 0,04 (8) · 0,035 (25) · 0,02 (26) · sirena lontana 0,015 (23) · cane a 8,6 s (1) e 1,6 s (27), picco 0,13. Rampa letti 0,3 s, taglio al salto 0,04 s (§5.37) |

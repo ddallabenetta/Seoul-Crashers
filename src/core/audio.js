@@ -121,6 +121,7 @@ export class AudioSystem {
     this.load();
     this.lx = 0;
     this.ly = 0;
+    this.sceneLv = { kkachi: 0, sirenFar: 0 };   // letti chiesti dal pannello a schermo
     this._live = [];      // suoni brevi in corso: { g, t } con t = quando staccarli
     this._stepD = 0;      // passi del giocatore, contati in pixel percorsi
     this._flash = 0;      // fronte del lampo, per far partire il tuono
@@ -218,6 +219,11 @@ export class AudioSystem {
     this.amb = ctx.createGain();
     this.amb.gain.value = this.mix.ambient;
     this.amb.connect(this.comp);
+
+    // Gli one-shot delle cutscene passano da un bus loro: `sceneStop` lo chiude in
+    // un attimo, e un latrato già partito non deve sopravvivere al tasto di salto.
+    this.sceneBus = ctx.createGain();
+    this.sceneBus.connect(this.sfx);
 
     // La musica **passa dal compressore**, al contrario dell'interfaccia: quando
     // scoppia una granata deve abbassarsi come tutto il resto, o un pezzo che
@@ -664,6 +670,34 @@ export class AudioSystem {
         return { osc, lfo, pan, bp };
       }, 0.25),
 
+      // Sirena lontana, solo per i pannelli (`scene`): non è la sirena della caccia
+      // ridotta, è un'altra cosa — una volante che passa due isolati più in là. Un
+      // triangolo (poche armoniche) con un lamento lento e un passa-basso stretto:
+      // da lontano restano i toni gravi e la salita-discesa, non il filo acuto.
+      // Passa dal bus degli effetti per prendere il riverbero della strada.
+      sirenFar: this.bed((node) => {
+        node.connect(this.sfx);
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = 900;
+        lp.Q.value = 0.5;
+        lp.connect(node);
+        const osc = ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.value = 640;
+        osc.connect(lp);
+        osc.start();
+        const lfo = ctx.createOscillator();
+        lfo.type = 'sine';
+        lfo.frequency.value = 0.32;
+        const lg = ctx.createGain();
+        lg.gain.value = 170;
+        lfo.connect(lg);
+        lg.connect(osc.frequency);
+        lfo.start();
+        return { osc, lfo, lp };
+      }, 0.6),
+
       // Rotore: rumore tagliato basso e "pale" ottenute modulando il guadagno.
       rotor: this.bed((node) => {
         const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
@@ -889,6 +923,13 @@ export class AudioSystem {
     if (kk?.visible) {
       beds.kkachi.target = duck * this.mix.radio * (kk.line?.text ? 0.02 : 0.05);
     }
+
+    // I letti chiesti da un pannello (`scene`). Non passano dal `duck` della
+    // modalità: la cutscene lo abbassa a 0,12 perché il mondo non c'è, ma questi
+    // *sono* la scena. Il fruscio segue la manopola della radio come in strada.
+    const sc = this.sceneLv;
+    beds.kkachi.target = Math.max(beds.kkachi.target, sc.kkachi * this.mix.radio);
+    beds.sirenFar.target = sc.sirenFar;
 
     // Canne della minigun: `spin` è già la manopola, qui diventa tono e volume.
     if (pl.spin > 0.01 && pl.onFoot) {
@@ -1279,6 +1320,62 @@ export class AudioSystem {
   }
 
   // --- suoni: mondo e interfaccia ---------------------------------------------
+
+  // --- regia dei pannelli (`ui/cutscene.js`) ----------------------------------
+
+  /**
+   * Letti tenuti finché il pannello è a schermo: `{ kkachi, sirenFar }` sono guadagni
+   * (la scala di `beds.kkachi` in strada: 0.02 sotto una battuta, 0.05 nei silenzi).
+   * `null` li spegne con la rampa normale; `sceneStop` li taglia.
+   */
+  scene(levels) {
+    const lv = this.sceneLv;
+    lv.kkachi = levels?.kkachi || 0;
+    lv.sirenFar = levels?.sirenFar || 0;
+    if (!this.beds) return;
+    this.beds.kkachi.smooth = this.beds.sirenFar.smooth = 0.3;
+    // Un pannello nuovo riapre il bus chiuso da un salto precedente.
+    if (this.ctx && levels) {
+      this.sceneBus.gain.cancelScheduledValues(this.ctx.currentTime);
+      this.sceneBus.gain.setValueAtTime(1, this.ctx.currentTime);
+    }
+  }
+
+  /** Salto o fine: zittisce subito letti e colpi della scena (silenzio in ~0,25 s). */
+  sceneStop() {
+    const lv = this.sceneLv;
+    lv.kkachi = 0;
+    lv.sirenFar = 0;
+    if (!this.beds) return;
+    this.beds.kkachi.smooth = this.beds.sirenFar.smooth = 0.04;
+    this.sceneBus.gain.setTargetAtTime(0, this.ctx.currentTime, 0.04);
+  }
+
+  /** Colpo secco di un pannello, temporizzato da `ui/cutscene.js`. */
+  sceneSfx(kind, vol = 1) {
+    if (kind === 'dog') this.dog(vol);
+  }
+
+  /**
+   * Un cane che abbaia lontano: tre latrati, ognuno con la sua eco di vicolo. Lontano
+   * vuol dire poco corpo (passa-basso a 1,1 kHz, niente attacco), piano, e un'eco
+   * a un quinto di secondo che è il riverbero di un vicolo vero. Dal bus di scena
+   * entra anche nel convolutore dello spazio.
+   */
+  dog(vol = 1) {
+    const out = this._at(null, null, 0.2 * vol, 2.2, this.sceneBus);
+    if (!out) return;
+    const far = this._filter(out, 'lowpass', 1100, 0.7);
+    const bark = (t, f, g) => {
+      const body = this._filter(far, 'bandpass', f * 1.5, 1.6);
+      this._tone(body, { type: 'sawtooth', f0: f, f1: f * 0.58, dur: 0.17, peak: g, attack: 0.012, t });
+      this._noise(this._filter(far, 'bandpass', 900, 1.2), { dur: 0.1, peak: g * 0.5, attack: 0.008, t });
+    };
+    for (const [t, f] of [[0, 520], [0.4, 480], [0.74, 440]]) {
+      bark(t, f, 0.9);
+      bark(t + 0.21, f * 0.97, 0.3);
+    }
+  }
 
   /** Tuono. `far` 0..1: vicino è uno schianto, lontano è solo rimbombo che arriva dopo. */
   thunder(far = 0.5) {
