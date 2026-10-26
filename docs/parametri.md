@@ -294,3 +294,8 @@
 | Zona vietata dei cortili di banda | `blocklife.makeCtx` | il centro, 56% per lato: lì si sgombra e si resta sei secondi |
 | Arredo urbano | `blocklife.STREET_MIX` · passo 74 px | probabilità per candidato = deficit di densità rispetto a Seoul × 1,1 (max 0,9); Seoul ha deficit 0 |
 | Insegne | `blocklife.addSigns` | probabilità = deficit di insegne per edificio × 1,5 (max 0,9); fino a 2 insegne sul palazzo con lato strada, 1 sugli altri |
+| Testate e spuntoni | `korea.TESTATA_LUNGHEZZA` · `SPUNTONE_MIN` | asfalto oltre il nodo di un vicolo cieco = larghezza + 44 px (l'auto che inverte sborda) · apron dipinto di 44 px se la via finiva sul nodo · sotto 40 px di spuntone non si taglia (§5.38) |
+| Terreno attorno alle città | `ground.GROUND_BLEND` · `GROUND_RIM` · `GROUND_N` | 80 px di sfumatura oltre il bordo; la rampa comincia 260 px dentro e arriva a prato 130 px dentro · 17 campioni per tile (§5.38) |
+| Rilievo sul bordo | `ground.RELIEF_EDGE` · `RELIEF_EDGE_MIN` · `korea.EDGE_BLEND` | ombreggiatura al 10% sul bordo, piena a 800 px · raccordo di quota 1300 px (§5.38) |
+| Foce del Han | `ground.BLEND_FOCE` · `SEA_X0` | 260 px di sfumatura fiume→mare · il mare occidentale si sfuma da x=-900 (§5.38) |
+

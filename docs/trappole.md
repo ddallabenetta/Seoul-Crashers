@@ -476,3 +476,19 @@ del molo: una gru nuova con lo stesso tipo cambia il bersaglio. Le gru del §5.3
 sovrappone: il test esatto va rifatto sul risultato (`blocklife.hasSolid`). E contare i prop
 solidi come «già occupato» salta i campi di Jeju (ci sono `ac_unit` dei cortili, che nei campi si
 tolgono); un `turf` può coprire un intero molo, quindi si vieta solo il suo centro (§5.39).
+**Un `x1` di area è già fuori dall'area.** `areaAt` è aperto a destra (`x < x1`), quindi
+`districtAt(7200, y)` risponde campagna: campionare il bordo esatto di Seoul dipingeva una
+riga verde larga un passo di campionamento. Per leggere il distretto del bordo si clampa a `x1 - 1`
+(§5.38).
+
+**Uno smoothstep non è un raccordo.** Parte con derivata zero: se la città scende di 0,09 px/px
+sul bordo e la campagna la prosegue piatta, l'hillshade disegna una striscia chiara e una parete
+scura. Il raccordo di quota deve continuare la pendenza uscente (`korea.elevationAt`, §5.38).
+
+**Un `createLinearGradient(left, …)` per tile è un mare a scacchi.** Il gradiente va ancorato a
+un'ascissa del mondo (`SEA_X0`), non al bordo del tile che si sta disegnando (§5.38).
+
+**Accorciare una via non è allungarla.** `regions.reindex` scarta gli edifici che toccano i
+`segments`: allungare un segmento per far stare una testata faceva sparire edifici. Le testate si
+dipingono (`ground.drawTestata`), non si aggiungono alla carreggiata (§5.38).
+

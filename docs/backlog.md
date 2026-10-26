@@ -297,10 +297,12 @@ il §5.21 altre undici — fra cui le due che erano tornate in cima.
   banchina e treno si vedono e si percorrono; dopo la scelta, però, il tempo avanza e il
   personaggio arriva senza tariffa, biglietto né sequenza di KTX. Adesso però è una comodità e
   non l'unica via, quindi pesa meno di prima.
-- **Il bordo di una città resta leggibile a terra.** La tinta del terreno si interpola fra i
-  distretti e la campagna si dirada, ma dove finiscono gli isolati la trama cambia di colpo. Si
-  legge come «qui finisce Seoul», che è quasi giusto — una periferia vera vorrebbe capannoni,
-  svincoli e case sparse.
+- **Il bordo di una città resta leggibile a terra, ma adesso sfuma** (§5.38: niente più bande
+  per tile né spuntoni di asfalto; le vie cieche hanno una testata). Una periferia vera
+  vorrebbe ancora capannoni, svincoli e case sparse. **T9c**: prolungando un viale in provinciale
+  si toglie la testata del nodo con `rimuoviTestata` e si allunga il segmento. **T9d** rifà la
+  forma di Busan e Jeju: le testate di quei bordi (nodi di Busan nord/costa e i sette di Jeju) vanno
+  ricalcolate, `accorciaStrade` le rigenera da sola.
 - **Lasciare una città non conserva il suo stato locale.** `ShopSystem` e gli interni non
   ricordano casse svuotate, spese e vendite di una città quando si è dall'altra parte del paese.
   Con una mappa sola non c'è più un momento in cui «si lascia una regione», quindi il difetto è
