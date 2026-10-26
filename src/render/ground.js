@@ -3,6 +3,7 @@
 import { noiseCanvas } from './sprites.js';
 import { SUN } from './camera.js';
 import { DISTRICT_BY_ID, districtAtNorm } from '../world/districts.js';
+import { drawBlockDecor } from './blockdecor.js';
 
 export const TILE = 512;
 const MAX_TILES = 96;
@@ -330,7 +331,10 @@ export class GroundRenderer {
 
     // --- Isolati: marciapiedi, cortili, parchi -------------------------------
     const blocks = city.blockGrid.queryRect(ox - 40, oy - 40, TILE + 80, TILE + 80);
-    for (const b of blocks) this.drawBlock(g, b, tx, ty);
+    for (const b of blocks) {
+      this.drawBlock(g, b, tx, ty);
+      if (b.decor) drawBlockDecor(g, b); // §5.39: pittura piatta di parchi, campi, moli
+    }
 
     // --- Strisce pedonali ----------------------------------------------------
     for (const cw of city.crosswalks) {
@@ -955,6 +959,7 @@ export class GroundRenderer {
         g.ellipse(b.x + rv * b.w, b.y + rv2 * b.h, 20 + rv * 40, 14 + rv2 * 30, rv * 6, 0, 6.2832);
         g.fill();
       }
+      if (b.decor) return; // il sentiero lo disegna la tipologia scelta (blocklife)
       g.strokeStyle = 'rgba(190,175,150,0.35)';
       g.lineWidth = 9;
       g.beginPath();

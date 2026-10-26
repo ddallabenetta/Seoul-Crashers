@@ -450,3 +450,11 @@ due quinti in alto a sinistra: un personaggio disegnato con `groundY` sul bordo 
 sotto il gradiente e sparisce. Peggio: con cinque voci il riquadro **esce dal pannello** e la
 prima riga finisce oltre il bordo di sopra. Si guarda con `cutscene-panel.scene`, non si indovina
 — e quando non ci sta, si taglia la battuta o si divide la tavola in due (§5.33).
+
+**Un'aggiunta in coda può spostare una missione.** M4 cerca il prop `crane` più vicino all'ufficio
+del molo: una gru nuova con lo stesso tipo cambia il bersaglio. Le gru del §5.39 sono `harborcrane`.
+
+**`queryRect` dice «c'è un edificio» e non è vero.** Restituisce i candidati delle *celle*, non chi
+sovrappone: il test esatto va rifatto sul risultato (`blocklife.hasSolid`). E contare i prop
+solidi come «già occupato» salta i campi di Jeju (ci sono `ac_unit` dei cortili, che nei campi si
+tolgono); un `turf` può coprire un intero molo, quindi si vieta solo il suo centro (§5.39).

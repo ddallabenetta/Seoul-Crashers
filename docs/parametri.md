@@ -287,3 +287,10 @@
 | Stelle della fuga in barca | `m4` fase `barca` | portate a **tre** se non ci si è già arrivati: sono quelle che mettono in acqua le motovedette e in aria l'elicottero (§5.5), e da tre in su non ti ammanettano più (§5.16) |
 | Camera dalla gru | `m4.ZOOM_GRU` · `m4.ZOOM_T` | 0,5 (il minimo consentito è 0,45) per 7 s, tenuta con `camera.holdZoom`: senza il blocco il giocatore la richiude nel frame dopo |
 | Sorpasso e corsia | `traffic.OVERTAKE` · `LANE` | `true` · slide 1,1 corsie/s · obbligatorio entro 700 px · facoltativo oltre 200 px dall'incrocio, leader ≥ 75 px/s più lento, gap ≥ 180, 3 s fra due cambi · finestra di corsia 26 px (§5.34) |
+| **— vita negli isolati (§5.39) —** | | |
+| Seme del passo | `blocklife.SALT` | `0x5eb1fe`, mescolato con la posizione del blocco: un rng per blocco, indipendente dall'ordine di visita e da quello principale |
+| Peso delle tipologie di parco | `blocklife.PARK_TYPES[k].w` · `.min` | stagno 1 · campo 1,2 · 정자 0,9 · giochi 1,1 · mercato 0,8 · orti 1 · piazzale 0,8 · bosco 0,25; ogni vicino uguale entro 900 px divide il peso per `1 + 3n` |
+| Temi della campagna | `blocklife.RURAL_THEMES` | pesi per regione (Jeju: frutteto 3,2; Busan: serre 2,2); 66% degli appezzamenti segue il tema, 20% un altro, 14% resta com'è |
+| Zona vietata dei cortili di banda | `blocklife.makeCtx` | il centro, 56% per lato: lì si sgombra e si resta sei secondi |
+| Arredo urbano | `blocklife.STREET_MIX` · passo 74 px | probabilità per candidato = deficit di densità rispetto a Seoul × 1,1 (max 0,9); Seoul ha deficit 0 |
+| Insegne | `blocklife.addSigns` | probabilità = deficit di insegne per edificio × 1,5 (max 0,9); fino a 2 insegne sul palazzo con lato strada, 1 sugli altri |

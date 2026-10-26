@@ -1320,6 +1320,280 @@ export function getPropSprite(p) {
         g.fillStyle = 'rgba(255,244,200,0.85)';
         roundRect(g, w * 0.52, 4, w * 0.4, h - 8, 2); g.fill();
       });
+    // --- Vita negli isolati (§5.39): arredo di parchi, campi, strade e moli ----
+    case 'stall': {
+      // Bancarella con telone: visto dall'alto è un rettangolo a strisce, la
+      // merce sporge appena sul lato aperto (+x).
+      const pal = [['#c9473a', '#f0e6d2'], ['#2f77b5', '#f0e6d2'], ['#d6a62e', '#f0e6d2'], ['#3f8f5e', '#f0e6d2']][(p.tint || 0) % 4];
+      return sprite(key, 46, 34, (g, w, h) => {
+        g.fillStyle = 'rgba(0,0,0,0.25)';
+        roundRect(g, 4, 5, w - 6, h - 6, 3); g.fill();
+        for (let i = 0; i < 7; i++) {
+          g.fillStyle = pal[i % 2];
+          g.fillRect(2 + i * ((w - 12) / 7), 2, (w - 12) / 7 + 0.6, h - 8);
+        }
+        g.strokeStyle = 'rgba(0,0,0,0.45)'; g.lineWidth = 1.2;
+        g.strokeRect(2, 2, w - 12, h - 8);
+        // Bordo smerlato sul lato del banco.
+        g.fillStyle = pal[0];
+        for (let i = 0; i < 6; i++) { g.beginPath(); g.arc(5 + i * ((w - 12) / 6), h - 6, 3.2, 0, Math.PI); g.fill(); }
+        // Merce: cassette colorate sul banco che sporge a destra.
+        const goods = ['#d9552f', '#e8c33a', '#6fae4a', '#a05ac0'];
+        for (let i = 0; i < 3; i++) {
+          g.fillStyle = '#6b5138'; g.fillRect(w - 10, 4 + i * 9, 8, 7);
+          g.fillStyle = goods[(i + (p.tint || 0)) % 4]; g.fillRect(w - 9, 5 + i * 9, 6, 4);
+        }
+      });
+    }
+    case 'parasol': {
+      const cols = ['#e0603a', '#3a8fd0', '#e0b43a', '#58a96b'];
+      const c1 = cols[(p.tint || 0) % 4];
+      return sprite(key, 30, 30, (g, w, h) => {
+        const cx = w / 2, cy = h / 2;
+        g.fillStyle = 'rgba(0,0,0,0.22)';
+        g.beginPath(); g.arc(cx + 1.5, cy + 1.5, 13, 0, 6.2832); g.fill();
+        for (let i = 0; i < 8; i++) {
+          g.fillStyle = i % 2 ? '#f2ecde' : c1;
+          g.beginPath(); g.moveTo(cx, cy);
+          g.arc(cx, cy, 13, i * Math.PI / 4, (i + 1) * Math.PI / 4); g.closePath(); g.fill();
+        }
+        g.strokeStyle = 'rgba(0,0,0,0.4)'; g.lineWidth = 1;
+        g.beginPath(); g.arc(cx, cy, 13, 0, 6.2832); g.stroke();
+        g.fillStyle = '#3a3a3a'; g.beginPath(); g.arc(cx, cy, 1.6, 0, 6.2832); g.fill();
+      });
+    }
+    case 'pavilion':
+      // 정자: tetto a padiglione di tegole grigie, gronda rossa e verde (단청)
+      // con le punte rialzate agli angoli. Dall'alto sono quattro falde e un colmo.
+      return sprite(key, 92, 92, (g, w, h) => {
+        const m = 4, x0 = m, y0 = m, x1 = w - m, y1 = h - m, cx = w / 2, cy = h / 2;
+        g.fillStyle = 'rgba(0,0,0,0.28)';
+        roundRect(g, x0 + 3, y0 + 4, x1 - x0, y1 - y0, 6); g.fill();
+        g.fillStyle = '#7c3a2e';
+        roundRect(g, x0, y0, x1 - x0, y1 - y0, 4); g.fill();
+        g.fillStyle = '#2f6a58';
+        roundRect(g, x0 + 3, y0 + 3, x1 - x0 - 6, y1 - y0 - 6, 3); g.fill();
+        const ix0 = x0 + 8, iy0 = y0 + 8, ix1 = x1 - 8, iy1 = y1 - 8;
+        const planes = [
+          [[ix0, iy0], [ix1, iy0], [cx, cy], '#565b66'],
+          [[ix1, iy0], [ix1, iy1], [cx, cy], '#3f434c'],
+          [[ix1, iy1], [ix0, iy1], [cx, cy], '#4a4e58'],
+          [[ix0, iy1], [ix0, iy0], [cx, cy], '#62677a'],
+        ];
+        for (const [a, b, c, col] of planes) {
+          g.fillStyle = col;
+          g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.lineTo(c[0], c[1]); g.closePath(); g.fill();
+        }
+        // File di tegole parallele alla gronda
+        g.strokeStyle = 'rgba(0,0,0,0.22)'; g.lineWidth = 1;
+        for (let t = 0.2; t < 0.95; t += 0.16) {
+          g.beginPath();
+          g.moveTo(ix0 + (cx - ix0) * t, iy0 + (cy - iy0) * t); g.lineTo(ix1 + (cx - ix1) * t, iy0 + (cy - iy0) * t);
+          g.lineTo(ix1 + (cx - ix1) * t, iy1 + (cy - iy1) * t); g.lineTo(ix0 + (cx - ix0) * t, iy1 + (cy - iy1) * t);
+          g.closePath(); g.stroke();
+        }
+        g.strokeStyle = 'rgba(255,255,255,0.28)'; g.lineWidth = 1.4;
+        g.beginPath();
+        for (const [px, py] of [[ix0, iy0], [ix1, iy0], [ix1, iy1], [ix0, iy1]]) { g.moveTo(px, py); g.lineTo(cx, cy); }
+        g.stroke();
+        g.fillStyle = '#d9b24a'; g.beginPath(); g.arc(cx, cy, 3.2, 0, 6.2832); g.fill();
+        // Angoli rialzati
+        g.fillStyle = '#7c3a2e';
+        for (const [px, py] of [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]) { g.beginPath(); g.arc(px, py, 3.4, 0, 6.2832); g.fill(); }
+      });
+    case 'swing':
+      return sprite(key, 44, 28, (g, w, h) => {
+        g.strokeStyle = '#2f6fb5'; g.lineWidth = 3;
+        g.beginPath(); g.moveTo(4, 3); g.lineTo(w - 4, 3); g.moveTo(4, h - 3); g.lineTo(w - 4, h - 3); g.stroke();
+        g.strokeStyle = '#8a9099'; g.lineWidth = 1.6;
+        g.beginPath(); g.moveTo(4, 3); g.lineTo(8, h / 2); g.moveTo(4, h - 3); g.lineTo(8, h / 2);
+        g.moveTo(w - 4, 3); g.lineTo(w - 8, h / 2); g.moveTo(w - 4, h - 3); g.lineTo(w - 8, h / 2); g.stroke();
+        g.strokeStyle = '#2f6fb5'; g.lineWidth = 3;
+        g.beginPath(); g.moveTo(8, h / 2); g.lineTo(w - 8, h / 2); g.stroke();
+        for (const sx of [w * 0.32, w * 0.68]) {
+          g.fillStyle = '#d6a62e'; roundRect(g, sx - 3.5, h / 2 - 5, 7, 10, 1.6); g.fill();
+          g.strokeStyle = 'rgba(0,0,0,0.4)'; g.lineWidth = 1; g.stroke();
+        }
+      });
+    case 'slide':
+      return sprite(key, 52, 22, (g, w, h) => {
+        g.fillStyle = 'rgba(0,0,0,0.25)'; roundRect(g, 4, 5, w - 6, h - 6, 3); g.fill();
+        g.fillStyle = '#c9473a'; roundRect(g, 2, 3, 15, h - 6, 2); g.fill();
+        g.strokeStyle = 'rgba(255,255,255,0.4)'; g.lineWidth = 1;
+        for (let x = 5; x < 15; x += 3.2) { g.beginPath(); g.moveTo(x, 4); g.lineTo(x, h - 4); g.stroke(); }
+        g.fillStyle = '#e8c33a'; roundRect(g, 17, 5, w - 19, h - 10, 4); g.fill();
+        g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(19, h / 2 - 1.5, w - 25, 3);
+        g.strokeStyle = '#2f6fb5'; g.lineWidth = 2;
+        g.beginPath(); g.moveTo(17, 5); g.lineTo(w - 3, 5); g.moveTo(17, h - 5); g.lineTo(w - 3, h - 5); g.stroke();
+      });
+    case 'seesaw':
+      return sprite(key, 48, 14, (g, w, h) => {
+        g.fillStyle = '#d6a62e'; roundRect(g, 2, h / 2 - 3, w - 4, 6, 3); g.fill();
+        g.strokeStyle = 'rgba(0,0,0,0.4)'; g.lineWidth = 1; g.stroke();
+        g.fillStyle = '#4a4f56'; g.beginPath(); g.arc(w / 2, h / 2, 4, 0, 6.2832); g.fill();
+        g.strokeStyle = '#2f6fb5'; g.lineWidth = 2;
+        for (const x of [7, w - 7]) { g.beginPath(); g.moveTo(x, 2); g.lineTo(x, h - 2); g.stroke(); }
+      });
+    case 'hoop':
+      // Canestro: il tabellone è una riga, il cerchio arancio esce verso il campo (+x).
+      return sprite(key, 26, 24, (g, w, h) => {
+        g.fillStyle = '#e8ecef'; roundRect(g, 2, 2, 5, h - 4, 1.4); g.fill();
+        g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 1; g.stroke();
+        g.strokeStyle = '#4a4f56'; g.lineWidth = 2;
+        g.beginPath(); g.moveTo(0, h / 2); g.lineTo(3, h / 2); g.stroke();
+        g.strokeStyle = '#e8622a'; g.lineWidth = 2.2;
+        g.beginPath(); g.arc(14, h / 2, 6.4, 0, 6.2832); g.stroke();
+        g.strokeStyle = 'rgba(255,255,255,0.5)'; g.lineWidth = 0.8;
+        g.beginPath(); g.arc(14, h / 2, 4, 0, 6.2832); g.stroke();
+      });
+    case 'goal':
+      return sprite(key, 14, 58, (g, w, h) => {
+        g.fillStyle = 'rgba(255,255,255,0.18)'; g.fillRect(2, 2, w - 2, h - 4);
+        g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 0.7;
+        for (let y = 4; y < h - 2; y += 4) { g.beginPath(); g.moveTo(2, y); g.lineTo(w, y); g.stroke(); }
+        for (let x = 4; x < w; x += 4) { g.beginPath(); g.moveTo(x, 2); g.lineTo(x, h - 2); g.stroke(); }
+        g.strokeStyle = '#f2f4f6'; g.lineWidth = 2.4;
+        g.beginPath(); g.moveTo(w - 1, 2); g.lineTo(2, 2); g.lineTo(2, h - 2); g.lineTo(w - 1, h - 2); g.stroke();
+      });
+    case 'bush': {
+      const flower = [null, '#e86a9a', '#f2d24a'][(p.tint || 0) % 3];
+      return sprite(key, 26, 26, (g, w, h) => {
+        const cx = w / 2, cy = h / 2;
+        const blobs = [[-5, -3, 7], [5, -4, 7], [0, 5, 8], [-6, 4, 6], [6, 4, 6]];
+        for (const [dx, dy, r] of blobs) {
+          const gr = g.createRadialGradient(cx + dx - 2, cy + dy - 2, 1, cx + dx, cy + dy, r);
+          gr.addColorStop(0, '#5d8a45'); gr.addColorStop(1, '#2f5a32');
+          g.fillStyle = gr; g.beginPath(); g.arc(cx + dx, cy + dy, r, 0, 6.2832); g.fill();
+        }
+        if (flower) {
+          g.fillStyle = flower;
+          for (const [dx, dy] of [[-6, -4], [4, -6], [2, 2], [-3, 6], [7, 4]]) { g.beginPath(); g.arc(cx + dx, cy + dy, 1.7, 0, 6.2832); g.fill(); }
+        }
+      });
+    }
+    case 'rock':
+      return sprite(key, 26, 22, (g, w, h) => {
+        g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(w / 2 + 1.5, h / 2 + 2, 11, 8, 0, 0, 6.2832); g.fill();
+        const gr = g.createRadialGradient(w * 0.38, h * 0.34, 1, w / 2, h / 2, 12);
+        gr.addColorStop(0, '#b4b6b0'); gr.addColorStop(1, '#6d706c');
+        g.fillStyle = gr;
+        g.beginPath(); g.moveTo(3, 12); g.lineTo(6, 5); g.lineTo(14, 2.5); g.lineTo(21, 6); g.lineTo(23, 14); g.lineTo(16, 19); g.lineTo(7, 18); g.closePath(); g.fill();
+        g.strokeStyle = 'rgba(0,0,0,0.4)'; g.lineWidth = 1; g.stroke();
+      });
+    case 'hay':
+      // 곤포 사일리지: la balla rotonda avvolta nel telo, bianca o verde.
+      return sprite(key, 28, 28, (g, w, h) => {
+        const wrap = (p.tint || 0) % 2 ? '#7fae66' : '#e9eee9';
+        g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); g.arc(w / 2 + 1.5, h / 2 + 2, 11.5, 0, 6.2832); g.fill();
+        const gr = g.createRadialGradient(w * 0.38, h * 0.36, 1, w / 2, h / 2, 12);
+        gr.addColorStop(0, wrap); gr.addColorStop(1, (p.tint || 0) % 2 ? '#4f7a40' : '#aab2ad');
+        g.fillStyle = gr; g.beginPath(); g.arc(w / 2, h / 2, 11.5, 0, 6.2832); g.fill();
+        g.strokeStyle = 'rgba(0,0,0,0.3)'; g.lineWidth = 0.9;
+        for (let r = 3; r < 11; r += 2.6) { g.beginPath(); g.arc(w / 2, h / 2, r, 0, 6.2832); g.stroke(); }
+      });
+    case 'orchard': {
+      // Alberi da frutto in filare: chioma compatta con i frutti ben visibili,
+      // arancio per i mandarini di Jeju (tint 0), bianchi per i peri in fiore (1).
+      const fruit = ['#f08a24', '#f4f0e6', '#e0702a'][(p.tint || 0) % 3];
+      return sprite(key, 34, 34, (g, w, h) => {
+        const cx = w / 2, cy = h / 2;
+        g.fillStyle = 'rgba(0,0,0,0.22)'; g.beginPath(); g.arc(cx + 1.5, cy + 2, 12, 0, 6.2832); g.fill();
+        const gr = g.createRadialGradient(cx - 3, cy - 4, 1, cx, cy, 12.5);
+        gr.addColorStop(0, '#5f8f45'); gr.addColorStop(1, '#2f5a30');
+        g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, 12, 0, 6.2832); g.fill();
+        g.fillStyle = fruit;
+        for (const [dx, dy] of [[-6, -5], [3, -7], [7, -1], [-2, 1], [-7, 4], [4, 6], [0, -2]]) { g.beginPath(); g.arc(cx + dx, cy + dy, 1.9, 0, 6.2832); g.fill(); }
+      });
+    }
+    case 'forklift':
+      return sprite(key, 38, 22, (g, w, h) => {
+        g.fillStyle = 'rgba(0,0,0,0.25)'; roundRect(g, 3, 4, w - 8, h - 5, 3); g.fill();
+        g.fillStyle = '#e0a82a'; roundRect(g, 2, 3, w - 14, h - 6, 3); g.fill();
+        g.strokeStyle = 'rgba(0,0,0,0.45)'; g.lineWidth = 1; g.stroke();
+        g.fillStyle = '#2c3036'; roundRect(g, 10, 6, 12, h - 12, 2); g.fill();
+        g.fillStyle = '#b87f1c'; g.fillRect(3, 5, 6, h - 10);
+        g.fillStyle = '#3a3f46'; g.fillRect(w - 13, 3, 4, h - 6);
+        g.fillStyle = '#8a9099'; g.fillRect(w - 9, 4, 8, 3); g.fillRect(w - 9, h - 7, 8, 3);
+        g.fillStyle = '#d9552f'; g.beginPath(); g.arc(7, 4.6, 1.6, 0, 6.2832); g.fill();
+      });
+    case 'trolley':
+      return sprite(key, 26, 16, (g, w, h) => {
+        g.fillStyle = '#6f7680'; roundRect(g, 2, 2, w - 4, h - 4, 2); g.fill();
+        g.strokeStyle = 'rgba(0,0,0,0.45)'; g.lineWidth = 1; g.stroke();
+        const cols = ['#3f7ea8', '#c8493a', '#cf9a2f'];
+        g.fillStyle = cols[(p.tint || 0) % 3]; roundRect(g, 5, 4, w - 13, h - 8, 1.5); g.fill();
+        g.fillStyle = 'rgba(255,255,255,0.22)'; g.fillRect(6, 5, w - 15, 2);
+        g.strokeStyle = '#3a3f46'; g.lineWidth = 2;
+        g.beginPath(); g.moveTo(2, 3); g.lineTo(2, h - 3); g.stroke();
+      });
+    case 'bikerack':
+      return sprite(key, 34, 14, (g, w, h) => {
+        g.strokeStyle = '#8a9099'; g.lineWidth = 1.6;
+        g.beginPath(); g.moveTo(2, 2); g.lineTo(w - 2, 2); g.moveTo(2, h - 2); g.lineTo(w - 2, h - 2); g.stroke();
+        for (let i = 0; i < 4; i++) {
+          const x = 5 + i * 7.5;
+          g.strokeStyle = ['#c8493a', '#2f6fb5', '#3a3f46', '#e0b43a'][i];
+          g.lineWidth = 1.5; g.beginPath(); g.moveTo(x, 3); g.lineTo(x, h - 3); g.stroke();
+          g.strokeStyle = '#222'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(x - 2.4, 4); g.lineTo(x + 2.4, 4); g.stroke();
+        }
+      });
+    case 'planter':
+      return sprite(key, 24, 24, (g, w, h) => {
+        g.fillStyle = '#8a8d90'; roundRect(g, 2, 2, w - 4, h - 4, 3); g.fill();
+        g.strokeStyle = 'rgba(0,0,0,0.4)'; g.lineWidth = 1; g.stroke();
+        g.fillStyle = '#4a6a3a'; roundRect(g, 5, 5, w - 10, h - 10, 2); g.fill();
+        g.fillStyle = ['#e86a9a', '#f2d24a', '#f08a24'][(p.tint || 0) % 3];
+        for (const [dx, dy] of [[8, 8], [14, 9], [10, 14], [15, 15], [7, 15]]) { g.beginPath(); g.arc(dx, dy, 1.6, 0, 6.2832); g.fill(); }
+      });
+    case 'mailbox':
+      return sprite(key, 14, 14, (g, w, h) => {
+        g.fillStyle = '#c0392b'; roundRect(g, 2, 2, w - 4, h - 4, 2.4); g.fill();
+        g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 1; g.stroke();
+        g.fillStyle = '#f2ecde'; g.fillRect(4, 5.5, w - 8, 3);
+        g.fillStyle = 'rgba(255,255,255,0.3)'; g.fillRect(3.5, 3, w - 7, 1.4);
+      });
+    case 'bedplat':
+      // 평상: la piattaforma di legno dove si siede, si mangia e si gioca a baduk.
+      return sprite(key, 44, 28, (g, w, h) => {
+        g.fillStyle = 'rgba(0,0,0,0.25)'; roundRect(g, 4, 5, w - 6, h - 6, 2); g.fill();
+        g.fillStyle = '#b08a5a'; roundRect(g, 2, 2, w - 6, h - 6, 2); g.fill();
+        g.strokeStyle = 'rgba(60,40,20,0.5)'; g.lineWidth = 1;
+        for (let x = 6; x < w - 6; x += 5.5) { g.beginPath(); g.moveTo(x, 3); g.lineTo(x, h - 5); g.stroke(); }
+        g.fillStyle = '#e8d9b0'; roundRect(g, w * 0.28, h * 0.25, 10, 10, 1); g.fill();
+        g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 0.6;
+        for (let i = 1; i < 4; i++) { g.beginPath(); g.moveTo(w * 0.28 + i * 2.5, h * 0.25); g.lineTo(w * 0.28 + i * 2.5, h * 0.25 + 10); g.moveTo(w * 0.28, h * 0.25 + i * 2.5); g.lineTo(w * 0.28 + 10, h * 0.25 + i * 2.5); g.stroke(); }
+      });
+    case 'trough':
+      return sprite(key, 32, 12, (g, w, h) => {
+        g.fillStyle = '#7d8388'; roundRect(g, 2, 2, w - 4, h - 4, 3); g.fill();
+        g.fillStyle = '#4f86a0'; roundRect(g, 4, 4, w - 8, h - 8, 2); g.fill();
+        g.fillStyle = 'rgba(255,255,255,0.3)'; g.fillRect(6, 5, w - 14, 1.4);
+      });
+    case 'harborcrane':
+      // Gru a portale (container): due gambe su rotaia e il braccio che sporge
+      // verso l'acqua (+x). Si disegna come il 'crane' esistente, un segmento lungo.
+      return sprite(key, 200, 50, (g, w, h) => {
+        g.fillStyle = '#3a3f46'; g.fillRect(8, 4, 5, h - 8); g.fillRect(w * 0.42, 4, 5, h - 8);
+        g.fillStyle = '#c8493a'; roundRect(g, 2, h / 2 - 9, w - 4, 18, 3); g.fill();
+        g.strokeStyle = 'rgba(0,0,0,0.4)'; g.lineWidth = 1.3;
+        for (let x = 12; x < w - 12; x += 13) {
+          g.beginPath(); g.moveTo(x, h / 2 - 9); g.lineTo(x + 9, h / 2 + 9); g.stroke();
+          g.beginPath(); g.moveTo(x + 9, h / 2 - 9); g.lineTo(x, h / 2 + 9); g.stroke();
+        }
+        g.fillStyle = '#e8c33a'; roundRect(g, w * 0.5, h / 2 - 7, w * 0.1, 14, 2); g.fill();
+        g.fillStyle = '#2c3036'; roundRect(g, w * 0.7, h / 2 - 6, 14, 12, 2); g.fill();
+      });
+    case 'mobilecrane':
+      return sprite(key, 74, 26, (g, w, h) => {
+        g.fillStyle = 'rgba(0,0,0,0.25)'; roundRect(g, 4, 5, w - 6, h - 6, 3); g.fill();
+        g.fillStyle = '#e0a82a'; roundRect(g, 2, 3, 28, h - 6, 3); g.fill();
+        g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 1; g.stroke();
+        g.fillStyle = '#2c3036'; roundRect(g, 22, 6, 7, h - 12, 1.5); g.fill();
+        g.fillStyle = '#c8493a'; roundRect(g, 30, h / 2 - 4, w - 36, 8, 2); g.fill();
+        g.strokeStyle = 'rgba(0,0,0,0.4)'; g.lineWidth = 1;
+        for (let x = 34; x < w - 8; x += 8) { g.beginPath(); g.moveTo(x, h / 2 - 4); g.lineTo(x + 6, h / 2 + 4); g.stroke(); }
+        g.fillStyle = '#4a4f56'; g.beginPath(); g.arc(w - 4, h / 2, 2.6, 0, 6.2832); g.fill();
+      });
     default:
       return sprite(`prop:unknown`, 12, 12, (g, w, h) => {
         g.fillStyle = '#888';
@@ -1570,4 +1844,10 @@ export function preloadSprites() {
   for (const type of ['lamp', 'tree', 'bin', 'hydrant', 'bench', 'vending', 'busstop', 'pallet', 'ac_unit', 'barrier']) {
     getPropSprite({ type, tint: 0, r: 12 });
   }
+  // §5.39: i prop della vita negli isolati nascono tutti al boot, non al primo incontro.
+  for (const type of ['pavilion', 'swing', 'slide', 'seesaw', 'hoop', 'goal', 'rock', 'forklift', 'trolley', 'bikerack',
+    'mailbox', 'bedplat', 'trough', 'harborcrane', 'mobilecrane']) getPropSprite({ type, tint: 0, r: 12 });
+  for (let t = 0; t < 4; t++) for (const type of ['stall', 'parasol']) getPropSprite({ type, tint: t, r: 12 });
+  for (let t = 0; t < 3; t++) for (const type of ['bush', 'orchard', 'planter']) getPropSprite({ type, tint: t, r: 12 });
+  for (let t = 0; t < 2; t++) getPropSprite({ type: 'hay', tint: t, r: 12 });
 }
