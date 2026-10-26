@@ -178,6 +178,11 @@ il §5.21 altre undici — fra cui le due che erano tornate in cima.
   momento in cui ti caricano.
 - ~~Nessuno sorpassa.~~ Fatto in §5.34 (`traffic.OVERTAKE`): la corsia segue la svolta.
 
+**Rimasto indietro dalle cuciture** (§5.38):
+- **Fra l'ultimo isolato di Seoul e il prato resta una striscia di terra scura** (~150 px a zoom 1, a sud e a est):
+  la sfumatura parte da `GROUND_RIM` px dentro il confine dell'area, non dal bordo dell'ultimo isolato. Va
+  ancorata agli isolati di bordo: è naturale farlo in T9c, che su quel bordo prolunga i viali in provinciali.
+
 **Rimasto indietro dai cortili** (§5.31):
 - **Le guardie del cortile tuo non sono tue.** Ci stanno e non ti sparano, ma non ti seguono,
   non si possono chiamare e non difendono niente più di prima.
