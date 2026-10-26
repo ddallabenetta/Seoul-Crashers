@@ -287,8 +287,8 @@
 | Stelle della fuga in barca | `m4` fase `barca` | portate a **tre** se non ci si è già arrivati: sono quelle che mettono in acqua le motovedette e in aria l'elicottero (§5.5), e da tre in su non ti ammanettano più (§5.16) |
 | Camera dalla gru | `m4.ZOOM_GRU` · `m4.ZOOM_T` | 0,5 (il minimo consentito è 0,45) per 7 s, tenuta con `camera.holdZoom`: senza il blocco il giocatore la richiude nel frame dopo |
 | Sorpasso e corsia | `traffic.OVERTAKE` · `LANE` | `true` · slide 1,1 corsie/s · obbligatorio entro 700 px · facoltativo oltre 200 px dall'incrocio, leader ≥ 75 px/s più lento, gap ≥ 180, 3 s fra due cambi · finestra di corsia 26 px (§5.34) |
-| Testate e spuntoni | `korea.TESTATA_LUNGHEZZA` · `SPUNTONE_MIN` | 44 px di asfalto oltre il nodo di un vicolo cieco · sotto 40 px di spuntone non si taglia (§5.38) |
-| Terreno attorno alle città | `ground.GROUND_BLEND` · `GROUND_RIM` · `GROUND_N` | 620 px di sfumatura verso la campagna, che comincia 300 px dentro il bordo · 17 campioni per tile (§5.38) |
-| Rilievo sul bordo | `ground.RELIEF_EDGE` · `RELIEF_EDGE_MIN` · `korea.EDGE_BLEND` | ombreggiatura al 35% sul bordo, piena a 700 px · raccordo di quota 1300 px (§5.38) |
+| Testate e spuntoni | `korea.TESTATA_LUNGHEZZA` · `SPUNTONE_MIN` | asfalto oltre il nodo di un vicolo cieco = larghezza + 44 px (l'auto che inverte sborda) · apron dipinto di 44 px se la via finiva sul nodo · sotto 40 px di spuntone non si taglia (§5.38) |
+| Terreno attorno alle città | `ground.GROUND_BLEND` · `GROUND_RIM` · `GROUND_N` | 80 px di sfumatura oltre il bordo; la rampa comincia 260 px dentro e arriva a prato 130 px dentro · 17 campioni per tile (§5.38) |
+| Rilievo sul bordo | `ground.RELIEF_EDGE` · `RELIEF_EDGE_MIN` · `korea.EDGE_BLEND` | ombreggiatura al 10% sul bordo, piena a 800 px · raccordo di quota 1300 px (§5.38) |
 | Foce del Han | `ground.BLEND_FOCE` · `SEA_X0` | 260 px di sfumatura fiume→mare · il mare occidentale si sfuma da x=-900 (§5.38) |
 

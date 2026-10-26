@@ -12,11 +12,13 @@ const RELIEF_N = 33;
 const RELIEF_SLOPE = 0.062;
 // Sfumatura del terreno dal bordo di una città alla campagna (px) e campioni per
 // tile del campo che la disegna (17 = uno ogni 32 px).
-const GROUND_BLEND = 620;
-const RELIEF_EDGE = 700;
-const RELIEF_EDGE_MIN = 0.35;
+const GROUND_BLEND = 80;
+// Quanto lontano dal bordo di una città le macchie di campagna si diradano (px).
+const COUNTRY_FADE = 360;
+const RELIEF_EDGE = 800;
+const RELIEF_EDGE_MIN = 0.1;
 const GROUND_N = 17;
-const GROUND_RIM = 300;
+const GROUND_RIM = 260;
 // Dove comincia il degradé del mare occidentale (px, fuori dal bordo ovest).
 const SEA_X0 = -900;
 // Raccordo del Han con il mare oltre il bordo est di Seoul (px).
@@ -215,10 +217,10 @@ export class GroundRenderer {
           else fy = best.y1 + 30;
         }
         const far = rgbOf(this.districtAt(fx, fy).ground);
-        // La rampa comincia `GROUND_RIM` px *dentro* il bordo, dove finiscono gli
+        // La rampa comincia `GROUND_RIM` px *dentro* il bordo e arriva a prato pieno 70 px prima del confine, sotto la siepe, dove finiscono gli
         // isolati e resta terra nuda: il fondo scuro di Gangnam non deve arrivare
         // intatto fino al confine per poi sfumare in mezzo alla campagna.
-        const u = Math.min(1, Math.max(0, (bd + GROUND_RIM) / (GROUND_BLEND + GROUND_RIM)));
+        const u = Math.min(1, Math.max(0, (bd + GROUND_RIM) / (GROUND_RIM - 130)));
         const t = u * u * (3 - 2 * u);
         const rgb = [edge[0] + (far[0] - edge[0]) * t, edge[1] + (far[1] - edge[1]) * t, edge[2] + (far[2] - edge[2]) * t];
         const o = (j * n + i) * 4;
@@ -249,7 +251,7 @@ export class GroundRenderer {
   drawCountryside(g, ox, oy) {
     const city = this.city;
     const cell = 128;
-    const FADE = GROUND_BLEND * 0.8;
+    const FADE = COUNTRY_FADE;
     const edgeDistance = (x, y) => {
       let best = Infinity;
       for (const a of city.areas || []) {
@@ -271,13 +273,17 @@ export class GroundRenderer {
         if (rv < 0.34) {
           // Appezzamento: il segno con cui la campagna coreana si riconosce
           // dall'alto, anche senza una strada che ci porti.
-          const w = cell * (0.62 + hash2(x, y + 1) * 0.3);
-          const h = cell * (0.55 + hash2(x + 1, y) * 0.34);
+          const w = cell * (0.5 + hash2(x, y + 1) * 0.42);
+          const h = cell * (0.42 + hash2(x + 1, y) * 0.46);
+          // Posizione sfalsata dentro la cella: a passo fisso i campi disegnavano
+          // una scacchiera, che sul bordo nord del mondo si leggeva come un pattern.
+          const fx = x + 4 + hash2(x + 3, y + 11) * Math.max(0, cell - w - 8);
+          const fy = y + 4 + hash2(x + 9, y + 5) * Math.max(0, cell - h - 8);
           g.fillStyle = rv < 0.16 ? 'rgba(58,79,44,0.55)' : 'rgba(74,78,40,0.45)';
-          g.fillRect(x + 8, y + 8, w, h);
+          g.fillRect(fx, fy, w, h);
           g.strokeStyle = 'rgba(30,38,24,0.35)';
           g.lineWidth = 2;
-          g.strokeRect(x + 8, y + 8, w, h);
+          g.strokeRect(fx, fy, w, h);
         } else if (rv < 0.86) {
           const n = 2 + ((rv * 100) | 0) % 3;
           for (let i = 0; i < n; i++) {
@@ -467,6 +473,7 @@ export class GroundRenderer {
     // Le teste dei vicoli ciechi stanno sopra gli isolati: quando la via muore in
     // un parco o in un campo l'apron e la barriera devono vedersi lo stesso.
     for (const t of city.testate || []) this.drawTestata(g, view, t, drawRoadRect);
+    this.drawSiepi(g, view);
 
     // Il limite giocabile è una fascia leggibile (scogliera, bosco o barriera),
     // non il punto in cui le tile semplicemente finiscono.
@@ -476,6 +483,53 @@ export class GroundRenderer {
     g.restore();
     this.drawRelief(g, ox, oy);
     return c;
+  }
+
+  /**
+   * Siepe e filare d'alberi lungo il bordo di una città verso la campagna. Dove
+   * finiscono gli isolati restava un piazzale di terra nuda grigio scuro che si
+   * leggeva come asfalto: la siepe dice «qui finisce la città, di là c'è prato».
+   * Dipinta al suolo (non sono prop), saltando strade, isolati e acqua. Il giro è
+   * fisso sul bordo del rettangolo, quindi due tile vicini combaciano.
+   */
+  drawSiepi(g, view) {
+    const city = this.city;
+    const STEP = 34;
+    const lati = [];
+    for (const a of city.areas || []) {
+      if (a.x1 < city.w - 200) lati.push({ a, v: true, c: a.x1 - 22, from: a.y0, to: a.y1 });
+      if (a.y1 < city.h - 200) lati.push({ a, v: false, c: a.y1 - 22, from: a.x0, to: a.x1 });
+      if (a.x0 > 200) lati.push({ a, v: true, c: a.x0 + 22, from: a.y0, to: a.y1 });
+      if (a.y0 > 200) lati.push({ a, v: false, c: a.y0 + 22, from: a.x0, to: a.x1 });
+    }
+    for (const l of lati) {
+      const lo = l.v ? view.y : view.x;
+      const hi = l.v ? view.y + view.h : view.x + view.w;
+      const across = l.v ? view.x : view.y;
+      const acrossSize = l.v ? view.w : view.h;
+      if (l.c < across - 40 || l.c > across + acrossSize + 40) continue;
+      const start = Math.max(l.from + STEP, Math.floor((lo - 40) / STEP) * STEP);
+      for (let p = start; p < Math.min(l.to - STEP, hi + 40); p += STEP) {
+        const h1 = hash2(p | 0, l.c | 0);
+        const h2 = hash2((p | 0) + 5, (l.c | 0) + 9);
+        const q = p + (h1 - 0.5) * 12;
+        const c = l.c + (h2 - 0.5) * 14;
+        const x = l.v ? c : q;
+        const y = l.v ? q : c;
+        if (city.isWater(x, y) || city.isOnRoad(x, y)) continue;
+        // `queryRect` restituisce i candidati della cella, non solo chi si sovrappone.
+        if (city.blockGrid.queryRect(x - 14, y - 14, 28, 28).some((b) =>
+          x + 14 > b.x && x - 14 < b.x + b.w && y + 14 > b.y && y - 14 < b.y + b.h)) continue;
+        if (h1 < 0.12) continue;
+        const r = 14 + h2 * 9;
+        g.fillStyle = 'rgba(0,0,0,0.22)';
+        g.beginPath(); g.arc(x + 4, y + 5, r, 0, 6.2832); g.fill();
+        g.fillStyle = h1 > 0.6 ? '#3a6a30' : '#2f5a2a';
+        g.beginPath(); g.arc(x, y, r, 0, 6.2832); g.fill();
+        g.fillStyle = 'rgba(150,200,110,0.30)';
+        g.beginPath(); g.arc(x - r * 0.3, y - r * 0.3, r * 0.5, 0, 6.2832); g.fill();
+      }
+    }
   }
 
   /**
@@ -599,20 +653,19 @@ export class GroundRenderer {
     const fillOutside = (x, y, w, h) => {
       if (w <= 0 || h <= 0) return;
       const C = 64;
+      // Un solo path riempito una volta: con rettangoli sovrapposti di 0,6 px e
+      // alpha dimezzata ogni giunto diventava una riga più scura (una griglia).
+      const path = new Path2D();
       for (let cy = y; cy < y + h; cy += C) {
         for (let cx = x; cx < x + w; cx += C) {
           const cw = Math.min(C, x + w - cx);
           const ch = Math.min(C, y + h - cy);
           if (wetAt(cx + cw / 2, cy + ch / 2)) continue;
-          g.fillStyle = 'rgba(10,24,14,0.52)';
-          g.fillRect(cx, cy, cw + 0.6, ch + 0.6);
-          const rv = hash2(cx | 0, cy | 0);
-          g.fillStyle = `rgba(55,92,53,${0.1 + rv * 0.14})`;
-          g.beginPath();
-          g.ellipse(cx + cw * rv, cy + ch * (1 - rv), 14 + rv * 26, 10 + rv * 18, 0, 0, 6.2832);
-          g.fill();
+          path.rect(cx, cy, cw, ch);
         }
       }
+      g.fillStyle = 'rgba(10,24,14,0.52)';
+      g.fill(path);
     };
 
     const vx0 = view.x;
@@ -695,9 +748,32 @@ export class GroundRenderer {
     // verticale in mezzo all'acqua.
     const fillWet = sa ? (x, y) => !inSa(x, y) && city.isWater(x, y) : (x, y) => city.isWater(x, y);
     g.fillStyle = '#123447';
+    // A ovest della banchina di Seoul il mare ha il degradé del suo disegno
+    // (`drawSea`): lo stesso colore va usato oltre il bordo del mondo e a sud della
+    // città, o fra dentro e fuori resta un gradino di tinta (B01 dell'audit).
+    const quayX = sa ? sa.quayX : -Infinity;
+    const seaStops = [[0, 15, 42, 58], [0.7, 21, 54, 72], [1, 29, 74, 92]];
+    const seaAt = (x) => {
+      const t = Math.min(1, Math.max(0, (x - SEA_X0) / (quayX - SEA_X0)));
+      for (let i = 1; i < seaStops.length; i++) {
+        if (t <= seaStops[i][0]) {
+          const u = (t - seaStops[i - 1][0]) / (seaStops[i][0] - seaStops[i - 1][0]);
+          return `rgb(${[1, 2, 3].map((k) => (seaStops[i - 1][k] + (seaStops[i][k] - seaStops[i - 1][k]) * u) | 0).join(',')})`;
+        }
+      }
+      return '#1d4a5c';
+    };
     for (let y = oy; y < yEnd; y += step) {
       let run = null;
       for (let x = ox; x <= xEnd + step; x += step) {
+        if ((x + step / 2 < quayX || (sa && y < sa.y0 && x < sa.quayX + 400)) && x <= xEnd) {
+          if (fillWet(x + step / 2, y + step / 2)) {
+            g.fillStyle = seaAt(x + step / 2);
+            g.fillRect(x, y, step + 0.8, step + 0.8);
+          }
+          continue;
+        }
+        g.fillStyle = '#123447';
         const wet = x <= xEnd && fillWet(x + step / 2, y + step / 2);
         if (wet && run === null) run = x;
         if (!wet && run !== null) {

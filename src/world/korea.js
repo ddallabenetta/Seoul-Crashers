@@ -243,17 +243,17 @@ function countryDistricts() {
   return [
     {
       ...base, name: 'Chungcheong', hangul: '충청', subtitle: 'Il corridoio della Gyeongbu, fra risaie e caselli',
-      accent: '#a7e45a', accent2: '#ffd05a', ground: '#333a26', sidewalk: '#4f5542',
+      accent: '#a7e45a', accent2: '#ffd05a', ground: '#4d5d33', sidewalk: '#4f5542',
       seed: { x: 7600 / KOREA.w, y: 9200 / KOREA.h },
     },
     {
       ...base, name: 'Honam', hangul: '호남', subtitle: 'Pianure, serre e strade bianche verso il mare',
-      accent: '#8fd07a', accent2: '#ffc04c', ground: '#31391f', sidewalk: '#4c5240',
+      accent: '#8fd07a', accent2: '#ffc04c', ground: '#4a5b30', sidewalk: '#4c5240',
       seed: { x: 3200 / KOREA.w, y: 12200 / KOREA.h },
     },
     {
       ...base, name: 'Gangwon', hangul: '강원', subtitle: 'La dorsale dei Taebaek e i passi verso l’est',
-      accent: '#7fd3c0', accent2: '#e0e6a0', ground: '#2c3728', sidewalk: '#4a5347',
+      accent: '#7fd3c0', accent2: '#e0e6a0', ground: '#44593a', sidewalk: '#4a5347',
       seed: { x: 12600 / KOREA.w, y: 4200 / KOREA.h },
     },
   ];
@@ -534,7 +534,7 @@ function addRestStops(korea, route, district) {
 // Quanto asfalto resta oltre il nodo di un vicolo cieco: abbastanza perché
 // l'auto che inverte la marcia non sporga sulla testata, poca da non sembrare
 // una strada che continua.
-export const TESTATA_LUNGHEZZA = 44;
+export const TESTATA_LUNGHEZZA = 44;  // apron dipinto sulle vie che finivano sul nodo
 // Un tratto che oltrepassa l'ultimo nodo di meno di così è ancora "un incrocio",
 // non uno spuntone: sono i pochi pixel d'arrotondamento fra `segments` e grafo.
 const SPUNTONE_MIN = 40;
@@ -596,13 +596,18 @@ function accorciaStrade(korea) {
           if (prosegue) continue;
           if (n.out.length === 1) {
             const w = vert ? n.vWidth : n.hWidth;
-            const target = p + sgn * TESTATA_LUNGHEZZA;
-            if (spuntone > TESTATA_LUNGHEZZA) s[idx] = target;
+            // Chi inverte la marcia in fondo al vicolo **sborda** dal nodo (misurato:
+            // ~100 px su una via da 76, ~160 su un arteria da 144 (più la barriera)). L'asfalto deve
+            // coprire quel giro, o le auto finiscono sull'erba: la testata sta dopo.
+            const giro = w + TESTATA_LUNGHEZZA;
+            const target = p + sgn * (spuntone > 0 ? giro : TESTATA_LUNGHEZZA);
+            if (spuntone > giro) s[idx] = target;
             testate.push({
               nodeId: n.id, x: n.x, y: n.y, axis, sgn, w,
-              // Dove finisce l'asfalto: il segmento, o il bordo dell'apron dipinto
-              // quando la via si fermava già sul nodo (Busan, Jeju).
-              end: target,
+              // Dove finisce l'asfalto: il segmento (accorciato o già corto) o,
+              // quando la via si fermava sul nodo (Busan, Jeju), il bordo
+              // dell'apron dipinto.
+              end: spuntone > 0 ? Math.min(Math.abs(fine - p), giro) * sgn + p : target,
             });
           } else if (spuntone > SPUNTONE_MIN) {
             const crossW = (vert ? n.hWidth : n.vWidth) / 2;

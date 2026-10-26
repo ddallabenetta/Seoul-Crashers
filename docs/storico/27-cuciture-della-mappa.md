@@ -37,6 +37,19 @@ prop, negozi, nodi, isolati e territori dentro Seoul sono identici prima e dopo.
   0,09 px/px → striscia chiara a x=7200 e parete scura). Ora la quota si continua con la
   pendenza del bordo (`EDGE_BLEND` 1300) e `reliefAttenuation` smorza il rilievo vicino al bordo.
   `drawCountryside` dirada le macchie su `GROUND_BLEND*0,8`.
+- **Revisione dopo la prima consegna.** (a) La fascia grigia sul bordo non era solo colore: era
+  terra nuda di Seoul, 250 px di «piazzale». Ora il suolo diventa prato pieno 130 px dentro il
+  confine (`GROUND_RIM` 260), i terreni di campagna sono più chiari (`#4d5d33` e simili in
+  `countryDistricts`, solo Busan/Jeju/corridoio: la palette di Seoul non cambia) e lungo il bordo
+  città c'è una **siepe** dipinta (`ground.drawSiepi`), che salta strade, isolati e acqua. Il
+  rilievo vicino al bordo scende al 10% (`RELIEF_EDGE_MIN`). (b) Le auto fuori strada: chi inverte la
+  marcia in fondo a un vicolo cieco **sborda** dal nodo di ~100 px (via da 76) o ~160 (arteria),
+  misurato; la prima versione tagliava l'asfalto a 44 px e le auto finivano sull'erba. Ora
+  l'asfalto copre il giro (`w + TESTATA_LUNGHEZZA`) e la barriera sta dopo; lo stesso sborno esisteva
+  già prima, nascosto dallo spuntone. (c) I campi di campagna sono sfalsati dentro la cella (a passo
+  fisso facevano una scacchiera) e `fillOutside` riempie un `Path2D` solo (i rettangoli
+  sovrapposti con alpha disegnavano una griglia di righe scure). (d) Il mare oltre il limite nord
+  usa lo stesso degradé di Seoul, quindi non c'è più il rettangolo di tinta diversa.
 - **Cucitura nell'acqua alla foce del Han**: `drawRegionalWater` escludeva Seoul anche dal
   confronto terra/acqua, quindi il bordo del rettangolo era una riva finta (la riga di schiuma
   verticale). Ora la battigia si decide sulla maschera intera e si salta solo dentro Seoul; il
