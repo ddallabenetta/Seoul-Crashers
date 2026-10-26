@@ -88,10 +88,8 @@ regola che conta: **ogni battuta è copiata da qualcun altro**, e il commento `/
 prova, non una nota.
 
 **Quello che la tappa D lascia indietro:**
-- **la regia sonora dell'apertura** (fruscio di banda sotto la voce che conta, il cane, la
-  sirena lontana). Il timbro del fruscio adesso c'è ed è quello giusto (`audio.beds.kkachi`),
-  quindi resta da fare un **aggancio dei suoni ai pannelli** — `ui/cutscene.js` non ce l'ha — e
-  tre suoni nuovi;
+- ~~la regia sonora dell'apertura~~: **fatta**, §5.37 (campi `bed` e `sfx` sul pannello). Restano
+  senza suono i pannelli di M3 e M4, per scelta;
 - ~~l'ottava chiamata dell'Atto I aspetta M3~~: **fatto**, §5.33 — quella riga adesso esce, e il
   predicato non è stato toccato;
 - **le «visite che cambiano»** (Jo dopo M6, Chun-sik dopo M9, il commesso dopo M8) stanno nello

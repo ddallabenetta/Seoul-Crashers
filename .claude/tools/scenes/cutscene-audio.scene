@@ -1,0 +1,75 @@
+// Regia sonora dei pannelli (§5.37): misura sul master, non a orecchio.
+//
+//   node .claude/tools/probe.mjs --menu --seconds 40 \
+//     --script .claude/tools/scenes/cutscene-audio.scene
+//
+// Verifica tre cose: (a) i pannelli agganciati suonano e gli altri restano al
+// pavimento; (b) dopo `ESC` il livello torna a zero in ~0,3 s; (c) i livelli
+// stanno sotto gli spari (picco di una pistola ~0.3). La musica del tema è
+// chiusa per la misura: il tema c'è sempre, e coprirebbe proprio i fruscii.
+const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
+const out = { pannelli: {}, controlli: [] };
+const check = (nome, ok, extra) => out.controlli.push({ nome, ok: !!ok, ...(extra !== undefined ? { extra } : {}) });
+
+const A = game.audio;
+A.unlock();
+await wait(1.2);
+if (!A.ready) return { errore: 'contesto audio non partito' };
+const an = A.ctx.createAnalyser();
+an.fftSize = 2048;
+A.master.connect(an);
+const buf = new Float32Array(an.fftSize);
+const meas = async (secs) => {
+  let sum = 0, n = 0, peak = 0;
+  const t0 = performance.now();
+  while (performance.now() - t0 < secs * 1000) {
+    an.getFloatTimeDomainData(buf);
+    for (let i = 0; i < buf.length; i++) { sum += buf[i] * buf[i]; peak = Math.max(peak, Math.abs(buf[i])); }
+    n += buf.length;
+    await new Promise((r) => setTimeout(r, 10));
+  }
+  return { rms: +Math.sqrt(sum / n).toFixed(4), picco: +peak.toFixed(3) };
+};
+
+const iNew = game.startMenu.items.findIndex((i) => i.id === 'new');
+game.startMenu.index = iNew;
+game.startMenu.activate(game);
+await wait(0.5);
+const C = game.cutscene;
+check('la cutscene è partita', C.active);
+A.mus.gain.value = 0;            // misura il solo effetto, vedi in testa
+const goto = (n, t = 0) => { C.i = n - 1; C.t = t; C.trans = 0; C.pending = -1; C.enter(game); };
+
+// 1. Ogni pannello: 1,5 s di misura dopo che i letti hanno avuto il tempo di salire.
+const pannelli = [2, 3, 7, 1, 8, 23, 25, 26, 27];
+for (const n of pannelli) {
+  goto(n, n === 1 ? 8.0 : 0);   // il pannello 1 parte vicino al cane, per misurarlo
+  await wait(1.0);              // rampa dei letti (smooth 0.3)
+  out.pannelli[n] = await meas(n === 1 ? 1.8 : n === 27 ? 1.6 : 1.5);
+}
+const base = out.pannelli[2];
+const sonori = [1, 8, 23, 25, 26, 27];
+for (const n of sonori) check(`il pannello ${n} suona sopra il silenzio`, out.pannelli[n].rms > base.rms + 0.001, `${out.pannelli[n].rms} vs ${base.rms}`);
+for (const n of [3, 7]) check(`il pannello ${n} non è cambiato`, out.pannelli[n].rms < base.rms + 0.002, `${out.pannelli[n].rms} vs ${base.rms}`);
+// il cane del pannello 27: t=0 → 1.6 s nella finestra? misurato sopra con 1.0+1.6 s
+const massimo = Math.max(...sonori.map((n) => out.pannelli[n].picco));
+check('il picco massimo resta sotto una pistola (0.30)', massimo < 0.3, massimo);
+
+// 2. ESC mentre suonano fruscio + sirena (23) e fruscio + cane (1). Si rilancia la
+// cutscene fra un giro e l'altro: dopo il salto il gioco è cominciato davvero.
+const { INTRO } = await import('/src/story/intro.js');
+for (const [n, t] of [[23, 0], [1, 8.0]]) {
+  if (!C.active) { C.play(game, INTRO, 'intro'); await wait(0.3); A.mus.gain.value = 0; }
+  goto(n, t);
+  await wait(n === 1 ? 1.1 : 1.6);
+  const prima = await meas(0.3);
+  game.input.justPressed.add('Escape');
+  await wait(0.3);                     // il «close» dell'interfaccia dura 0,16 s
+  const dopo = await meas(0.3);
+  out.pannelli[`esc_${n}`] = { prima, dopo };
+  check(`ESC dal pannello ${n}: dopo 0,3 s il livello è azzerato`, dopo.rms < 0.003 || dopo.rms < prima.rms * 0.15, `${prima.rms} -> ${dopo.rms}`);
+  check(`ESC dal pannello ${n}: i letti di scena sono a zero`, A.sceneLv.kkachi === 0 && A.sceneLv.sirenFar === 0);
+  await wait(1.2);
+}
+out.letti = A.stats.letti;
+return out;
