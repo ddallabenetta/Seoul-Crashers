@@ -163,9 +163,8 @@ prima: il §5.12 ha pagato diciannove voci di questo elenco, il §5.13 ha chiuso
 il §5.21 altre undici — fra cui le due che erano tornate in cima.
 
 **Le cose che si sentono di più, oggi:**
-- ~~Non ti caricano in volante.~~ Fatto in §5.35 (`entities/arrest.js`). Resta indietro: una volante
-  su tre-quattro si pianta dietro una coda e la scena cade nel fallback (dissolvenza senza volante);
-  la volante si ferma dove capita, anche in mezzo a un incrocio; non c'è un pannello a pixel del
+- ~~Non ti caricano in volante.~~ Fatto in §5.35 (`entities/arrest.js`). Resta indietro: nei dieci posti provati la volante
+  arriva sempre, ma i casi lenti (una nascita lontana, 10-11 s) restano; non c'è un pannello a pixel del
   momento in cui ti caricano.
 - ~~Nessuno sorpassa.~~ Fatto in §5.34 (`traffic.OVERTAKE`): la corsia segue la svolta.
 

@@ -552,7 +552,11 @@ export class PoliceSystem {
   }
 
   /** `accept(pt, edge, dir)`, se c'è, scarta i punti che non vanno bene a chi chiama. */
-  trySpawnCar(game, kind, tier, near, accept = null, attempts = 24) {
+  trySpawnCar(game, kind, tier, near, accept = null, opts = null) {
+    const attempts = (opts && opts.attempts) || 24;
+    const minD = (opts && opts.minD) || 520;
+    const maxD = (opts && opts.maxD) || 1500;
+    const margin = opts && opts.margin !== undefined ? opts.margin : 80;
     const rng = this.rng;
     const f = this.focus(game);
     if (!near.length) return null;
@@ -564,10 +568,10 @@ export class PoliceSystem {
       const pt = lanePoint(edge, dir, lane, s, this.tmp);
       const d = dist(pt.x, pt.y, f.x, f.y);
       // Non troppo addosso (comparirebbe a vista) né troppo lontana (non arriva mai).
-      if (d < 520 || d > 1500) continue;
+      if (d < minD || d > maxD) continue;
       // Sotto assedio la camera inquadra una stanza: `outsideView` direbbe di sì
       // ovunque, e la distanza dalla porta è l'unico criterio che resta.
-      if (!this.siegeDoor && !outsideView(game, pt.x, pt.y, 80)) continue;
+      if (!this.siegeDoor && !outsideView(game, pt.x, pt.y, margin)) continue;
       let clear = true;
       for (const o of game.vehicles) {
         if (dist(o.x, o.y, pt.x, pt.y) < 90) { clear = false; break; }
@@ -862,14 +866,14 @@ export class PoliceSystem {
       this.followRoads(v, dt, game, to.x, to.y);
       const d = dist(v.x, v.y, e.x, e.y);
       e.minD = Math.min(e.minD, d);
-      // Si ferma a ~70 px dal ciglio: chi aspetta è a piedi, sul marciapiede.
-      const want = clamp((d - 70) * 1.6, 0, 300);
+      // Si ferma sul punto di carico (già fuori dall'incrocio, `arrest.stopPoint`).
+      const want = clamp((d - 60) * 2, 0, 300);
       if (want < 240) {
         const diff = want - v.speed;
         v.throttle = diff > 6 ? clamp(diff / 60, 0.2, 1) : clamp(diff / 50, -1, -0.1);
       }
       // Arrivata, o passata oltre il punto più vicino senza essersi fermata.
-      if ((Math.abs(v.speed) < 14 && d < 220) || (e.minD < 160 && d > e.minD + 30)) {
+      if ((Math.abs(v.speed) < 14 && d < 190) || (e.minD < 160 && d > e.minD + 30)) {
         e.state = 'hold';
         return;
       }

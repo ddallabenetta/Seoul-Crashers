@@ -14,23 +14,31 @@ alla fine), `ESC` salta, e si chiude **sempre** in `bustPlayer()`, che resta il 
 ## Come funziona
 
 Un modulo solo, `entities/arrest.js` (`game.arrest`, classe `ArrestSequence`), più tre ganci in
-`police.js`. Le fasi. Misurato su otto arresti di fila: **5,4 s con una volante già lì** (2-3 stelle, equipaggio sbarcato),
-**8-11 s con una che arriva da fuori campo** — la parte lunga è `wait`, perché la volante nasce a 520+ px
-(`trySpawnCar` la vuole fuori inquadratura) e ci mette 2,5-4 s:
+`police.js`. Le fasi. Misurato su **dieci posti diversi e livelli 1-3** (`arresto.scene`, sezione 6): **10 su 10
+arrivano in fondo, durata mediana 7,8 s** (5,9-8,0 s in sette casi, 9,8 e 11,4 s nei due in cui la volante
+è arrivata tardi e l'attesa è scaduta a 5 s), contro i 3 falliti su 8 della
+prima versione. Con una volante già lì (2-3 stelle, equipaggio sbarcato) 5-6 s.
 
 | fase | cosa succede | durata |
 | --- | --- | --- |
-| `cuff` | il giocatore perde il controllo, posa **ammanettato** (`getHeroSprite(f,'cuffed')`), suono delle manette (`audio.handcuffs`), zoom a 1,8. L'agente si mette a fianco. Intanto la volante è già partita | 0,8 s |
-| `wait` | si aspetta che la volante arrivi e si fermi (`escort.state === 'hold'`) | 0-4 s |
-| `walk` | l'agente va alla portiera davanti, il giocatore lo segue e va a quella dietro, dallo stesso lato in cui si trova | ~1-2 s |
-| `board` | portiera, il giocatore sparisce, sale l'agente (`police.boardCop`) | 0,95 s |
-| `drive` | la volante parte lungo la strada su cui è; la camera la segue e stringe a 2,0 (`holdZoom`) | 2,0 s |
-| `fade` | dissolvenza a nero e `bustPlayer()`; al commissariato rientra in 0,9 s | 0,7 s |
+| `cuff` | il giocatore perde il controllo, posa **ammanettato** (`getHeroSprite(f,'cuffed')`), suono delle manette (`audio.handcuffs`), zoom a 1,8. L'agente si mette a fianco | 0,7 s |
+| `wait` | la volante **nasce a 0,3 s** (a zoom già stretto, vedi sotto) e arriva; intanto agente e giocatore **camminano già** verso il punto di carico. Finisce quando la volante si ferma (`escort.state === 'hold'`) | 1,5-4 s |
+| `walk` | l'agente va alla portiera davanti, il giocatore lo segue e va a quella dietro, dallo stesso lato in cui si trova. Si sale appena entrambi sono a 50 px dall'auto | 0-2 s |
+| `board` | portiera, il giocatore sparisce, sale l'agente (`police.boardCop`) | 0,8 s |
+| `drive` | la volante parte lungo la strada su cui è; la camera la segue e stringe a 2,0 (`holdZoom`) | 1,6 s |
+| `fade` | dissolvenza a nero e `bustPlayer()`; al commissariato rientra in 0,9 s | 0,6 s |
 
 - **La volante.** Si usa la più vicina già lì (`police.cars`, entro 380 px e in linea di vista).
-  Altrimenti `police.trySpawnCar` ne fa nascere una **appena fuori campo** (520-780 px) col muso dalla
-  parte giusta e con un A* che arrivi al ciglio senza giri. Va a **~70 px dal punto più vicino
-  della strada** e frena prima: una volante che frena sulla testa di chi deve caricare non è una scena.
+  Altrimenti ne nasce una **appena fuori campo** (`arrest.spawnCar`, 250-420 px, poi 250-900), **non prima di
+  0,3 s**: `trySpawnCar` esclude i punti in vista col riquadro della camera *di quel momento*, e a zoom 1,12
+  il campo è largo il doppio di quanto sarà a 1,8. Il filtro di nascita vuole un punto **sulla corsia,
+  a ≥ 90 px da un incrocio**, col muso verso il punto di carico, **senza auto ferme davanti** (una coda al
+  semaforo non si salta) e con un A* che non sia più lungo di 1,4× la linea d'aria + 120 px.
+- **Dove si ferma.** `arrest.stopPoint`: il punto di strada più vicino al giocatore **spostato a ≥ 150 px dal
+  nodo** (mai sul box dell'incrocio né sulle strisce; a metà se l'arco è corto). La volante frena da
+  lontano (`driveEscort`) e si ferma a ~60 px da lì (lo scarto è l'offset di corsia).
+- **Se si pianta.** Velocità ~0 per più di 1,2 s senza essere arrivata: `arrest.respawn` la toglie e ne fa
+  nascere un'altra (fino a 3 volte, e solo se restano > 0,8 s al limite d'attesa).
 - **Non è un'entrata in veicolo.** `player.enterVehicle` conta come furto ed emette `onEnterVehicle`:
   qui il giocatore resta `onFoot` con `vehicle === null` (radio e tachimetro non si accendono) e
   non si disegna (`arrest.hidden`). **Dentro la volante le sue coordinate seguono quelle dell'auto**:
@@ -55,8 +63,8 @@ colpo di pistola 0,30-0,60). La portiera della volante riusa `doorClose`.
 
 Tutto finisce in `bustPlayer()`, tranne un caso:
 
-- **Nessuna volante raggiungibile** (nessuna strada entro 300 px, nessun punto di nascita buono,
-  non arriva in 5 s, o l'accompagnamento a piedi dura più di 4 s): niente teletrasporti, si resta in
+- **Nessuna volante raggiungibile** (nessuna strada entro 300 px, nessun punto di nascita buono entro 1,8 s,
+  non arriva in 5 s, o l'accompagnamento a piedi dura più di 5 s): niente teletrasporti, si resta in
   manette e si va alla dissolvenza (`mode: 'short'`, o salto a `fade`).
 - **Agente morto prima di salire, volante distrutta o tolta dalla lista, timeout di 12 s**: `finish`.
 - **`ESC` in qualunque fase**: `skip` → `finish` → `bustPlayer`.

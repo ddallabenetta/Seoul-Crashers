@@ -18,6 +18,7 @@
 //   · `escSalta` — ESC chiude subito, in qualunque fase
 //   · `nessunAutosaveDurante` — lo slot automatico non cambia mentre le manette sono addosso
 //   · `missioneRipresa` — l'arresto durante una missione la riprende dalla stessa fase
+//   · `campione9su10` — su dieci posti e livelli 1-3, almeno nove arresti arrivano in fondo
 //   · `barraSiAzzeraNelNegozio` — il bug di `arresting`/`bustT` congelati dentro un interno
 const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
 const S = await import('/src/core/save.js');
@@ -42,8 +43,8 @@ let busts = 0;
 game.on('busted', () => { busts++; });
 
 /** Marciapiede libero accanto a una strada lunga, vicino al punto di partenza. */
-function marciapiede(skip = 0) {
-  const sp = game.city.spawn;
+function marciapiede(skip = 0, c = null) {
+  const sp = c || game.city.spawn;
   const edges = game.city.graph.edgesNear(sp.x, sp.y, 900).filter((e) => e.len > 300);
   const grid = game.area().grid;
   let k = 0;
@@ -62,9 +63,9 @@ function marciapiede(skip = 0) {
 
 /** Come `preparaArresto`, ma se l'agente non sopravvive al primo mezzo secondo (un
  *  passante armato, un'auto) riprova su un altro marciapiede: non è quello che si prova. */
-async function preparaArresto(skip = 0) {
+async function preparaArresto(skip = 0, c = null, heat = 12) {
   for (let k = 0; k < 5; k++) {
-    const s = await preparaUnArresto(skip + k);
+    const s = await preparaUnArresto(skip + k, c, heat);
     if (!s) return null;
     await wait(0.4);
     if (!s.cop.dead) return s;
@@ -72,11 +73,11 @@ async function preparaArresto(skip = 0) {
   return null;
 }
 
-async function preparaUnArresto(skip = 0) {
+async function preparaUnArresto(skip = 0, c = null, heat = 12) {
   if (game.shops.active) game.shops.leave(game);
   game.wanted.reset();
   P.standDown(game, true);
-  const at = marciapiede(skip);
+  const at = marciapiede(skip, c);
   if (!at) return null;
   pl.revive(at.x, at.y);
   pl.weapon = 'fists';
@@ -85,7 +86,8 @@ async function preparaUnArresto(skip = 0) {
   game.camera.snapTo(at.x, at.y);
   game.camera.setZoomTarget(1);
   await wait(0.5);
-  game.wanted.add(12, game);   // una stella
+  game.wanted.add(heat, game);   // 12 = una stella, 30 = due, 60 = tre
+  pl.hp = 100000;   // a due-tre stelle le volanti sparano: qui si prova la scena, non la sopravvivenza
   const cop = P.addCop(game, at.x + 30, at.y, 'cop', 'pistol');
   cop.x = at.x + 30; cop.y = at.y;
   return { at, cop };
@@ -185,13 +187,13 @@ await wait(1);
 {
   const setup = await preparaArresto(1);
   const bust0 = game.stats.busted || 0;
-  const orig = A.nearestRoadPoint;
-  A.nearestRoadPoint = () => null;
+  const orig = A.stopPoint;
+  A.stopPoint = () => null;
   await aspettaAttiva(8, 'Corta');
   out.fallbackSenzaVolante = A.active && A.mode === 'short';
   const t0 = performance.now();
   while (A.active && performance.now() - t0 < 8000) await wait(0.1);
-  A.nearestRoadPoint = orig;
+  A.stopPoint = orig;
   out.fallbackChiude = !A.active && (game.stats.busted || 0) === bust0 + 1 && !!setup;
   await wait(1);
 }
@@ -239,6 +241,51 @@ await wait(1);
   }
   game.wanted.reset();
   P.standDown(game, true);
+}
+
+// ---- 6. Campione: dieci posti diversi, livelli 1-3 -------------------------
+// L'obiettivo è >= 9 arresti su 10 che arrivano in fondo (`comeFinisce` =
+// dissolvenza *con* la volante: fasi fino a `drive`) e una durata tipica <= 8 s.
+{
+  const sp = game.city.spawn;
+  const centri = [[0, 0], [900, 0], [-900, 200], [0, 900], [0, -900], [1500, 700], [-1500, -500], [700, -1400], [-700, 1500], [2200, 200]];
+  const livelli = [12, 12, 30, 60, 12, 30, 60, 12, 12, 30];   // 1,1,2,3,1,2,3,1,1,2 stelle
+  const campione = [];
+  for (let i = 0; i < centri.length; i++) {
+    const c = { x: sp.x + centri[i][0], y: sp.y + centri[i][1] };
+    const setup = await preparaArresto(0, c, livelli[i]);
+    if (!setup) { campione.push({ i, errore: 'nessun marciapiede' }); continue; }
+    const area = (game.areaAt && game.areaAt(pl.x, pl.y) && game.areaAt(pl.x, pl.y).name) || '?';
+    const lvl = game.wanted.level;
+    await aspettaAttiva(25, `Campione${i}`);
+    const t0 = performance.now();
+    const fasi = [];
+    let ultima = '';
+    let diag = false;
+    let walkDiag = null;
+    while (A.active && performance.now() - t0 < 20000) {
+      if (A.phase !== ultima) { ultima = A.phase; fasi.push(`${A.phase}@${((performance.now() - t0) / 1000).toFixed(1)}`); }
+      if (A.phase === 'walk' && A.t > 1.6 && !diag) {
+        diag = true;
+        const c = A.cop, v = A.car;
+        walkDiag = { cf: Math.round(Math.hypot(c.x - A.front.x, c.y - A.front.y)), pr: Math.round(Math.hypot(pl.x - A.rear.x, pl.y - A.rear.y)), cv: Math.round(Math.hypot(c.vx, c.vy)), pv: Math.round(Math.hypot(pl.vx, pl.vy)), lag: Math.round(Math.hypot(c.x - pl.x, c.y - pl.y)), carD: Math.round(Math.hypot(v.x - pl.x, v.y - pl.y)), carV: Math.round(v.speed), stuck: c.stuckT, cstate: c.state };
+      }
+      await wait(0.05);
+    }
+    campione.push({
+      i, area, lvl, modo: A.mode, retries: A.retries, why: A.why,
+      dur: +((performance.now() - t0) / 1000).toFixed(1), completo: A.why === 'dissolvenza' && fasi.some((f) => f.startsWith('drive')),
+      fasi: fasi.join('>'), walkDiag, forzata: A.forced,
+    });
+    await wait(1.2);
+  }
+  pl.hp = 100;
+  out.campione = campione;
+  out.campioneCompleti = campione.filter((r) => r.completo).length;
+  const durate = campione.filter((r) => r.completo).map((r) => r.dur).sort((a, b) => a - b);
+  out.campioneMediana = durate.length ? durate[Math.floor(durate.length / 2)] : null;
+  out.campione9su10 = out.campioneCompleti >= 9;
+  out.durataTipicaEntro8s = out.campioneMediana !== null && out.campioneMediana <= 8;
 }
 
 window.__OUT = out;

@@ -24,17 +24,19 @@ import { VEHICLE_TYPES } from '../render/sprites.js';
 import { hasLineOfSight } from './weapons.js';
 import { approachAngle, clamp, damp, dist, pointSegment, smoothstep } from '../core/math.js';
 
-const CUFF_T = 0.8;      // le manette: tempo per vederle
+const CUFF_T = 0.7;      // le manette: tempo per vederle
 const WAIT_CAR = 5;      // quanto si aspetta la volante prima di rinunciare
-const WALK_MAX = 4;      // quanto può durare il tragitto a piedi
-const BOARD_T = 0.95;    // portiera, giocatore dentro, agente al volante
-const DRIVE_T = 2.0;     // la volante parte e si allontana
-const FADE_T = 0.7;      // dissolvenza prima della cella
+const WALK_MAX = 5;      // quanto può durare il tragitto a piedi
+const BOARD_T = 0.8;    // portiera, giocatore dentro, agente al volante
+const DRIVE_T = 1.6;     // la volante parte e si allontana
+const FADE_T = 0.6;      // dissolvenza prima della cella
 const FADE_IN = 0.9;     // e da nero al commissariato
+const SPAWN_GIVEUP = 1.8; // se entro qui non nasce, niente volante
 const TIMEOUT = 12;      // oltre questo, qualcosa è andato storto
 const CAR_REACH = 380;   // una volante già lì: entro questa distanza si usa
+const NODE_CLEAR = 150;  // dal nodo: oltre il box dell'incrocio e le strisce
 const KERB_REACH = 300;  // oltre questa distanza da una strada non si chiama nessuno
-const WALK = 74;         // passo dell'accompagnamento: quello del giocatore
+const WALK = 92;         // passo dell'accompagnamento: svelto, ti portano via di fretta
 const ZOOM_SCENE = 1.8;   // si devono leggere due persone e le manette
 const ZOOM_DRIVE = 2.0;   // e poi si stringe sulla volante che parte
 
@@ -55,6 +57,12 @@ export class ArrestSequence {
     this.hidden = false;   // il giocatore è già dentro la volante
     this.copA = 0;
     this.why = '';
+    this.kerb = null;
+    this.pre = null;
+    this.forced = null;
+    this.pending = false;   // la volante nascerà fra poco (a zoom già stretto)
+    this.retries = 0;
+    this._stuckT = 0;
     this.mode = 'short';   // 'car' se c'è una volante, 'short' se non c'è modo
     this.copIn = false;
     this.front = { x: 0, y: 0 };
@@ -86,91 +94,122 @@ export class ArrestSequence {
   }
 
   /**
-   * La volante: la più vicina già lì, altrimenti una nuova che arriva da fuori
-   * campo e accosta. Se non c'è una strada abbastanza vicina o non si trova un
-   * punto dove farla nascere, **nessuna volante**: si resta ammanettati sul posto
-   * e si va alla dissolvenza (`mode: 'short'`). È il fallback onesto.
+   * La volante: la più vicina già lì; altrimenti ne nascerà una **appena fuori
+   * campo**, sul tratto di corsia che porta verso il giocatore (`spawnCar`, a
+   * zoom già stretto: non prima di 0,3 s). Se non c'è una strada abbastanza
+   * vicina, o non si trova un punto dove farla nascere, **nessuna volante**: si
+   * resta ammanettati sul posto e si va alla dissolvenza (`mode: 'short'`).
    */
   pickCar(game) {
     const P = game.police;
     const pl = game.player;
     this.mode = 'short';
+    this.kerb = this.stopPoint(game);
 
     let best = null;
-    let fresh = false;
     let bd = CAR_REACH;
     for (const v of P.cars) {
       if (v.dead || v.driver !== 'cop' || VEHICLE_TYPES[v.kind].marine) continue;
       const d = dist(v.x, v.y, pl.x, pl.y);
       if (d < bd && hasLineOfSight(game, pl.x, pl.y, v.x, v.y)) { bd = d; best = v; }
     }
+    if (best) this.adopt(game, best, false);
+    else if (this.kerb) { this.mode = 'car'; this.pending = true; }
+  }
 
-    const kerb = this.nearestRoadPoint(game);
-    if (!best && kerb) {
-      const near = P.city.graph.edgesNear(pl.x, pl.y, 1000);
-      const graph = P.city.graph;
-      const goal = graph.nearestNode(kerb.x, kerb.y);
-      fresh = true;
-      best = P.trySpawnCar(game, 'police', P.tier, near, (pt, edge, dir) => {
-        const dx = pl.x - pt.x;
-        const dy = pl.y - pt.y;
-        const d = Math.hypot(dx, dy);
-        // Appena fuori dall'inquadratura (`trySpawnCar` esclude già quello che si
-        // vede) e col muso dalla parte giusta: sono ~2 s di strada, e la scena
-        // deve stare in sei-otto secondi in tutto.
-        if (d > 780 || Math.cos(pt.angle) * dx + Math.sin(pt.angle) * dy < d * 0.3) return false;
-        // Niente auto ferme davanti: una coda al semaforo la volante non la salta.
-        const c = Math.cos(pt.angle);
-        const s = Math.sin(pt.angle);
-        for (const o of game.vehicles) {
-          const fx = (o.x - pt.x) * c + (o.y - pt.y) * s;
-          if (fx > 0 && fx < 280 && Math.abs(-(o.x - pt.x) * s + (o.y - pt.y) * c) < 34) return false;
-        }
-        // E una strada che ci arrivi senza giri: l'A* dal prossimo incrocio non
-        // deve essere molto più lungo della linea d'aria (misurato: senza questo
-        // una volante su tre faceva il giro dell'isolato e la scena scadeva).
-        const chain = game.route.solve(graph, graph.nodeById(dir > 0 ? edge.b : edge.a), goal);
-        if (!chain) return false;
-        let len = Math.hypot(chain[0].x - pt.x, chain[0].y - pt.y);
-        for (let i = 1; i < chain.length; i++) len += Math.hypot(chain[i].x - chain[i - 1].x, chain[i].y - chain[i - 1].y);
-        return len < d * 1.35 + 120;
-      }, 160);
-    }
-    if (!best) return;
-
-    this.car = best;
+  /** Mette una volante al servizio della scena. */
+  adopt(game, v, fresh) {
+    const pl = game.player;
+    this.car = v;
     this.mode = 'car';
-    const t = kerb || { x: pl.x, y: pl.y };
-    const copAi = best.copAi;
+    this.pending = false;
+    const t = this.kerb || { x: pl.x, y: pl.y };
+    const copAi = v.copAi;
     // Una volante già lì può essere ferma storta: la si riaggancia alla corsia.
     // Una appena nata ha già la sua.
     if (!fresh) copAi.edge = null;
     copAi.jamT = 0;
     copAi.recoverT = 0;
-    best.siren = true;
-    best.lightsOn = true;
-    best.handbrake = false;
-    const still = Math.abs(best.speed) < 20 && dist(best.x, best.y, pl.x, pl.y) < 260;
-    const goalGraph = game.police.city.graph;
-    best.escort = {
+    v.siren = true;
+    v.lightsOn = true;
+    v.handbrake = false;
+    const still = Math.abs(v.speed) < 20 && dist(v.x, v.y, pl.x, pl.y) < 260;
+    v.escort = {
       state: still ? 'hold' : 'approach', x: t.x, y: t.y, minD: Infinity,
-      goal: goalGraph.nearestNode(t.x, t.y), edge: null, dir: 0, next: null,
+      goal: game.police.city.graph.nearestNode(t.x, t.y), edge: null, dir: 0, next: null,
     };
+    this._stuckT = 0;
   }
 
-  /** Il punto della strada più vicino al giocatore, se ce n'è uno ragionevole. */
-  nearestRoadPoint(game) {
+  /**
+   * Il posto dove la volante si ferma: il punto di strada più vicino al
+   * giocatore, **spostato fuori dall'incrocio** (mai sul box né sulle strisce:
+   * almeno `NODE_CLEAR` dal nodo, o a metà se l'arco è corto). `null` se non c'è
+   * una strada ragionevole.
+   */
+  stopPoint(game) {
     const pl = game.player;
     let best = null;
     let bd = KERB_REACH;
     for (const e of game.police.city.graph.edgesNear(pl.x, pl.y, KERB_REACH)) {
       const q = pointSegment(pl.x, pl.y, e.ax, e.ay, e.bx, e.by);
-      if (q.dist < bd) {
-        bd = q.dist;
-        best = { x: e.ax + (e.bx - e.ax) * q.t, y: e.ay + (e.by - e.ay) * q.t };
-      }
+      if (q.dist >= bd) continue;
+      bd = q.dist;
+      const m = e.len > NODE_CLEAR * 2 + 40 ? NODE_CLEAR : e.len / 2;
+      const s = clamp(q.t * e.len, m, e.len - m);
+      best = { x: e.ax + e.dx * s, y: e.ay + e.dy * s, edge: e };
     }
     return best;
+  }
+
+  /**
+   * Fa nascere la volante. Prima passata stretta (250-420 px da chi aspetta, fuori
+   * vista, ~1,5-2 s di strada), poi una larga. Il filtro vuole un punto **sulla
+   * corsia, fuori dall'incrocio**, col muso verso il posto di carico, senza auto
+   * ferme davanti e con un percorso (A*) che non giri attorno all'isolato.
+   */
+  spawnCar(game) {
+    const P = game.police;
+    const pl = game.player;
+    const k = this.kerb;
+    const graph = P.city.graph;
+    const goal = graph.nearestNode(k.x, k.y);
+    const near = graph.edgesNear(pl.x, pl.y, 800);
+    const accept = (pt, edge, dir) => {
+      if (dist(pt.x, pt.y, edge.ax, edge.ay) < NODE_CLEAR * 0.6 || dist(pt.x, pt.y, edge.bx, edge.by) < NODE_CLEAR * 0.6) return false;
+      const dx = k.x - pt.x;
+      const dy = k.y - pt.y;
+      const d = Math.hypot(dx, dy);
+      const c = Math.cos(pt.angle);
+      const s = Math.sin(pt.angle);
+      if (c * dx + s * dy < d * 0.3) return false;
+      for (const o of game.vehicles) {
+        const fx = (o.x - pt.x) * c + (o.y - pt.y) * s;
+        if (fx > 0 && fx < 220 && Math.abs(-(o.x - pt.x) * s + (o.y - pt.y) * c) < 34) return false;
+      }
+      if (edge === k.edge) return true;
+      const chain = game.route.solve(graph, graph.nodeById(dir > 0 ? edge.b : edge.a), goal);
+      if (!chain) return false;
+      let len = Math.hypot(chain[0].x - pt.x, chain[0].y - pt.y);
+      for (let i = 1; i < chain.length; i++) len += Math.hypot(chain[i].x - chain[i - 1].x, chain[i].y - chain[i - 1].y);
+      return len < d * 1.4 + 120;
+    };
+    let v = P.trySpawnCar(game, 'police', P.tier, near, accept, { minD: 250, maxD: 420, margin: 20, attempts: 150 });
+    if (!v) v = P.trySpawnCar(game, 'police', P.tier, near, accept, { minD: 250, maxD: 900, margin: 20, attempts: 150 });
+    if (v) this.adopt(game, v, true);
+    return !!v;
+  }
+
+  /** La volante si è piantata (~0 per più di 1,2 s senza essere arrivata): via, e se ne fa nascere un'altra. */
+  respawn(game) {
+    const P = game.police;
+    const v = this.car;
+    this.car = null;
+    this.pending = true;
+    this.retries++;
+    const i = P.cars.indexOf(v);
+    if (i >= 0) P.cars.splice(i, 1);
+    P.dropVehicle(v, game, false);
   }
 
   // --- uscite -----------------------------------------------------------------
@@ -227,7 +266,8 @@ export class ArrestSequence {
     const car = this.car;
     // Anomalie: l'agente è caduto prima di salire, o la volante non c'è più.
     if (!this.copIn && (cop.dead || cop.gone)) return this.finish(game, cop.dead ? 'agenteMorto' : 'agenteSparito');
-    if (this.mode === 'car' && (car.dead || !game.vehicles.includes(car))) return this.finish(game, car.dead ? 'volanteDistrutta' : 'volanteSparita');
+    if (car && (car.dead || !game.vehicles.includes(car))) return this.finish(game, car.dead ? 'volanteDistrutta' : 'volanteSparita');
+    if (this.mode === 'car' && this.phase !== 'board' && this.phase !== 'drive' && this.phase !== 'fade') this.manageCar(game, dt);
 
     const cam = game.camera;
     switch (this.phase) {
@@ -244,13 +284,21 @@ export class ArrestSequence {
         break;
 
       case 'wait':
-        this.freeze(pl);
-        if (car.escort.state === 'hold') {
+        if (this.mode === 'short') { this.freeze(pl); this.go('short'); break; }
+        // Si va già verso il punto di carico: la volante ci arriva da sola e
+        // quando si ferma il tragitto è quasi fatto (è metà della durata).
+        if (!this.pre) this.planPre(pl);
+        this.walkPlayer(dt, game);
+        if (car && car.escort.state === 'hold') {
           this.planDoors(car, pl);
           this.go('walk');
         } else if (this.total > WAIT_CAR) {
           // Non è arrivata: se è vicina si ferma lì, altrimenti non si aspetta oltre.
-          if (dist(car.x, car.y, pl.x, pl.y) < 420) car.escort.state = 'hold';
+          if (car && dist(car.x, car.y, pl.x, pl.y) < 420) {
+            // Scattata per scadenza e non per arrivo: serve a chi prova.
+            this.forced = { d: Math.round(dist(car.x, car.y, car.escort.x, car.escort.y)), minD: Math.round(car.escort.minD), v: Math.round(car.speed), st: car.escort.state, jam: car.copAi.jamT };
+            car.escort.state = 'hold';
+          }
           else this.go('fade');
         }
         break;
@@ -258,8 +306,8 @@ export class ArrestSequence {
       case 'walk': {
         this._walkT += dt;
         this.walkPlayer(dt, game);
-        const atFront = dist(cop.x, cop.y, this.front.x, this.front.y) < 14;
-        const atRear = dist(pl.x, pl.y, this.rear.x, this.rear.y) < 14;
+        const atFront = dist(cop.x, cop.y, this.front.x, this.front.y) < 14 || dist(cop.x, cop.y, car.x, car.y) < 50;
+        const atRear = dist(pl.x, pl.y, this.rear.x, this.rear.y) < 14 || dist(pl.x, pl.y, car.x, car.y) < 50;
         if (atFront && atRear) this.go('board');
         else if (this._walkT > WALK_MAX) this.go('fade');   // intoppo: niente teletrasporti
         break;
@@ -302,6 +350,24 @@ export class ArrestSequence {
     }
   }
 
+  /**
+   * La volante prima che parta: nascita differita (serve lo zoom già stretto, o
+   * `trySpawnCar` la farebbe nascere troppo lontano per restare fuori vista) e
+   * ripresa se si pianta.
+   */
+  manageCar(game, dt) {
+    if (this.pending) {
+      if (this.total < 0.3) return;
+      if (this.spawnCar(game)) return;
+      if (this.total > SPAWN_GIVEUP) { this.pending = false; this.mode = 'short'; }
+      return;
+    }
+    const car = this.car;
+    if (!car || !car.escort || car.escort.state !== 'approach') { this._stuckT = 0; return; }
+    this._stuckT = Math.abs(car.speed) < 8 ? this._stuckT + dt : 0;
+    if (this._stuckT > 1.2 && this.retries < 3 && this.total < WAIT_CAR - 0.8) this.respawn(game);
+  }
+
   go(phase) {
     this.phase = phase;
     this.t = 0;
@@ -325,6 +391,16 @@ export class ArrestSequence {
    * fare il giro dell'auto è una scena che non serve e una fonte di incastri.
    * L'agente va a quella davanti, il giocatore a quella dietro.
    */
+  planPre(pl) {
+    const k = this.kerb;
+    const d = Math.hypot(pl.x - k.x, pl.y - k.y) || 1;
+    // Sul marciapiede, a un passo dalla corsia: non in mezzo alla strada.
+    const m = Math.min(d, 46);
+    this.pre = { x: k.x + ((pl.x - k.x) / d) * m, y: k.y + ((pl.y - k.y) / d) * m };
+    this.front = this.pre;
+    this.rear = this.pre;
+  }
+
   planDoors(car, pl) {
     const spec = VEHICLE_TYPES[car.kind];
     const cos = Math.cos(car.angle);
@@ -390,7 +466,7 @@ export class ArrestSequence {
       p.angle = Math.atan2(pl.y - p.y, pl.x - p.x);
       return { x: p.x, y: p.y, speed: 0 };
     }
-    if (this.phase === 'walk') {
+    if (this.phase === 'walk' || (this.phase === 'wait' && this.pre)) {
       // Se il giocatore è rimasto indietro (un angolo, un lampione) lo si aspetta.
       const lag = dist(p.x, p.y, pl.x, pl.y);
       const atDoor = dist(p.x, p.y, this.front.x, this.front.y) < 42;
@@ -400,7 +476,7 @@ export class ArrestSequence {
       return { x: this.front.x, y: this.front.y, speed: lag > 52 && !atDoor ? 0 : WALK };
     }
     if (this.phase === 'board') return { x: this.front.x, y: this.front.y, speed: 0 };
-    if (this.phase === 'cuff' || this.phase === 'wait' || this.phase === 'short') {
+    if (this.phase === 'cuff' || this.phase === 'short') {
       // Si mette a fianco del giocatore e lo guarda.
       const gx = pl.x + Math.cos(this.copA) * 26;
       const gy = pl.y + Math.sin(this.copA) * 26;
