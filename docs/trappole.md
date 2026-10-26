@@ -450,3 +450,20 @@ due quinti in alto a sinistra: un personaggio disegnato con `groundY` sul bordo 
 sotto il gradiente e sparisce. Peggio: con cinque voci il riquadro **esce dal pannello** e la
 prima riga finisce oltre il bordo di sopra. Si guarda con `cutscene-panel.scene`, non si indovina
 — e quando non ci sta, si taglia la battuta o si divide la tavola in due (§5.33).
+
+**Un `x1` di area è già fuori dall'area.** `areaAt` è aperto a destra (`x < x1`), quindi
+`districtAt(7200, y)` risponde campagna: campionare il bordo esatto di Seoul dipingeva una
+riga verde larga un passo di campionamento. Per leggere il distretto del bordo si clampa a `x1 - 1`
+(§5.38).
+
+**Uno smoothstep non è un raccordo.** Parte con derivata zero: se la città scende di 0,09 px/px
+sul bordo e la campagna la prosegue piatta, l'hillshade disegna una striscia chiara e una parete
+scura. Il raccordo di quota deve continuare la pendenza uscente (`korea.elevationAt`, §5.38).
+
+**Un `createLinearGradient(left, …)` per tile è un mare a scacchi.** Il gradiente va ancorato a
+un'ascissa del mondo (`SEA_X0`), non al bordo del tile che si sta disegnando (§5.38).
+
+**Accorciare una via non è allungarla.** `regions.reindex` scarta gli edifici che toccano i
+`segments`: allungare un segmento per far stare una testata faceva sparire edifici. Le testate si
+dipingono (`ground.drawTestata`), non si aggiungono alla carreggiata (§5.38).
+
