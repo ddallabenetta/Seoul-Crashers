@@ -469,3 +469,10 @@ nessuno per conto suo: chi vuole il giocatore fermo mentre il mondo gira deve ga
 **Una scena che campiona «ogni mezzo secondo» con `floor(t/500) > tr.length` campiona ogni decimo.**
 Il contatore recupera finché non raggiunge l'orologio, quindi dopo una pausa (una fase che comincia)
 sembra di vedere un agente che cammina a 8 px/s: è un'illusione dello script, non del gioco.
+**Un'aggiunta in coda può spostare una missione.** M4 cerca il prop `crane` più vicino all'ufficio
+del molo: una gru nuova con lo stesso tipo cambia il bersaglio. Le gru del §5.39 sono `harborcrane`.
+
+**`queryRect` dice «c'è un edificio» e non è vero.** Restituisce i candidati delle *celle*, non chi
+sovrappone: il test esatto va rifatto sul risultato (`blocklife.hasSolid`). E contare i prop
+solidi come «già occupato» salta i campi di Jeju (ci sono `ac_unit` dei cortili, che nei campi si
+tolgono); un `turf` può coprire un intero molo, quindi si vieta solo il suo centro (§5.39).

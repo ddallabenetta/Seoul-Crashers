@@ -133,6 +133,18 @@ saltate fuori scrivendo l'atto:
 
 ---
 
+## 6.1 — Dopo la vita negli isolati (§5.39)
+
+- **Busan resta sotto Seoul per insegne** (0,29 → ~0,62 per edificio contro ~1,07): solo 364 edifici
+  su 815 hanno un lato strada e quasi tutti avevano già un'insegna. Il resto lo dirà la forma nuova di
+  Busan (T9d): il passo `blocklife` si limita a leggere quello che trova.
+- **Le tipologie dei parchi sono statiche**: niente gente che gioca a basket, niente bancarelle
+  servite. I pedoni non sanno che l'area giochi o il mercato esistono (`life.js` potrebbe dare loro un
+  motivo per andarci).
+- **La campagna del corridoio** (`campagna`, nessun blocco `rural`) non riceve niente: è il lavoro di T9c,
+  e le funzioni di `blocklife` valgono per qualunque blocco con `fields`.
+- **Gli animali** non ci sono: i pascoli hanno recinto e abbeveratoio, non mucche.
+
 ## 6. Backlog successivo (già concordato con l'utente)
 
 **Fase 3 — contenuti.** Negozi e interni (§5.8), la mappa (§5.9), il ciclo giorno-notte
