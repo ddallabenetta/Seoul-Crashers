@@ -266,6 +266,10 @@ il §5.21 altre undici — fra cui le due che erano tornate in cima.
   cercare la capacità da un'altra parte — la priorità fra i mezzi.
 - **Non c'è priorità fra i mezzi**: un autobus (158 px) e uno scooter (44 px) trattano l'incrocio
   allo stesso modo, e il primo lo occupa per il doppio del tempo.
+- **L'invariante `dentroLamiera = 0` di `walkers-census` non tiene già su `main`**: tre run della
+  stessa configurazione danno 2, 46 e 144 campioni, sempre con pedoni dentro un'auto **in sosta**.
+  È caotico (cambia con qualunque cosa sposti il rng a valle) e non è del sorpasso: va inseguito
+  nella tappa T2, che è quella dei pedoni.
 - **I pedoni aggirano le lamiere ferme ma non si aggirano fra loro**: dal §5.21 un passante
   scarta un'auto in sosta, due passanti che si incontrano invece si compenetrano. Si nota molto
   meno (sono sagome della stessa taglia che si sovrappongono per un istante), ma è lo stesso
