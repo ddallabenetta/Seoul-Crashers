@@ -463,6 +463,66 @@ const HEADS = {
     '......############......',
     '.........#ssss#.........',
   ],
+  // Nam Ji-uk, il Serpente Nero di Busan. **Gli occhiali sottili e i capelli pettinati
+  // all'indietro** sono la sua faccia: è il solo del cast che sembra un professore, ed è
+  // la cosa che il copione vuole (cortese, colto, e ha fatto uccidere più gente di tutti).
+  // Il volto si stringe verso il mento. Il filo d'argento (`a`) è la montatura.
+  nam: [
+    '........................',
+    '......############......',
+    '....##hhhhhhhhhhhh##....',
+    '...#hhhHhhhhhhhhhhhh#...',
+    '..#hhHhhhhhhhhhhhhhhh#..',
+    '..#hhhhhhhhhhhhhhhhhh#..',
+    '..#shhhhhhhhhhhhhhhhs#..',
+    '..#sshhhhhhhhhhhhhhss#..',
+    '..#ss###ssssssss###ss#..',
+    '..#saaaaaaaaaaaaaaaas#..',
+    '..#sawwwwassssawwwwas#..',
+    '..#saw##wassssaw##was#..',
+    '..#saaaaaassssaaaaaas#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssssss##ssssssss#..',
+    '..#sssssssdd#ssssssss#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssss######ssssss#..',
+    '..#ssssssssssssssssss#..',
+    '...#ssssssssssssssss#...',
+    '....#ssssssssssssss#....',
+    '.....##ssssssssss##.....',
+    '.......##########.......',
+    '.........#ssss#.........',
+  ],
+
+  // Ko Eun-bi, 철마파, quarantadue anni. **La bandana** (`c`, rosso ruggine) tirata sulla fronte
+  // e **la macchia d'olio** sulla guancia (`d`): è una che ha le mani nei motori da una vita, e
+  // lo dice prima ancora di parlare. Faccia aperta, sopracciglia dritte, nessuna ombra di sospetto.
+  ko: [
+    '........................',
+    '......############......',
+    '....##cccccccccccc##....',
+    '...#cCCCCCCCCCCCCCCc#...',
+    '..#ccccccccccccccccccc#.',
+    '..#hhhhhhhhhhhhhhhhhh#..',
+    '..#hhhhhhhhhhhhhhhhhh#..',
+    '..#hhssssssssssssssshh#.',
+    '..#ssssssssssssssssss#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssssssssssssssss#..',
+    '..#ss####ssssss####ss#..',
+    '..#ssw##wssssssw##wss#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssssss##sssssdds#..',
+    '..#sssssssdd#sssssdds#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssss######ssssss#..',
+    '..#ssssssssssssssssss#..',
+    '...#ssssssssssssssss#...',
+    '...#ssssssssssssssss#...',
+    '....##ssssssssssss##....',
+    '......############......',
+    '.........#ssss#.........',
+  ],
 };
 
 // --- le tinte ------------------------------------------------------------------
@@ -583,6 +643,23 @@ export const CAST = {
     hair: '#241f2e', hairHi: '#453d55',
     coat: '#232a35', coatHi: '#333d4c', shirt: '#c9ced8', pants: '#1d212a',
     accent: '#c2384a', build: 10, name: 'Dulchae',
+  },
+  // Nam Ji-uk (M10). Il completo chiaro di lino: a Busan, in un mercato del pesce, è l'unico
+  // abito che non sa di pesce, ed è il modo in cui il copione lo presenta («cortese, colto»).
+  nam: {
+    head: 'nam',
+    hair: '#2c2b33', hairHi: '#5a5864',
+    coat: '#8d98a3', coatHi: '#aab5bf', shirt: '#eef1f5', pants: '#6f7b87',
+    accent: '#2a323f', build: 8, name: 'Nam Ji-uk',
+  },
+  // Ko Eun-bi (M10). La tuta da officina, verde bottiglia e unta: **non ha una parte politica
+  // e non la veste**. Il rosso della bandana è il suo colore.
+  ko: {
+    head: 'ko',
+    hair: '#2a2430', hairHi: '#4b4256',
+    cap: '#b8472a', capHi: '#dd6a44',
+    coat: '#2f4c46', coatHi: '#436b62', shirt: '#cdd3d8', pants: '#27333a',
+    accent: '#e0a23a', build: 8, name: 'Ko Eun-bi',
   },
 };
 
