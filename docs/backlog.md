@@ -193,6 +193,11 @@ il §5.21 altre undici — fra cui le due che erano tornate in cima.
   momento in cui ti caricano.
 - ~~Nessuno sorpassa.~~ Fatto in §5.34 (`traffic.OVERTAKE`): la corsia segue la svolta.
 
+**Scene che a volte falliscono sotto carico** (rilevato nel rework):
+- `atto-1.scene` → `gruSiSale` e `arresto.scene` → `attraversaLeFasi`/`campione9su10` sono falliti una volta ciascuno
+  con la macchina carica di altri probe, e passano alla riprova (tre su tre anche su `main`). Aspettano a tempo
+  di orologio, non di simulazione: vanno portate a passi di `game.loop` prima di farne un controllo di CI.
+
 **Rimasto indietro dalle cuciture** (§5.38):
 - **Fra l'ultimo isolato di Seoul e il prato resta una striscia di terra scura** (~150 px a zoom 1, a sud e a est):
   la sfumatura parte da `GROUND_RIM` px dentro il confine dell'area, non dal bordo dell'ultimo isolato. Va
