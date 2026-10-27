@@ -1,0 +1,162 @@
+// Costo per sistema: ms di JS per frame, su quattro scenari fissi e ripetibili (§5.45).
+//
+//   node .claude/tools/probe.mjs --seconds 2 --quiet --script .claude/tools/scenes/costo.scene
+//
+// Come è reso ripetibile: il loop reale viene fermato e i frame si guidano a mano
+// (`update(1/60)` + `render()`), `Math.random` è sostituito da un LCG con seme fisso, ora e
+// meteo sono bloccati. Lo stesso albero dà lo stesso scenario a ogni lancio; quello che cambia
+// è solo il tempo di muro. Con `window.__SOLO = 'busan'` (o `centro`, `inseguimento`, `notte`)
+// si fa un solo scenario; `window.__FRAMES` cambia la durata (default 600 dopo 240 di riscaldo);
+// `window.__ZOOM` imposta lo zoom (0.49 = mira di precisione).
+//
+// Cosa NON è: è tempo di JS in headless con rasterizzazione software. Il disegno su canvas
+// (terreno, luce, HUD) costa molto più qui che su una GPU: serve a confrontare prima e dopo,
+// non a prevedere i fps di una macchina vera. Confronto onesto: due alberi, run in coppia
+// contemporanea, ≥3 coppie — i valori assoluti oscillano col carico della macchina.
+// `performance.now()` ha risoluzione di 100 µs: le somme su centinaia di frame reggono,
+// il singolo frame no.
+const FRAMES = window.__FRAMES || 600;
+const WARM = 240;
+const ZOOM = window.__ZOOM || 1;
+
+let seed = 20260730;
+const realRandom = Math.random;
+const lcg = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
+
+// Strumentazione: ogni voce accumula i ms spesi dentro il metodo.
+const acc = {};
+const undo = [];
+function wrap(obj, name, label) {
+  if (!obj || typeof obj[name] !== 'function') return;
+  const orig = obj[name];
+  acc[label] = 0;
+  obj[name] = function (...a) {
+    const t = performance.now();
+    try { return orig.apply(this, a); } finally { acc[label] += performance.now() - t; }
+  };
+  undo.push(() => { obj[name] = orig; });
+}
+const g = game, sc = g.scene;
+wrap(g, 'update', 'update.TOT');
+wrap(g.traffic, 'update', 'update.traffico');
+wrap(g.pedSystem, 'update', 'update.pedoni');
+wrap(g.police, 'update', 'update.polizia');
+wrap(g.life, 'update', 'update.vita');
+wrap(g.projectiles, 'update', 'update.proiettili');
+wrap(g.actors, 'update', 'update.attori');
+wrap(g.pickups, 'update', 'update.raccolte');
+wrap(g.wanted, 'update', 'update.ricercato');
+wrap(g.player, 'update', 'update.giocatore');
+wrap(g.fx, 'update', 'update.effetti');
+wrap(g.hud, 'update', 'update.hud');
+wrap(g.audio, 'update', 'update.audio');
+wrap(g.vehicleGrid, 'rebuild', 'update.griglia-veicoli');
+wrap(g.pedGrid, 'rebuild', 'update.griglia-pedoni');
+wrap(g, 'render', 'render.TOT');
+wrap(sc, 'render', 'render.scena+terreno+luce');
+wrap(sc.ground, 'draw', 'render.terreno');
+wrap(sc, 'drawLight', 'render.luce');
+wrap(g.fx, 'draw', 'render.effetti');
+wrap(g.hud, 'draw', 'render.hud');
+
+const SCENARI = {
+  centro: async () => {
+    g.dayCycle.hour = 13; g.dayCycle.setWeather('clear'); g.dayCycle.paused = true;
+  },
+  inseguimento: async () => {
+    g.dayCycle.hour = 14; g.dayCycle.setWeather('clear'); g.dayCycle.paused = true;
+    const pl = g.player;
+    let best = null, bd = 1e9;
+    for (const v of g.vehicles) {
+      if (v.driver !== 'ai' || v.dead) continue;
+      const d = Math.hypot(v.x - pl.x, v.y - pl.y);
+      if (d < bd) { bd = d; best = v; }
+    }
+    if (best) pl.enterVehicle(best, g);
+    g.wanted.add(400, g);
+    return { guida: true };
+  },
+  notte: async () => {
+    g.dayCycle.hour = 23; g.dayCycle.setWeather('storm', 9999); g.dayCycle.paused = true;
+  },
+  busan: async () => {
+    g.dayCycle.hour = 13; g.dayCycle.setWeather('clear'); g.dayCycle.paused = true;
+    g.travelTo('busan', null, { silent: true });
+  },
+};
+
+// Pilota minimo: gas a fondo, e se si pianta fa retromarcia sterzando. Deterministico.
+function guida(frame) {
+  const pl = g.player, inp = g.input;
+  inp._keyboardDown.clear();
+  const v = pl.vehicle;
+  if (!v) return;
+  pl.hp = 1e6;
+  const speed = Math.abs(v.speed || 0);
+  if (speed < 25) guida.stuck = (guida.stuck || 0) + 1; else guida.stuck = 0;
+  if (guida.stuck > 40) { guida.rev = 50; guida.stuck = 0; guida.dir = (guida.dir || 1) * -1; }
+  if (guida.rev > 0) { guida.rev--; inp._keyboardDown.add('KeyS'); inp._keyboardDown.add(guida.dir > 0 ? 'KeyA' : 'KeyD'); }
+  else {
+    inp._keyboardDown.add('KeyW');
+    const ph = Math.sin(frame / 55);
+    if (ph > 0.55) inp._keyboardDown.add('KeyD'); else if (ph < -0.55) inp._keyboardDown.add('KeyA');
+  }
+  for (const c of inp._keyboardDown) inp.down.add(c);
+  for (const c of [...inp.down]) if (!inp._keyboardDown.has(c)) inp.down.delete(c);
+}
+
+const wasRunning = g.loop.running;
+g.loop.stop();
+Math.random = lcg;
+const out = {};
+const nomi = window.__SOLO ? [window.__SOLO] : Object.keys(SCENARI);
+const home = { x: g.city.spawn.x, y: g.city.spawn.y };
+try {
+  for (const nome of nomi) {
+    seed = 20260730;
+    g.travelTo('seoul', null, { silent: true });
+    g.player.x = home.x; g.player.y = home.y;
+    g.camera.snapTo(home.x, home.y);
+    g.camera.setZoomTarget(ZOOM);
+    g.wanted.reset();
+    g.traffic.prewarm(g, 44, 20);
+    const extra = await SCENARI[nome]();
+    g.camera.snapTo(g.player.x, g.player.y);
+    const frames = [];
+    const per = {};          // label -> ms di ogni frame misurato
+    let prev = {};
+    for (let f = 0; f < WARM + FRAMES; f++) {
+      if (extra?.guida) guida(f);
+      if (f === WARM) { prev = {}; for (const k in acc) { acc[k] = 0; per[k] = []; } }
+      const t0 = performance.now();
+      g.update(1 / 60);
+      g.render();
+      if (f >= WARM) {
+        frames.push(performance.now() - t0);
+        for (const k in acc) { per[k].push(acc[k] - (prev[k] || 0)); prev[k] = acc[k]; }
+      }
+    }
+    const q = (a, p) => { const s = [...a].sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(s.length * p))]; };
+    // Media per frame, non mediana: `performance.now()` ha 100 µs di risoluzione, e il disegno su
+    // canvas viene rasterizzato a ondate (qualche frame di fila costa 250 ms perché il browser
+    // svuota il buffer dei comandi), quindi la mediana di render.* non dice niente. Sulla somma
+    // di 600 frame le due cose si mediano. Per le voci `update.*` (JS puro) media e mediana coincidono.
+    const r = {};
+    for (const k of Object.keys(per).sort()) r[k] = +(per[k].reduce((x, y) => x + y, 0) / per[k].length).toFixed(3);
+    r['render.scena'] = +(r['render.scena+terreno+luce'] - r['render.terreno'] - r['render.luce'] - r['render.effetti']).toFixed(3);
+    delete r['render.scena+terreno+luce'];
+    out[nome] = {
+      msPerFrame: r,
+      frame: { media: +(frames.reduce((x, y) => x + y, 0) / frames.length).toFixed(2), mediana: +q(frames, 0.5).toFixed(2) },
+      popolazione: {
+        veicoli: g.vehicles.length, pedoni: g.peds.length, volanti: g.police.cops?.length ?? null,
+        stelle: g.wanted.level,
+      },
+    };
+  }
+} finally {
+  Math.random = realRandom;
+  for (const u of undo) u();
+  if (wasRunning) g.loop.start();
+}
+return out;
