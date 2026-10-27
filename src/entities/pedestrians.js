@@ -604,10 +604,10 @@ export class PedestrianSystem {
           if (g.i >= g.path.length) {
             if (g.loop) g.i = 0;
             else {
+              // `p.goto` resta: chi l'ha scritto legge `arrived` per sapere che ci è arrivato.
               g.arrived = true;
               p.state = 'post';
               p.home = { x: wp.x, y: wp.y };
-              p.goto = null;
             }
           }
         }

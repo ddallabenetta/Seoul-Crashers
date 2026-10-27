@@ -13,6 +13,7 @@
 // obiettivo, quindi ogni ricerca ha un ripiego che allarga il criterio invece di
 // restituire `null`.
 import { dist } from '../core/math.js';
+import { SIDEWALK } from '../world/citygen.js';
 
 /**
  * Un indirizzo di missione: la vetrina e **a che piano** sta l'attività cercata.
@@ -35,16 +36,23 @@ function seoul(game, s) {
  * Seoul. Meglio un 당구장 due strade più in là che una fase senza blip.
  */
 export function findShop(game, biz, opts = {}) {
-  const { district = null, near = game.city.spawn, avoid = [], minDist = 0 } = opts;
+  const { district = null, near = game.city.spawn, avoid = [], minDist = 0, level: wantLevel = null, visible = false } = opts;
+  // `district` è l'etichetta con cui la generazione ha marcato la vetrina; `visible` chiede il
+  // quartiere **che il giocatore legge a schermo** (`districtAt`), che sui bordi fra due
+  // distretti non è lo stesso. Chi manda in un posto e lo scrive nell'HUD vuole il secondo.
+  const where = (s) => (visible ? game.city.districtAt(s.x, s.y)?.id : s.district);
   const skip = new Set(avoid);
   const pick = (wantDistrict, wantMin) => {
     let best = null;
     let bestD = Infinity;
     for (const s of game.city.shops) {
       if (skip.has(s.id) || !seoul(game, s)) continue;
-      if (wantDistrict && s.district !== wantDistrict) continue;
+      if (wantDistrict && where(s) !== wantDistrict) continue;
       const level = s.biz.indexOf(biz);
       if (level < 0) continue;
+      // `level` è una **preferenza**: il copione dice «terzo piano», e se in quel quartiere non
+      // c'è, il ripiego sotto (senza vincolo) trova comunque un indirizzo.
+      if (wantLevel !== null && level !== wantLevel) continue;
       const d = dist(s.x, s.y, near.x, near.y);
       if (d < wantMin || d >= bestD) continue;
       bestD = d;
@@ -52,7 +60,9 @@ export function findShop(game, biz, opts = {}) {
     }
     return best;
   };
-  return pick(district, minDist) || pick(district, 0) || pick(null, minDist) || pick(null, 0);
+  const found = pick(district, minDist) || pick(district, 0) || pick(null, minDist) || pick(null, 0);
+  if (found || wantLevel === null) return found;
+  return findShop(game, biz, { ...opts, level: null });
 }
 
 /**
@@ -180,4 +190,46 @@ export function arrivata(v, to) {
   if (!v) return true;
   if (v.dead) return true;
   return !!v.ai?.arrived || Math.hypot(v.x - to.x, v.y - to.y) < 70;
+}
+
+/**
+ * L'isolato che sta attorno a una porta, e **il giro che ci fa un pedone**: i quattro angoli
+ * della fascia di marciapiede (`SIDEWALK * 0.78` dal bordo, la stessa di `pedestrians.js`) in
+ * senso orario, con la porta proiettata sul suo lato nel posto che le compete. Serve a chi
+ * deve far camminare qualcuno **attorno a un palazzo** senza sapere com'è fatta la maglia
+ * (M8): i punti sono sulla strada dei passanti, quindi nessuno li trova dentro un muro.
+ *
+ * `corners` sono i quattro angoli senza la porta (per spargere la folla); `door` è la porta vera, a
+ * due passi dall'anello; `idx` dice a che punto del giro sta la sua proiezione. Torna `null` se la porta non cade in nessun isolato — non succede a Seoul, ma
+ * una missione non deve dipendere da questo.
+ */
+const LATO = { top: 0, right: 1, bottom: 2, left: 3 };
+
+export function anelloMarciapiede(game, shop) {
+  if (!shop) return null;
+  const blocks = game.city.blockGrid.queryRect(shop.x - 2, shop.y - 2, 4, 4);
+  const block = blocks.find((b) => shop.x >= b.x && shop.x <= b.x + b.w && shop.y >= b.y && shop.y <= b.y + b.h);
+  if (!block) return null;
+  const m = SIDEWALK * 0.78;
+  const x0 = block.x + m;
+  const y0 = block.y + m;
+  const x1 = block.x + block.w - m;
+  const y1 = block.y + block.h - m;
+  const corners = [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }];
+  const side = LATO[shop.edge] ?? 0;
+  // La proiezione della porta sul suo lato, tenuta lontana dagli angoli.
+  const proj = { x: clampTo(shop.x, x0 + 24, x1 - 24), y: clampTo(shop.y, y0 + 24, y1 - 24) };
+  const door = side === 0 ? { x: proj.x, y: y0 } : side === 2 ? { x: proj.x, y: y1 }
+    : side === 1 ? { x: x1, y: proj.y } : { x: x0, y: proj.y };
+  const ring = [];
+  let idx = 0;
+  corners.forEach((c, i) => {
+    ring.push(c);
+    if (i === side) { idx = ring.length; ring.push(door); }
+  });
+  return { block, ring, corners, idx, door: { x: shop.x, y: shop.y }, side };
+}
+
+function clampTo(v, lo, hi) {
+  return Math.min(Math.max(v, lo), Math.max(lo, hi));
 }

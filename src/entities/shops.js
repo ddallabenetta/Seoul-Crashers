@@ -622,6 +622,7 @@ export class ShopSystem {
     // vanno buttate, o la cassa svuotata di *prima* si sovrapporrebbe a quella
     // del salvataggio.
     this.cache.clear();
+    this.stage.clear();
     this.pending = new Map(Object.entries(d.interiors || {}));
   }
 
@@ -703,6 +704,21 @@ export class ShopSystem {
   floorOpen(shop, bizId, game) {
     if (this.sealed.has(shop.id)) return false;
     return this.held.has(shop.id) || this.isOpen(bizId, game);
+  }
+
+  /**
+   * Dietro **questa** porta, per ora, c'è un'altra stanza (`alt` ha la forma di una vetrina,
+   * con lo stesso `id`). La città non cambia: la insegna è sempre quella, ma dentro c'è il
+   * cortile cieco di M8. `unstage` ripristina la pianta vera e butta quella di scena.
+   */
+  stageShop(shopId, alt) {
+    this.stage.set(shopId, alt);
+    this.cache.delete(`stage:${shopId}`);
+  }
+
+  unstage(shopId) {
+    this.stage.delete(shopId);
+    this.cache.delete(`stage:${shopId}`);
   }
 
   /** «Oggi qui si entra». Il contrario di `seal`, e sta nel salvataggio come lei. */
