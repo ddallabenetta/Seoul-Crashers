@@ -7,7 +7,7 @@ non tutti. Il `README.md` descrive il gioco e i comandi; qui c'è quello che ser
 
 Ultimo aggiornamento: **il rework** — **l'Atto II è chiuso** (§5.42, T8: **M7** farsi arrestare apposta in una
 cella percorribile, **M8** un pedinamento a piedi nella folla e un cortile cieco, il raccordo **R3**, le ultime
-cinque chiamate di 까치 dell'atto e il commesso dopo M8), **l'Atto II, prima metà** (§5.40, T7: **M5** i tre cortili di Pyo, **M6** la torre di
+cinque chiamate di 까치 dell'atto e il commesso dopo M8), **la forma di Busan e Jeju** (§5.41, T9d: coste a poligoni, Hallasan, ponti veri, luoghi dell'Atto III), **l'Atto II, prima metà** (§5.40, T7: **M5** i tre cortili di Pyo, **M6** la torre di
 한성개발 alle 14:00, il raccordo **R2**, tre chiamate di 까치 e Jo che risponde dopo M6), **le cuciture e i bordi
 della mappa** (§5.38, T9a), **la vita negli isolati** (§5.39, T9b), **l'arresto in volante** (§5.35, T3), **la
 regia sonora dei pannelli** (§5.37, T6) e **il sorpasso sulle arterie** (§5.34, T1). Prima: **l'Atto I completo** (§5.33, tappa E) — **M3**, **M4** e il raccordo
@@ -51,6 +51,7 @@ l'impianto delle missioni con M1 e M2 (§5.29). Le tappe precedenti sono §5.8-5
 | **toccare gli estremi delle strade**, le testate dei vicoli ciechi, il terreno attorno alle città o il bordo del mondo | `docs/storico/27-cuciture-della-mappa.md` (§5.38) |
 | toccare la corsia, il cambio corsia o il car-following del traffico | `docs/storico/23-sorpasso.md` (§5.34) |
 | toccare l'**arresto**: manette, agente che accompagna, volante che parte, `ESC` | `docs/storico/24-arresto-in-volante.md` (§5.35) |
+| **rifare la geografia** di Busan o Jeju, aggiungere un luogo nominato, una strada, un ponte | `docs/storico/30-busan-e-jeju.md` (§5.41) |
 | **arredare** un parco, un campo, un molo o un marciapiede; aggiungere insegne o un tipo di prop | `docs/storico/28-vita-negli-isolati.md` (§5.39) |
 | **pedinare qualcuno**, far portare un oggetto, mandare un'auto in un posto | `docs/storico/22-atto-i-completo.md` (§5.33) |
 | **contare cortili**, far leggere dei faldoni, un punto fisso come «Jo dopo M6», le chiamate dell'Atto II | `docs/storico/29-atto-ii-m5-m6-r2.md` (§5.40) |
@@ -100,6 +101,7 @@ commenti resta valido: si risolve qui.
 | §5.39 Vita negli isolati: tipologie di parchi e campi, arredo, insegne, moli | `docs/storico/28-vita-negli-isolati.md` |
 | §5.40 L'Atto II, prima metà: M5, M6, R2, tre chiamate di 까치, Jo dopo M6 | `docs/storico/29-atto-ii-m5-m6-r2.md` |
 | §5.42 L'Atto II, seconda metà: M7, M8, R3, cinque chiamate di 까치, il commesso dopo M8 | `docs/storico/31-atto-ii-m7-m8-r3.md` |
+| §5.41 La forma di Busan e Jeju: coste a maschera, strade da tracciati, luoghi dell'Atto III | `docs/storico/30-busan-e-jeju.md` |
 | §6 Backlog | `docs/backlog.md` |
 | §8 Parametri | `docs/parametri.md` |
 | §9 Strumenti (`.claude/`) | `docs/strumenti.md` |

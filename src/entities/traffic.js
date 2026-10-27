@@ -230,7 +230,10 @@ export class TrafficSystem {
       }
       if (!clear) continue;
 
-      const district = DISTRICT_BY_ID[this.city.districtAt(pt.x, pt.y).id];
+      // Busan e Jeju hanno i loro distretti (§5.41): il mix di veicoli è il loro, non quello
+      // del distretto di Seoul con lo stesso id. Per Seoul il risultato è identico.
+      const here = this.city.districtAt(pt.x, pt.y);
+      const district = here.region && here.region !== 'seoul' ? here : DISTRICT_BY_ID[here.id];
       let kind = rng.pick(district.vehicleMix);
       // Autobus e camion solo sui boulevard: negli incroci stretti si incastrano.
       if ((kind === 'bus' || kind === 'truck') && !edge.arterial) {
@@ -276,7 +279,8 @@ export class TrafficSystem {
         if (circleRectPush(spot.x, spot.y, 22, s)) { blocked = true; break; }
       }
       if (blocked) continue;
-      const district = DISTRICT_BY_ID[spot.district] || DISTRICT_BY_ID.hongdae;
+      const there = this.city.districtAt(spot.x, spot.y);
+      const district = there.region && there.region !== 'seoul' ? there : (DISTRICT_BY_ID[spot.district] || DISTRICT_BY_ID.hongdae);
       const kind = rng.pick(district.vehicleMix.filter((k) => k !== 'bus'));
       const v = createVehicle(kind, spot.x, spot.y, spot.angle + rng.range(-0.05, 0.05), rng.int(0, 9));
       v.driver = null;

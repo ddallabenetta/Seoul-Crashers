@@ -173,9 +173,12 @@ export class Scene {
     }
     const flying = this._fq;
     flying.length = 0;
+    const under = [];
     for (const v of game.vehicles) {
       if (v.x < view.x || v.x > view.x + view.w || v.y < view.y || v.y > view.y + view.h) continue;
       if (airborne(v)) { flying.push(v); continue; }
+      // Una barca sotto un ponte (§5.41) passa dietro l'impalcato, non sopra.
+      if (city.underDeck && VEHICLE_TYPES[v.kind]?.marine && city.underDeck(v.x, v.y)) { under.push(v); continue; }
       list.push({ t: 2, o: v, d: (v.x - ccx) ** 2 + (v.y - ccy) ** 2 });
     }
     for (const p of game.peds) {
@@ -200,6 +203,7 @@ export class Scene {
 
     list.sort((a, b) => b.d - a.d);
 
+    if (under.length) this.drawUnderDeck(ctx, cam, game, under);
     for (const item of list) {
       switch (item.t) {
         case 0: this.drawBuilding(ctx, item.o, cam, game); break;
@@ -229,6 +233,24 @@ export class Scene {
     // disegnato. È l'unico modo di illuminare una città fatta di tile cachati
     // da 512 px senza rigenerarli a ogni minuto di orologio.
     this.drawLight(ctx, game);
+  }
+
+  /**
+   * Le barche sotto un impalcato: si disegnano e poi si ridipinge il terreno ritagliato
+   * sul rettangolo del ponte, così l'impalcato (e i suoi piloni) le copre. Le auto e i
+   * pedoni sul ponte stanno nella fila ordinata, che viene dopo.
+   */
+  drawUnderDeck(ctx, cam, game, boats) {
+    for (const v of boats) this.drawVehicle(ctx, v, cam, game);
+    for (const b of this.city.bridges) {
+      if (!boats.some((v) => v.x > b.x - 60 && v.x < b.x + b.w + 60 && v.y > b.y - 60 && v.y < b.y + b.h + 60)) continue;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(b.x, b.y, b.w, b.h);
+      ctx.clip();
+      this.ground.draw(ctx, cam);
+      ctx.restore();
+    }
   }
 
   drawLight(ctx, game) {

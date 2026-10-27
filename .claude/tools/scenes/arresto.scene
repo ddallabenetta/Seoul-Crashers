@@ -132,6 +132,9 @@ async function aspettaAttiva(max = 7, quale = '') {
         fasi.push(`${A.phase}@${((performance.now() - t0) / 1000).toFixed(1)}s`);
         await wait(0.15);   // un attimo dentro la fase, non sul bordo
         await shot(`1-${String(++n).padStart(2, '0')}-${A.phase}`);
+        // Lo scatto della dissolvenza può durare più della dissolvenza: a quel punto
+        // `bustPlayer` ha già salvato, ed è il salvataggio giusto, non uno «durante».
+        if (!A.active) continue;
       }
       if (S.canAutosave(game)) canAutosaveMai = false;
       if (snapAuto() !== autoPrima) autoCambiato = true;

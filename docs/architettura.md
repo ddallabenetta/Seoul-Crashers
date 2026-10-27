@@ -40,8 +40,11 @@ src/world/
                       del corridoio, autostrada Gyeongbu, aree di servizio
   regions.js          chiusura comune: carreggiata, ingressi metro, indici, limiti
   seoul_expansion.js  landmark reali, cintura metropolitana e 16 stazioni della capitale
-  busan.js            generatore autonomo: baia, Nakdong, ponti e tessuto urbano di Busan
-  jeju.js             generatore autonomo: profilo insulare, Hallasan, campagne e due città
+  busan.js            generatore autonomo: cuneo costiero, monti, porto, baia di Suyeong, luoghi dell'Atto III (§5.41)
+  jeju.js             generatore autonomo: isola a costa rugosa, Hallasan, strada costiera ad anello, due città (§5.41)
+  coastmask.js        maschera terra/acqua da poligoni + distanza dalla riva (Busan, Jeju)
+  netgen.js           reti stradali da tracciati assiali, `staircase`, isolati dallo spazio libero
+  regionkit.js        edifici, isolati, vetrine, landmark comuni a Busan e Jeju
   roadclearance.js    ingombro della carreggiata e ricerca delle linee attive più vicine
   daycycle.js         orologio, tabella della luce ora per ora, meteo a catena di Markov
   interiors.js        catalogo delle attività (con gli orari) + pianta di ogni piano

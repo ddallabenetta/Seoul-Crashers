@@ -308,6 +308,7 @@ function sink(v, dt, world) {
  */
 function resolveMarine(v, spec, world, dt) {
   const city = world.city;
+  const wet = city.isNavigable ? (x, y) => city.isNavigable(x, y) : (x, y) => city.isWater(x, y);
   const cos = Math.cos(v.angle);
   const sin = Math.sin(v.angle);
   const half = spec.len * 0.44;
@@ -317,12 +318,12 @@ function resolveMarine(v, spec, world, dt) {
     { x: v.x - cos * half, y: v.y - sin * half, at: -1 },
   ];
   for (const p of probes) {
-    if (city.isWater(p.x, p.y)) continue;
+    if (wet(p.x, p.y)) continue;
     let nx = 0;
     let ny = 0;
     for (let a = 0; a < 8; a++) {
       const ang = (a * Math.PI) / 4;
-      if (city.isWater(p.x + Math.cos(ang) * 46, p.y + Math.sin(ang) * 46)) {
+      if (wet(p.x + Math.cos(ang) * 46, p.y + Math.sin(ang) * 46)) {
         nx += Math.cos(ang);
         ny += Math.sin(ang);
       }
