@@ -30,6 +30,20 @@ const LANE = {
   window: 26,       // larghezza (px dal centro) in cui un'auto occupa una corsia
 };
 
+// Cedere il passo alle sirene (§5.36). Un oggetto e non costanti sciolte: `on` spegne
+// tutto, anche il sorpasso delle volanti in `police.followRoads`.
+export const YIELD = {
+  on: true,
+  range: 430,       // px: da quanto dietro (o davanti, contromano) una volante a sirena si fa sentire
+  band: 60,         // px di scarto laterale entro cui la volante è «sulla mia strada»
+  hold: 1.4,        // s di cortesia dopo l'ultima volta che era in vista: niente sfarfallio
+  slow: 100,        // px/s: tetto di chi cede, perché la volante abbia il tempo di passare
+  bias: 7,          // px verso il cordolo su una strada a corsia singola
+  biasRate: 36,     // px/s
+  nodeR: 330,       // una volante a sirena entro questo raggio dall'incrocio ferma chi sta per ripartire
+  nodeHold: 4,      // s oltre i quali si riparte comunque: la cortesia non deve incastrare un incrocio
+};
+
 /** Svolta di `choice` rispetto all'arco da cui si arriva: dritto, destra, sinistra, inversione. */
 export function turnOf(edge, dir, choice) {
   if (!choice) return 'dritto';
@@ -69,6 +83,7 @@ export class TrafficSystem {
     this.parkingSpots = this.collectParkingSpots();
     this.spawnTimer = 0;
     this.tmp = {};
+    this.sirens = [];   // le volanti a sirena in moto, rifatte a ogni frame (§5.36)
   }
 
   /**
@@ -106,6 +121,15 @@ export class TrafficSystem {
 
   update(dt, game) {
     this.stream(dt, game);
+    const sir = this.sirens;
+    sir.length = 0;
+    if (YIELD.on) {
+      // Un posto di blocco ha la sirena ma non viene da nessuna parte; una volante
+      // sbarcata nemmeno.
+      for (const v of this.vehicles) {
+        if (v.siren && v.driver === 'cop' && !v.dead && !v.deployed && !v.blockCar && Math.abs(v.speed) > 30) sir.push(v);
+      }
+    }
     for (const v of this.vehicles) {
       if (v.driver === 'player') continue;
       if (v.driver === 'ai') this.driveAI(v, dt, game);
@@ -518,6 +542,12 @@ export class TrafficSystem {
       ai.laneF = Math.abs(ai.lane - ai.laneF) <= step ? ai.lane : ai.laneF + Math.sign(ai.lane - ai.laneF) * step;
       return;
     }
+    // Una volante a sirena alle spalle: dalla corsia interna ci si porta su quella
+    // esterna (se c'è posto) e basta, nessun'altra decisione finché dura la cortesia.
+    if (ai.yieldT > 0) {
+      if (ai.lane === 0 && this.laneProbe(v, spec, ai, 1, game, true)) { ai.lane = 1; ai.lcAge = 0; }
+      return;
+    }
     if (!ai.nextChoice) ai.nextChoice = this.chooseNext(v, endNode, edge, game);
     const turn = turnOf(edge, ai.dir, ai.nextChoice);
     const toEnd = edge.len - nodeHalf - ai.s;
@@ -540,6 +570,58 @@ export class TrafficSystem {
     if (!probe) return;
     ai.lane = want;
     ai.lcAge = 0;
+  }
+
+  // --- sirene (§5.36) ----------------------------------------------------------
+
+  /**
+   * C'è una volante a sirena sulla mia strada — alle spalle nello stesso verso, o
+   * contromano davanti? Ne tiene il conto in `ai.yieldT`, che dura `YIELD.hold` dopo
+   * l'ultima volta che la si è vista (altrimenti si cede e si riprende a ogni frame
+   * in cui la volante esce dalla fascia). Ritorna la distanza della più vicina.
+   */
+  sirenWatch(v, ai, dt) {
+    const cos = Math.cos(v.angle), sin = Math.sin(v.angle);
+    let near = Infinity;
+    for (const c of this.sirens) {
+      const dx = c.x - v.x, dy = c.y - v.y;
+      const lat = -dx * sin + dy * cos;
+      if (Math.abs(lat) > YIELD.band) continue;
+      const fwd = dx * cos + dy * sin;
+      const same = Math.cos(c.angle - v.angle);
+      let d = Infinity;
+      if (same > 0.7 && fwd < 40 && fwd > -YIELD.range) d = Math.max(0, -fwd);
+      else if (same < -0.7 && fwd > 20 && fwd < YIELD.range * 0.7) d = fwd;
+      if (d < near) near = d;
+    }
+    if (near < Infinity) ai.yieldT = YIELD.hold;
+    else if (ai.yieldT > 0) ai.yieldT = Math.max(0, ai.yieldT - dt);
+    return near;
+  }
+
+  /**
+   * Una volante a sirena sta per attraversare l'incrocio davanti a me, da un'altra
+   * strada o contromano? Allora non si riparte (le volanti non guardano i semafori).
+   */
+  sirenCrossing(v, node) {
+    for (const c of this.sirens) {
+      const dx = node.x - c.x, dy = node.y - c.y;
+      if (dx * dx + dy * dy > YIELD.nodeR * YIELD.nodeR) continue;
+      if (c.vx * dx + c.vy * dy <= 0) continue;   // si sta allontanando
+      if (Math.cos(c.angle - v.angle) > 0.7) continue;   // stesso verso: è un caso di `sirenWatch`
+      return true;
+    }
+    return false;
+  }
+
+  /** Il waypoint davanti al muso, spostato verso il cordolo se si sta cedendo il passo. */
+  wayPoint(ai, look) {
+    const wp = lanePoint(ai.edge, ai.dir, ai.laneF ?? ai.lane, ai.s + look, this.tmp);
+    if (ai.bias) {
+      wp.x -= Math.sin(wp.angle) * ai.bias;
+      wp.y += Math.cos(wp.angle) * ai.bias;
+    }
+    return wp;
   }
 
   // --- guida AI --------------------------------------------------------------
@@ -627,12 +709,29 @@ export class TrafficSystem {
       }
     }
 
+    // Cedere il passo a una volante a sirena (§5.36): stato, e scostamento verso il
+    // cordolo dove la corsia è una sola (sulle arterie ci si sposta di corsia, in
+    // `laneLogic`).
+    if (YIELD.on && !ai.scripted) {
+      if (this.sirens.length) this.sirenWatch(v, ai, dt);
+      else if (ai.yieldT > 0) ai.yieldT = Math.max(0, ai.yieldT - dt);
+      const wantBias = ai.yieldT > 0 && laneCount(edge) === 1 ? YIELD.bias : 0;
+      if (ai.bias || wantBias) {
+        const step = YIELD.biasRate * dt;
+        const cur = ai.bias || 0;
+        ai.bias = Math.abs(wantBias - cur) <= step ? wantBias : cur + Math.sign(wantBias - cur) * step;
+      }
+    } else if (ai.bias || ai.yieldT) {
+      ai.bias = 0;
+      ai.yieldT = 0;
+    }
+
     if (OVERTAKE && !ai.scripted) this.laneLogic(v, spec, dt, game, edge, endNode, nodeHalf);
 
     // Waypoint davanti al muso, sul centro della corsia (frazionaria se si sta
     // scivolando da una all'altra)
     const look = 34 + Math.abs(v.speed) * 0.34;
-    let wp = lanePoint(ai.edge, ai.dir, ai.laneF ?? ai.lane, ai.s + look, this.tmp);
+    let wp = this.wayPoint(ai, look);
     let heading = angleDiff(v.angle, Math.atan2(wp.y - v.y, wp.x - v.x));
 
     // Girato di traverso o spinto fuori strada: riaggancia la corsia e ricalcola.
@@ -642,7 +741,7 @@ export class TrafficSystem {
         edge = ai.edge;
         endNode = graph.nodeById(ai.dir > 0 ? edge.b : edge.a);
         nodeHalf = (edge.axis === 'v' ? endNode.hWidth : endNode.vWidth) / 2;
-        wp = lanePoint(ai.edge, ai.dir, ai.laneF ?? ai.lane, ai.s + look, this.tmp);
+        wp = this.wayPoint(ai, look);
         heading = angleDiff(v.angle, Math.atan2(wp.y - v.y, wp.x - v.x));
       }
       if (Math.abs(heading) > 2.4) {
@@ -664,6 +763,8 @@ export class TrafficSystem {
     const queued = cap < 42;
 
     let target = ai.target * ai.aggression;
+    // Chi cede il passo rallenta: la volante deve avere il tempo di infilarsi.
+    if (ai.yieldT > 0) target = Math.min(target, YIELD.slow);
 
     // Curva imminente: rallenta per davvero. A 90 px/s un'auto taglia l'angolo
     // e finisce sul marciapiede, dove resta piantata.
@@ -682,6 +783,19 @@ export class TrafficSystem {
         target = stopDist < 22 ? 0 : Math.min(target, stopDist * 1.5);
         waitingAtLight = true;
       }
+    }
+
+    // Una volante a sirena in arrivo sull'incrocio (le volanti non guardano i
+    // semafori): non si riparte verso di lei. La cortesia ha un tetto, o due
+    // volanti in fila terrebbero fermo un incrocio per sempre.
+    if (this.sirens.length && !waitingAtLight && stopDist < 120 && stopDist > -4 && !ai.scripted) {
+      if ((ai.sirenHold || 0) < YIELD.nodeHold && this.sirenCrossing(v, endNode)) {
+        ai.sirenHold = (ai.sirenHold || 0) + dt;
+        target = stopDist < 22 ? 0 : Math.min(target, stopDist * 1.5);
+        waitingAtLight = true;
+      }
+    } else if (ai.sirenHold > 0 && (stopDist > 130 || stopDist < -4 || !this.sirens.length)) {
+      ai.sirenHold = 0;   // il tetto vale per un incrocio alla volta
     }
 
     // Incrocio. Due regole distinte, e servono entrambe:
@@ -853,6 +967,7 @@ export class TrafficSystem {
         if (v.ai.honkT <= 0) {
           v.ai.honkT = 2.2;
           game.audio?.honk(v);
+          game.emit('honk', v);
         }
       }
     }

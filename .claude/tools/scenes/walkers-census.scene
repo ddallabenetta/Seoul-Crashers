@@ -33,6 +33,7 @@ let samples = 0;
 let stuckSum = 0;     // pedoni che vogliono muoversi e non si muovono
 let pedSum = 0;
 const travel = new Map();   // id -> px percorsi
+const culprits = new Map();  // "ped/auto" -> campioni dentro, e chi sono
 const last = new Map();
 
 /** True se il pedone compenetra la terna di cerchi di un veicolo senza guidatore. */
@@ -66,8 +67,20 @@ function sample() {
     if (prev) travel.set(p.id, (travel.get(p.id) || 0) + Math.hypot(p.x - prev.x, p.y - prev.y));
     last.set(p.id, { x: p.x, y: p.y });
     for (const v of game.vehicleGrid.queryCircle(p.x, p.y, 90)) {
-      if (v.driver || v.z > 6) continue;
-      if (insideBody(p, v)) { hit++; break; }
+      // Solo le lamiere **solide**: le stesse che `pedestrians.updatePed` tratta da muro,
+      // cioè senza guidatore, a terra e sotto i 12 px/s. Una carcassa che rotola a 30 px/s
+      // dopo un urto non è un'auto in sosta, e un passante che ci finisce sotto non rompe
+      // l'invariante (§5.36).
+      if (v.driver || v.z > 6 || Math.hypot(v.vx, v.vy) >= 12) continue;
+      if (insideBody(p, v)) {
+        hit++;
+        // Chi e dove: un invariante che si rompe senza dire chi lo rompe costa una sessione.
+        const key = `${p.id}/${v.id}`;
+        const e = culprits.get(key) || { campioni: 0, ped: p.state + (p.role ? `/${p.role}` : ""), auto: v.kind + (v.spot ? " in-sosta" : "") + (v.protect ? " protetta" : "") };
+        e.campioni++;
+        culprits.set(key, e);
+        break;
+      }
     }
   }
   pedSum += alive;
@@ -94,6 +107,8 @@ return {
   pedoniMedi: Math.round(pedSum / samples),
   // L'invariante: quante volte, su tutti i campioni, un pedone era dentro un'auto.
   dentroLamiera: insidePeds,
+  // I tre che ci sono stati più a lungo, con stato del pedone e tipo di auto: vuoto se l'invariante tiene.
+  colpevoli: [...culprits.values()].sort((a, b) => b.campioni - a.campioni).slice(0, 3),
   campioniConUnDentro: inside,
   piantati: +(stuckSum / samples).toFixed(2),
   // Strada percorsa: la mediana dice se il quartiere cammina, la coda bassa se

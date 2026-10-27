@@ -266,10 +266,17 @@ il §5.21 altre undici — fra cui le due che erano tornate in cima.
   cercare la capacità da un'altra parte — la priorità fra i mezzi.
 - **Non c'è priorità fra i mezzi**: un autobus (158 px) e uno scooter (44 px) trattano l'incrocio
   allo stesso modo, e il primo lo occupa per il doppio del tempo.
-- **L'invariante `dentroLamiera = 0` di `walkers-census` non tiene già su `main`**: tre run della
-  stessa configurazione danno 2, 46 e 144 campioni, sempre con pedoni dentro un'auto **in sosta**.
-  È caotico (cambia con qualunque cosa sposti il rng a valle) e non è del sorpasso: va inseguito
-  nella tappa T2, che è quella dei pedoni.
+- **Le sirene fanno cedere il traffico e le volanti passano (§5.36), ma con prudenza**: la volante
+  supera dalla corsia opposta solo se per ~400 px laggiù non c'è nessuno, altrimenti resta il freno
+  a 60. Con traffico fitto in senso opposto non passa; per passare lo stesso servirebbe che chi
+  viene contromano si fermasse (`sirenWatch` lo fa rallentare e scostare, non fermare).
+- **Il traffico cede solo alle volanti di `driver === 'cop'`**: non ci sono ambulanze né mezzi
+  di soccorso, e una sirena sul tetto del giocatore (la volante rubata) non fa cedere nessuno.
+- **I pedoni attraversano agli angoli dell'isolato, non sulle strisce**: `city.crosswalks` esiste
+  ed è disegnato, ma `planCrossing` parte dal marciapiede e va dritto. Dove l'incrocio ha le
+  strisce sarebbe giusto passare da lì, e non cambierebbe niente per la larghezza o il semaforo.
+- **Il clacson si sente per distanza, non per linea di vista**: un muro non lo ferma
+  (`hearHonk`, 240 px). Costa zero e si sente comunque, ma non è un modello di propagazione.
 - **I pedoni aggirano le lamiere ferme ma non si aggirano fra loro**: dal §5.21 un passante
   scarta un'auto in sosta, due passanti che si incontrano invece si compenetrano. Si nota molto
   meno (sono sagome della stessa taglia che si sovrappongono per un istante), ma è lo stesso

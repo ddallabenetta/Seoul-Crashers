@@ -50,6 +50,21 @@ export function canPass(node, axis, time) {
   return ph === 'h' || ph === 'h-yellow';
 }
 
+/**
+ * Il rosso delle auto di un asse, visto da chi attraversa quell'asse a piedi (§5.36).
+ * `left` = secondi di rosso che restano (0 se le auto passano), `wait` = fra quanti
+ * secondi comincia il rosso se adesso passano, `pass` = quanto dura la finestra in cui
+ * passano. È la stessa fase di `canPass`: il giallo conta come via libera per le auto.
+ */
+export function trafficRed(node, axis, time) {
+  const p = (time + node.tOffset) % SIGNAL_CYCLE;
+  const from = axis === 'h' ? GREEN + YELLOW : 0;
+  const to = axis === 'h' ? SIGNAL_CYCLE : GREEN + YELLOW;
+  const pass = to - from;
+  if (p >= from && p < to) return { left: 0, wait: to - p, pass };
+  return { left: p < from ? from - p : SIGNAL_CYCLE - p + from, wait: 0, pass };
+}
+
 export function buildRoadGraph(city) {
   const { vLines, hLines } = city;
   const nodes = [];

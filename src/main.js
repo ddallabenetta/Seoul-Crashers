@@ -202,6 +202,9 @@ class Game {
     this.pedGrid = new DynamicGrid(this.city.w, this.city.h, 120);
     this.traffic = new TrafficSystem(this.city, this.rng, this.vehicles);
     this.pedSystem = new PedestrianSystem(this.city, this.rng, this.peds);
+    // Il clacson si sente (§5.36): chi lo suona lo annuncia sul bus, e la griglia dei
+    // pedoni dice chi è abbastanza vicino da girarsi.
+    this.on('honk', (v) => this.pedSystem.hearHonk(v, this));
     // La vita degli altri: voli, navigazione, campagna, raduni e cronaca nera.
     // Ha un rng suo — pescare da `this.rng` sposterebbe lo streaming di traffico
     // e pedoni ogni volta che decolla un aereo.

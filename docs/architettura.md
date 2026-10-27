@@ -535,6 +535,20 @@ turno**, e vale solo dove non c'è semaforo — dove c'è, il turno lo assegna g
 sommarci una prenotazione ferma chi ha il verde. Ognuna di queste, da sola, produce uno stallo:
 servono tutte e tre, più il limite di tempo che le sblocca (§5.10).
 
+**La strada reagisce (§5.36).** Due canali, scelti per costare quasi niente. Le **sirene** sono
+uno *stato* e non un evento: `TrafficSystem.update` e `PedestrianSystem.update` raccolgono a ogni
+frame, ognuno per conto suo, le volanti a sirena in moto (`siren`, `driver === 'cop'`, non
+`blockCar` né `deployed`), e chi guida o cammina le guarda per distanza. Il **clacson** è un
+*evento*: `game.emit('honk', veicolo)` (tasto H e frenata davanti al giocatore a piedi), e
+`pedSystem.hearHonk` risponde interrogando `pedGrid` — niente giro su tutti i pedoni. Ogni
+comportamento ha il suo interruttore in un oggetto esportato (`traffic.YIELD.on`,
+`pedestrians.PED_TUNE.react` e `.crossSmart`), che una scena cambia a runtime per confrontare.
+**Invariante nuovo:** la valvola anti-incastro dei pedoni misura lo *spostamento*, non la velocità,
+e la spinta fuori da una lamiera toglie anche la componente di velocità contro
+(`pedestrians.pushOutOfCars`): senza, chi è incastrato corre sul posto per sempre. Chi ha un
+compito (`errand`) si sposta di lato per 1,2 s quando si incastra, perché l'ordine di `life`
+punta sempre lo stesso punto e non sa di muri.
+
 **Inseguimento senza pathfinding.** A ogni nodo `police.chooseEdge` prende l'arco il cui
 estremo lontano è più vicino al bersaglio (greedy, dieci confronti). Su una maglia ortogonale
 arriva quasi sempre; quando sbaglia interviene lo stesso anti-incastro del traffico civile

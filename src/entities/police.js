@@ -25,7 +25,8 @@ import { createVehicle } from './vehicle.js';
 import { createPed } from './pedestrians.js';
 import { VEHICLE_TYPES } from '../render/sprites.js';
 import { PROJ } from '../render/camera.js';
-import { lanePoint, laneCount } from '../world/roadgraph.js';
+import { lanePoint, laneCount, laneOffset } from '../world/roadgraph.js';
+import { YIELD } from './traffic.js';
 import { WEAPONS, shoot, hasLineOfSight } from './weapons.js';
 import { angleDiff, clamp, damp, dist, pointSegment } from '../core/math.js';
 
@@ -895,13 +896,13 @@ export class PoliceSystem {
     }
 
     const look = 44 + Math.abs(v.speed) * 0.36;
-    let wp = lanePoint(ai.edge, ai.dir, ai.lane, ai.s + look, this.tmp);
+    let wp = this.wayPoint(ai, look);
     let heading = angleDiff(v.angle, Math.atan2(wp.y - v.y, wp.x - v.x));
 
     if (Math.abs(heading) > 1.9 || Math.hypot(wp.x - v.x, wp.y - v.y) > 280) {
       if (this.snapToRoad(v)) {
         project();
-        wp = lanePoint(ai.edge, ai.dir, ai.lane, ai.s + look, this.tmp);
+        wp = this.wayPoint(ai, look);
         heading = angleDiff(v.angle, Math.atan2(wp.y - v.y, wp.x - v.x));
       }
       if (Math.abs(heading) > 2.4) {
@@ -925,19 +926,67 @@ export class PoliceSystem {
     const spec = VEHICLE_TYPES[v.kind];
     const probe = 34 + Math.abs(v.speed) * 0.4;
     const reach = spec.len * 0.5 + probe;
+    let blocked = false;
+    // Dall'altra parte dell'ostacolo: dove si sta passando (bias negativo = a sinistra),
+    // l'ostacolo sta a destra, a `-bias` px dall'asse della volante.
+    let beside = false;
     for (const o of game.vehicleGrid.queryCircle(v.x + cos * reach * 0.5, v.y + sin * reach * 0.5, reach * 0.5 + 40)) {
       if (o === v || o.driver === 'player') continue;
       const forward = (o.x - v.x) * cos + (o.y - v.y) * sin;
-      const lateral = Math.abs(-(o.x - v.x) * sin + (o.y - v.y) * cos);
+      const side = -(o.x - v.x) * sin + (o.y - v.y) * cos;
       const gap = forward - (spec.len + VEHICLE_TYPES[o.kind].len) * 0.5;
-      if (forward > 0 && gap < probe && lateral < 26) target = Math.min(target, 60);
+      if (forward > 0 && gap < probe && Math.abs(side) < 26) blocked = true;
+      if (ai.bias < -8 && Math.abs(side + ai.bias) < 24 && gap < probe && forward > -(spec.len + VEHICLE_TYPES[o.kind].len) * 0.5 - 12) beside = true;
     }
+    // Sorpasso (§5.36): chi sta davanti in corsia non si aspetta, si supera dalla corsia
+    // opposta — ma solo se laggiù non c'è nessuno per tutto il tratto che serve. Gli altri
+    // (civili) intanto si scostano e rallentano (`traffic.sirenWatch`); se la corsia
+    // opposta è occupata resta il vecchio freno a 60.
+    let wantBias = 0;
+    if (YIELD.on && (blocked || beside)) {
+      const lane = laneOffset(ai.edge, ai.lane);
+      if (this.oppositeClear(v, spec, cos, sin, game, -2 * lane) || (beside && !blocked)) wantBias = -2 * lane;
+    }
+    if (blocked && !wantBias) target = Math.min(target, 60);
+    else if (wantBias) target = Math.min(target, 280);
+    const bstep = 120 * dt;
+    const cur = ai.bias || 0;
+    ai.bias = Math.abs(wantBias - cur) <= bstep ? wantBias : cur + Math.sign(wantBias - cur) * bstep;
 
     const diff = target - v.speed;
     if (diff > 6) v.throttle = clamp(diff / 60, 0.2, 1);
     else if (diff < -6) v.throttle = clamp(diff / 90, -1, -0.15);
     else v.throttle = 0.1;
     v.handbrake = false;
+  }
+
+  /** Il waypoint davanti al muso, spostato di lato mentre si supera (`ai.bias`, px a destra). */
+  wayPoint(ai, look) {
+    const wp = lanePoint(ai.edge, ai.dir, ai.lane, ai.s + look, this.tmp);
+    if (ai.bias) {
+      wp.x -= Math.sin(wp.angle) * ai.bias;
+      wp.y += Math.cos(wp.angle) * ai.bias;
+    }
+    return wp;
+  }
+
+  /**
+   * La corsia opposta (a `bias` px dall'asse, negativo = sinistra) è libera per tutto il
+   * tratto del sorpasso? Si guarda un po' più avanti di quanto serva e si restringe di
+   * 4 px la fascia di ogni veicolo: l'ostacolo che si sta superando, in corsia, sta a
+   * un'ampiezza di distanza e non conta.
+   */
+  oppositeClear(v, spec, cos, sin, game, bias) {
+    const reach = spec.len * 0.5 + 170 + Math.abs(v.speed) * 0.75;
+    for (const o of game.vehicleGrid.queryCircle(v.x + cos * reach * 0.5, v.y + sin * reach * 0.5, reach * 0.5 + 50)) {
+      if (o === v) continue;
+      const dx = o.x - v.x, dy = o.y - v.y;
+      const forward = dx * cos + dy * sin;
+      if (forward < -spec.len * 0.6 || forward > reach) continue;
+      const side = -dx * sin + dy * cos;
+      if (Math.abs(side - bias) < spec.wid * 0.5 + VEHICLE_TYPES[o.kind].wid * 0.5 - 4) return false;
+    }
+    return true;
   }
 
   /** Arco più sensato verso il bersaglio, evitando l'inversione a U. */

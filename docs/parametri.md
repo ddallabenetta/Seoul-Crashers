@@ -287,3 +287,8 @@
 | Stelle della fuga in barca | `m4` fase `barca` | portate a **tre** se non ci si è già arrivati: sono quelle che mettono in acqua le motovedette e in aria l'elicottero (§5.5), e da tre in su non ti ammanettano più (§5.16) |
 | Camera dalla gru | `m4.ZOOM_GRU` · `m4.ZOOM_T` | 0,5 (il minimo consentito è 0,45) per 7 s, tenuta con `camera.holdZoom`: senza il blocco il giocatore la richiude nel frame dopo |
 | Sorpasso e corsia | `traffic.OVERTAKE` · `LANE` | `true` · slide 1,1 corsie/s · obbligatorio entro 700 px · facoltativo oltre 200 px dall'incrocio, leader ≥ 75 px/s più lento, gap ≥ 180, 3 s fra due cambi · finestra di corsia 26 px (§5.34) |
+| **— la strada reagisce (§5.36) —** | | |
+| Cedere il passo alle sirene | `traffic.YIELD` | `on` spegne tutto, anche il sorpasso delle volanti. `range` 430 px dietro (contromano 70%) · `band` 60 px di scarto laterale · `hold` 1,4 s di cortesia · `slow` 100 px/s di tetto per chi cede · `bias` 7 px verso il cordolo sulle strade a corsia singola · `nodeR` 330 px e `nodeHold` 4 s per non ripartire da un incrocio verso la volante |
+| Sorpasso della volante | `police.followRoads` | passa dalla corsia opposta (scarto `-2·laneOffset`, a 120 px/s) solo se la fascia è libera per `len/2 + 170 + 0,75·v` px; tetto 280 px/s mentre passa, altrimenti il vecchio freno a 60 |
+| Reazioni dei pedoni | `pedestrians.PED_TUNE` | `react` (clacson e sirene) e `crossSmart` (attraversamenti) li spengono. `hornR` 240 px · `hornNear` 120 px · `sirenR` 320 px · `greenMargin` 1 s di rosso che deve avanzare oltre la traversata · `maxWait` 10 s oltre cui non si aspetta il verde |
+| Passo svelto | `p.hurryT` | ×2,0 al posto di ×1,45 per 1,8 s dopo un clacson, 3 s dopo una sirena |
