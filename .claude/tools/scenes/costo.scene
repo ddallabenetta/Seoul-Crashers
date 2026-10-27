@@ -117,7 +117,9 @@ try {
     g.travelTo('seoul', null, { silent: true });
     g.player.x = home.x; g.player.y = home.y;
     g.camera.snapTo(home.x, home.y);
-    g.camera.setZoomTarget(ZOOM);
+    // `holdZoom`: `player.update` riscrive il bersaglio a ogni frame, e senza blocco lo zoom torna a 1.
+    g.camera.releaseZoom();
+    if (ZOOM !== 1) g.camera.holdZoom(ZOOM, 1e9); else g.camera.setZoomTarget(1);
     g.wanted.reset();
     g.traffic.prewarm(g, 44, 20);
     const extra = await SCENARI[nome]();
