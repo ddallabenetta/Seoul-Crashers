@@ -299,3 +299,7 @@
 | Rilievo sul bordo | `ground.RELIEF_EDGE` · `RELIEF_EDGE_MIN` · `korea.EDGE_BLEND` | ombreggiatura al 10% sul bordo, piena a 800 px · raccordo di quota 1300 px (§5.38) |
 | Foce del Han | `ground.BLEND_FOCE` · `SEA_X0` | 260 px di sfumatura fiume→mare · il mare occidentale si sfuma da x=-900 (§5.38) |
 
+
+| Busan e Jeju (§5.41) | `busan.GRIDS` · `TERRACES` · `SEAM` · `HILLS` · `jeju.HALLA` · `JEJU_WORLD` | griglie a mano; terrazze di 22 px; mare d'ovest da y 1000 e d'est da y 2140; cono 300 px su 1500×600; isola 7200×4800 |
+| Rete da tracciati | `netgen.staircase thr` · `carveBlocks minSize/steps` · `regionkit lotScale/gapScale` | thr ≥ 200 (arteria 230-250); 72 px e passate 200/100; 0,7-0,9 e 0,7 |
+| Spiaggia | `ground SHORE_R` | 120 px di sabbia/basalto dalla riva |

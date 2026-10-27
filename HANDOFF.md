@@ -5,7 +5,7 @@ resta corto apposta.** Il contenuto vero sta in `docs/`, e si apre un documento 
 non tutti. Il `README.md` descrive il gioco e i comandi; qui c'è quello che serve a
 *sviluppare*. Avvio e vincoli stanno in `CLAUDE.md`, che si carica da solo.
 
-Ultimo aggiornamento: **il rework** — **le cuciture e i bordi della mappa** (§5.38, T9a: niente più monconi
+Ultimo aggiornamento: **il rework** — **la forma di Busan e Jeju** (§5.41, T9d: coste a poligoni, Hallasan, porto e ponte Gwangan, luoghi dell'Atto III in `story/places.js`), **le cuciture e i bordi della mappa** (§5.38, T9a: niente più monconi
 d'asfalto, testate sui vicoli ciechi, prato e siepe attorno a Seoul, mare fino al bordo del mondo), **la vita
 negli isolati** (§5.39, T9b: parchi, campi, moli e marciapiedi con tipologie, arredo e insegne, in
 `world/blocklife.js`), **l'arresto in volante** (§5.35, T3), **la regia sonora dei pannelli** (§5.37, T6) e
@@ -51,6 +51,7 @@ l'impianto delle missioni con M1 e M2 (§5.29). Le tappe precedenti sono §5.8-5
 | **toccare gli estremi delle strade**, le testate dei vicoli ciechi, il terreno attorno alle città o il bordo del mondo | `docs/storico/27-cuciture-della-mappa.md` (§5.38) |
 | toccare la corsia, il cambio corsia o il car-following del traffico | `docs/storico/23-sorpasso.md` (§5.34) |
 | toccare l'**arresto**: manette, agente che accompagna, volante che parte, `ESC` | `docs/storico/24-arresto-in-volante.md` (§5.35) |
+| **rifare la geografia** di Busan o Jeju, aggiungere un luogo nominato, una strada, un ponte | `docs/storico/30-busan-e-jeju.md` (§5.41) |
 | **arredare** un parco, un campo, un molo o un marciapiede; aggiungere insegne o un tipo di prop | `docs/storico/28-vita-negli-isolati.md` (§5.39) |
 | **pedinare qualcuno**, far portare un oggetto, mandare un'auto in un posto | `docs/storico/22-atto-i-completo.md` (§5.33) |
 | **scrivere una battuta di Kkachi**, o toccare la radio e la `91.45` | `docs/storico/21-kkachi.md` (§5.32) |
@@ -96,6 +97,7 @@ commenti resta valido: si risolve qui.
 | §5.37 La regia sonora dei pannelli: `bed` e `sfx` | `docs/storico/26-regia-sonora.md` |
 | §5.38 Le cuciture della mappa: spuntoni, testate, fascia scura, bordi del mondo | `docs/storico/27-cuciture-della-mappa.md` |
 | §5.39 Vita negli isolati: tipologie di parchi e campi, arredo, insegne, moli | `docs/storico/28-vita-negli-isolati.md` |
+| §5.41 La forma di Busan e Jeju: coste a maschera, strade da tracciati, luoghi dell'Atto III | `docs/storico/30-busan-e-jeju.md` |
 | §6 Backlog | `docs/backlog.md` |
 | §8 Parametri | `docs/parametri.md` |
 | §9 Strumenti (`.claude/`) | `docs/strumenti.md` |

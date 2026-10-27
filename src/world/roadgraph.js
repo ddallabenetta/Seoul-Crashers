@@ -134,12 +134,21 @@ export function buildRoadGraph(city) {
     n.signal = hasV && hasH;
   }
 
+  return graphFromParts(nodes, edges, city.w, city.h);
+}
+
+/**
+ * Chiude un grafo: scarta i nodi isolati, indicizza gli archi e dà al grafo i
+ * suoi metodi. Separato dalla costruzione per griglia perché Busan e Jeju (`netgen.js`)
+ * costruiscono nodi e archi da tracciati liberi e non da un reticolo di linee.
+ */
+export function graphFromParts(nodes, edges, w, h) {
   // Scarta i nodi isolati (possono nascere ai bordi del fiume).
   const usable = nodes.filter((n) => n.out.length > 0);
 
   // Indice spaziale degli archi: lo streaming del traffico deve trovare in fretta
   // le strade vicine al giocatore, non frugare in tutta la città.
-  const edgeGrid = new SpatialGrid(city.w, city.h, 320);
+  const edgeGrid = new SpatialGrid(w, h, 320);
   for (const e of edges) {
     edgeGrid.insertRect({
       x: Math.min(e.ax, e.bx) - 20,

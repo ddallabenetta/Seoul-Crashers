@@ -82,6 +82,28 @@ export const BUSINESSES = {
     shop: 'food', keeper: 'gangster', crowd: 4, open: [17, 4], radio: true,
     pal: { floor: '#33292c', wall: '#43353a', trim: '#6b4a52', accent: '#ff5fa2' },
   },
+  // Tre locali di mare (§5.41): non esistono nei mix di Seoul, quindi la capitale
+  // non cambia di un byte. Stesso impianto della tavola calda, un'altra insegna.
+  hoe: {
+    id: 'hoe', hangul: '횟집', label: 'ristorante di pesce', where: 'any', layout: 'eatery',
+    shop: 'food', keeper: 'civil', crowd: 3, open: [11, 23], radio: true,
+    pal: { floor: '#34464a', wall: '#46606a', trim: '#6f9aa4', accent: '#49d7e0' },
+  },
+  heuk: {
+    id: 'heuk', hangul: '흑돼지', label: 'griglia di maiale nero', where: 'any', layout: 'eatery',
+    shop: 'food', keeper: 'civil', crowd: 4, open: [12, 2], radio: true,
+    pal: { floor: '#3a2f2a', wall: '#4d3c33', trim: '#7a5a42', accent: '#ff8a3d' },
+  },
+  gukbap: {
+    id: 'gukbap', hangul: '돼지국밥', label: 'zuppa di maiale', where: 'any', layout: 'eatery',
+    shop: 'food', keeper: 'civil', crowd: 4, open: [6, 23], radio: true,
+    pal: { floor: '#4a3c34', wall: '#6a5042', trim: '#a07858', accent: '#ffb347' },
+  },
+  cafe: {
+    id: 'cafe', hangul: '카페', label: 'caffè', where: 'any', layout: 'eatery',
+    shop: 'food', keeper: 'student', crowd: 3, open: [8, 22], radio: true,
+    pal: { floor: '#4a4238', wall: '#6a5e4e', trim: '#a08a68', accent: '#f3c98b' },
+  },
   pcbang: {
     id: 'pcbang', hangul: '피시방', label: 'internet café', where: 'upper', layout: 'desks',
     keeper: 'student', crowd: 5, open: [14, 4],
@@ -134,6 +156,10 @@ export function bizOpenAt(bizId, hour) {
 const RUSH = {
   bar:       [[17, 20, 0.4], [20, 23, 1], [23, 2, 1.2], [2, 4, 0.35]],
   bunsik:    [[8, 11, 0.4], [11, 14, 1.2], [14, 17, 0.5], [17, 21, 1], [21, 22, 0.5]],
+  gukbap:    [[6, 9, 0.8], [9, 11, 0.4], [11, 14, 1.2], [14, 17, 0.4], [17, 23, 1]],
+  hoe:       [[11, 14, 1], [14, 17, 0.5], [17, 22, 1.2], [22, 23, 0.6]],
+  heuk:      [[12, 14, 0.8], [14, 17, 0.4], [17, 23, 1.2], [23, 2, 0.8]],
+  cafe:      [[8, 11, 0.8], [11, 17, 1.2], [17, 20, 0.8], [20, 22, 0.4]],
   conv:      [[0, 5, 0.25], [5, 8, 0.5], [8, 12, 0.8], [12, 14, 1.1], [14, 18, 0.8], [18, 23, 1.1], [23, 24, 0.5]],
   pharma:    [[9, 12, 0.9], [12, 14, 0.6], [14, 20, 1]],
   guns:      [[10, 14, 0.7], [14, 20, 0.9]],

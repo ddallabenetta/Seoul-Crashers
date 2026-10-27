@@ -262,6 +262,20 @@ export function apply(game, data) {
   const at = worldPoint(data);
   pl.x = at.x;
   pl.y = at.y;
+  // Dal §5.41 Busan e Jeju hanno un'altra forma: un salvataggio più vecchio può aver
+  // lasciato il giocatore dove adesso c'è il mare. A piedi lo si rimette alla fermata più
+  // vicina; a bordo di una barca (kind `boat`, `ferry`, `patrol`) l'acqua è giusta così com'è.
+  if (!data.vehicle || !['boat', 'ferry', 'patrol'].includes(data.vehicle.kind)) {
+    if (game.city.isWater(pl.x, pl.y)) {
+      let best = null;
+      let bd = Infinity;
+      for (const s of game.city.transitStations || []) {
+        const d = (s.arrivalX - pl.x) ** 2 + (s.arrivalY - pl.y) ** 2;
+        if (d < bd) { bd = d; best = s; }
+      }
+      if (best) { pl.x = best.arrivalX; pl.y = best.arrivalY; }
+    }
+  }
   game.dayCycle.restore(data.clock);
   game.wanted.restore(data.wanted);
   game.shops.restore(data.shops);

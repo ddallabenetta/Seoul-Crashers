@@ -499,8 +499,10 @@ export class GroundRenderer {
   drawSiepi(g, view) {
     const city = this.city;
     const STEP = 34;
-    const lati = [];
+    const lati = [...(city.siepi || [])];
     for (const a of city.areas || []) {
+      // Busan e Jeju non hanno la siepe sul rettangolo ma sul confine reale (`korea.siepi`).
+      if (a.id !== 'seoul') continue;
       if (a.x1 < city.w - 200) lati.push({ a, v: true, c: a.x1 - 22, from: a.y0, to: a.y1 });
       if (a.y1 < city.h - 200) lati.push({ a, v: false, c: a.y1 - 22, from: a.x0, to: a.x1 });
       if (a.x0 > 200) lati.push({ a, v: true, c: a.x0 + 22, from: a.y0, to: a.y1 });
@@ -522,7 +524,7 @@ export class GroundRenderer {
         const y = l.v ? q : c;
         if (city.isWater(x, y) || city.isOnRoad(x, y)) continue;
         // `queryRect` restituisce i candidati della cella, non solo chi si sovrappone.
-        if (city.blockGrid.queryRect(x - 14, y - 14, 28, 28).some((b) =>
+        if (!l.borda && city.blockGrid.queryRect(x - 14, y - 14, 28, 28).some((b) =>
           x + 14 > b.x && x - 14 < b.x + b.w && y + 14 > b.y && y - 14 < b.y + b.h)) continue;
         if (h1 < 0.12) continue;
         const r = 14 + h2 * 9;
@@ -809,6 +811,26 @@ export class GroundRenderer {
           if (!fillWet(x + step / 2, y + step / 2)) continue;
           const a = 1 - (x + step / 2 - sa.x1) / BLEND_FOCE;
           g.fillStyle = `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a.toFixed(3)})`;
+          g.fillRect(x, y, step + 0.8, step + 0.8);
+        }
+      }
+    }
+
+    // Spiaggia (§5.41): Busan e Jeju hanno una maschera con la distanza dalla riva
+    // (`shoreDist`). La terra entro `SHORE_R` px dall'acqua diventa sabbia o basalto
+    // (`shoreKind`, a macchie larghe): prima restava il fondo scuro del distretto,
+    // e fra l'ultimo isolato e il mare si leggeva come un piazzale d'asfalto.
+    if (city.shoreDist) {
+      const SHORE_R = 120;
+      for (let y = oy; y < yEnd; y += step) {
+        for (let x = ox; x < xEnd; x += step) {
+          const cx = x + step / 2;
+          const cy = y + step / 2;
+          if (inSa(cx, cy) || city.isWater(cx, cy)) continue;
+          const d = city.shoreDist(cx, cy);
+          if (d === undefined || d >= SHORE_R) continue;
+          const a = Math.pow(1 - d / SHORE_R, 0.85);
+          g.fillStyle = city.shoreKind(cx, cy) === 'sand' ? `rgba(214,198,148,${(0.92 * a).toFixed(3)})` : `rgba(56,56,54,${(0.86 * a).toFixed(3)})`;
           g.fillRect(x, y, step + 0.8, step + 0.8);
         }
       }
