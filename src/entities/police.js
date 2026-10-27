@@ -8,10 +8,12 @@
 //    collisioni, sangue e ragdoll. Una volante è un veicolo in `game.vehicles` con
 //    `driver === 'cop'`: la fisica gliela fa girare `traffic.update` come a tutti
 //    gli altri, qui si scrivono solo gas e sterzo.
-// 2. **Niente pathfinding.** A ogni incrocio si sceglie l'arco che avvicina di più
-//    all'obiettivo (greedy sul grafo). Su una maglia ortogonale porta a destinazione
-//    quasi sempre, costa una decina di confronti, e quando sbaglia c'è l'anti-incastro
-//    che manovra in retromarcia — lo stesso rimedio del traffico civile.
+// 2. **Greedy da vicino, A* da lontano** (§5.44). A ogni incrocio si sceglie l'arco che
+//    avvicina di più all'obiettivo. Su una maglia ortogonale porta a destinazione quasi
+//    sempre, costa una decina di confronti, e quando sbaglia c'è l'anti-incastro che
+//    manovra in retromarcia. Ma davanti a un fiume, a una baia o a un vicolo cieco il
+//    greedy si pianta nel minimo locale: lì (`CHASE`) la volante segue un percorso A*
+//    sul grafo, ricalcolato a soglie e a scaglioni, e torna al greedy appena è vicina.
 // 3. **Il posto di blocco è geometria che esiste già.** Volanti ferme di traverso
 //    più due transenne `vehicleOnly`: fermano le ruote, lasciano passare i piedi e i
 //    proiettili. Identiche alle scalinate, e i ponti sul Han sono il posto giusto
@@ -103,6 +105,16 @@ const NADE_GAP = 5;
 const SPIKE_WATCH = 700;
 const SPIKE_SLICE = 6;
 
+// Inseguimento su percorso (§5.44). Spegnere `on` riporta al greedy puro di prima.
+export const CHASE = {
+  on: true,
+  near: 520,      // sotto questa distanza (e senza stallo) si guida a vista, come sempre
+  moved: 160,     // il bersaglio si è spostato di tanto dall'ultimo calcolo: si rifà
+  every: 1.0,     // secondi massimi fra due calcoli della stessa volante
+  perFrame: 1,    // calcoli A* concessi a tutta la polizia in un frame: mai a grappolo
+  stall: 3.5,     // secondi senza avvicinarsi di 30 px: il greedy è in un minimo locale
+};
+
 /** True se il punto è fuori dal rettangolo inquadrato (con margine). */
 function outsideView(game, x, y, margin = 60) {
   const b = game.camera.bounds(margin);
@@ -137,6 +149,9 @@ export class PoliceSystem {
     this._spikeI = 0;
     this._boarded = [];
     this.tmp = {};
+    this._solves = 0;
+    // Misure del costo dell'A* (leggono le scene): solo contatori, niente allocazioni.
+    this.chaseStats = { n: 0, ms: 0, peak: 0, frameMs: 0, framePeak: 0 };
   }
 
   get tier() {
@@ -161,6 +176,10 @@ export class PoliceSystem {
     this._level = game.wanted.level;
     const tier = this.tier;
     this.nadeCd = Math.max(0, this.nadeCd - dt);
+    this._solves = 0;
+    const cs = this.chaseStats;
+    if (cs.frameMs > cs.framePeak) cs.framePeak = cs.frameMs;
+    cs.frameMs = 0;
     this.prune(game);
 
     if (this._level > 0) {
@@ -801,7 +820,10 @@ export class PoliceSystem {
       return;
     }
 
-    if (tier.ram && !pl.onFoot && los && d < 460) {
+    const stalled = this.chaseProgress(ai, dt, d);
+    // Speronare in linea d'aria attraverso una baia non è un inseguimento: se non si
+    // avvicina da secondi, il percorso vince sulla mira.
+    if (tier.ram && !pl.onFoot && los && d < 460 && !(CHASE.on && stalled)) {
       // Speronamento: si punta dove sarà, non dove è.
       const aim = Math.atan2(pl.y + pl.vy * 0.3 - v.y, pl.x + pl.vx * 0.3 - v.x);
       v.steer = clamp(angleDiff(v.angle, aim) * 2.6, -1, 1);
@@ -809,6 +831,7 @@ export class PoliceSystem {
       v.handbrake = false;
       ai.edge = null; // alla fine dello speronamento si riaggancia da capo
     } else {
+      this.chasePath(v, dt, game, tx, ty, d, stalled);
       this.followRoads(v, dt, game, tx, ty);
     }
 
@@ -846,6 +869,7 @@ export class PoliceSystem {
   driveEscort(v, dt, game) {
     const e = v.escort;
     const ai = v.copAi;
+    ai.path = null;   // la scorta ha il suo A* (`escortWaypoint`)
     if (e.state === 'hold') {
       v.throttle = 0;
       v.steer = 0;
@@ -1001,7 +1025,7 @@ export class PoliceSystem {
     // e la volante si pianta (è la trappola già pagata dal traffico civile).
     if (ai.s > ai.edge.len - 40) {
       const node = graph.nodeById(ai.dir > 0 ? ai.edge.b : ai.edge.a);
-      const next = this.chooseEdge(node, ai.edge, tx, ty);
+      const next = this.chooseEdge(node, ai.edge, tx, ty, ai.path);
       if (next) {
         ai.edge = next.edge;
         ai.dir = next.dir;
@@ -1104,8 +1128,80 @@ export class PoliceSystem {
     return true;
   }
 
+  /**
+   * Quanto la volante si è avvicinata. Ritorna true quando da `CHASE.stall` secondi
+   * non guadagna 30 px: il segno di un minimo locale (fiume, baia, vicolo cieco), che
+   * a vista d'occhio è «ti vedo, sei lì, e non arrivo».
+   */
+  chaseProgress(ai, dt, d) {
+    if (ai.bestD === undefined || d < ai.bestD - 30) { ai.bestD = d; ai.stallT = 0; }
+    else ai.stallT = (ai.stallT || 0) + dt;
+    // Un bersaglio che scappa fa crescere `d` senza che la volante sia incastrata.
+    if (d > ai.bestD + 260) { ai.bestD = d; ai.stallT = 0; }
+    return ai.stallT > CHASE.stall;
+  }
+
+  /**
+   * Tiene aggiornato `ai.path`, la fila di nodi A* verso il bersaglio, o lo toglie.
+   * Si accende da lontano o in stallo e si spegne (con isteresi) vicino: da vicino la
+   * guida diretta di sempre è più reattiva, e un percorso rifatto ogni secondo su
+   * un bersaglio che si muove non aggiunge niente. Il calcolo è **a scaglioni**: a
+   * ogni volante un orologio sfasato, e `perFrame` calcoli per tutta la polizia.
+   */
+  chasePath(v, dt, game, tx, ty, d, stalled) {
+    const ai = v.copAi;
+    if (!CHASE.on || !ai.edge || !game.route) { ai.path = null; return; }
+    if (ai.pathOn) {
+      if (d < CHASE.near * 0.7 && !stalled) ai.pathOn = false;
+    } else if (d > CHASE.near || stalled) ai.pathOn = true;
+    if (!ai.pathOn) { ai.path = null; return; }
+
+    if (ai.pathT === undefined) ai.pathT = this.rng.range(0, CHASE.every);
+    ai.pathT -= dt;
+    const path = ai.path;
+    const stale = !path || path.stale || Math.hypot(path.gx - tx, path.gy - ty) > CHASE.moved;
+    if (!stale && ai.pathT > 0) return;
+    if (this._solves >= CHASE.perFrame) return;
+    this._solves++;
+    ai.pathT = CHASE.every * (0.8 + this.rng.next() * 0.4);
+
+    const t0 = performance.now();
+    const graph = this.city.graph;
+    const start = graph.nodeById(ai.dir > 0 ? ai.edge.b : ai.edge.a);
+    const goal = graph.nearestNode(tx, ty);
+    // `avoid`: dal nodo davanti non si rientra per l'arco da cui si arriva (niente U).
+    const chain = game.route.solve(graph, start, goal, ai.edge);
+    const cs = this.chaseStats;
+    const ms = performance.now() - t0;
+    cs.n++; cs.ms += ms; cs.frameMs += ms;
+    if (ms > cs.peak) cs.peak = ms;
+    if (!chain) {
+      // Meta in un'altra componente (Jeju, un'isola): resta il greedy, e si riprova fra un po'.
+      ai.path = { ids: null, gx: tx, gy: ty, stale: false };
+      return;
+    }
+    const ids = new Int32Array(chain.length);
+    for (let i = 0; i < chain.length; i++) ids[i] = chain[i].id;
+    ai.path = { ids, gx: tx, gy: ty, stale: false };
+  }
+
   /** Arco più sensato verso il bersaglio, evitando l'inversione a U. */
-  chooseEdge(node, fromEdge, tx, ty) {
+  chooseEdge(node, fromEdge, tx, ty, path = null) {
+    if (path && path.ids) {
+      const ids = path.ids;
+      let i = -1;
+      for (let k = 0; k < ids.length; k++) if (ids[k] === node.id) { i = k; break; }
+      if (i >= 0 && i + 1 < ids.length) {
+        const nid = ids[i + 1];
+        for (const o of node.out) {
+          if ((o.dir > 0 ? o.edge.b : o.edge.a) === nid && (o.edge !== fromEdge || node.out.length < 2)) {
+            return { edge: o.edge, dir: o.dir };
+          }
+        }
+      }
+      // Fuori dal percorso (un urto, una sterzata): si rifà al prossimo giro.
+      if (i < 0) path.stale = true;
+    }
     let best = null;
     let bestD = Infinity;
     for (const o of node.out) {

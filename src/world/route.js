@@ -169,8 +169,12 @@ export class RouteGuide {
    * Restituisce `null` quando la meta è in un'altra componente del grafo — Jeju
    * non ha nessun arco che la raggiunga (§3), ed è giusto che la carta lo dica
    * con una retta invece di inventarsi una strada.
+   *
+   * `avoid` (opzionale) è un arco che dal nodo di partenza non si può riprendere:
+   * lo usa la polizia, che parte dal nodo *davanti* alla volante e non può rientrare
+   * per la strada da cui sta arrivando.
    */
-  solve(graph, start, goal) {
+  solve(graph, start, goal, avoid = null) {
     if (!start || !goal) return null;
     const nodes = graph.nodes;
     const n = nodes.length;
@@ -204,6 +208,8 @@ export class RouteGuide {
       const node = nodes[cur];
       const base = g[cur];
       for (const o of node.out) {
+        // `avoid`: dal nodo di partenza non si riparte per quell'arco (niente inversione a U).
+        if (o.edge === avoid && cur === start.id && node.out.length > 1) continue;
         // `out` guarda l'arco dal proprio capo: con `dir` 1 l'altro estremo è `b`.
         const nb = o.dir > 0 ? o.edge.b : o.edge.a;
         if (closed[nb] === gen) continue;
