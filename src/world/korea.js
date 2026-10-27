@@ -866,6 +866,9 @@ export function createKorea() {
   // falso) ma c'è mare fra i piloni (§5.41).
   korea.isNavigable = (x, y) => {
     if (korea.isWater(x, y)) return true;
+    return korea.underDeck(x, y);
+  };
+  korea.underDeck = (x, y) => {
     const a = areaAt(clamp(x, 0, KOREA.w - 1), clamp(y, 0, KOREA.h - 1));
     return !!(a && a.city.underDeck && a.city.underDeck(x - a.x0, y - a.y0));
   };
