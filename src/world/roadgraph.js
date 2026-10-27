@@ -13,8 +13,9 @@ export function laneCount(edge) {
   return edge.arterial ? 2 : 1;
 }
 
+// `lane` può essere frazionario: è lo scivolamento di un cambio corsia (§5.34).
 export function laneOffset(edge, lane) {
-  if (edge.arterial) return lane === 0 ? 18 : 54;
+  if (edge.arterial) return 18 + 36 * lane;
   return 19;
 }
 
@@ -47,6 +48,21 @@ export function canPass(node, axis, time) {
   const ph = signalAxis(node, time);
   if (axis === 'v') return ph === 'v' || ph === 'v-yellow';
   return ph === 'h' || ph === 'h-yellow';
+}
+
+/**
+ * Il rosso delle auto di un asse, visto da chi attraversa quell'asse a piedi (§5.36).
+ * `left` = secondi di rosso che restano (0 se le auto passano), `wait` = fra quanti
+ * secondi comincia il rosso se adesso passano, `pass` = quanto dura la finestra in cui
+ * passano. È la stessa fase di `canPass`: il giallo conta come via libera per le auto.
+ */
+export function trafficRed(node, axis, time) {
+  const p = (time + node.tOffset) % SIGNAL_CYCLE;
+  const from = axis === 'h' ? GREEN + YELLOW : 0;
+  const to = axis === 'h' ? SIGNAL_CYCLE : GREEN + YELLOW;
+  const pass = to - from;
+  if (p >= from && p < to) return { left: 0, wait: to - p, pass };
+  return { left: p < from ? from - p : SIGNAL_CYCLE - p + from, wait: 0, pass };
 }
 
 export function buildRoadGraph(city) {
@@ -133,12 +149,21 @@ export function buildRoadGraph(city) {
     n.signal = hasV && hasH;
   }
 
+  return graphFromParts(nodes, edges, city.w, city.h);
+}
+
+/**
+ * Chiude un grafo: scarta i nodi isolati, indicizza gli archi e dà al grafo i
+ * suoi metodi. Separato dalla costruzione per griglia perché Busan e Jeju (`netgen.js`)
+ * costruiscono nodi e archi da tracciati liberi e non da un reticolo di linee.
+ */
+export function graphFromParts(nodes, edges, w, h) {
   // Scarta i nodi isolati (possono nascere ai bordi del fiume).
   const usable = nodes.filter((n) => n.out.length > 0);
 
   // Indice spaziale degli archi: lo streaming del traffico deve trovare in fretta
   // le strade vicine al giocatore, non frugare in tutta la città.
-  const edgeGrid = new SpatialGrid(city.w, city.h, 320);
+  const edgeGrid = new SpatialGrid(w, h, 320);
   for (const e of edges) {
     edgeGrid.insertRect({
       x: Math.min(e.ax, e.bx) - 20,

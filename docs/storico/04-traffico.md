@@ -66,3 +66,5 @@ si spostano tutte nella corsia libera, si ritrovano affiancate all'incrocio dove
 si riuniscono, e il guadagno sul rettilineo si perde tutto lì. Se qualcuno ci riprova, il pezzo
 che manca è la scelta della corsia **in funzione della svolta successiva**: senza quella, il
 sorpasso è un debito che si paga all'incrocio dopo.
+
+*Ripreso e fatto in §5.34 ([23-sorpasso.md](23-sorpasso.md)): corsia in funzione della svolta.*

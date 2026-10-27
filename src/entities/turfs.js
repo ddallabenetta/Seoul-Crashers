@@ -117,7 +117,7 @@ export class TurfSystem {
   }
 
   /**
-   * Passa di mano. `how` dice come (`force`, `deal`, `war`) e finisce sul bus:
+   * Passa di mano. `how` dice come (`force`, `deal`, `work`, `war`) e finisce sul bus:
    * una missione che vuole sapere *in che modo* hai preso un cortile — M5 ne
    * conta tre e non le importa quale — non deve guardare dentro questo file.
    */
@@ -126,7 +126,10 @@ export class TurfSystem {
     // Tuo se te lo sei preso tu. Una guerra fra bande può portare un cortile al
     // 백호파 senza che tu ci fossi (`entities/life.js`): quello è della banda, e
     // la banda non ti deve niente.
-    const held = gangId === PLAYER_GANG && (how === 'force' || how === 'deal');
+    // `work` è la terza strada di M5: si rubano le auto che il cortile smontava e il
+    // padrone se ne va da solo. Nessuno ha sparato e nessuno ha pagato, ma il cortile
+    // è di chi l'ha svuotato quanto negli altri due modi.
+    const held = gangId === PLAYER_GANG && (how === 'force' || how === 'deal' || how === 'work');
     if (t.gang === gangId && !!t.held === held) return false;
     const wasMine = this.mine(t);
     const before = t.hangul;

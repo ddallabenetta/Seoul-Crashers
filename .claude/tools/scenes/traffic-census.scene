@@ -26,9 +26,14 @@ const tally = (arr, f) => arr.reduce((a, e) => (a[f(e)] = (a[f(e)] || 0) + 1, a)
 
 // Lo spawn più un ospedale per distretto: marciapiedi in zone diverse, e il
 // giocatore fermo lì non finisce sotto un'auto.
+// Con `echo 'window.__AREA = "busan";'` davanti la misura si fa in un'altra regione
+// (§5.41): partenza alla sua fermata di Seomyeon/centro e gli ospedali di quella regione.
+const area = window.__AREA ? game.city.areas.find((a) => a.id === window.__AREA) : null;
+const inArea = (o) => !area || (o.x >= area.x0 && o.x < area.x1 && o.y >= area.y0 && o.y < area.y1);
+const home = area ? game.city.transitStations.find((s) => inArea({ x: s.arrivalX, y: s.arrivalY })) : null;
 const spots = [
-  { x: game.player.x, y: game.player.y },
-  ...game.city.hospitals.slice(0, 4).map((h) => ({ x: h.x, y: h.y })),
+  home ? { x: home.arrivalX, y: home.arrivalY } : { x: game.player.x, y: game.player.y },
+  ...game.city.hospitals.filter(inArea).slice(0, 4).map((h) => ({ x: h.x, y: h.y })),
 ];
 
 const events = [];

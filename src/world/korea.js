@@ -16,7 +16,7 @@ import { SpatialGrid } from '../core/spatial.js';
 import { generateCity } from './citygen.js';
 import { DISTRICTS as SEOUL_DISTRICTS } from './districts.js';
 import { expandSeoul } from './seoul_expansion.js';
-import { createBusanCity } from './busan.js';
+import { createBusanCity, BUSAN_WORLD, SEAM } from './busan.js';
 import { createJejuCity } from './jeju.js';
 
 // Dimensione del mondo unificato. Le tre città conservano la taglia che avevano;
@@ -37,6 +37,10 @@ export const AREAS = [
 // (7200) e il bordo nord di Busan (10400), cioè in aperta campagna.
 const EXPRESSWAY_Y = 9200;
 const EXPRESSWAY_W = 144;
+// Larghezza (px) del raccordo di quota fra il bordo di una città e il rilievo di
+// campagna. 560 bastava per una pianura; sul lato est di Seoul, che scende di
+// 100 px in 300, faceva una parete.
+const EDGE_BLEND = 1300;
 
 const sm = (t) => { const u = t < 0 ? 0 : t > 1 ? 1 : t; return u * u * (3 - 2 * u); };
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -148,6 +152,8 @@ function shiftCity(city, dx, dy) {
 function buildLaneMarks(city) {
   const axis = (lines, perp) => {
     for (const l of lines) {
+      // Le linee di `netgen` (Busan, Jeju) portano già i loro `marks`.
+      if (!l.on && l.marks) continue;
       l.marks = [];
       if (!l.on) { for (const [a, b] of l.segments) l.marks.push([a, b]); continue; }
       for (let j = 0; j < l.on.length && j < perp.length - 1; j++) {
@@ -183,19 +189,38 @@ function makeGeography(seoul) {
     + 280 * Math.sin((y - seoul.h) / 950);
   // Costa meridionale: la penisola finisce qui, e sotto c'è solo il mare che
   // separa la terraferma da Jeju.
-  const southCoast = (x) => 14200 + 1900 * sm((x - 1500) / 11000) + 400 * Math.sin(x / 1600 + 0.7);
+  const southCoastBase = (x) => 14200 + 1900 * sm((x - 1500) / 11000) + 400 * Math.sin(x / 1600 + 0.7);
+  // A sud di Busan è tutto mare: la maschera della città ha l'acqua sul bordo basso, e
+  // fuori dal rettangolo la terra non deve ricominciare (§5.41). Il raccordo parte
+  // a ovest, dove la costa della penisola scende da sola.
+  const busanSouth = busan.y + BUSAN_WORLD.h - 12;
+  const southCoast = (x) => {
+    const k = sm((x - 8300) / 1300);
+    return southCoastBase(x) * (1 - k) + busanSouth * k;
+  };
   // Costa orientale (Mar dell'Est): stretta a nord, larga all'altezza di Busan.
-  const eastCoast = (y) => Math.min(KOREA.w - 120, 13000 + 3400 * sm((y - 1000) / 9000)
+  const eastCoastBase = (y) => Math.min(KOREA.w - 120, 13000 + 3400 * sm((y - 1000) / 9000)
     + 320 * Math.sin(y / 1300));
+  // Il litorale di Haeundae: dal confine est di Busan in giù il mare comincia sul
+  // bordo del rettangolo, e la costa del Mar dell'Est vi si raccorda dall'alto.
+  const busanEast = busan.x + BUSAN_WORLD.w;
+  const eastBlendY = busan.y + SEAM.eastY - 940;
+  const eastCoast = (y) => {
+    const t = sm((y - eastBlendY) / 940);
+    return eastCoastBase(y) * (1 - t) + busanEast * t;
+  };
   // La baia di Jinhae, a ovest di Busan: senza, l'acqua che Busan ha sul proprio
   // bordo occidentale finirebbe contro una parete di terra dritta.
-  const bayWest = (y) => busan.x - (300 + 1500 * sm((y - busan.y) / 2600));
+  // La fascia comincia dove comincia il mare di Busan sul suo bordo ovest (`SEAM`) e
+  // si allarga piano: partire dal bordo nord faceva una tacca dritta sul rettangolo.
+  const bayY0 = busan.y + SEAM.westY;
+  const bayWest = (y) => busan.x - (300 + 1500 * sm((y - bayY0) / 2400)) * sm((y - bayY0) / 450);
 
   const seaAt = (x, y) => {
     if (x < westCoast(y)) return true;
     if (y > southCoast(x)) return true;
     if (x > eastCoast(y)) return true;
-    if (y > busan.y && x < busan.x && x > bayWest(y)) return true;
+    if (y > bayY0 && x < busan.x && x > bayWest(y)) return true;
     // La coda del Han a est di Seoul: il fiume non può interrompersi sul bordo
     // di un rettangolo, quindi si assottiglia fino a sparire fra le colline.
     if (x >= seoul.w && x < seoul.w + 1300) {
@@ -239,17 +264,17 @@ function countryDistricts() {
   return [
     {
       ...base, name: 'Chungcheong', hangul: '충청', subtitle: 'Il corridoio della Gyeongbu, fra risaie e caselli',
-      accent: '#a7e45a', accent2: '#ffd05a', ground: '#333a26', sidewalk: '#4f5542',
+      accent: '#a7e45a', accent2: '#ffd05a', ground: '#4d5d33', sidewalk: '#4f5542',
       seed: { x: 7600 / KOREA.w, y: 9200 / KOREA.h },
     },
     {
       ...base, name: 'Honam', hangul: '호남', subtitle: 'Pianure, serre e strade bianche verso il mare',
-      accent: '#8fd07a', accent2: '#ffc04c', ground: '#31391f', sidewalk: '#4c5240',
+      accent: '#8fd07a', accent2: '#ffc04c', ground: '#4a5b30', sidewalk: '#4c5240',
       seed: { x: 3200 / KOREA.w, y: 12200 / KOREA.h },
     },
     {
       ...base, name: 'Gangwon', hangul: '강원', subtitle: 'La dorsale dei Taebaek e i passi verso l’est',
-      accent: '#7fd3c0', accent2: '#e0e6a0', ground: '#2c3728', sidewalk: '#4a5347',
+      accent: '#7fd3c0', accent2: '#e0e6a0', ground: '#44593a', sidewalk: '#4a5347',
       seed: { x: 12600 / KOREA.w, y: 4200 / KOREA.h },
     },
   ];
@@ -458,7 +483,13 @@ function addExpressway(korea, parts) {
       on: null,
     };
   };
-  korea.vLines.push(line(exit.x, wExit, exit.y, EXPRESSWAY_Y + half, half + 8));
+  const exitLine = line(exit.x, wExit, exit.y - wExit / 2, EXPRESSWAY_Y + half, half + 8);
+  // All'uscita di Seoul non c'è nessun incrocio: il nodo è solo il punto in cui la
+  // via diventa autostrada. Le strisce partono dove finiscono quelle della città
+  // (a metà larghezza dal nodo), senza il buco d'asfalto liscio che il padding
+  // da incrocio lasciava lì.
+  if (exitLine.marks.length) exitLine.marks[0][0] = exitLine.segments[0][0];
+  korea.vLines.push(exitLine);
   korea.hLines.push(line(
     EXPRESSWAY_Y, EXPRESSWAY_W,
     Math.min(exit.x, entry.x) - wExit / 2, Math.max(exit.x, entry.x) + wEntry / 2,
@@ -515,6 +546,170 @@ function addRestStops(korea, route, district) {
       label: 'Area di servizio', kind: 'service', district: district.id, region: 'korea', x: cx, y,
     });
   }
+}
+
+// ---------------------------------------------------------------------------
+// CUCITURE: LE STRADE CHE FINISCONO
+// ---------------------------------------------------------------------------
+
+// Quanto asfalto resta oltre il nodo di un vicolo cieco: abbastanza perché
+// l'auto che inverte la marcia non sporga sulla testata, poca da non sembrare
+// una strada che continua.
+export const TESTATA_LUNGHEZZA = 44;  // apron dipinto sulle vie che finivano sul nodo
+// Un tratto che oltrepassa l'ultimo nodo di meno di così è ancora "un incrocio",
+// non uno spuntone: sono i pochi pixel d'arrotondamento fra `segments` e grafo.
+const SPUNTONE_MIN = 40;
+
+/**
+ * Le linee di Seoul e di Busan arrivano fino al bordo della propria mappa
+ * (100..7100), ma il grafo si ferma all'ultimo incrocio: oltre c'erano 70
+ * spuntoni di asfalto senza strisce, non guidabili, che finivano in terra nuda.
+ * Qui si accorciano **senza consumare rng** (è un passo sui dati già generati,
+ * dopo la generazione: la maglia di Seoul e i luoghi delle missioni non si
+ * muovono). Tre casi per ogni estremo di segmento:
+ *  - il nodo ha un arco verso l'esterno: la strada continua, non si tocca (è il
+ *    caso dell'innesto dell'autostrada);
+ *  - il nodo è un vicolo cieco: l'asfalto si ferma `TESTATA_LUNGHEZZA` oltre il
+ *    nodo e si registra una **testata** (`korea.testate`), che il renderer disegna;
+ *  - il nodo è un incrocio e oltre c'è solo uno spuntone: si taglia al bordo
+ *    dell'incrocio. Se lo spuntone arrivava all'argine del Han diventa un
+ *    **accesso pedonale** al lungofiume (`korea.accessiFiume`), perché lì la via
+ *    finiva sull'acqua apposta (citygen: «le verticali arrivano fino all'argine»).
+ * Chi in futuro prolunga una via (T9c) toglie la sua testata con
+ * `rimuoviTestata(city, nodo)` e allunga il segmento: il renderer legge la lista.
+ */
+function accorciaStrade(korea) {
+  const nodes = korea.graph.usableNodes;
+  const testate = [];
+  const accessi = [];
+  const rive = [korea.river.y0, korea.river.y1];
+
+  const passo = (lines, axis) => {
+    const vert = axis === 'v';
+    for (const l of lines) {
+      if (l.expressway) continue;
+      const own = nodes.filter((n) => Math.abs((vert ? n.x : n.y) - l.c) < 2);
+      if (!own.length) continue;
+      for (const s of l.segments) {
+        const inside = own.filter((n) => {
+          const p = vert ? n.y : n.x;
+          return p >= s[0] - 2 && p <= s[1] + 2;
+        });
+        if (!inside.length) continue;
+        let lo = inside[0];
+        let hi = inside[0];
+        for (const n of inside) {
+          if ((vert ? n.y : n.x) < (vert ? lo.y : lo.x)) lo = n;
+          if ((vert ? n.y : n.x) > (vert ? hi.y : hi.x)) hi = n;
+        }
+        for (const sgn of [-1, 1]) {
+          const n = sgn < 0 ? lo : hi;
+          const p = vert ? n.y : n.x;
+          const idx = sgn < 0 ? 0 : 1;
+          const fine = s[idx];
+          const spuntone = (fine - p) * sgn;
+          // Arco che esce dal nodo verso questo estremo lungo l'asse della linea.
+          const prosegue = n.out.some((o) => {
+            const d = o.dir === 1 ? 1 : -1;
+            const comp = vert ? o.edge.dy : o.edge.dx;
+            return o.edge.axis === axis && Math.sign(comp * d) === sgn;
+          });
+          if (prosegue) continue;
+          if (n.out.length === 1) {
+            const w = vert ? n.vWidth : n.hWidth;
+            // Chi inverte la marcia in fondo al vicolo **sborda** dal nodo (misurato:
+            // ~100 px su una via da 76, ~160 su un arteria da 144 (più la barriera)). L'asfalto deve
+            // coprire quel giro, o le auto finiscono sull'erba: la testata sta dopo.
+            const giro = w + TESTATA_LUNGHEZZA;
+            const target = p + sgn * (spuntone > 0 ? giro : TESTATA_LUNGHEZZA);
+            if (spuntone > giro) s[idx] = target;
+            testate.push({
+              nodeId: n.id, x: n.x, y: n.y, axis, sgn, w,
+              // Dove finisce l'asfalto: il segmento (accorciato o già corto) o,
+              // quando la via si fermava sul nodo (Busan, Jeju), il bordo
+              // dell'apron dipinto.
+              end: spuntone > 0 ? Math.min(Math.abs(fine - p), giro) * sgn + p : target,
+            });
+          } else if (spuntone > SPUNTONE_MIN) {
+            const crossW = (vert ? n.hWidth : n.vWidth) / 2;
+            const target = p + sgn * crossW;
+            const sulFiume = vert && rive.some((r) => Math.abs(fine - r) < 4);
+            if (sulFiume) {
+              accessi.push({ axis, c: l.c, w: l.width, from: target, to: fine, sgn });
+            }
+            s[idx] = target;
+          }
+        }
+      }
+    }
+  };
+  passo(korea.vLines, 'v');
+  passo(korea.hLines, 'h');
+  korea.testate = testate;
+  korea.accessiFiume = accessi;
+}
+
+/** Toglie la testata di un nodo: serve a chi prolunga la via oltre il vicolo cieco. */
+export function rimuoviTestata(city, node) {
+  const i = (city.testate || []).findIndex((t) => t.nodeId === node.id);
+  if (i < 0) return false;
+  city.testate.splice(i, 1);
+  return true;
+}
+
+
+// ---------------------------------------------------------------------------
+// SIEPI SUL CONFINE REALE
+// ---------------------------------------------------------------------------
+
+/**
+ * Le siepi di Busan e Jeju (§5.41). Quelle di Seoul stanno sul bordo del rettangolo
+ * (`ground.drawSiepi`), perché lì la città finisce davvero contro la campagna. Busan
+ * e Jeju hanno un'isola, un cuneo e una costa che non coincidono con il loro
+ * rettangolo: il confine va cercato dove l'isolato urbano **guarda un campo** (o
+ * terra aperta) e non una strada, il mare, un parco o un altro isolato urbano.
+ * Restituisce i tratti nel formato di `drawSiepi`: `{ v, c, from, to }`.
+ */
+function calcolaSiepi(korea) {
+  const grid = new SpatialGrid(KOREA.w, KOREA.h, 420);
+  for (const b of korea.blocks) grid.insertRect({ x: b.x, y: b.y, w: b.w, h: b.h, block: b });
+  const blockAt = (x, y, self) => {
+    for (const o of grid.queryRect(x - 1, y - 1, 2, 2)) {
+      if (o.block !== self && x > o.x && x < o.x + o.w && y > o.y && y < o.y + o.h) return o.block;
+    }
+    return null;
+  };
+  const out = [];
+  const STEP = 34;
+  const OFF = 26;
+  for (const b of korea.blocks) {
+    if (b.type !== 'urban') continue;
+    const area = korea.areaAt(b.x + b.w / 2, b.y + b.h / 2);
+    if (!area || area.id === 'seoul') continue;
+    for (const side of ['top', 'bottom', 'left', 'right']) {
+      const vert = side === 'left' || side === 'right';
+      const len = vert ? b.h : b.w;
+      const c = side === 'left' ? b.x - OFF : side === 'right' ? b.x + b.w + OFF : side === 'top' ? b.y - OFF : b.y + b.h + OFF;
+      let run = null;
+      const close = (t) => {
+        if (run !== null && t - run >= STEP * 2) {
+          const from = (vert ? b.y : b.x) + run;
+          out.push({ v: vert, c, from, to: (vert ? b.y : b.x) + t, borda: true });
+        }
+        run = null;
+      };
+      for (let t = 0; t <= len; t += STEP) {
+        const x = vert ? c : b.x + t;
+        const y = vert ? b.y + t : c;
+        const nb = blockAt(x, y, b);
+        const open = !korea.isWater(x, y) && !korea.isOnRoad(x, y) && (nb === null || nb.type === 'rural');
+        if (open && run === null) run = t;
+        if (!open) close(t);
+      }
+      close(len);
+    }
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -657,27 +852,60 @@ export function createKorea() {
 
   // --- campi geografici composti ---------------------------------------------
   korea.isWater = (x, y) => {
+    // Oltre il limite del mondo il terreno è quello del bordo prolungato: il mare
+    // resta mare e la riva resta riva, invece di cambiare formula (e costa) sulla
+    // linea dei 16800×24000, dove il renderer ora continua a disegnare.
+    if (x < 0 || y < 0 || x >= KOREA.w || y >= KOREA.h) {
+      x = clamp(x, 0, KOREA.w - 1);
+      y = clamp(y, 0, KOREA.h - 1);
+    }
     const a = areaAt(x, y);
     return a ? a.city.isWater(x - a.x0, y - a.y0) : geo.seaAt(x, y);
   };
+  // Acqua per chi **naviga**: sotto un ponte l'impalcato è terra per le auto (`isWater`
+  // falso) ma c'è mare fra i piloni (§5.41).
+  korea.isNavigable = (x, y) => {
+    if (korea.isWater(x, y)) return true;
+    return korea.underDeck(x, y);
+  };
+  korea.underDeck = (x, y) => {
+    const a = areaAt(clamp(x, 0, KOREA.w - 1), clamp(y, 0, KOREA.h - 1));
+    return !!(a && a.city.underDeck && a.city.underDeck(x - a.x0, y - a.y0));
+  };
+  korea.bridges = [];
+  korea.pylons = [];
+  for (const part of parts) {
+    for (const b of part.city.bridges || []) korea.bridges.push({ ...b, x: b.x + part.x, y: b.y + part.y });
+    for (const q of part.city.pylons || []) korea.pylons.push({ ...q, x: q.x + part.x, y: q.y + part.y });
+  }
   korea.elevationAt = (x, y) => {
     const a = areaAt(x, y);
     if (a) return a.city.elevationAt(x - a.x0, y - a.y0);
     if (geo.seaAt(x, y)) return 0;
     let e = geo.ruralElevation(x, y);
     // Raccordo con il bordo delle città: senza, l'hillshade disegnerebbe una
-    // riga netta tutt'attorno a ogni rettangolo.
+    // riga netta tutt'attorno a ogni rettangolo. La quota si **continua** con la
+    // pendenza che la città ha sul bordo (termine lineare che si spegne) invece di
+    // appiattirsi di colpo: lo smoothstep da solo parte con derivata zero, e dove
+    // Seoul scende di 0,09 px/px quel gomito è una striscia chiara sul terreno.
     for (const b of areas) {
       const dx = Math.max(b.x0 - x, 0, x - b.x1);
       const dy = Math.max(b.y0 - y, 0, y - b.y1);
       const d = Math.hypot(dx, dy);
-      if (d >= 560) continue;
-      const w = sm(d / 560);
+      if (d >= EDGE_BLEND) continue;
+      const u = d / EDGE_BLEND;
+      const w = sm(u);
       const cx = clamp(x, b.x0 + 6, b.x1 - 6);
       const cy = clamp(y, b.y0 + 6, b.y1 - 6);
-      e = e * w + b.city.elevationAt(cx - b.x0, cy - b.y0) * (1 - w);
+      const edgeH = b.city.elevationAt(cx - b.x0, cy - b.y0);
+      // Pendenza uscente: differenza fra il punto sul bordo e uno 24 px dentro.
+      const ix = clamp(x, b.x0 + 30, b.x1 - 30);
+      const iy = clamp(y, b.y0 + 30, b.y1 - 30);
+      const inner = b.city.elevationAt(ix - b.x0, iy - b.y0);
+      const slope = d > 0 ? (edgeH - inner) / Math.max(1, Math.hypot(cx - ix, cy - iy)) : 0;
+      e = e * w + edgeH * (1 - w) + slope * d * (1 - u) * (1 - u);
     }
-    return e;
+    return e < 0 ? 0 : e;
   };
   korea.urbanAt = (x, y) => {
     const a = areaAt(x, y);
@@ -691,6 +919,16 @@ export function createKorea() {
     return country[0];
   };
   korea.districtAtNorm = (nx, ny) => korea.districtAt(nx * KOREA.w, ny * KOREA.h);
+  // Distanza dalla riva e natura della riva (sabbia o basalto): le regioni con una
+  // maschera di costa (Busan, Jeju) le espongono, il resto del mondo no.
+  korea.shoreDist = (x, y) => {
+    const a = areaAt(x, y);
+    return a && a.city.shoreDist ? a.city.shoreDist(x - a.x0, y - a.y0) : undefined;
+  };
+  korea.shoreKind = (x, y) => {
+    const a = areaAt(x, y);
+    return a && a.city.shoreKind ? a.city.shoreKind(x - a.x0, y - a.y0) : 'sand';
+  };
   // Su tre maglie messe insieme la scansione lineare delle linee smette di
   // essere gratis: la stessa domanda («questo rettangolo invade una strada?»)
   // arriva una volta per edificio e una per prop. Le carreggiate finiscono
@@ -710,6 +948,9 @@ export function createKorea() {
   korea.expressway = route ? { y: EXPRESSWAY_Y, exit: route.exit, entry: route.entry } : null;
   // Gli archi nuovi vanno indicizzati insieme agli altri.
   korea.graph = finishGraph(korea.graph.nodes, korea.graph.edges, KOREA.w, KOREA.h);
+  // Dopo l'autostrada (il nodo d'uscita deve già avere il suo arco verso sud) e
+  // prima dell'indice delle carreggiate, che legge i segmenti già accorciati.
+  accorciaStrade(korea);
 
   korea.roadIndex = new SpatialGrid(KOREA.w, KOREA.h, 420);
   for (const l of korea.vLines) {
@@ -732,6 +973,7 @@ export function createKorea() {
   for (const b of korea.blocks) {
     if (!b.districtRef) b.districtRef = korea.districtAt(b.x + b.w / 2, b.y + b.h / 2);
   }
+  korea.siepi = calcolaSiepi(korea);
   for (const part of parts) {
     for (const s of part.city.transitStations || []) {
       s.region = part.id;

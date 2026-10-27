@@ -286,3 +286,64 @@
 | L'agguato del porto | `m4.AGGUATO` · `m4.CADE` | sei uomini · Oh Se-jung cade dopo 16 s di sparatoria. La fase si chiude quando ne resta in piedi al più uno, o dopo 150 s |
 | Stelle della fuga in barca | `m4` fase `barca` | portate a **tre** se non ci si è già arrivati: sono quelle che mettono in acqua le motovedette e in aria l'elicottero (§5.5), e da tre in su non ti ammanettano più (§5.16) |
 | Camera dalla gru | `m4.ZOOM_GRU` · `m4.ZOOM_T` | 0,5 (il minimo consentito è 0,45) per 7 s, tenuta con `camera.holdZoom`: senza il blocco il giocatore la richiude nel frame dopo |
+| Sorpasso e corsia | `traffic.OVERTAKE` · `LANE` | `true` · slide 1,1 corsie/s · obbligatorio entro 700 px · facoltativo oltre 200 px dall'incrocio, leader ≥ 75 px/s più lento, gap ≥ 180, 3 s fra due cambi · finestra di corsia 26 px (§5.34) |
+| **— la strada reagisce (§5.36) —** | | |
+| Cedere il passo alle sirene | `traffic.YIELD` | `on` spegne tutto, anche il sorpasso delle volanti. `range` 430 px dietro (contromano 70%) · `band` 60 px di scarto laterale · `hold` 1,4 s di cortesia · `slow` 100 px/s di tetto per chi cede · `bias` 7 px verso il cordolo sulle strade a corsia singola · `nodeR` 330 px e `nodeHold` 4 s per non ripartire da un incrocio verso la volante |
+| Sorpasso della volante | `police.followRoads` | passa dalla corsia opposta (scarto `-2·laneOffset`, a 120 px/s) solo se la fascia è libera per `len/2 + 170 + 0,75·v` px; tetto 280 px/s mentre passa, altrimenti il vecchio freno a 60 |
+| Reazioni dei pedoni | `pedestrians.PED_TUNE` | `react` (clacson e sirene) e `crossSmart` (attraversamenti) li spengono. `hornR` 240 px · `hornNear` 120 px · `sirenR` 320 px · `greenMargin` 1 s di rosso che deve avanzare oltre la traversata · `maxWait` 10 s oltre cui non si aspetta il verde |
+| Passo svelto | `p.hurryT` | ×2,0 al posto di ×1,45 per 1,8 s dopo un clacson, 3 s dopo una sirena |
+| **— vita negli isolati (§5.39) —** | | |
+| Seme del passo | `blocklife.SALT` | `0x5eb1fe`, mescolato con la posizione del blocco: un rng per blocco, indipendente dall'ordine di visita e da quello principale |
+| Peso delle tipologie di parco | `blocklife.PARK_TYPES[k].w` · `.min` | stagno 1 · campo 1,2 · 정자 0,9 · giochi 1,1 · mercato 0,8 · orti 1 · piazzale 0,8 · bosco 0,25; ogni vicino uguale entro 900 px divide il peso per `1 + 3n` |
+| Temi della campagna | `blocklife.RURAL_THEMES` | pesi per regione (Jeju: frutteto 3,2; Busan: serre 2,2); 66% degli appezzamenti segue il tema, 20% un altro, 14% resta com'è |
+| Zona vietata dei cortili di banda | `blocklife.makeCtx` | il centro, 56% per lato: lì si sgombra e si resta sei secondi |
+| Arredo urbano | `blocklife.STREET_MIX` · passo 74 px | probabilità per candidato = deficit di densità rispetto a Seoul × 1,1 (max 0,9); Seoul ha deficit 0 |
+| Insegne | `blocklife.addSigns` | probabilità = deficit di insegne per edificio × 1,5 (max 0,9); fino a 2 insegne sul palazzo con lato strada, 1 sugli altri |
+| Testate e spuntoni | `korea.TESTATA_LUNGHEZZA` · `SPUNTONE_MIN` | asfalto oltre il nodo di un vicolo cieco = larghezza + 44 px (l'auto che inverte sborda) · apron dipinto di 44 px se la via finiva sul nodo · sotto 40 px di spuntone non si taglia (§5.38) |
+| Terreno attorno alle città | `ground.GROUND_BLEND` · `GROUND_RIM` · `GROUND_N` | 80 px di sfumatura oltre il bordo; la rampa comincia 260 px dentro e arriva a prato 130 px dentro · 17 campioni per tile (§5.38) |
+| Rilievo sul bordo | `ground.RELIEF_EDGE` · `RELIEF_EDGE_MIN` · `korea.EDGE_BLEND` | ombreggiatura al 10% sul bordo, piena a 800 px · raccordo di quota 1300 px (§5.38) |
+| Foce del Han | `ground.BLEND_FOCE` · `SEA_X0` | 260 px di sfumatura fiume→mare · il mare occidentale si sfuma da x=-900 (§5.38) |
+
+
+| Busan e Jeju (§5.41) | `busan.GRIDS` · `TERRACES` · `SEAM` · `HILLS` · `jeju.HALLA` · `JEJU_WORLD` | griglie a mano; terrazze di 22 px; mare d'ovest da y 1000 e d'est da y 2140; cono 300 px su 1500×600; isola 7200×4800 |
+| Rete da tracciati | `netgen.staircase thr` · `carveBlocks minSize/steps` · `regionkit lotScale/gapScale` | thr ≥ 200 (arteria 230-250); 72 px e passate 200/100; 0,7-0,9 e 0,7 |
+| Spiaggia | `ground SHORE_R` | 120 px di sabbia/basalto dalla riva |
+| **— l'Atto II, prima metà (§5.40) —** | | |
+| Quanti cortili chiede Pyo | `m5.CORTILI` | 3: due degli 흑사파 passano al 철마파 all'inizio della missione, più quello che Seoul ha già |
+| Auto da smontare per cortile | `m5.AUTO_PER_CORTILE` | 3, ferme nel mezzo del recinto a 40 px una dall'altra; ne nasce una nuova per ogni rovinata o abbandonata finché non ne sono state **vendute** tre |
+| Dove nascono le auto | `m5.RAGGIO_AUTO` | 900 px dal cortile: più vicino di così non si vedono nascere |
+| Dove comincia la scena con Pyo · dove saluta il ragazzo | `m5.INGRESSO` · `m5.USCITA` | 170 px dal centro del cortile · 210 px |
+| Morti nella fase dei cortili per cui Pyo se ne accorge | `m5.MORTI_PER_PYO` | 3: una riga in più al ritorno, nessun prezzo che sale |
+| Appuntamento della torre | `m6.APPUNTAMENTO` · `FINESTRA` · `CHIUSURA_ORE` | 14:00, con 0,6 h di anticipo concesso, e **fino alle 17**: oltre l'ufficio non riceve e si aspetta il giorno dopo |
+| Silenzio dopo la riga del 1992 | `m6.SILENZIO` | 3 s senza pannello, battuta né musica, prima dell'allarme |
+| Dove comincia la fase della porta | `m6.ARRIVO` | 170 px dalla porta della torre |
+| Sosta della berlina al 편의점 | `m6.SOSTA` | 3 s, poi riparte per la torre. Velocità del giro: 112 px/s (`avviaGiro`) |
+| Fasce del pedinamento di M6 | `tail.SPOT` · `LOSE` | **quelle di §5.33**: 132 e 620 px. M6 non ne passa di proprie |
+| Faldoni sul piano | `m6.DOCS` | sette, di cui tre inutili e uno solo che esce dopo l'atto di cessione; stanno ad almeno 60 px dalle scale e a 44 px l'uno dall'altro |
+| Sparare dentro la torre | `m6.controllaTorre` | tre stelle **mentre si è dentro**: chiude l'archivio fino alle 14:00 del giorno dopo |
+| Quanto vale la riga del 1992 per 까치 | `story/kkachi` `a2-riga` | 900 s di gioco dopo la lettura |
+| Raggio della chiamata davanti a Pyo | `story/kkachi.davantiAlCortile` | 520 px dal centro del cortile del 황소파 |
+| Raggio con cui Jo parla | `story/visite` | 56 px, come `joPoint` di M2 |
+| Fruscio dei pannelli dell'Atto II | `r2-1.bed.kkachi` · `m6-7.bed.kkachi` | 0,03 · 0,03. Misurati sul master: rms 0,0048 e 0,0049 contro 0,0030 della cucina vuota di R2-2, che non ha letto |
+
+| **— l'Atto II, seconda metà (§5.42) —** | | |
+| Fascia del fermo di M7 | `m7.SERA` · mezzanotte | si può farsi arrestare dalle **20:00 alla mezzanotte**; prima si aspetta, dopo «il fermo è chiuso» e si riparte da domani sera. Con le sei ore del `bustPlayer` l'uscita cade fra le 02 e le 06 |
+| L'ora dell'uscita · le nove | `m7.USCITA` · `M7.finish` | 06:10 (`10-continuita.md`: Byeon muore alle 06:40) · poi 09:00, perché il pannello 6 lo dice |
+| Dove comincia l'attesa · dove comincia la chiusura | `m7.ARRIVO` · `m7.LONTANO` | 170 px dal commissariato · 130 px dal cancello |
+| Ha-eun e la riga sola | `m7.ATTESA_HAEUN` | 45 s da liberi nella fase dell'arresto; il numero di ore è quello vero (1-4) |
+| La cella | `interiors.cells` | 138 px di cella sopra la sbarra, due celle da 174 px, divisorio e fronte solidi; `shop.w/h` 210×150 → pianta 378×270 |
+| Quando parla la missione di M8 | `m8.MATTINA` · `BUSTA` · `BUSTA_A` | 11:00 (finestra 10:30-12) · 13:45 (finestra fino alle 15:30) |
+| Soglie del pedinamento a piedi | `m8.SPOT` · `LOSE` | **62 e 360 px**, contro 132 e 620 di §5.33 (`tail.begin` le riceve) |
+| In vista · tempo del pedinamento | `m8.IN_VISTA` · `PEDINA_TEMPO` | 320 px: comincia il pedinamento · 36 s, **e** a meno di 520 px dalla porta: l'altro si accorge lo stesso |
+| Velocità di Dulchae | `m8.CAMMINA` · `CORRE` | 50 px/s (la folla va da 46 a 58) · 86 px/s: più del passo (74) e meno dello scatto (126) di Jae-min, che ha stamina per ~4,5 s |
+| Quando sfugge | `m8.SFUGGITO` · `SFUGGITO_TEMPO` | oltre 470 px per 6,5 s: la fase riparte da `cerca` |
+| La folla di M8 | `m8.PASSANTI` · `TEPPISTI` | 16 passanti e 4 in nero senza banda, sull'anello dell'isolato (rng degli attori, non quello dello streaming) |
+| Stelle alla rottura | `m8.rottura` | `wanted.add(26 - heat)`: due stelle, con la radio che dà il nome |
+| Il cortile cieco | `m8.cortile` | 200×170 → pianta 360×306, senza uscita sul retro; la sequenza parte 1,3 s dopo l'ingresso |
+| Ricerca in quartiere | `places.findShop` `level` · `visible` | preferenza di piano (ripiega su qualunque) · distretto come lo legge l'HUD (`districtAt`) invece dell'etichetta di generazione |
+| R3: la notte | `r3.NOTTE` · `NOTTE_DA` · `NOTTE_A` | si aspetta fino alle 23:00; vale dalle 22:30 alle 03:00 |
+| Il quadrante di R3 | `r3-5.hold` | 5 s, con il fruscio a 0,04 |
+| Fruscio dei pannelli di M7 e R3 | `m7-2.bed` · `m7-3.bed` · `r3-1…r3-5.bed` | 0,03 · 0,045 · 0,02 · 0,035 · 0,035 · 0,03 · 0,04. Misurati sul master: rms 0,0048 e 0,0070 (M7), da 0,0035 a 0,0063 (R3) contro 0,0023 del silenzio; picco massimo 0,025 |
+| Sette secondi in banchina | `metro.insideT` (evento `metroDwell`) | 7 s dalla discesa: scatta la seconda metà della chiamata 13 |
+| Raggio della chiamata 13 · della 16 | `story/kkachi.vicinoAllaMetro` · `a2-funerale` | 380 px da una scala di Seoul · 260 px dalla sala dell'ospedale di Hongdae |
+| La mezzanotte senza stelle | `story/kkachi.DIECI_MINUTI` · `BUCO` | 600 s di gioco guidando e senza stelle prima delle 05:00; un buco di oltre 20 s fra due valutazioni azzera il conto |

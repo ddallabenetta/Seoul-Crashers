@@ -2,7 +2,7 @@
 // rispetto dei semafori, distanza di sicurezza, auto parcheggiate.
 import { createVehicle, updateVehicle, airborne } from './vehicle.js';
 import { VEHICLE_TYPES } from '../render/sprites.js';
-import { lanePoint, laneCount, canPass } from '../world/roadgraph.js';
+import { lanePoint, laneCount, laneOffset, canPass } from '../world/roadgraph.js';
 import { DISTRICT_BY_ID } from '../world/districts.js';
 import { angleDiff, clamp, circleRectPush, dist, pointSegment } from '../core/math.js';
 import { createPed } from './pedestrians.js';
@@ -14,6 +14,46 @@ import { createPed } from './pedestrians.js';
 // 23%, a 44 del 6%. Il limite di capacità sta lì in mezzo.
 const MAX_TRAFFIC = 44;
 const MAX_PARKED = 24;
+
+// Sorpasso e scelta della corsia in funzione della svolta (§5.34). Con `false` la
+// guida è identica a quella di prima: la corsia si sceglie a caso alla nascita e
+// non si cambia mai.
+export const OVERTAKE = true;
+const LANE = {
+  slide: 1.1,       // corsie al secondo: 36 px in poco più di 0,9 s
+  mandatory: 700,   // da quanto prima dell'incrocio ci si porta sulla corsia della svolta (le arterie hanno archi da ~290 px: di fatto subito)
+  noOptional: 200,  // negli ultimi px non si sorpassa: è lì che ci si ritrova affiancati
+  minBetween: 3,    // secondi fra due cambi facoltativi: senza, si fa ping-pong
+  minMandatory: 0.3,
+  slower: 75,       // quanto più lento del proprio target dev'essere il leader
+  optional: true,   // sorpasso facoltativo (oltre alla corsia della svolta)
+  window: 26,       // larghezza (px dal centro) in cui un'auto occupa una corsia
+};
+
+// Cedere il passo alle sirene (§5.36). Un oggetto e non costanti sciolte: `on` spegne
+// tutto, anche il sorpasso delle volanti in `police.followRoads`.
+export const YIELD = {
+  on: true,
+  range: 430,       // px: da quanto dietro (o davanti, contromano) una volante a sirena si fa sentire
+  band: 60,         // px di scarto laterale entro cui la volante è «sulla mia strada»
+  hold: 1.4,        // s di cortesia dopo l'ultima volta che era in vista: niente sfarfallio
+  slow: 100,        // px/s: tetto di chi cede, perché la volante abbia il tempo di passare
+  bias: 7,          // px verso il cordolo su una strada a corsia singola
+  biasRate: 36,     // px/s
+  nodeR: 330,       // una volante a sirena entro questo raggio dall'incrocio ferma chi sta per ripartire
+  nodeHold: 4,      // s oltre i quali si riparte comunque: la cortesia non deve incastrare un incrocio
+};
+
+/** Svolta di `choice` rispetto all'arco da cui si arriva: dritto, destra, sinistra, inversione. */
+export function turnOf(edge, dir, choice) {
+  if (!choice) return 'dritto';
+  const c = choice.edge;
+  if (c.axis === edge.axis) return choice.dir === dir ? 'dritto' : 'inversione';
+  const fx = dir > 0 ? edge.dx : -edge.dx, fy = dir > 0 ? edge.dy : -edge.dy;
+  const gx = choice.dir > 0 ? c.dx : -c.dx, gy = choice.dir > 0 ? c.dy : -c.dy;
+  // y verso il basso: il prodotto vettoriale positivo è una svolta a destra.
+  return fx * gy - fy * gx > 0 ? 'destra' : 'sinistra';
+}
 
 // Spazio libero fra i paraurti che un'auto vuole trovarsi davanti da ferma. Tutte
 // le distanze di sicurezza partono da qui e si misurano **fra le carrozzerie**:
@@ -43,6 +83,7 @@ export class TrafficSystem {
     this.parkingSpots = this.collectParkingSpots();
     this.spawnTimer = 0;
     this.tmp = {};
+    this.sirens = [];   // le volanti a sirena in moto, rifatte a ogni frame (§5.36)
   }
 
   /**
@@ -80,6 +121,15 @@ export class TrafficSystem {
 
   update(dt, game) {
     this.stream(dt, game);
+    const sir = this.sirens;
+    sir.length = 0;
+    if (YIELD.on) {
+      // Un posto di blocco ha la sirena ma non viene da nessuna parte; una volante
+      // sbarcata nemmeno.
+      for (const v of this.vehicles) {
+        if (v.siren && v.driver === 'cop' && !v.dead && !v.deployed && !v.blockCar && Math.abs(v.speed) > 30) sir.push(v);
+      }
+    }
     for (const v of this.vehicles) {
       if (v.driver === 'player') continue;
       if (v.driver === 'ai') this.driveAI(v, dt, game);
@@ -204,7 +254,10 @@ export class TrafficSystem {
       }
       if (!clear) continue;
 
-      const district = DISTRICT_BY_ID[this.city.districtAt(pt.x, pt.y).id];
+      // Busan e Jeju hanno i loro distretti (§5.41): il mix di veicoli è il loro, non quello
+      // del distretto di Seoul con lo stesso id. Per Seoul il risultato è identico.
+      const here = this.city.districtAt(pt.x, pt.y);
+      const district = here.region && here.region !== 'seoul' ? here : DISTRICT_BY_ID[here.id];
       let kind = rng.pick(district.vehicleMix);
       // Autobus e camion solo sui boulevard: negli incroci stretti si incastrano.
       if ((kind === 'bus' || kind === 'truck') && !edge.arterial) {
@@ -250,7 +303,8 @@ export class TrafficSystem {
         if (circleRectPush(spot.x, spot.y, 22, s)) { blocked = true; break; }
       }
       if (blocked) continue;
-      const district = DISTRICT_BY_ID[spot.district] || DISTRICT_BY_ID.hongdae;
+      const there = this.city.districtAt(spot.x, spot.y);
+      const district = there.region && there.region !== 'seoul' ? there : (DISTRICT_BY_ID[spot.district] || DISTRICT_BY_ID.hongdae);
       const kind = rng.pick(district.vehicleMix.filter((k) => k !== 'bus'));
       const v = createVehicle(kind, spot.x, spot.y, spot.angle + rng.range(-0.05, 0.05), rng.int(0, 9));
       v.driver = null;
@@ -311,6 +365,7 @@ export class TrafficSystem {
     v.ai.edge = best.edge;
     v.ai.dir = best.dir;
     v.ai.lane = Math.min(v.ai.lane, laneCount(best.edge) - 1);
+    if (v.ai.laneF !== undefined) v.ai.laneF = v.ai.lane;
     v.ai.s = best.s;
     v.ai.nextChoice = null;
     v.ai.jamT = 0;
@@ -437,6 +492,142 @@ export class TrafficSystem {
     return null;
   }
 
+  // --- corsia e sorpasso (§5.34) ----------------------------------------------
+  //
+  // Il pezzo che mancava al primo tentativo (docs/storico/04-traffico.md) era scegliere la
+  // corsia **in funzione della svolta**: la corsia a destra serve a chi svolta a
+  // destra, quella a sinistra a chi svolta a sinistra, e chi va dritto sta dove c'è
+  // posto. La svolta si decide appena si entra nell'arco, non all'incrocio.
+
+  /**
+   * C'è posto, in questo istante, sulla corsia `want`? Davanti e dietro, con uno
+   * spazio che cresce con la velocità relativa: chi arriva da dietro più veloce
+   * di noi ha bisogno di più strada di chi ci sta alla pari.
+   * Restituisce `null` se è occupata, altrimenti il gap davanti e la velocità di chi lo chiude.
+   */
+  laneProbe(v, spec, ai, want, game, eager = false) {
+    // Chi deve per forza spostarsi (la svolta è vicina) si accontenta di meno spazio.
+    const k = eager ? 0.6 : 1;
+    const cos = Math.cos(v.angle), sin = Math.sin(v.angle);
+    const delta = laneOffset(ai.edge, want) - laneOffset(ai.edge, ai.laneF);
+    const mySpeed = Math.max(0, v.speed);
+    let gapAhead = Infinity, speedAhead = Infinity;
+    for (const o of game.vehicleGrid.queryCircle(v.x, v.y, 300)) {
+      if (o === v || airborne(o)) continue;
+      const dx = o.x - v.x, dy = o.y - v.y;
+      const lat = -dx * sin + dy * cos;
+      if (Math.abs(lat - delta) > LANE.window) continue;
+      const fwd = dx * cos + dy * sin;
+      const ospec = VEHICLE_TYPES[o.kind];
+      const half = (spec.len + ospec.len) * 0.5;
+      const oSp = Math.max(0, o.vx * cos + o.vy * sin);
+      if (fwd >= 0) {
+        const gap = fwd - half;
+        if (gap < GAP_STOP + (eager ? 2 : 12) + Math.max(0, mySpeed - oSp) * 0.9 * k) return null;
+        if (gap < gapAhead) { gapAhead = gap; speedAhead = oSp; }
+      } else {
+        const gap = -fwd - half;
+        if (gap < (eager ? 10 : 16) + Math.max(0, oSp - mySpeed) * 1.1 * k + oSp * 0.1 * k) return null;
+      }
+    }
+    return { gap: gapAhead, speed: speedAhead };
+  }
+
+  /** Sceglie la corsia desiderata e la fa scivolare. Solo per il traffico libero. */
+  laneLogic(v, spec, dt, game, edge, endNode, nodeHalf) {
+    const ai = v.ai;
+    if (ai.laneF === undefined) { ai.laneF = ai.lane; ai.lcAge = 99; }
+    ai.lcAge += dt;
+    const maxLane = laneCount(edge) - 1;
+    if (maxLane < 1) { ai.lane = 0; ai.laneF = 0; return; }
+    // Scivolamento: l'offset cambia in modo continuo, mai a salti.
+    if (ai.laneF !== ai.lane) {
+      const step = LANE.slide * dt;
+      ai.laneF = Math.abs(ai.lane - ai.laneF) <= step ? ai.lane : ai.laneF + Math.sign(ai.lane - ai.laneF) * step;
+      return;
+    }
+    // Una volante a sirena alle spalle: dalla corsia interna ci si porta su quella
+    // esterna (se c'è posto) e basta, nessun'altra decisione finché dura la cortesia.
+    if (ai.yieldT > 0) {
+      if (ai.lane === 0 && this.laneProbe(v, spec, ai, 1, game, true)) { ai.lane = 1; ai.lcAge = 0; }
+      return;
+    }
+    if (!ai.nextChoice) ai.nextChoice = this.chooseNext(v, endNode, edge, game);
+    const turn = turnOf(edge, ai.dir, ai.nextChoice);
+    const toEnd = edge.len - nodeHalf - ai.s;
+    let want = ai.lane;
+    let forced = false;
+    if (turn === 'destra') want = 1;
+    else if (turn === 'sinistra' || turn === 'inversione') want = 0;
+    if (want !== ai.lane && toEnd < LANE.mandatory && ai.lcAge > LANE.minMandatory) forced = true;
+    else want = ai.lane;
+    // Sorpasso facoltativo: solo se si va dritto, il leader è sensibilmente più
+    // lento di quanto vorremmo andare e dall'altra parte si sta meglio.
+    let probe = null;
+    if (!forced && LANE.optional && turn === 'dritto' && toEnd > LANE.noOptional && ai.lcAge > LANE.minBetween
+        && ai.leadGap < 120 && ai.leadSpeed < ai.target * ai.aggression - LANE.slower) {
+      want = 1 - ai.lane;
+      probe = this.laneProbe(v, spec, ai, want, game);
+      if (!probe || probe.gap < Math.max(180, ai.leadGap + 100) || probe.speed < ai.leadSpeed + 40) return;
+    } else if (!forced) return;
+    else probe = this.laneProbe(v, spec, ai, want, game, true);
+    if (!probe) return;
+    ai.lane = want;
+    ai.lcAge = 0;
+  }
+
+  // --- sirene (§5.36) ----------------------------------------------------------
+
+  /**
+   * C'è una volante a sirena sulla mia strada — alle spalle nello stesso verso, o
+   * contromano davanti? Ne tiene il conto in `ai.yieldT`, che dura `YIELD.hold` dopo
+   * l'ultima volta che la si è vista (altrimenti si cede e si riprende a ogni frame
+   * in cui la volante esce dalla fascia). Ritorna la distanza della più vicina.
+   */
+  sirenWatch(v, ai, dt) {
+    const cos = Math.cos(v.angle), sin = Math.sin(v.angle);
+    let near = Infinity;
+    for (const c of this.sirens) {
+      const dx = c.x - v.x, dy = c.y - v.y;
+      const lat = -dx * sin + dy * cos;
+      if (Math.abs(lat) > YIELD.band) continue;
+      const fwd = dx * cos + dy * sin;
+      const same = Math.cos(c.angle - v.angle);
+      let d = Infinity;
+      if (same > 0.7 && fwd < 40 && fwd > -YIELD.range) d = Math.max(0, -fwd);
+      else if (same < -0.7 && fwd > 20 && fwd < YIELD.range * 0.7) d = fwd;
+      if (d < near) near = d;
+    }
+    if (near < Infinity) ai.yieldT = YIELD.hold;
+    else if (ai.yieldT > 0) ai.yieldT = Math.max(0, ai.yieldT - dt);
+    return near;
+  }
+
+  /**
+   * Una volante a sirena sta per attraversare l'incrocio davanti a me, da un'altra
+   * strada o contromano? Allora non si riparte (le volanti non guardano i semafori).
+   */
+  sirenCrossing(v, node) {
+    for (const c of this.sirens) {
+      const dx = node.x - c.x, dy = node.y - c.y;
+      if (dx * dx + dy * dy > YIELD.nodeR * YIELD.nodeR) continue;
+      if (c.vx * dx + c.vy * dy <= 0) continue;   // si sta allontanando
+      if (Math.cos(c.angle - v.angle) > 0.7) continue;   // stesso verso: è un caso di `sirenWatch`
+      return true;
+    }
+    return false;
+  }
+
+  /** Il waypoint davanti al muso, spostato verso il cordolo se si sta cedendo il passo. */
+  wayPoint(ai, look) {
+    const wp = lanePoint(ai.edge, ai.dir, ai.laneF ?? ai.lane, ai.s + look, this.tmp);
+    if (ai.bias) {
+      wp.x -= Math.sin(wp.angle) * ai.bias;
+      wp.y += Math.cos(wp.angle) * ai.bias;
+    }
+    return wp;
+  }
+
   // --- guida AI --------------------------------------------------------------
   driveAI(v, dt, game) {
     const ai = v.ai;
@@ -499,9 +690,17 @@ export class TrafficSystem {
     if (ai.s > edge.len - nodeHalf * 0.35) {
       const choice = ai.nextChoice || this.chooseNext(v, endNode, edge, game);
       if (choice) {
+        const turn = OVERTAKE && !ai.scripted ? turnOf(edge, ai.dir, choice) : null;
         ai.edge = choice.edge;
         ai.dir = choice.dir;
         ai.lane = Math.min(ai.lane, laneCount(choice.edge) - 1);
+        if (turn) {
+          // Si entra nella corsia che la svolta stessa indica: a destra quella
+          // esterna, a sinistra quella interna. È la geometria a deciderlo.
+          if (laneCount(choice.edge) > 1 && (turn === 'destra' || turn === 'sinistra')) ai.lane = turn === 'destra' ? 1 : 0;
+          ai.laneF = ai.laneF === undefined || ai.lane !== Math.round(ai.laneF) ? ai.lane : Math.min(ai.laneF, laneCount(choice.edge) - 1);
+          ai.lcAge = 0;
+        }
         ai.nextChoice = null;
         ai.target = this.cruiseSpeed(choice.edge, v.kind, this.rng);
         ai.clearing = endNode.claimAxis === edge.axis
@@ -514,9 +713,29 @@ export class TrafficSystem {
       }
     }
 
-    // Waypoint davanti al muso, sul centro della corsia
+    // Cedere il passo a una volante a sirena (§5.36): stato, e scostamento verso il
+    // cordolo dove la corsia è una sola (sulle arterie ci si sposta di corsia, in
+    // `laneLogic`).
+    if (YIELD.on && !ai.scripted) {
+      if (this.sirens.length) this.sirenWatch(v, ai, dt);
+      else if (ai.yieldT > 0) ai.yieldT = Math.max(0, ai.yieldT - dt);
+      const wantBias = ai.yieldT > 0 && laneCount(edge) === 1 ? YIELD.bias : 0;
+      if (ai.bias || wantBias) {
+        const step = YIELD.biasRate * dt;
+        const cur = ai.bias || 0;
+        ai.bias = Math.abs(wantBias - cur) <= step ? wantBias : cur + Math.sign(wantBias - cur) * step;
+      }
+    } else if (ai.bias || ai.yieldT) {
+      ai.bias = 0;
+      ai.yieldT = 0;
+    }
+
+    if (OVERTAKE && !ai.scripted) this.laneLogic(v, spec, dt, game, edge, endNode, nodeHalf);
+
+    // Waypoint davanti al muso, sul centro della corsia (frazionaria se si sta
+    // scivolando da una all'altra)
     const look = 34 + Math.abs(v.speed) * 0.34;
-    let wp = lanePoint(ai.edge, ai.dir, ai.lane, ai.s + look, this.tmp);
+    let wp = this.wayPoint(ai, look);
     let heading = angleDiff(v.angle, Math.atan2(wp.y - v.y, wp.x - v.x));
 
     // Girato di traverso o spinto fuori strada: riaggancia la corsia e ricalcola.
@@ -526,7 +745,7 @@ export class TrafficSystem {
         edge = ai.edge;
         endNode = graph.nodeById(ai.dir > 0 ? edge.b : edge.a);
         nodeHalf = (edge.axis === 'v' ? endNode.hWidth : endNode.vWidth) / 2;
-        wp = lanePoint(ai.edge, ai.dir, ai.lane, ai.s + look, this.tmp);
+        wp = this.wayPoint(ai, look);
         heading = angleDiff(v.angle, Math.atan2(wp.y - v.y, wp.x - v.x));
       }
       if (Math.abs(heading) > 2.4) {
@@ -548,6 +767,8 @@ export class TrafficSystem {
     const queued = cap < 42;
 
     let target = ai.target * ai.aggression;
+    // Chi cede il passo rallenta: la volante deve avere il tempo di infilarsi.
+    if (ai.yieldT > 0) target = Math.min(target, YIELD.slow);
 
     // Curva imminente: rallenta per davvero. A 90 px/s un'auto taglia l'angolo
     // e finisce sul marciapiede, dove resta piantata.
@@ -566,6 +787,19 @@ export class TrafficSystem {
         target = stopDist < 22 ? 0 : Math.min(target, stopDist * 1.5);
         waitingAtLight = true;
       }
+    }
+
+    // Una volante a sirena in arrivo sull'incrocio (le volanti non guardano i
+    // semafori): non si riparte verso di lei. La cortesia ha un tetto, o due
+    // volanti in fila terrebbero fermo un incrocio per sempre.
+    if (this.sirens.length && !waitingAtLight && stopDist < 120 && stopDist > -4 && !ai.scripted) {
+      if ((ai.sirenHold || 0) < YIELD.nodeHold && this.sirenCrossing(v, endNode)) {
+        ai.sirenHold = (ai.sirenHold || 0) + dt;
+        target = stopDist < 22 ? 0 : Math.min(target, stopDist * 1.5);
+        waitingAtLight = true;
+      }
+    } else if (ai.sirenHold > 0 && (stopDist > 130 || stopDist < -4 || !this.sirens.length)) {
+      ai.sirenHold = 0;   // il tetto vale per un incrocio alla volta
     }
 
     // Incrocio. Due regole distinte, e servono entrambe:
@@ -681,6 +915,14 @@ export class TrafficSystem {
     const reach = half + GAP_STOP + speed * 0.85 + 40;
     const ahead = game.vehicleGrid.queryCircle(v.x + cos * reach * 0.5, v.y + sin * reach * 0.5, reach * 0.5 + 44);
     let cap = Infinity;
+    // Durante un cambio corsia si guarda anche quella di destinazione: la
+    // carrozzeria sta a metà strada fra le due, e chi ha davanti può essere in
+    // una qualunque. `leadGap`/`leadSpeed` servono a decidere se vale un sorpasso.
+    const ai = v.ai;
+    const slideD = ai.laneF !== undefined && ai.laneF !== ai.lane
+      ? laneOffset(ai.edge, ai.lane) - laneOffset(ai.edge, ai.laneF) : 0;
+    ai.leadGap = Infinity;
+    ai.leadSpeed = 0;
     for (const o of ahead) {
       if (o === v || airborne(o)) continue;
       const ospec = VEHICLE_TYPES[o.kind];
@@ -693,7 +935,8 @@ export class TrafficSystem {
       // distanza fra le due corsie (38 px), o si frenerebbe per chi arriva in senso
       // opposto sulla sua corsia.
       const side = Math.min(31, (spec.wid + ospec.wid) * 0.5 + 5);
-      if (Math.abs(-dx * sin + dy * cos) > side) continue;
+      const lat = -dx * sin + dy * cos;
+      if (Math.abs(lat) > side && !(slideD && Math.abs(lat - slideD) <= side)) continue;
       const gap = forward - (spec.len + ospec.len) * 0.5;
       // Si punta alla velocità di chi sta davanti, corretta dall'errore di
       // distanza. Ridurre invece la velocità *desiderata* in proporzione allo
@@ -701,6 +944,7 @@ export class TrafficSystem {
       // stop-and-go: chi frena troppo fa frenare di più chi ha dietro, e la coda
       // si ferma da sola senza che davanti ci sia niente.
       const lead = Math.max(0, o.vx * cos + o.vy * sin);
+      if (gap < ai.leadGap && Math.abs(lat) <= side) { ai.leadGap = gap; ai.leadSpeed = lead; }
       const want = GAP_STOP + speed * 0.16;
       cap = Math.min(cap, Math.max(0, lead + (gap - want) * 2.6));
     }
@@ -727,6 +971,7 @@ export class TrafficSystem {
         if (v.ai.honkT <= 0) {
           v.ai.honkT = 2.2;
           game.audio?.honk(v);
+          game.emit('honk', v);
         }
       }
     }

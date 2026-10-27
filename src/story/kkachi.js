@@ -20,6 +20,9 @@
 // predicato è già quello definitivo e resta falso finché quella missione non
 // esiste. Non è un pezzo mancante, è una riga che non si è ancora avverata.
 import { PLAYER_GANG } from '../entities/turfs.js';
+import { HERO_OUTFITS } from '../render/sprites.js';
+import { findTurf } from './places.js';
+import { airborne } from '../entities/vehicle.js';
 import { dist } from '../core/math.js';
 
 /**
@@ -67,6 +70,12 @@ function sulPonte(game) {
   return r.bridges.some((b) => Math.abs(x - b.x) < b.w / 2 + 6);
 }
 
+/** Il cortile di una banda a portata di sguardo: un raggio, non un'inquadratura. */
+function davantiAlCortile(game, gangId, raggio = 520) {
+  const y = findTurf(game, gangId, game.player);
+  return !!y && dist(game.player.x, game.player.y, y.x, y.y) < raggio;
+}
+
 /** Una volante ferma nei paraggi: quelle di quartiere e quelle della caccia. */
 function volanteFerma(game) {
   const pl = game.player;
@@ -77,6 +86,55 @@ function volanteFerma(game) {
   }
   return false;
 }
+
+/**
+ * In campagna: l'area che non è né Seoul né Busan né Jeju (`areaAt` torna `null`), oppure il
+ * distretto di 경기도 dentro Seoul. A bordo di un mezzo di terra — chi naviga o vola ha la sua
+ * chiamata (la 10) — perché «prima volta in campagna» è una cosa che si fa guidando.
+ */
+function inCampagna(game) {
+  const pl = game.player;
+  const v = pl.vehicle;
+  if (!v || pl.onFoot || airborne(v)) return false;
+  const area = game.areaAt(pl.x, pl.y);
+  return !area || (area.id === 'seoul' && pl.district?.id === 'gyeonggi');
+}
+
+/** Un ingresso della metro di Seoul a portata di sguardo, mentre si guida. */
+function vicinoAllaMetro(game, raggio = 380) {
+  const pl = game.player;
+  if (!pl.vehicle || pl.onFoot) return false;
+  for (const s of game.city.transitStations || []) {
+    if (s.region && s.region !== 'seoul') continue;
+    const e = game.metro.entranceOf(s);
+    if (dist(pl.x, pl.y, e.x, e.y) < raggio) return true;
+  }
+  return false;
+}
+
+/**
+ * Il 장례식장 di Hongdae. Il gioco non ha un edificio che si chiami così, e i funerali coreani si
+ * tengono **nelle sale annesse agli ospedali**: è quello del distretto, e qui si cerca una volta
+ * sola. Torna `null` se Seoul non ne ha uno.
+ */
+let _funerale;
+function funerale(game) {
+  if (_funerale === undefined || _funerale?.city !== game.city) {
+    const h = (game.city.hospitals || []).find((q) => q.district === 'hongdae' && game.areaAt(q.x, q.y)?.id === 'seoul');
+    _funerale = h ? { x: h.x, y: h.y, city: game.city } : { city: game.city, none: true };
+  }
+  return _funerale.none ? null : _funerale;
+}
+
+/**
+ * Da quanto si guida dopo mezzanotte senza stelle. **Non è un timer a parte**: `Kkachi.pickCall`
+ * guarda i predicati solo mentre si guida e senza stelle, quindi vale la regola «si valuta
+ * ogni mezzo secondo quando può parlare». Un buco più lungo di `BUCO` secondi fra due
+ * valutazioni (sceso dall'auto, un'inseguita, un menu lungo) azzera il conto.
+ */
+const BUCO = 20;
+const DIECI_MINUTI = 600;
+let calmo = { da: null, ultimo: 0 };
 
 // --- le otto chiamate dell'Atto I -------------------------------------------------
 //
@@ -168,6 +226,133 @@ export const CHIAMATE = [
       { kkachi: true, text: '«I martedì e i venerdì. Dodici anni. Se moltiplichi, fa una cifra che in una busta non ci sta.»' },
       { who: 'Jae-min', text: '«E dove va a finire?»' },
       { kkachi: true, text: '«Nelle perizie. Le paga qualcuno, e quel qualcuno siete voi.»' },
+    ],
+  },
+
+  // === Le chiamate dell'Atto II legate a M5 e M6 ===============================
+  //
+  // Delle otto dell'Atto II **tre** stanno qui perché il copione le lega a un momento
+  // preciso di queste due missioni; le altre cinque (campagna, primo volo, metro, la
+  // mezzanotte senza stelle, il 장례식장) sono della seconda metà della tappa F. Come le
+  // altre, ognuna è copiata da qualcosa che qualcun altro dice. L'ordine è la
+  // priorità: la riga del 1992, che vale un quarto d'ora, sopra la geografica, e questa
+  // sopra quella che dipende da un abito.
+  {
+    // origine: nessuna. Il copione la dà come «—»: è la riga in cui Kkachi, domandato
+    // su una parola che ha appena letto in un faldone, risponde con la stessa due volte.
+    // Vale **dopo aver letto la pagina del 1992** (M6, `kkachi.mark('riga1992')`) e dura
+    // un quarto d'ora di gioco: oltre, la domanda non ha più niente a cui appoggiarsi.
+    id: 'a2-riga',
+    when: (game, k) => k.since('riga1992', game) < 900,
+    lines: [
+      { who: 'Jae-min', text: '«Cos\'è un\'acquisizione?»' },
+      { kkachi: true, text: '«Una voce di bilancio.»' },
+      { who: 'Jae-min', text: '«E un bambino?»' },
+      { kkachi: true, text: '«Una voce di bilancio.»' },
+    ],
+  },
+  {
+    // origine: Kkachi, M6 (pannello 8: «So quello che è stato detto ad alta voce») —
+    // **anticipata**: il giocatore la sente passando davanti a Pyo, e la riga di M6 che
+    // la spiega arriva dopo. Aspetta M5, perché «un altro nome» è quello che Pyo ha
+    // detto e ha corretto.
+    id: 'a2-pyo',
+    when: (game) => game.missions.isDone('m5') && davantiAlCortile(game, 'hwangso'),
+    lines: [
+      { kkachi: true, text: '«Il vecchio Pyo ti ha chiamato con un altro nome.»' },
+      { who: 'Jae-min', text: '«Come lo sai?»' },
+      { kkachi: true, text: '«Perché l\'ha detto ad alta voce.»' },
+    ],
+  },
+  {
+    // origine: Ha-eun, M3 («Bel giubbotto. Le sta grande.»). Aspetta M3 per la stessa
+    // ragione per cui `a1-itaewon` aspetta la sua: la copia non esiste prima dell'originale.
+    // Il predicato è l'**abito addosso**, non l'acquisto: `HERO_OUTFITS` ha cinque giacche
+    // e quella che conta è `suit`.
+    id: 'a2-completo',
+    when: (game) => game.missions.isDone('m3') && HERO_OUTFITS[game.player.outfit]?.id === 'suit',
+    lines: [
+      { kkachi: true, text: '«Ti sta male.»' },
+      { who: 'Jae-min', text: '«È della mia taglia.»' },
+      { kkachi: true, text: '«Non ho detto che è piccolo. Ho detto che ti sta male.»' },
+    ],
+  },
+
+  // === Le altre cinque dell'Atto II (T8, §5.42) ================================
+  //
+  // Con queste le otto sono tutte: la 9, la 10, la 13, la 15 e la 16. Tre aspettano
+  // l'originale (M7 e il copione dell'apertura), due non l'hanno e parlano quando il mondo lo
+  // dice. L'ordine è la priorità, e le più rare stanno sopra.
+  {
+    // origine: **Byeon, M7** (la cella, dalla parte della sua rabbia: «Qui si demolisce senza
+    // gru…»). Il copione la dà a Ryu in M6, ma Ryu non la dice in nessuna delle sue righe: la
+    // riga è stata messa dove un capocantiere si rifiuta di parlare, perché la regola 3 vuole
+    // che l'originale **esista**, non che stia dove il copione l'aveva immaginato.
+    id: 'a2-campagna',
+    when: (game) => game.missions.isDone('m7') && inCampagna(game),
+    lines: [
+      { kkachi: true, text: '«Qui si demolisce senza gru. Basta smettere di riparare le strade e aspettare sei anni.»' },
+    ],
+  },
+  {
+    // origine: nessuna. **La risposta è vuota**: è la prima volta che Kkachi non ne ha una, e si
+    // sente perché la ripete con le stesse parole — «quelli che guardano da lassù» è la
+    // domanda scritta al contrario. Nell'Atto II, e non prima: chi vola con la storia ancora
+    // ferma al primo atto la sente comunque, perché volare si può dal primo minuto.
+    id: 'a2-volo',
+    when: (game) => game.missions.isDone('r1') && !!game.player.vehicle && airborne(game.player.vehicle),
+    lines: [
+      { kkachi: true, text: '«Da lassù non si vede chi deve cosa a chi. È per questo che a loro piace guardare da lassù.»' },
+      { who: 'Jae-min', text: '«Chi, loro?»' },
+      { kkachi: true, text: '«…Quelli che guardano da lassù.»' },
+    ],
+  },
+  {
+    // origine: Kkachi, M7 («Là dentro non c'è una macchina accesa. Io sto dove c'è una radio
+    // accesa»). **Dice la stessa cosa dall'altra parte**: sotto non ci sarà nessuno a
+    // sentirlo. Si sente avvicinandosi a una scala, **prima** di scendere (a piedi non parla),
+    // e la seconda metà — sette secondi dopo, in banchina, **nessuna risposta** — non è una
+    // riga di radio ma un toast di Jae-min (`attachKkachi`, `metroDwell`).
+    id: 'a2-metro',
+    when: (game) => game.missions.isDone('m7') && !(game.stats.metro > 0) && vicinoAllaMetro(game),
+    lines: [
+      { kkachi: true, text: '«Sotto non ti sento. È l\'unico posto della città dove sei solo.»' },
+    ],
+  },
+  {
+    // origine: Jo, M2 — **il silenzio come risposta**: in M2 Jo non risponde alla domanda e
+    // basta, e qui Kkachi chiude con la stessa mancanza. Il predicato è l'unico stateful della
+    // tabella: dieci minuti di gioco fra mezzanotte e le cinque, guidando e **senza stelle** —
+    // quando ne ha una `Kkachi` tace (regola 4) e il conto si perde da solo.
+    id: 'a2-mezzanotte',
+    when: (game) => {
+      const h = game.dayCycle.hour;
+      const ora = game.time;
+      if (calmo.da === null || ora - calmo.ultimo > BUCO || h >= 5) calmo.da = h < 5 ? ora : null;
+      calmo.ultimo = ora;
+      return game.missions.isDone('m2') && h < 5 && calmo.da !== null && ora - calmo.da >= DIECI_MINUTI;
+    },
+    lines: [
+      { kkachi: true, text: '«Adesso non ti cerca nessuno. Goditelo, dura poco e non torna.»' },
+      { who: 'Jae-min', text: '…' },
+      { kkachi: true, text: '«Bravo.»' },
+    ],
+  },
+  {
+    // origine: il narratore, pannello 12 della cutscene («Buste di condoglianze. Sono tre. La più
+    // spessa è di 한성개발»). Il copione la dà a Chun-sik in R1, che quelle buste non nomina mai:
+    // l'originale vero è quel pannello, e dice la stessa cosa. Il 장례식장 di Hongdae è la sala
+    // dell'ospedale del distretto — il gioco non ha un edificio con quel nome, e i funerali
+    // coreani si fanno lì.
+    id: 'a2-funerale',
+    when: (game) => {
+      if (!game.missions.isDone('r1')) return false;
+      const f = funerale(game);
+      const pl = game.player;
+      return !!f && !!pl.vehicle && !pl.onFoot && dist(pl.x, pl.y, f.x, f.y) < 260;
+    },
+    lines: [
+      { kkachi: true, text: '«Le buste bianche si contano il giorno dopo. Chi ha messo di più, di solito, è chi ha più da farsi perdonare.»' },
     ],
   },
 ];
@@ -324,6 +509,16 @@ export function attachKkachi(game) {
   game.on('districtChange', (d, isNew) => {
     if (isNew) k.mark('distrettoNuovo', game);
   });
+  // **La seconda metà della chiamata 13**: sette secondi in banchina, e nessuna risposta. Non è una
+  // riga di radio — sotto terra la radio non c'è, ed è tutto il punto — ma una domanda a vuoto. Si
+  // dice una volta sola, e si segna fra le chiamate (non conta per il finale: `heard` non cambia).
+  game.on('metroDwell', () => {
+    if (!k.done.has('a2-metro') || k.done.has('a2-metro-vuoto')) return;
+    k.done.add('a2-metro-vuoto');
+    game.hud.toast('Jae-min: «…Kkachi?» — nessuna risposta', 4.6);
+  });
+  calmo = { da: null, ultimo: 0 };
+  _funerale = undefined;
   game.on('turfClaimed', (t, gangId, how, wasMine) => {
     if (!wasMine || gangId === PLAYER_GANG) return;
     // Solo quello che non ha visto: il cartello a terra lo dice già a chi c'era.

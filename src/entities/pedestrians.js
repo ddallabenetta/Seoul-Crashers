@@ -5,6 +5,7 @@ import { SIDEWALK } from '../world/citygen.js';
 import { DISTRICT_BY_ID } from '../world/districts.js';
 import { angleDiff, approachAngle, clamp, dist, damp, circleRectPush } from '../core/math.js';
 import { airborne } from './vehicle.js';
+import { trafficRed } from '../world/roadgraph.js';
 import { WEAPONS, shoot, meleeSwing, hasLineOfSight } from './weapons.js';
 
 const BASE_MAX = 62;
@@ -41,6 +42,19 @@ const SHELTER_MAX = 40;
 // Quanto si affretta il passo sotto l'acqua. Poco: un marciapiede al piccolo
 // trotto si legge come panico, non come pioggia.
 const RAIN_HURRY = 0.12;
+
+// La strada reagisce (§5.36). Un oggetto e non costanti sciolte: ogni comportamento si
+// spegne da solo (una scena lo cambia a runtime per confrontare con e senza).
+export const PED_TUNE = {
+  react: true,        // clacson e sirene
+  crossSmart: true,   // attraversamento: meta dalla larghezza vera, semaforo, finestra laterale
+  anchor: true,       // l'anello dei marciapiedi aspetta chi è rimasto indietro (e si riancora se è lontano)
+  hornR: 240,         // quanto lontano un clacson è un richiamo
+  hornNear: 120,      // entro questa distanza chi è sul marciapiede si volta e fa un passo indietro
+  sirenR: 320,        // una volante a sirena entro questo raggio: chi attraversa sgombera
+  greenMargin: 1.0,   // secondi di rosso che devono avanzare oltre la traversata
+  maxWait: 10,        // oltre questa attesa del verde si gira l'angolo invece di aspettare
+};
 
 /** Tinte degli ombrelli. La trasparente è quella coreana per eccellenza. */
 export const UMBRELLAS = ['#1c2029', '#2f4f7a', '#8c2f3c', '#3f6b4a', '#d9dde4', '#b8b0d8'];
@@ -110,6 +124,7 @@ export function createPed(kind, x, y, rng) {
     turf: null,       // territorio presidiato: lo guida lo stato `guard`
     dealer: false,    // 거래책: l'uomo con cui si tratta (vedi `spawnTurf`)
     cop: false,       // in servizio: lo stato lo guida `police.copBehavior`
+    escort: false,    // sta portando via il giocatore (`entities/arrest.js`)
     copWeapon: null,
     // Chi ha un compito da `life.js`. `role` dice quale mestiere sta facendo (e
     // quindi che ordini riceve), `ev` il fatto a cui appartiene, `aggro` chi gli
@@ -128,6 +143,16 @@ export function createPed(kind, x, y, rng) {
     stuckT: 0,        // da quanto vuole muoversi senza riuscirci (vedi `unstick`)
     crossX: 0,
     crossY: 0,
+    crossSX: 0,       // da dove è sceso: ci si torna se il clacson lo coglie nella prima metà
+    crossSY: 0,
+    detourT: 0,       // deviazione laterale di chi ha un compito e si è incastrato
+    detX: 0, detY: 0,
+    crossPend: false, // aspetta il verde e poi attraversa senza ritirare il dado
+    crossWaits: 0,
+    hurryT: 0,        // secondi di passo svelto (clacson, sirena)
+    faceT: 0,         // secondi in cui lo sguardo non segue la velocità (voltato verso un clacson)
+    reactT: -99,      // ultimo istante in cui ha reagito a un clacson
+    cleared: false,   // ha già sgomberato per una sirena in questa traversata
     // Chi si porta dietro l'ombrello. Si decide alla nascita e non quando
     // comincia a piovere: in una visuale dall'alto un passante sotto l'acqua
     // *è* un ombrello, e vederli comparire tutti insieme sopra le teste
@@ -213,6 +238,55 @@ export class PedestrianSystem {
     this._sq = [];     // scratch per la ricerca dei portoni
     this._cars = [];   // scratch: le lamiere ferme attorno al pedone in esame
     this._goal = { x: 0, y: 0 };
+    this._sirens = []; // le volanti a sirena in movimento, rifatte a ogni frame
+    this._eq = [];     // scratch: archi attorno a un attraversamento
+    this._rp = {};     // scratch: il punto dell'anello sotto il pedone
+  }
+
+  /**
+   * Un clacson si sente (§5.36). Arriva dal bus (`game.emit('honk', veicolo)`) e si
+   * risolve sulla griglia dei pedoni: nessun ciclo su tutti, nessun O(n²). Chi sta
+   * attraversando o torna indietro (se è nella prima metà) o allunga il passo; chi è
+   * sul marciapiede e il clacson l'ha vicino si volta e fa mezzo passo indietro.
+   */
+  hearHonk(src, game) {
+    if (!PED_TUNE.react || !src) return;
+    const now = game.time;
+    for (const p of game.pedGrid.queryCircle(src.x, src.y, PED_TUNE.hornR)) {
+      if (p.dead || p.cop || p.hostile || p.panic > 0 || now - p.reactT < 2) continue;
+      const d = dist(p.x, p.y, src.x, src.y);
+      if (d > PED_TUNE.hornR) continue;
+      if (p.state === 'crossing') {
+        p.reactT = now;
+        const toGoal = dist(p.x, p.y, p.crossX, p.crossY);
+        const toStart = dist(p.x, p.y, p.crossSX, p.crossSY);
+        if (toStart < toGoal && d < PED_TUNE.hornNear * 1.6) {
+          p.crossX = p.crossSX;
+          p.crossY = p.crossSY;
+        }
+        p.hurryT = 1.8;
+      } else if ((p.state === 'walk' || p.state === 'idle') && d < PED_TUNE.hornNear) {
+        p.reactT = now;
+        const ux = (src.x - p.x) / (d || 1), uy = (src.y - p.y) / (d || 1);
+        p.angle = Math.atan2(uy, ux);
+        p.state = 'idle';
+        p.idleT = 0.45 + (p.id % 5) * 0.12;   // sfasati senza consumare l'rng
+        // Lo scarto indietro fa girare il corpo verso dove scivola (`updatePed` allinea
+        // l'angolo alla velocità): per tutta la sosta lo sguardo resta sul rumore.
+        p.faceT = p.idleT;
+        p.vx -= ux * 55;
+        p.vy -= uy * 55;
+      }
+    }
+  }
+
+  /** Una volante a sirena in moto abbastanza vicina da far sgomberare la carreggiata. */
+  sirenNear(x, y, r) {
+    const r2 = r * r;
+    for (const s of this._sirens) {
+      if ((s.x - x) ** 2 + (s.y - y) ** 2 < r2) return s;
+    }
+    return null;
   }
 
   /**
@@ -256,6 +330,15 @@ export class PedestrianSystem {
   update(dt, game) {
     this.stream(dt, game);
     this.watchTurfs(game, dt);
+    const sir = this._sirens;
+    sir.length = 0;
+    if (PED_TUNE.react) {
+      // Un posto di blocco (`blockCar`) e una volante sbarcata hanno la sirena ma non
+      // vengono da nessuna parte: non è da loro che si sgombera.
+      for (const v of game.vehicles) {
+        if (v.siren && v.driver === 'cop' && !v.dead && !v.deployed && !v.blockCar && Math.abs(v.speed) > 40) sir.push(v);
+      }
+    }
     for (const p of this.peds) this.updatePed(p, dt, game);
   }
 
@@ -364,7 +447,8 @@ export class PedestrianSystem {
         const cars = game.vehicleGrid.queryCircle(pt.x, pt.y, 46);
         if (cars.some((v) => !v.spot)) continue;
       }
-      const district = DISTRICT_BY_ID[block.district] || DISTRICT_BY_ID.hongdae;
+      const dr = block.districtRef;
+      const district = dr && dr.region && dr.region !== 'seoul' ? dr : (DISTRICT_BY_ID[block.district] || DISTRICT_BY_ID.hongdae);
       const ped = createPed(rng.pick(district.pedMix), pt.x, pt.y, rng);
       ped.block = block;
       ped.side = side;
@@ -395,6 +479,7 @@ export class PedestrianSystem {
       p.bleedT -= dt;
       if (Math.random() < 0.25) game.fx.addBlood(p.x, p.y, 0.25);
     }
+    const x0 = p.x, y0 = p.y;
 
     // Pericolo: veicoli veloci nei paraggi. La stessa query serve anche alle
     // lamiere ferme, che sono l'opposto — un muro invece di una minaccia — e
@@ -427,7 +512,19 @@ export class PedestrianSystem {
     // in mezzo al traffico scioglierebbe la pattuglia. Vale identico per chi ha un
     // compito da `life.js`: una rapina in riva a un boulevard finirebbe prima di
     // cominciare, sciolta dal traffico invece che dalla polizia.
-    if (p.cop || p.state === 'errand') p.panic = 0;
+    if (p.cop || p.state === 'errand' || p.state === 'goto') p.panic = 0;
+
+    if (p.hurryT > 0) p.hurryT -= dt;
+    // Una sirena che arriva: chi è in carreggiata esce dalla parte più vicina, di corsa.
+    if (p.state === 'crossing' && !p.cleared && this._sirens.length
+      && this.sirenNear(p.x, p.y, PED_TUNE.sirenR)) {
+      p.cleared = true;
+      p.hurryT = 3;
+      if (dist(p.x, p.y, p.crossSX, p.crossSY) < dist(p.x, p.y, p.crossX, p.crossY)) {
+        p.crossX = p.crossSX;
+        p.crossY = p.crossSY;
+      }
+    }
 
     if (p.panic > 0 && !p.hostile) {
       p.panic -= dt;
@@ -587,6 +684,31 @@ export class PedestrianSystem {
         ty = p.postY;
         break;
       }
+      case 'goto': {
+        // Un personaggio della storia che segue una fila di punti (M8: chi si pedina e poi
+        // scappa). Non è `errand` perché non appartiene a un fatto di `life.js`, e non è
+        // `commute` perché la meta non è sua: la scrive la missione in `p.goto`. Non si
+        // spaventa — è lui che decide quando correre — e arrivato in fondo si ferma lì.
+        const g = p.goto;
+        if (!g || !g.path.length) { p.state = 'walk'; break; }
+        const wp = g.path[g.i];
+        tx = wp.x;
+        ty = wp.y;
+        targetSpeed = g.speed;
+        if (Math.hypot(wp.x - p.x, wp.y - p.y) < 14) {
+          g.i++;
+          if (g.i >= g.path.length) {
+            if (g.loop) g.i = 0;
+            else {
+              // `p.goto` resta: chi l'ha scritto legge `arrived` per sapere che ci è arrivato.
+              g.arrived = true;
+              p.state = 'post';
+              p.home = { x: wp.x, y: wp.y };
+            }
+          }
+        }
+        break;
+      }
       case 'errand': {
         // Ha un compito: dove andare lo decide `life.order`, allo stesso modo in
         // cui lo stato `duty` lo chiede a `police.copBehavior`. Qui non si sa (e
@@ -596,6 +718,14 @@ export class PedestrianSystem {
           tx = order.x;
           ty = order.y;
           targetSpeed = order.speed;
+        }
+        // Incastrato (`unstick`): per un attimo si va di lato invece che verso l'ordine, e
+        // poi si riprova — è l'unico modo in cui chi ha un compito esce da un angolo
+        // fra un muro e un'auto, perché l'ordine punta sempre lo stesso punto.
+        if (p.detourT > 0) {
+          p.detourT -= dt;
+          tx = p.x + p.detX * 60;
+          ty = p.y + p.detY * 60;
         }
         break;
       }
@@ -672,7 +802,7 @@ export class PedestrianSystem {
         break;
       }
       case 'crossing': {
-        targetSpeed = p.baseSpeed * 1.45;
+        targetSpeed = p.baseSpeed * (p.hurryT > 0 ? 2.0 : 1.45);
         tx = p.crossX;
         ty = p.crossY;
         if (dist(p.x, p.y, tx, ty) < 12) {
@@ -707,14 +837,27 @@ export class PedestrianSystem {
           }
           break;
         }
+        // Il punto dell'anello aspetta il pedone (§5.36). Prima `p.t` correva alla velocità
+        // voluta anche con il pedone rimasto indietro — dopo un riparo, una fuga, un urto —
+        // e due che si inseguono alla stessa velocità non si raggiungono mai: metà dei
+        // passanti camminava per sempre a 150-400 px dal proprio marciapiede, e scattava
+        // l'«angolo» (e l'attraversamento) lontano da dove stava. Se è molto lontano si
+        // riancora all'isolato più vicino.
+        let lag = 0;
+        if (PED_TUNE.anchor) {
+          const rp = sidewalkPoint(p.block, p.side, clamp(p.t, 0, 1), this._rp);
+          lag = Math.hypot(p.x - rp.x, p.y - rp.y);
+          if (lag > 220 && this.reanchor(p)) lag = 0;
+        }
         const len = sideLength(p.block, p.side);
-        p.t += (p.dirSign * targetSpeed * dt) / Math.max(1, len);
+        if (lag < 45) p.t += (p.dirSign * targetSpeed * dt) / Math.max(1, len);
         if (p.t > 1 || p.t < 0) {
           // Angolo dell'isolato: gira, oppure attraversa la strada
-          const wantCross = this.rng.chance(0.16);
-          if (wantCross && this.crossingIsSafe(p, game)) {
-            this.startCrossing(p);
+          const wantCross = p.crossPend || this.rng.chance(0.16);
+          if (wantCross && this.tryCross(p, game)) {
+            // partito, oppure in attesa del verde: in entrambi i casi non si gira l'angolo
           } else {
+            p.crossPend = false;
             const turn = p.t > 1 ? 1 : -1;
             p.side = (p.side + (p.dirSign > 0 ? turn : turn) + 4) % 4;
             p.t = p.t > 1 ? 0.02 : 0.98;
@@ -744,7 +887,9 @@ export class PedestrianSystem {
     // spostata di lato quanto basta a passare e il resto lo fa lo steering. Chi
     // sta sotto una tettoia o davanti al suo banco è arrivato e non deve
     // scansare niente.
-    if (cars.length && targetSpeed > 1) {
+    // `escort`: l'agente che porta via il giocatore va a una portiera, cioè *contro*
+    // una lamiera — scansarla è esattamente quello che non deve fare (§5.35).
+    if (cars.length && targetSpeed > 1 && !p.escort) {
       const goal = this.deflectAroundCars(p, tx, ty, cars);
       if (goal) { tx = goal.x; ty = goal.y; }
     }
@@ -773,8 +918,9 @@ export class PedestrianSystem {
     p.y += p.vy * dt;
 
     const sp = Math.hypot(p.vx, p.vy);
+    if (p.faceT > 0) p.faceT -= dt;
     if (sp > 4) {
-      p.angle = approachAngle(p.angle, Math.atan2(p.vy, p.vx), 10 * dt);
+      if (!(p.faceT > 0)) p.angle = approachAngle(p.angle, Math.atan2(p.vy, p.vx), 10 * dt);
       p.animT += sp * dt * 0.2;
     }
 
@@ -784,7 +930,7 @@ export class PedestrianSystem {
     // scavalcato: rifargli la query dei solidi a ogni frame, per venti persone,
     // è il grosso di quello che costa la pioggia.
     if (p.state === 'flee' || p.state === 'crossing' || p.state === 'hostile'
-      || p.state === 'duty' || p.state === 'errand' || p.state === 'commute'
+      || p.state === 'duty' || p.state === 'errand' || p.state === 'commute' || p.state === 'goto'
       || ((p.state === 'shelter' || p.state === 'gather' || p.state === 'work') && targetSpeed > 0)) {
       const solids = this.city.solidGrid.queryRect(p.x - 24, p.y - 24, 48, 48);
       for (const s of solids) {
@@ -804,7 +950,9 @@ export class PedestrianSystem {
     // Valvola anti-incastro: chi vuole muoversi e non ci riesce cambia idea. Nasce
     // per le auto in sosta — aggirare non riesce sempre, per esempio in mezzo a
     // due parcheggiate — ma vale per qualunque stallo.
-    if (targetSpeed > 10 && Math.hypot(p.vx, p.vy) < targetSpeed * 0.28) {
+    // Si misura lo **spostamento** e non la velocità: contro un muro o una lamiera la
+    // velocità resta alta e il pedone corre sul posto (§5.36).
+    if (targetSpeed > 10 && Math.hypot(p.x - x0, p.y - y0) < targetSpeed * dt * 0.28) {
       p.stuckT += dt;
       if (p.stuckT > STUCK_TIME) this.unstick(p, game);
     } else if (p.stuckT > 0) {
@@ -855,35 +1003,50 @@ export class PedestrianSystem {
     return goal;
   }
 
-  /** La carrozzeria ferma è solida: stessa risoluzione del giocatore (§5.17). */
+  /**
+   * La carrozzeria ferma è solida: stessa risoluzione del giocatore (§5.17).
+   *
+   * Due difetti qui erano la causa di `dentroLamiera > 0` (§5.36). Primo: si usciva
+   * solo dal cerchio più compenetrato, ma i tre cerchi di un furgone si sovrappongono
+   * e uscire dal centrale lascia un paio di pixel dentro il vicino, che bastano a
+   * restare «dentro» finché si spinge contro la fiancata. Secondo: la velocità contro
+   * la lamiera restava intatta, quindi chi era incastrato fra un muro e un'auto in
+   * sosta correva sul posto a regime, e la valvola anti-incastro (`stuckT`, che misura
+   * la velocità e non lo spostamento) non scattava mai.
+   */
   pushOutOfCars(p, cars) {
-    for (const v of cars) {
-      const spec = VEHICLE_TYPES[v.kind];
-      if (!spec) continue;
-      const r = spec.wid * 0.46;
-      const half = spec.len * 0.5 - r * 0.75;
-      const cos = Math.cos(v.angle), sin = Math.sin(v.angle);
-      const minD = r + PED_R;
-      // Solo il cerchio più compenetrato: sommare i tre spara via il pedone.
-      let bx = 0, by = 0, best = 0;
-      for (let k = -1; k <= 1; k++) {
-        const dx = p.x - (v.x + cos * half * k);
-        const dy = p.y - (v.y + sin * half * k);
-        const d2 = dx * dx + dy * dy;
-        if (d2 > minD * minD) continue;
-        const d = Math.sqrt(d2);
-        const overlap = minD - d;
-        if (overlap <= best) continue;
-        best = overlap;
-        // Piedi sull'asse esatto del veicolo: la normale sarebbe lunga zero. Da
-        // sotto un'auto si esce di fianco, che è il lato corto.
-        bx = d > 0.01 ? dx / d : -sin;
-        by = d > 0.01 ? dy / d : cos;
+    let nx = 0, ny = 0, hit = false;
+    for (let pass = 0; pass < 2; pass++) {
+      let any = false;
+      for (const v of cars) {
+        const spec = VEHICLE_TYPES[v.kind];
+        if (!spec) continue;
+        const r = spec.wid * 0.46;
+        const half = spec.len * 0.5 - r * 0.75;
+        const cos = Math.cos(v.angle), sin = Math.sin(v.angle);
+        const minD = r + PED_R;
+        // Un cerchio alla volta e non la somma: sommare i tre spara via il pedone.
+        for (let k = -1; k <= 1; k++) {
+          const dx = p.x - (v.x + cos * half * k);
+          const dy = p.y - (v.y + sin * half * k);
+          const d2 = dx * dx + dy * dy;
+          if (d2 >= minD * minD) continue;
+          const d = Math.sqrt(d2);
+          // Piedi sull'asse esatto del veicolo: la normale sarebbe lunga zero. Da
+          // sotto un'auto si esce di fianco, che è il lato corto.
+          const ux = d > 0.01 ? dx / d : -sin;
+          const uy = d > 0.01 ? dy / d : cos;
+          p.x += ux * (minD - d);
+          p.y += uy * (minD - d);
+          nx = ux; ny = uy;
+          any = hit = true;
+        }
       }
-      if (best > 0) {
-        p.x += bx * best;
-        p.y += by * best;
-      }
+      if (!any) break;
+    }
+    if (hit) {
+      const vn = p.vx * nx + p.vy * ny;
+      if (vn < 0) { p.vx -= vn * nx; p.vy -= vn * ny; }
     }
   }
 
@@ -918,6 +1081,16 @@ export class PedestrianSystem {
         p.postX = 0;    // si sceglie un altro posto dove ciondolare (o da zappare)
         p.idleT = 0;
         break;
+      case 'errand': {
+        // Di lato per 1,2 s, un lato diverso a ogni volta. Dove si va lo sceglie l'ordine
+        // di `life`, che non sa di muri: qui si può solo cambiare strada.
+        const a = Math.hypot(p.vx, p.vy) > 2 ? Math.atan2(p.vy, p.vx) : p.angle;
+        p.dirSign *= -1;
+        p.detX = -Math.sin(a) * p.dirSign;
+        p.detY = Math.cos(a) * p.dirSign;
+        p.detourT = 1.2;
+        break;
+      }
       case 'flee':
         // Con le spalle al muro non si scappa: ci si ferma e si ricomincia.
         p.panic = 0;
@@ -985,6 +1158,8 @@ export class PedestrianSystem {
       p.hostile = true;
       p.state = 'hostile';
       p.panic = 0;
+    } else if (p.state === 'goto') {
+      // Chi segue un percorso della storia non scappa e non risponde: continua.
     } else if (p.state === 'errand') {
       // Chi è già in mezzo a una sparatoria non scappa perché gli hanno sparato:
       // gira il ferro verso chi l'ha colpito. Senza questa riga la prima
@@ -1022,7 +1197,7 @@ export class PedestrianSystem {
     for (const p of this.peds) {
       // Chi ha un compito non si spaventa per uno sparo: o è suo, o è di quello a
       // cui sta sparando. Vale anche per la divisa, per la stessa ragione.
-      if (p.dead || p.hostile || p.cop || p.state === 'errand') continue;
+      if (p.dead || p.hostile || p.cop || p.state === 'errand' || p.state === 'goto') continue;
       const d2 = (p.x - x) ** 2 + (p.y - y) ** 2;
       if (d2 > r2) continue;
       if (source === game.player && PED_KINDS[p.kind]?.fights && d2 < near2) {
@@ -1039,6 +1214,20 @@ export class PedestrianSystem {
         game.audio?.scream(p.x, p.y, p.voice);
       }
     }
+  }
+
+  /** Rimette l'anello sotto i piedi: l'isolato più vicino, il lato più vicino, la posizione sul lato. */
+  reanchor(p) {
+    let best = null, bd = Infinity;
+    for (const b of this.city.blockGrid.queryRect(p.x - 140, p.y - 140, 280, 280)) {
+      const d = dist(p.x, p.y, clamp(p.x, b.x, b.x + b.w), clamp(p.y, b.y, b.y + b.h));
+      if (d < bd) { bd = d; best = b; }
+    }
+    if (!best) return false;
+    p.block = best;
+    p.side = this.nearestSide(best, p.x, p.y);
+    p.t = this.tOnSide(best, p.side, p.x, p.y);
+    return true;
   }
 
   nearestSide(b, x, y) {
@@ -1086,8 +1275,144 @@ export class PedestrianSystem {
     const reach = 110;
     p.crossX = pt.x + nx * reach;
     p.crossY = pt.y + ny * reach;
+    this.beginCrossing(p, pt.x, pt.y);
+  }
+
+  beginCrossing(p, sx, sy) {
+    p.crossSX = sx;
+    p.crossSY = sy;
+    p.cleared = false;
+    p.crossPend = false;
+    p.crossWaits = 0;
     p.state = 'crossing';
     p.t = clamp(p.t, 0.02, 0.98);
+  }
+
+  /**
+   * Il pedone è a un angolo e vuole attraversare. Restituisce `true` se ha deciso
+   * (è partito, oppure aspetta il verde) e `false` se deve girare l'angolo. Con
+   * `crossSmart` spento è la vecchia regola: meta fissa a 110 px e solo auto veloci
+   * di fronte.
+   */
+  tryCross(p, game) {
+    if (!PED_TUNE.crossSmart) {
+      if (!this.crossingIsSafe(p, game)) return false;
+      this.startCrossing(p);
+      return true;
+    }
+    const plan = this.planCrossing(p);
+    if (!plan) return false;
+    // `p.t` corre sull'anello alla velocità voluta anche se il pedone è rimasto indietro
+    // (urtato, tornato da una fuga, incastrato fra due auto): l'«angolo» scatta quando il
+    // punto dell'anello arriva alla fine del lato, e il pedone può essere a 200-1000 px da lì.
+    // Attraversare da un punto lontano dal pedone vuol dire teletrasportarlo — e guardare il
+    // semaforo e le auto di un incrocio che non è il suo. Si attraversa solo da vicino.
+    if (dist(p.x, p.y, plan.sx, plan.sy) > 60) return false;
+    const wait = this.crossingVerdict(p, game, plan);
+    if (wait < 0) return false;
+    if (wait > 0) {
+      // Due attese e basta: un incrocio con un ciclo storto non trattiene nessuno per sempre.
+      if (++p.crossWaits > 2) return false;
+      p.crossPend = true;
+      p.state = 'idle';
+      p.idleT = wait;
+      p.t = clamp(p.t, 0.02, 0.98);
+      return true;
+    }
+    p.crossX = plan.gx;
+    p.crossY = plan.gy;
+    this.beginCrossing(p, plan.sx, plan.sy);
+    return true;
+  }
+
+  /**
+   * Dove porta davvero l'attraversamento. Si cammina lungo la normale del lato fino al
+   * primo isolato oltre la carreggiata e si sbarca sul suo marciapiede: la meta fissa
+   * a 110 px lasciava a metà strada chiunque attraversasse un'arteria (175 px da
+   * marciapiede a marciapiede), e dove non c'è un isolato dall'altra parte (il fiume,
+   * il bordo della mappa) non si attraversa affatto.
+   */
+  planCrossing(p) {
+    const b = p.block;
+    const t = clamp(p.t, 0.02, 0.98);
+    const pt = sidewalkPoint(b, p.side, t, {});
+    let nx = 0, ny = 0;
+    if (p.side === 0) ny = -1;
+    else if (p.side === 1) nx = 1;
+    else if (p.side === 2) ny = 1;
+    else nx = -1;
+    const grid = this.city.blockGrid;
+    for (let d = 24; d <= 236; d += 8) {
+      const x = pt.x + nx * d;
+      const y = pt.y + ny * d;
+      for (const o of grid.queryRect(x - 0.5, y - 0.5, 1, 1)) {
+        if (o === b || x < o.x || x > o.x + o.w || y < o.y || y > o.y + o.h) continue;
+        const len = d + SIDEWALK * 0.78;
+        return { sx: pt.x, sy: pt.y, nx, ny, len, gx: pt.x + nx * len, gy: pt.y + ny * len };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * 0 = si parte; > 0 = si aspetta tanti secondi il verde pedonale; < 0 = oggi no.
+   * Tre cose, in ordine: una sirena vicina, il semaforo dell'incrocio accanto (si
+   * parte solo col rosso per le auto e con rosso abbastanza da arrivare dall'altra
+   * parte) e le auto in moto, seguite lungo il loro cammino per la durata della
+   * traversata — frontali ma anche di lato, che è quello che il vecchio controllo
+   * non vedeva.
+   */
+  crossingVerdict(p, game, plan) {
+    if (this._sirens.length && this.sirenNear(plan.sx, plan.sy, PED_TUNE.sirenR * 1.25)) return -1;
+    const dur = plan.len / (p.baseSpeed * 1.45);
+    const node = this.signalNear(plan.sx, plan.sy);
+    if (node) {
+      const axis = plan.ny !== 0 ? 'h' : 'v';   // l'asse della strada che si attraversa
+      const red = trafficRed(node, axis, game.time);
+      if (red.left < dur + PED_TUNE.greenMargin) {
+        const wait = (red.left > 0 ? red.left + red.pass : red.wait) + 0.3;
+        return wait > PED_TUNE.maxWait ? -1 : wait;
+      }
+    }
+    return this.pathClear(game, plan, p.baseSpeed * 1.45, dur) ? 0 : -1;
+  }
+
+  /** L'incrocio più vicino al punto, se ha il semaforo. */
+  signalNear(x, y) {
+    const graph = this.city.graph;
+    let best = null;
+    let bd = 170 * 170;
+    for (const e of graph.edgesNear(x, y, 170, this._eq)) {
+      for (const id of [e.a, e.b]) {
+        const n = graph.nodeById(id);
+        const d2 = (n.x - x) ** 2 + (n.y - y) ** 2;
+        if (d2 < bd) { bd = d2; best = n; }
+      }
+    }
+    return best && best.signal ? best : null;
+  }
+
+  /** Nessun veicolo in moto passa a meno di una carrozzeria dal pedone lungo la traversata. */
+  pathClear(game, plan, speed, dur) {
+    if (!game.vehicleGrid) return true;
+    const mx = (plan.sx + plan.gx) / 2, my = (plan.sy + plan.gy) / 2;
+    for (const v of game.vehicleGrid.queryCircle(mx, my, plan.len * 0.5 + 260)) {
+      if (airborne(v)) continue;
+      const sp = Math.hypot(v.vx, v.vy);
+      if (sp < 40) continue;
+      const spec = VEHICLE_TYPES[v.kind];
+      // La carrozzeria, non un cerchio: un'auto che passa **accanto** alla traiettoria del
+      // pedone non lo prende, e un raggio largo chiudeva quasi ogni attraversamento.
+      const hl = (spec ? spec.len : 70) * 0.5 + 10, hw = (spec ? spec.wid : 32) * 0.5 + 12;
+      const cos = v.vx / sp, sin = v.vy / sp;
+      for (let t = 0; t <= dur + 0.4; t += 0.2) {
+        const f = Math.min(t * speed, plan.len);
+        const dx = plan.sx + plan.nx * f - (v.x + v.vx * t);
+        const dy = plan.sy + plan.ny * f - (v.y + v.vy * t);
+        if (Math.abs(dx * cos + dy * sin) < hl && Math.abs(-dx * sin + dy * cos) < hw) return false;
+      }
+    }
+    return true;
   }
 
   knockDown(p, v, game) {

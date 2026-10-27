@@ -41,6 +41,10 @@ quelle si capisce al primo passaggio invece che a M4.
 
 ## I personaggi: da sagome a pixel art
 
+> **Nota (T6):** il cast reale è di **9 personaggi con 8 pose**, più di quanto dicano le cifre sotto
+> («sette pose», «sei pose» in `cast-sheet`): fa fede il sorgente del cast e `cast-sheet.scene`. La regia sonora dei
+> pannelli (campi `bed`/`sfx`) è in §5.37, `docs/storico/26-regia-sonora.md`.
+
 Il copione diceva «le facce non hanno tratti: si leggono dalla posa». Implementato, dava cinque
 sagome nere identiche, e l'utente ha chiesto l'opposto: **soggetti visibili, personaggi
 riconoscibili e carismatici, in sprite 2d**. Fra fumetto a inchiostro e pixel art ha scelto la

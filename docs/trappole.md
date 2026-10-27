@@ -128,6 +128,13 @@ codice spiega il perché nel punto giusto.
 | Un tetto sembra fuori dall'asse ma copre ancora una corsia | il grafo descrive il percorso dei veicoli, non il rettangolo asfaltato; boulevard e strade hanno larghezze diverse | ogni controllo di piazzamento usa le linee attive e la loro `width` tramite `roadclearance.js`, non soltanto nodi o archi centrali |
 | Uscendo dalla metro si riappare dentro la scala | quando l'ingresso è diventato solido, salvarne il centro come posizione esterna ha trasformato una coordinata valida in una collisione | `MetroSystem.enterStation` conserva la posizione reale del giocatore, già verificata dall'interazione |
 | Entrando in metro il giocatore viene espulso di lato | `entry` cade dentro un pilastro/arredo e il primo frame di collisione corregge il punto iniziale | ogni cambio alla pianta 1080×720 va verificato con raggio giocatore: ingresso, uscita e porta del treno liberi e percorso connesso |
+| Il sorpasso peggiora flusso e immobili | cambi facoltativi larghi (leader −40 px/s, nessun limite di gap): tutti nella corsia libera e affiancati all'incrocio. I soli cambi obbligatori non costano niente | `traffic.LANE.slower` · `noOptional` (§5.34) |
+| `ai.lane` non dice dove sta l'auto | con `OVERTAKE` è la corsia *desiderata*; quella fisica è `ai.laneF`, frazionaria, e `lanePoint`/`laneOffset` accettano frazioni | `traffic.laneLogic`, `roadgraph.laneOffset` |
+| `walkers-census` dà `dentroLamiera` > 0 (2, 46, 144, 290…) sempre per un'auto in sosta | i **rapinatori nascevano a ±26 px dal centro** dell'auto della fuga, dentro la carrozzeria; il lato più corto per uscirne dava su un muro e restavano incastrati fra muro e lamiera per tutta la rapina. Due difetti in `pushOutOfCars` lo rendevano permanente: usciva solo dal cerchio più compenetrato (i tre cerchi si sovrappongono, restano 1-2 px nel vicino) e **non toglieva la velocità contro la lamiera**, quindi `stuckT` — che misura la velocità, non lo spostamento — non scattava mai | `life.besideCar`, `pedestrians.pushOutOfCars` (§5.36) |
+| Il pedone «corre sul posto» contro un'auto e nessuna valvola scatta | `stuckT` confronta la velocità con quella voluta, e la velocità non viene mai tolta quando un muro o una lamiera ti respinge: qualunque spinta di posizione va accompagnata dall'azzeramento della componente contro | `pedestrians.pushOutOfCars` |
+| I pedoni si fermano a metà di un'arteria e tornano indietro | `startCrossing` puntava a 110 px fissi: fra due marciapiedi una via da 76 px sono ~107, un'arteria da 144 sono ~175. Non trovando un isolato entro 40 px il pedone «tornava a camminare» in mezzo alla carreggiata | `pedestrians.planCrossing` cammina lungo la normale fino al primo isolato oltre la strada (§5.36) |
+| Un pedone parte col verde alle auto | `crossingIsSafe` guardava solo le auto veloci *di fronte* e ignorava il semaforo | `pedestrians.crossingVerdict` + `roadgraph.trafficRed` |
+| Le volanti a sirena restano a 60 px/s dietro un'utilitaria | `followRoads` frenava per chiunque stesse nella propria corsia, e il traffico civile non sapeva delle sirene | sorpasso dalla corsia opposta (`police.oppositeClear`) e cortesia civile (`traffic.sirenWatch`), §5.36 |
 
 Regola generale emersa: **prima di dare la colpa all'AI, verifica la geometria.** Quasi tutti
 gli "stalli dell'AI" erano problemi di ingombri, corsie o posizionamento.
@@ -448,3 +455,102 @@ due quinti in alto a sinistra: un personaggio disegnato con `groundY` sul bordo 
 sotto il gradiente e sparisce. Peggio: con cinque voci il riquadro **esce dal pannello** e la
 prima riga finisce oltre il bordo di sopra. Si guarda con `cutscene-panel.scene`, non si indovina
 — e quando non ci sta, si taglia la battuta o si divide la tavola in due (§5.33).
+
+**Dentro un negozio `police.update` non gira, e con lui ogni cronometro che ci vive.** La barra del
+fermo (`arresting`/`bustT`) restava congelata a metà mentre si era al riparo, e riprendeva da dov'era
+all'uscita (§5.35). Vale per qualunque stato di polizia che si aggiorna in `update` e non in `siege`:
+quello che deve smettere di contare entrando da una porta va azzerato **in `siege`**.
+
+**`followRoads` non porta a una destinazione ferma.** Sceglie a ogni incrocio l'arco che *avvicina di
+più* al bersaglio: regge un inseguimento (il bersaglio si avvicina da sé) ma su un punto fermo una
+volante su due girava attorno all'isolato. Per mandarla in un posto si passa il **nodo dopo di un A\***
+(`police.escortWaypoint`, ricalcolato solo quando cambia arco) e non il posto (§5.35).
+
+**Una modalità con `playerRuns: false` non ferma niente da sola.** `mode.playerRuns` non lo legge
+nessuno per conto suo: chi vuole il giocatore fermo mentre il mondo gira deve gatare a mano
+`player.update` e **ogni sistema che consuma tasti** (negozi, metro, cortili, missioni) — in
+`main.update` lo fa `live` (§5.35). Un tasto che resta vivo è una porta che si apre sotto le manette.
+
+**Una scena che campiona «ogni mezzo secondo» con `floor(t/500) > tr.length` campiona ogni decimo.**
+Il contatore recupera finché non raggiunge l'orologio, quindi dopo una pausa (una fase che comincia)
+sembra di vedere un agente che cammina a 8 px/s: è un'illusione dello script, non del gioco.
+**Un'aggiunta in coda può spostare una missione.** M4 cerca il prop `crane` più vicino all'ufficio
+del molo: una gru nuova con lo stesso tipo cambia il bersaglio. Le gru del §5.39 sono `harborcrane`.
+
+**`queryRect` dice «c'è un edificio» e non è vero.** Restituisce i candidati delle *celle*, non chi
+sovrappone: il test esatto va rifatto sul risultato (`blocklife.hasSolid`). E contare i prop
+solidi come «già occupato» salta i campi di Jeju (ci sono `ac_unit` dei cortili, che nei campi si
+tolgono); un `turf` può coprire un intero molo, quindi si vieta solo il suo centro (§5.39).
+**Un `x1` di area è già fuori dall'area.** `areaAt` è aperto a destra (`x < x1`), quindi
+`districtAt(7200, y)` risponde campagna: campionare il bordo esatto di Seoul dipingeva una
+riga verde larga un passo di campionamento. Per leggere il distretto del bordo si clampa a `x1 - 1`
+(§5.38).
+
+**Uno smoothstep non è un raccordo.** Parte con derivata zero: se la città scende di 0,09 px/px
+sul bordo e la campagna la prosegue piatta, l'hillshade disegna una striscia chiara e una parete
+scura. Il raccordo di quota deve continuare la pendenza uscente (`korea.elevationAt`, §5.38).
+
+**Un `createLinearGradient(left, …)` per tile è un mare a scacchi.** Il gradiente va ancorato a
+un'ascissa del mondo (`SEA_X0`), non al bordo del tile che si sta disegnando (§5.38).
+
+**Accorciare una via non è allungarla.** `regions.reindex` scarta gli edifici che toccano i
+`segments`: allungare un segmento per far stare una testata faceva sparire edifici. Le testate si
+dipingono (`ground.drawTestata`), non si aggiungono alla carreggiata (§5.38).
+
+
+**Busan e Jeju: ponti, landmark e gradini (§5.41).** Un ponte è terra per `isWater` (le auto
+non affondano) ma `isNavigable`/`underDeck` lasciano passare le barche fra i piloni: chi scrive codice per
+barche usa `isNavigable`, non `isWater`, o una barca non passa sotto il ponte. Un landmark vicino alla riva va
+riservato prima di `carveBlocks` o `reindex` lancia «Landmark sulla carreggiata». Un tracciato libero
+che taglia in diagonale una griglia ne sovrappone le strade: attaccarlo a una sua linea (`exactEnd`).
+Gradini di `staircase` più piccoli della somma delle mezze carreggiate sovrappongono gli asfalti.
+**`teleport` di una scena esce dal negozio, e il punto di piano non compare.** Una prova che porta il
+giocatore su un faldone, su Jo o su un punto di una pianta con la stessa funzione con cui lo porta in
+strada lo **fa uscire** (`shops.leave`): il suggerimento non c'è e `p.run` gira lo stesso, quindi la
+prova dice `true` su un'azione che nessuno vedrebbe. Dentro si cambia `pl.x/y` e si fa `camera.snapTo`
+(§5.40, `atto-2.scene`).
+
+**Un indirizzo di `places.js` non ha la normale della porta.** `{ shop, id, level, x, y }`: `nx`/`ny`
+stanno su `addr.shop`. `addr.nx` è `undefined` e `x + nx * 18` è `NaN`, che il teletrasporto accetta
+senza lamentarsi — e il giocatore finisce dove non c'è niente (§5.40).
+
+**Una fase di soli pannelli si chiama come le dai.** `panelPhase('m6-chiusura', …)` è la fase
+`m6/m6-chiusura`, non `m6/chiusura`: una scena che aspetta il nome «giusto» resta ferma e il
+`finoA` scade senza dire perché.
+
+**Una chiamata di 까치 che deve uscire in una prova viene rubata da un'altra.** La tabella è una
+priorità, e basta che piova (`a1-pioggia`) o sia notte perché la chiamata che si sta provando non parta.
+Per provarne una sola si segnano le altre come `done` (§5.40).
+
+**Una definizione di attore nata in una missione finita non sopravvive a un caricamento.** `prepare`
+gira solo per la missione in corso: Jo, definita da M2, dopo un salvataggio non c'era più e il banco
+tornava a un commesso qualunque. Chi deve esserci **dopo** la sua missione si ridefinisce da sé in
+`missions.afterRestore` (§5.40).
+
+**`moored` + `protect` sopravvive a `clearWorld`.** Un'auto della storia che deve sparire con un
+caricamento (le tre del cortile di M5) è solo `protect`: `moored` la farebbe restare in `game.vehicles`
+attraverso ogni partita nuova e ogni ricarica.
+
+**`figure(..., 'seat', { crop })` con un `crop` piccolo è una testa sola.** Il corpo comincia alla cella
+24: `crop: 26` per un bambino seduto dà una faccia che galleggia, `crop: 46` dà busto e gambe. E sotto il
+60% del pannello c'è il riquadro delle battute (§5.33).
+
+**`put()` scarta in silenzio quello che tocca un mobile già messo.** Il divisorio fra le due celle di M7
+sparì perché era attaccato alla sbarra della fronte (`pad(o, 2)` sovrapposto): a schermo c'era una cella
+sola, e nessun errore. Si mettono per primi i pezzi lunghi, e il secondo si ferma due pixel prima (§5.42).
+
+**`shop.district` non è il distretto che legge il giocatore.** L'etichetta con cui la generazione marca una
+vetrina e `districtAt` (quella dell'HUD) si separano sui bordi: la prima porta «di Myeongdong» stava a
+Hongdae. Chi manda in un quartiere e lo scrive a schermo passa `visible: true` a `findShop` (§5.42).
+
+**`actors.restore` azzera `d.ped` di chi è nato durante il caricamento.** Un attore d'interno definito dalla
+fase mentre `missions.restore` rientra (Byeon) ha il pedone sul piano ma `actors.get(id)` dice `null`: una
+prova guarda `floor.people`, non `actors.get` (§5.42).
+
+**Un pedone `goto` che arriva lascia `p.goto` com'è.** `goto.arrived` è il modo in cui la missione sa che ci
+è arrivato: azzerarlo all'arrivo (la prima versione lo faceva) vuol dire che nessuno lo vede mai, e la fase
+resta ad aspettare un pedone fermo (§5.42).
+
+**`shops.snapshot` ignora le chiavi non numeriche della cache.** Le stanze della storia stanno sotto
+`stage:<id>` o sotto un id inventato (`m7-cella`) e si rifanno da sole: scriverle nel salvataggio vorrebbe
+dire un'altra pianta per ogni vetrina (§5.42).

@@ -332,6 +332,137 @@ const HEADS = {
     '......############......',
     '.........#ssss#.........',
   ],
+
+  // Pyo Man-deok, sessantasei anni, l'usura di Gangnam. **La testa pelata è la sua
+  // faccia**: una cupola di pelle con una frangia bianca ai lati e un pizzetto
+  // bianco sotto — nel cast è l'unico senza capelli sopra, e a questa scala si
+  // riconosce prima di vedergli gli occhi. Le sopracciglia bianche e folte stanno
+  // sulla riga 10 e le palpebre pesanti sulla 11: guarda a mezz'asta, come chi ha
+  // già contato quello che hai in tasca. Le rughe della fronte e le borse sotto gli
+  // occhi sono la sua età; il resto è fermo, perché lui si muove col ventaglio.
+  pyo: [
+    '........................',
+    '.......##########.......',
+    '.....##sssSSSSsss##.....',
+    '...##sssssSSSSsssss##...',
+    '..#hhsssssssssssssshh#..',
+    '..#hHssssssSSssssssHh#..',
+    '..#hhsssssssssssssshh#..',
+    '..#shhsssssssssssshhs#..',
+    '..#ssssssssssssssssss#..',
+    '..#sssddddddddddddsss#..',
+    '..#sHHHHssssssssHHHHs#..',
+    '..#s####ssssssss####s#..',
+    '..#ssw##wssssssw##wss#..',
+    '..#sddddssssssssdddds#..',
+    '..#ssssssss##ssssssss#..',
+    '..#sssssssdd#ssssssss#..',
+    '..#ssdssssssssssssdss#..',
+    '..#ssssss######ssssss#..',
+    '..#ssssssssssssssssss#..',
+    '...#ssssHHHHHHHHssss#...',
+    '...#sssssHHHHHHsssss#...',
+    '....##ssssHHHHssss##....',
+    '......############......',
+    '.........#ssss#.........',
+  ],
+
+  // Il bambino. Non ha un nome nel copione ed è lo stesso nella cucina di R2 e nella
+  // foto di Pyo: tre mesi, forse quattro. Quello che lo fa piccolo non è il corpo —
+  // che è lo stesso parametrico di tutti — ma la testa: tonda, con la fronte alta e
+  // il ciuffo di capelli neri **solo in cima**, gli occhi bassi e larghi, due
+  // guance rosa (`a`) e una bocca da quattro celle. Sta in una pagina di pannelli
+  // dove tutti gli altri hanno sessant'anni, quindi basta che sia rotondo.
+  bambino: [
+    '........................',
+    '........########........',
+    '......##hhhhhhhh##......',
+    '....##hhhhhhhhhhhh##....',
+    '...#ssshhhhhhhhhhsss#...',
+    '..#ssssssshhhhsssssss#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssssssssssssssSS#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssw##wssssssw##wss#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssssssssdsssssss#..',
+    '..#saassssssssssssaas#..',
+    '..#saassssssssssssaas#..',
+    '..#ssssssss####ssssss#..',
+    '..#ssssssssssssssssss#..',
+    '...#ssssssssssssssss#...',
+    '....#ssssssssssssss#....',
+    '.....##ssssssssss##.....',
+    '.......##########.......',
+    '.........#ssss#.........',
+  ],
+
+  // Ku Man-gi a trent'anni, nella foto che Pyo tiene dentro il ventaglio. Parente
+  // stretto di Jae-min, e va letto così: stessa mascella, ma **le basette e i baffi**
+  // — che Jae-min non ha — e la scriminatura da una parte. Non ha cicatrici: è la
+  // sola cosa che il narratore dice di lui, e il pannello deve lasciarla vedere.
+  kumangi: [
+    '........................',
+    '......############......',
+    '....##hhhhhhhhhhhh##....',
+    '...#hhhhhhhhhhhhhhhh#...',
+    '..#hhhhhhhHhhhhhhhhhh#..',
+    '..#hhhhhhHHhhhhhhhhhh#..',
+    '..#hhhhhhHhhhhhhhhhhh#..',
+    '..#hhhhHhhhhhhhhhhhhh#..',
+    '..#hhhhhhhhhhhhhhhhhh#..',
+    '..#hssssssssssssssssh#..',
+    '..#hsssssssssssssssSh#..',
+    '..#hs###ssssssss###sh#..',
+    '..#hsw##wssssssw##wsh#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssssss##ssssssss#..',
+    '..#sssssssdd#ssssssss#..',
+    '..#sssssshhhhhhssssss#..',
+    '..#ssssss######ssssss#..',
+    '..#ssssssssssssssssss#..',
+    '...#ssssssssssssssss#...',
+    '...#ssssssssssssssss#...',
+    '....##ssssssssssss##....',
+    '......############......',
+    '.........#ssss#.........',
+  ],
+
+  // Seo Mi-rae, diciannove anni, il 피시방 di Hongdae. **I capelli lunghi sono la sua
+  // faccia**: la frangia dritta a tutta fronte e due ciocche lisce che scendono ai lati
+  // fino al mento, quindi il volto è più stretto di tutti gli altri del cast — a questa
+  // scala è la prima cosa che si legge. Il fermaglio (`a`, il ciano delle sue cuffie e dei
+  // suoi monitor) sta sulla ciocca di destra. Le cuffie al collo non sono nella griglia:
+  // le mette il pannello, perché stanno sul corpo.
+  mirae: [
+    '........................',
+    '......############......',
+    '....##hhhhhhhhhhhh##....',
+    '...#hhhhhhhhhhhhhhhh#...',
+    '..#hhhhhhhHHhhhhhhhhh#..',
+    '..#hhhhhhhhhhhhhhhhhh#..',
+    '..#hhhhhhhhhhhhhhhahh#..',
+    '..#hhhhhhhhhhhhhhhhhh#..',
+    '..#hhhhhhhhhhhhhhhhhh#..',
+    '..#hhsssssssssssssshh#..',
+    '..#hhsssssssssssssShh#..',
+    '..#hh###ssssssss###hh#..',
+    '..#hhw##wssssssw##whh#..',
+    '..#hhsssssssssssssshh#..',
+    '..#hhssssss##sssssshh#..',
+    '..#hhsssssdd#sssssshh#..',
+    '..#hhsssssssssssssshh#..',
+    '..#hhssss######sssshh#..',
+    '..#hhsssssssssssssshh#..',
+    '...#hhsssssssssssshh#...',
+    '...#hhsssssssssssshh#...',
+    '....##hssssssssssh##....',
+    '......############......',
+    '.........#ssss#.........',
+  ],
 };
 
 // --- le tinte ------------------------------------------------------------------
@@ -412,6 +543,46 @@ export const CAST = {
     // di corsia è quello che lo separa dal letto.
     coat: '#dbe1ea', coatHi: '#f1f4f9', shirt: '#93a8bd', pants: '#39424f',
     accent: '#5fe0a8', build: 9, name: 'Jeong Han-su',
+  },
+
+  pyo: {
+    head: 'pyo',
+    hair: '#aeabb8', hairHi: '#e4e2ea',
+    // Il gilet giallo del Bue Giallo: sul fondo scuro di una tenda è la sola
+    // macchia calda del pannello, ed è quello che deve fare.
+    coat: '#b8942f', coatHi: '#d9b64a', shirt: '#efe9d8', pants: '#3a3a44',
+    accent: '#7a5a14', build: 13, name: 'Pyo Man-deok',
+  },
+  bambino: {
+    head: 'bambino',
+    hair: '#1f1a24', hairHi: '#3b3346',
+    coat: '#e8d58a', coatHi: '#f5e6a6', shirt: '#fff4d8', pants: '#b9c4d6',
+    // Il rosa delle guance (`a` nella griglia), e della cintura della tutina.
+    accent: '#e79a9a', build: 4, name: 'Bambino',
+  },
+  kumangi: {
+    head: 'kumangi',
+    hair: '#1c1824', hairHi: '#4a4458',
+    coat: '#6b5a3a', coatHi: '#85734d', shirt: '#e9eaf0', pants: '#2b2b33',
+    accent: '#c2384a', build: 11, name: 'Ku Man-gi',
+  },
+  mirae: {
+    head: 'mirae',
+    hair: '#1e1a2c', hairHi: '#4a4163',
+    // La felpa. Grigio-blu come i monitor spenti: sul fondo scuro di un 피시방 la distingue
+    // dal bomber nero di Jae-min, e il ciano dell'accento è quello delle cuffie.
+    coat: '#34465c', coatHi: '#4a6180', shirt: '#cfd8e4', pants: '#1f2430',
+    accent: '#38d6ff', build: 7, name: 'Seo Mi-rae',
+  },
+  // L'altro Jae-min (M8). Stessa testa, stessi capelli, **stesso bomber**: è il punto, e in
+  // un pannello si distingue da una cosa sola — la mano destra in tasca (`figure`, `pocket`).
+  // Non lo si vede mai in faccia: il copione lo tiene di spalle o a mezzo busto di nuca, e la
+  // sua faccia è quella del giocatore.
+  dulchae: {
+    head: 'jaemin',
+    hair: '#241f2e', hairHi: '#453d55',
+    coat: '#232a35', coatHi: '#333d4c', shirt: '#c9ced8', pants: '#1d212a',
+    accent: '#c2384a', build: 10, name: 'Dulchae',
   },
 };
 
@@ -565,11 +736,14 @@ export const FIGURE_UNITS = 50;  // testa + corpo in piedi
  * Un personaggio intero. `groundY` è dove poggiano i piedi; `k` la scala di una
  * cella (`unitScale`). `crop` taglia il corpo a una certa cella, e serve ai mezzi
  * busti: un primo piano che finisce nel nulla è meglio di un primo piano con due
- * gambe schiacciate in fondo.
+ * gambe schiacciate in fondo. `pocket` (-1 sinistra, +1 destra dello schermo) mette quella
+ * mano in tasca: è la sola cosa che distingue Dulchae da Jae-min.
  */
 export function figure(P, id, cx, groundY, k, pose = 'stand', opts = {}) {
-  const { mood = 'fermo', flip = false, coat = null, crop = FIGURE_UNITS, dim = 0, rim = true } = opts;
-  const spec = CAST[id];
+  const { mood = 'fermo', flip = false, coat = null, crop = FIGURE_UNITS, dim = 0, rim = true, pocket = 0 } = opts;
+  // `accent` ridipinge la cravatta e la banda sulla schiena: per Dong-hyeok è il colore
+  // della cicatrice, e su un bomber diventa una striscia chiara di mezzo pannello.
+  const spec = opts.accent ? { ...CAST[id], accent: opts.accent } : CAST[id];
   const topY = groundY - crop * k;
   const ox = Math.round(cx - (HEAD_UNITS * k) / 2);
   const oy = Math.round(topY);
@@ -611,6 +785,13 @@ export function figure(P, id, cx, groundY, k, pose = 'stand', opts = {}) {
       put(x + side * 2, NECK - 1, 2, 5, jacketHi);
       put(x + side * 4, NECK - 4, 2, 5, jacketHi);
       put(x + side * 4, NECK - 6, 2, 2, SKIN.s);
+      return;
+    }
+    if (pocket === side) {
+      // La mano in tasca (`dulchae`): il braccio si ferma al fianco e **la mano non c'è** —
+      // al suo posto la bocca scura della tasca. `pocket` è il lato dello schermo (+1 destra).
+      put(x, NECK + 2, 2, 9, jacketHi);
+      put(x - side, NECK + 10, 4, 3, '#12151c');
       return;
     }
     const len = pose === 'lean' ? 10 : 12;

@@ -40,8 +40,11 @@ src/world/
                       del corridoio, autostrada Gyeongbu, aree di servizio
   regions.js          chiusura comune: carreggiata, ingressi metro, indici, limiti
   seoul_expansion.js  landmark reali, cintura metropolitana e 16 stazioni della capitale
-  busan.js            generatore autonomo: baia, Nakdong, ponti e tessuto urbano di Busan
-  jeju.js             generatore autonomo: profilo insulare, Hallasan, campagne e due città
+  busan.js            generatore autonomo: cuneo costiero, monti, porto, baia di Suyeong, luoghi dell'Atto III (§5.41)
+  jeju.js             generatore autonomo: isola a costa rugosa, Hallasan, strada costiera ad anello, due città (§5.41)
+  coastmask.js        maschera terra/acqua da poligoni + distanza dalla riva (Busan, Jeju)
+  netgen.js           reti stradali da tracciati assiali, `staircase`, isolati dallo spazio libero
+  regionkit.js        edifici, isolati, vetrine, landmark comuni a Busan e Jeju
   roadclearance.js    ingombro della carreggiata e ricerca delle linee attive più vicine
   daycycle.js         orologio, tabella della luce ora per ora, meteo a catena di Markov
   interiors.js        catalogo delle attività (con gli orari) + pianta di ogni piano
@@ -100,7 +103,9 @@ src/story/
   intro.js            «12년», i 28 pannelli dell'apertura e il passaggio di consegne
   places.js           dove succedono le cose: la storia non piazza indirizzi, li cerca
   m1.js … m4.js       una missione per file: le sue fasi e i suoi pannelli
-  r1.js               il raccordo che chiude l'Atto I: una missione con una fase sola
+  m5.js, m6.js        l'Atto II, prima metà: tre cortili da contare, la torre e i faldoni (§5.40)
+  r1.js, r2.js        i raccordi: una missione con una fase sola e i suoi pannelli
+  visite.js           le «visite che cambiano»: un punto fisso, non di fase (Jo dopo M6)
   hospital.js         il 병원 «성심»: una battuta a ogni morte, e quattro pannelli
   kkachi.js           quello che 까치 dice e quando: le chiamate e le righe di servizio
 
@@ -427,6 +432,16 @@ regole della campagna sono cablate lì e non nelle missioni — **un blip solo**
 cutscene non si rivede mai** (`seen`, che sta nel salvataggio). Nel salvataggio va la *posizione*
 nella storia, non la storia: ~122 byte, e il ripristino **rientra nella fase** invece di saltarla.
 
+**Non tutto quello che la storia fa sta in una fase** (§5.40). Un personaggio che risponde in modo
+diverso a seconda di quanto la storia è avanzata (Jo dopo M6) è lì **sempre**, con una missione in
+corso o senza: `MissionSystem.standing(p)` è un punto interattivo **fuori dalle fasi**, che non si
+smonta al cambio e ha un `when(game)` che dice quando vale; e `MissionSystem.afterRestore(fn)` rifà
+dopo ogni caricamento quello che `prepare` — che gira solo per la missione in corso — non rifà più:
+una definizione di attore nata in una missione finita non sopravvive a un salvataggio. Sono le due
+cose che servono anche alle visite di Chun-sik e del commesso. Il resto del bus ha guadagnato un
+evento, `vehicleSold(v, place, price)`, da cui M5 conta le auto portate via a un cortile: **la
+missione ascolta, il sistema dei cortili (`turfs.claim`) decide chi è il padrone**.
+
 **Chi segue qualcuno e chi porta qualcosa non sono missioni: sono due sistemi** (§5.33).
 `core/tail.js` tiene **due** serbatoi — «l'hai perso» e «ti ha visto» — e quando uno arriva in
 fondo manda `tailLost` o `tailSpotted` sul bus: cosa voglia dire lo decide la missione, che in M3
@@ -439,6 +454,16 @@ il blip: due vorrebbero dire un inventario e un elenco di bersagli, cioè due co
 non ha. Sotto, il traffico ha imparato una cosa sola in più: un'auto della storia può ricevere
 **una meta** (`traffic.sendTo`, l'A* del §5.30 calcolato una volta) e a ogni incrocio prendere
 l'arco che ci porta, invece di scegliere a caso come tutte le altre.
+
+**Una stanza di scena non cambia la città** (§5.42). M7 e M8 chiedono due posti che Seoul non ha — una
+cella percorribile e un cortile cieco — e **nessuno dei due è una vetrina nuova nella generazione**
+(`jail` e `yard` stanno in `BUSINESSES` con `where: 'story'`, in nessuna riga di `DISTRICT_MIX`: l'rng non
+si sposta). La cella è una vetrina **inventata** (`id: 'm7-cella'`) davanti al punto del commissariato;
+il cortile sta dietro una porta **vera** di Myeongdong via `shops.stageShop(id, alt)`: stesso `id`, altra
+pianta, cache sotto `stage:<id>`, e `unstage` ripristina quella di prima. Una fase può prendersi l'arresto
+(`phase.busted(ctx)`) invece di rientrare, e nascondere il proprio riquadro (`phase.quiet`). Chi cammina
+in una scena a piedi usa lo stato `goto` dei pedoni (una fila di punti, `p.goto.arrived`) e `tail.begin` accetta
+un pedone: le soglie le passa la missione.
 
 **Un dialogo non è una cutscene: è la stessa scena, ferma** (§5.29). Metà del copione delle
 missioni sono scambi di due righe *nel posto in cui succedono*, e coprire quel posto con una
@@ -534,6 +559,20 @@ stop-and-go); `boxBlocked` dice se **oltre** l'incrocio c'è posto per tutta la 
 turno**, e vale solo dove non c'è semaforo — dove c'è, il turno lo assegna già la lanterna e
 sommarci una prenotazione ferma chi ha il verde. Ognuna di queste, da sola, produce uno stallo:
 servono tutte e tre, più il limite di tempo che le sblocca (§5.10).
+
+**La strada reagisce (§5.36).** Due canali, scelti per costare quasi niente. Le **sirene** sono
+uno *stato* e non un evento: `TrafficSystem.update` e `PedestrianSystem.update` raccolgono a ogni
+frame, ognuno per conto suo, le volanti a sirena in moto (`siren`, `driver === 'cop'`, non
+`blockCar` né `deployed`), e chi guida o cammina le guarda per distanza. Il **clacson** è un
+*evento*: `game.emit('honk', veicolo)` (tasto H e frenata davanti al giocatore a piedi), e
+`pedSystem.hearHonk` risponde interrogando `pedGrid` — niente giro su tutti i pedoni. Ogni
+comportamento ha il suo interruttore in un oggetto esportato (`traffic.YIELD.on`,
+`pedestrians.PED_TUNE.react` e `.crossSmart`), che una scena cambia a runtime per confrontare.
+**Invariante nuovo:** la valvola anti-incastro dei pedoni misura lo *spostamento*, non la velocità,
+e la spinta fuori da una lamiera toglie anche la componente di velocità contro
+(`pedestrians.pushOutOfCars`): senza, chi è incastrato corre sul posto per sempre. Chi ha un
+compito (`errand`) si sposta di lato per 1,2 s quando si incastra, perché l'ordine di `life`
+punta sempre lo stesso punto e non sa di muri.
 
 **Inseguimento senza pathfinding.** A ogni nodo `police.chooseEdge` prende l'arco il cui
 estremo lontano è più vicino al bersaglio (greedy, dieci confronti). Su una maglia ortogonale

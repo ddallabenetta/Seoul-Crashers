@@ -1,0 +1,282 @@
+// La strada reagisce (§5.36): tre misure prese **dall'esterno**, così la stessa scena gira
+// uguale sull'albero di partenza (dove niente reagisce) e su quello nuovo.
+//
+//   node .claude/tools/probe.mjs --seconds 0 --quiet --script .claude/tools/scenes/sirene.scene
+//
+//   volante   una volante a sirena accesa percorre un tratto di arteria in cui stanno delle
+//             berline lente (target 70 px/s, tre per corsia sulle due corsie). Si misura il
+//             tempo e la velocità media del tratto, il danno preso e quante berline si sono
+//             scostate (laneF > 0,5 o offset a destra) al momento del passaggio. Sull'albero
+//             nuovo si misura due volte, con `YIELD.on` spento e acceso, sugli stessi tratti.
+//   pedoni    quattro zone: attraversamenti partiti, arrivati dall'altra parte, tornati
+//             indietro a metà, e campioni di passanti fermi in carreggiata
+//   clacson   un clacson a 90 px da una trentina di passanti, contro un controllo senza
+//             clacson: quanti hanno cambiato rotta o passo entro un secondo
+//
+// Il tempo è quello di gioco (`game.time`), non l'orologio: due scene in parallelo sulla
+// stessa macchina non si falsano a vicenda come con i teletrasporti a tempo di muro.
+const { createVehicle } = await import('/src/entities/vehicle.js');
+const { lanePoint, canPass } = await import('/src/world/roadgraph.js');
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const traffic = await import('/src/entities/traffic.js');
+const pedMod = await import('/src/entities/pedestrians.js');
+const YIELD = traffic.YIELD || null;
+const PED = pedMod.PED_TUNE || null;
+const graph = game.city.graph;
+
+const out = {};
+const tp = (x, y) => { game.player.x = x; game.player.y = y; game.player.vx = 0; game.player.vy = 0; game.camera.snapTo(x, y); };
+
+// ---------------------------------------------------------------- volante
+// Gli archi di arteria più lunghi e più vicini al punto di partenza: stesso elenco
+// per tutti gli alberi, perché la maglia è deterministica.
+const near = graph.edges.filter((e) => e.arterial && e.len >= 560)
+  .sort((a, b) => Math.hypot((a.ax + a.bx) / 2 - game.player.x, (a.ay + a.by) / 2 - game.player.y)
+    - Math.hypot((b.ax + b.bx) / 2 - game.player.x, (b.ay + b.by) / 2 - game.player.y))
+  .slice(0, 5);
+
+async function trial(edge, dir) {
+  const mx = (edge.ax + edge.bx) / 2, my = (edge.ay + edge.by) / 2;
+  tp(mx, my + 260);
+  await wait(900);
+  tp(mx, my);
+  const A = 110, B = Math.min(edge.len - 110, 110 + 560);  // il tratto finisce 130 px dopo l'ultima berlina: oltre si misurerebbero gli incroci, non il passaggio
+  const cars = [];
+  // Berline lente: lasciano due corsie piene davanti alla volante.
+  const lanes = [0, 1, 0, 0, 1];
+  lanes.forEach((lane, i) => {
+    const s = A + 130 + i * 75;
+    if (s > B - 20) return;
+    const pt = lanePoint(edge, dir, lane, s, {});
+    const v = createVehicle('sedan', pt.x, pt.y, pt.angle, i);
+    v.driver = 'ai';
+    v.ai = { edge, dir, lane, s, target: 70, nextChoice: null, waitT: 0, jamT: 0, recoverT: 0,
+      recoverSteer: 0, aggression: 1, honkT: 0, startLane: lane };
+    v.speed = 60; v.vx = Math.cos(pt.angle) * 60; v.vy = Math.sin(pt.angle) * 60;
+    game.vehicles.push(v);
+    cars.push(v);
+  });
+  const p0 = lanePoint(edge, dir, 0, A, {});
+  const cop = createVehicle('police', p0.x, p0.y, p0.angle, 0);
+  cop.driver = 'cop'; cop.copUnit = true; cop.siren = true; cop.protect = true; cop.crew = 2;
+  cop.speed = 160; cop.vx = Math.cos(p0.angle) * 160; cop.vy = Math.sin(p0.angle) * 160;
+  cop.copAi = { edge, dir, lane: 0, s: A, jamT: 0, recoverT: 0, recoverSteer: 1, fireT: 99 };
+  game.vehicles.push(cop);
+  const goal = lanePoint(edge, dir, 0, B + 40, {});
+  const sOf = (v) => dir > 0 ? (v.x - edge.ax) * edge.dx + (v.y - edge.ay) * edge.dy
+    : (edge.bx - v.x) * edge.dx + (edge.by - v.y) * edge.dy;
+  const offOf = (v) => dir > 0 ? (v.x - edge.ax) * -edge.dy + (v.y - edge.ay) * edge.dx
+    : (v.x - edge.bx) * edge.dy + (v.y - edge.by) * -edge.dx;
+  const t0 = game.time;
+  let last = game.time, hp0 = cop.hp, passed = 0, minSp = 999, shifted = 0, seenPass = new Set();
+  let stopT = 0;
+  while (game.time - t0 < 22 && sOf(cop) < B) {
+    await new Promise((r) => requestAnimationFrame(r));
+    const dt = Math.min(0.05, game.time - last); last = game.time;
+    if (dt <= 0) continue;
+    game.police.followRoads(cop, dt, game, goal.x, goal.y);
+    if (Math.abs(cop.speed) < 12) { stopT += dt; if (stopT > 1.6) { stopT = 0; cop.copAi.recoverT = 0.9; } } else stopT = 0;
+    if (cop.copAi.recoverT > 0) { cop.copAi.recoverT -= dt; cop.throttle = -0.6; cop.steer = cop.copAi.recoverSteer; }
+    minSp = Math.min(minSp, Math.abs(cop.speed));
+    for (const c of cars) {
+      if (seenPass.has(c.id)) continue;
+      if (sOf(cop) > sOf(c)) {
+        seenPass.add(c.id); passed++;
+        // Scostata: più a destra della sua corsia, o passata nell'altra corsia.
+        const base = c.ai.startLane === 0 ? 18 : 54;
+        if (offOf(c) - base > 8 || (c.ai.startLane === 0 && offOf(c) > 36)) shifted++;
+      }
+    }
+  }
+  const dt = game.time - t0;
+  const dist = sOf(cop) - A;
+  const res = {
+    t: +dt.toFixed(1), kmh: +(dist / Math.max(0.1, dt)).toFixed(0), arrivata: sOf(cop) >= B,
+    sorpassate: passed, scostate: shifted, minVel: +minSp.toFixed(0), danno: Math.round(hp0 - cop.hp),
+    hpCivili: Math.round(cars.reduce((a, c) => a + (c.maxHp - c.hp), 0)),
+  };
+  for (const v of [cop, ...cars]) { const i = game.vehicles.indexOf(v); if (i >= 0) game.vehicles.splice(i, 1); }
+  await wait(1500);
+  return res;
+}
+
+async function runTrials(label) {
+  const rows = [];
+  near.forEach((e, i) => { e.__i = i; });
+  for (const e of near) if (window.__EDGE == null || window.__EDGE === e.__i) rows.push(await trial(e, 1));
+  const ok = rows.filter((r) => r.arrivata);
+  const avg = (k) => +(rows.reduce((a, r) => a + r[k], 0) / rows.length).toFixed(1);
+  out[label] = {
+    prove: rows.length, arrivate: ok.length, tempoMedio: avg('t'), velMedia: avg('kmh'),
+    minVelMedia: avg('minVel'), danniVolante: avg('danno'), danniCivili: avg('hpCivili'),
+    sorpassate: avg('sorpassate'), scostate: avg('scostate'), righe: rows,
+  };
+}
+// `window.__SOLO = 'volante' | 'pedoni' | 'clacson'` (con uno script di una riga davanti) fa
+// girare una parte sola.
+const SOLO = window.__SOLO || null;
+if (!SOLO || SOLO === 'volante') {
+  if (YIELD) {
+    YIELD.on = false;
+    if (!window.__SOLOON) await runTrials('volante_spento');
+    YIELD.on = true;
+    await runTrials('volante_acceso');
+  } else {
+    await runTrials('volante');
+  }
+}
+
+// ---------------------------------------------------------------- pedoni
+if (PED) PED.crossSmart = true;
+const zones = [
+  { x: game.player.x, y: game.player.y },
+  ...game.city.hospitals.slice(0, 3).map((h) => ({ x: h.x, y: h.y })),
+];
+const st = { partiti: 0, arrivati: 0, tornati: 0, tornatiAMezzo: 0, tornatiPerPanico: 0, campioni: 0, fermiInStrada: 0, inStrada: 0,
+  arteriaPartiti: 0, arteriaArrivati: 0, arteriaTornatiAMezzo: 0, camminandoInStrada: 0,
+  alSemaforo: 0, colVerdeAlleAuto: 0 };
+// La strada che sta per essere attraversata è un'arteria? L'asse delle strade attraversate è
+// perpendicolare alla direzione di marcia del pedone.
+const crossesArterial = (p) => {
+  const horiz = Math.abs(p.crossX - p.x) > Math.abs(p.crossY - p.y);
+  return game.city.graph.edgesNear(p.x, p.y, 140).some((e) => e.arterial && e.axis === (horiz ? 'v' : 'h'));
+};
+for (const z of (SOLO && SOLO !== 'pedoni' ? [] : zones)) {
+  tp(z.x, z.y);
+  await wait(6000);
+  const start = new Map();   // id -> blocco di partenza
+  const prev = new Map();    // id -> stato
+  const t0 = game.time;
+  while (game.time - t0 < 18) {
+    await wait(100);
+    for (const p of game.peds) {
+      if (p.dead) continue;
+      st.campioni++;
+      const was = prev.get(p.id);
+      if (p.state === 'crossing' && was !== 'crossing') {
+        const art = crossesArterial(p);
+        st.partiti++;
+        // Parte mentre le auto della strada che attraversa hanno via libera? Il semaforo è quello
+        // dell'incrocio più vicino (entro 170 px), lo stesso che guarda `crossingVerdict`.
+        let node = null, bd = 170 * 170;
+        for (const e of game.city.graph.edgesNear(p.x, p.y, 170)) {
+          for (const id of [e.a, e.b]) {
+            const n = game.city.graph.nodeById(id);
+            const d2 = (n.x - p.x) ** 2 + (n.y - p.y) ** 2;
+            if (d2 < bd) { bd = d2; node = n; }
+          }
+        }
+        if (node && node.signal) {
+          st.alSemaforo++;
+          const axis = Math.abs(p.crossX - p.x) > Math.abs(p.crossY - p.y) ? 'v' : 'h';
+          if (canPass(node, axis, game.time)) st.colVerdeAlleAuto++;
+        }
+        if (art) st.arteriaPartiti++;
+        start.set(p.id, { block: p.block, art });
+      }
+      if (was === 'crossing' && p.state !== 'crossing') {
+        const si = start.get(p.id);
+        if (si && p.block !== si.block) { st.arrivati++; if (si.art) st.arteriaArrivati++; }
+        else {
+          st.tornati++;
+          // Tornato indietro **a metà carreggiata** è il difetto delle arterie (§5.36);
+          // tornato dal cordolo è una rinuncia innocua.
+          if (game.city.isOnRoad(p.x, p.y) && !(p.panic > 0 || p.state === 'flee')) {
+            st.tornatiAMezzo++;
+            if (si && si.art) st.arteriaTornatiAMezzo++;
+          }
+          if (p.panic > 0 || p.state === 'flee') st.tornatiPerPanico++;
+        }
+        start.delete(p.id);
+      }
+      prev.set(p.id, p.state);
+      if (game.city.isOnRoad(p.x, p.y)) {
+        st.inStrada++;
+        if (p.state === 'crossing' || p.state === 'walk' || p.state === 'flee') st.camminandoInStrada++;
+        if (Math.hypot(p.vx, p.vy) < 5 && (p.state === 'crossing' || p.state === 'walk' || p.state === 'flee')) st.fermiInStrada++;
+      }
+    }
+  }
+}
+// Quanto si sta in carreggiata a ogni traversata conclusa: è l'esposizione al traffico.
+st.campioniInStradaPerTraversata = +(st.camminandoInStrada / Math.max(1, st.arrivati + st.tornati)).toFixed(1);
+st.fermiInStradaPer1000 = +(st.fermiInStrada * 1000 / Math.max(1, st.campioni)).toFixed(2);
+out.pedoni = st;
+
+// ---------------------------------------------------------------- clacson
+// Controllo e prova sullo stesso posto: la rotta dei passanti cambia di suo ogni tanto
+// (angoli, soste), quindi conta la differenza.
+// Si contano solo i passanti **vicini** (entro 130 px dal clacson, dove la reazione è la
+// più forte): chi camminava e si è fermato o ha girato di spalle, chi attraversava e ha
+// invertito o accelerato. Il controllo dice quanti lo fanno comunque in 1,2 s.
+function snapshot(set, car) {
+  return set.filter((p) => Math.hypot(p.x - car.x, p.y - car.y) < 130)
+    .map((p) => ({ p, a: Math.atan2(p.vy, p.vx), s: Math.hypot(p.vx, p.vy), st: p.state }));
+}
+// La reazione è un battito (si ferma mezzo secondo e riparte): si guarda **in ogni istante**
+// della finestra, non solo alla fine.
+async function watchChanged(snap, ms, car) {
+  const hit = new Set();
+  const faced = new Set();   // chi si è voltato verso il clacson restando fermo: la reazione di §5.36
+  for (let t = 0; t < ms; t += 100) {
+    await wait(100);
+    for (const s of snap) {
+      if (s.p.dead || s.p.gone) continue;
+      let toCar = Math.abs(s.p.angle - Math.atan2(car.y - s.p.y, car.x - s.p.x)) % (2 * Math.PI);
+      if (toCar > Math.PI) toCar = 2 * Math.PI - toCar;
+      if (s.p.state === 'idle' && toCar < 0.4 && s.st !== 'idle') faced.add(s);
+      if (hit.has(s)) continue;
+      const a = Math.atan2(s.p.vy, s.p.vx), sp = Math.hypot(s.p.vx, s.p.vy);
+      let da = Math.abs(a - s.a); if (da > Math.PI) da = 2 * Math.PI - da;
+      if ((s.s > 25 && sp < 8) || (s.s > 12 && sp > 12 && da > 1.5)
+        || (s.st === 'crossing' && s.p.state === 'crossing' && sp > s.s * 1.25)) hit.add(s);
+    }
+  }
+  return { cambiati: hit.size, voltati: faced.size };
+}
+const honk = { prove: [], controllo: [] };
+const crowded = () => {
+  // Il passante con più vicini entro 150 px, fra quelli a portata di schermo.
+  let best = null, bn = -1;
+  const cand = game.peds.filter((p) => !p.dead && !p.cop && p.state !== 'errand'
+    && Math.hypot(p.x - game.player.x, p.y - game.player.y) < 600);
+  for (const p of cand) {
+    let n = 0;
+    for (const o of cand) if (Math.hypot(o.x - p.x, o.y - p.y) < 150) n++;
+    if (n > bn) { bn = n; best = p; }
+  }
+  return best;
+};
+for (let k = 0; k < (SOLO && SOLO !== 'clacson' ? 0 : SOLO ? 14 : 8); k++) {
+  // Due prove per zona: la seconda a folla già rimescolata, senza ripagare l'attesa dello streaming.
+  if (k % 2 === 0) {
+    const z = zones[(k >> 1) % zones.length];
+    tp(z.x, z.y);
+    await wait(9000);
+  } else await wait(2500);
+  for (const mode of ['controllo', 'prova']) {
+    const c = crowded();
+    if (!c) continue;
+    const set = game.peds.filter((p) => !p.dead && !p.cop && p.state !== 'errand'
+      && Math.hypot(p.x - c.x, p.y - c.y) < 240).slice(0, 40);
+    // Il clacson parte da un'auto fantasma accanto al passante: nessuna fisica, solo la posizione.
+    const car = createVehicle('sedan', c.x + 50, c.y, 0, 0);
+    car.driver = 'ai';
+    const snap = snapshot(set, car);
+    if (mode === 'prova') {
+      game.audio?.honk(car);
+      game.emit('honk', car);
+    }
+    const w = await watchChanged(snap, 1500, car);
+    (mode === 'prova' ? honk.prove : honk.controllo).push({ n: snap.length, cambiati: w.cambiati, voltati: w.voltati });
+    await wait(1500);
+  }
+}
+const sum = (a, k) => a.reduce((s, r) => s + r[k], 0);
+out.clacson = {
+  passanti: sum(honk.prove, 'n'), cambiatiConClacson: sum(honk.prove, 'cambiati'), voltatiConClacson: sum(honk.prove, 'voltati'),
+  passantiControllo: sum(honk.controllo, 'n'), cambiatiControllo: sum(honk.controllo, 'cambiati'), voltatiControllo: sum(honk.controllo, 'voltati'),
+  quotaConClacson: +(sum(honk.prove, 'cambiati') / Math.max(1, sum(honk.prove, 'n'))).toFixed(2),
+  quotaControllo: +(sum(honk.controllo, 'cambiati') / Math.max(1, sum(honk.controllo, 'n'))).toFixed(2),
+};
+return out;

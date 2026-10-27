@@ -173,16 +173,19 @@ export class Scene {
     }
     const flying = this._fq;
     flying.length = 0;
+    const under = [];
     for (const v of game.vehicles) {
       if (v.x < view.x || v.x > view.x + view.w || v.y < view.y || v.y > view.y + view.h) continue;
       if (airborne(v)) { flying.push(v); continue; }
+      // Una barca sotto un ponte (§5.41) passa dietro l'impalcato, non sopra.
+      if (city.underDeck && VEHICLE_TYPES[v.kind]?.marine && city.underDeck(v.x, v.y)) { under.push(v); continue; }
       list.push({ t: 2, o: v, d: (v.x - ccx) ** 2 + (v.y - ccy) ** 2 });
     }
     for (const p of game.peds) {
       if (p.x < view.x || p.x > view.x + view.w || p.y < view.y || p.y > view.y + view.h) continue;
       list.push({ t: 3, o: p, d: (p.x - ccx) ** 2 + (p.y - ccy) ** 2 });
     }
-    if (game.player.onFoot) {
+    if (game.player.onFoot && !game.arrest.hidden) {
       list.push({ t: 4, o: game.player, d: (game.player.x - ccx) ** 2 + (game.player.y - ccy) ** 2 });
     }
     if (game.pickups) {
@@ -200,6 +203,7 @@ export class Scene {
 
     list.sort((a, b) => b.d - a.d);
 
+    if (under.length) this.drawUnderDeck(ctx, cam, game, under);
     for (const item of list) {
       switch (item.t) {
         case 0: this.drawBuilding(ctx, item.o, cam, game); break;
@@ -229,6 +233,24 @@ export class Scene {
     // disegnato. È l'unico modo di illuminare una città fatta di tile cachati
     // da 512 px senza rigenerarli a ogni minuto di orologio.
     this.drawLight(ctx, game);
+  }
+
+  /**
+   * Le barche sotto un impalcato: si disegnano e poi si ridipinge il terreno ritagliato
+   * sul rettangolo del ponte, così l'impalcato (e i suoi piloni) le copre. Le auto e i
+   * pedoni sul ponte stanno nella fila ordinata, che viene dopo.
+   */
+  drawUnderDeck(ctx, cam, game, boats) {
+    for (const v of boats) this.drawVehicle(ctx, v, cam, game);
+    for (const b of this.city.bridges) {
+      if (!boats.some((v) => v.x > b.x - 60 && v.x < b.x + b.w + 60 && v.y > b.y - 60 && v.y < b.y + b.h + 60)) continue;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(b.x, b.y, b.w, b.h);
+      ctx.clip();
+      this.ground.draw(ctx, cam);
+      ctx.restore();
+    }
   }
 
   drawLight(ctx, game) {
@@ -892,7 +914,9 @@ export class Scene {
     const ox = (p.x - cam.cx) * f;
     const oy = (p.y - cam.cy) * f;
     const frame = p.dead ? 0 : Math.floor(p.animT) % PED_FRAMES;
-    const spr = getPedSprite(p.kind, p.colorIndex, frame);
+    // `look: 'hero'` è l'altro Jae-min (M8): lo stesso sprite del giocatore, con la mano
+    // destra in tasca. È l'unico che porta la banda rossa nella folla.
+    const spr = p.look === 'hero' ? getHeroSprite(frame, 'pocket', 0) : getPedSprite(p.kind, p.colorIndex, frame);
     // Chi ce l'ha con te va riconosciuto al volo: nella folla un teppista nero
     // è identico a un passante finché non ti spara.
     if ((p.hostile || p.cop) && !p.dead) {
@@ -1066,8 +1090,9 @@ export class Scene {
     const oy = (pl.y - cam.cy) * f;
     const frame = pl.dying ? 0 : Math.floor(pl.animT) % PED_FRAMES;
     // Con un'arma da fuoco in pugno la posa cambia: braccia tese verso il mirino.
-    const aiming = !pl.dying && !WEAPONS[pl.weapon].melee;
-    const spr = getHeroSprite(frame, aiming ? 'aim' : 'walk', pl.outfit);
+    const cuffed = !!game?.arrest.active;
+    const aiming = !pl.dying && !cuffed && !WEAPONS[pl.weapon].melee;
+    const spr = getHeroSprite(frame, cuffed ? 'cuffed' : aiming ? 'aim' : 'walk', pl.outfit);
     ctx.save();
     ctx.translate(pl.x + ox * 0.7, pl.y + oy * 0.7);
     ctx.rotate(pl.angle);
@@ -1077,7 +1102,7 @@ export class Scene {
     }
     ctx.drawImage(spr.canvas, -spr.w / 2, -spr.h / 2, spr.w, spr.h);
     // L'arma va sopra la sagoma, non sotto: è quello che si deve leggere per primo.
-    if (!pl.dying) drawHeldWeapon(ctx, pl.weapon, game ? game.time * 34 * pl.spin : 0);
+    if (!pl.dying && !cuffed) drawHeldWeapon(ctx, pl.weapon, game ? game.time * 34 * pl.spin : 0);
     ctx.restore();
   }
 

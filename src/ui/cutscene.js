@@ -1,7 +1,7 @@
 // Il lettore di pannelli.
 //
 // Non sa niente di quale storia sta raccontando: riceve una sequenza (un array di
-// `{ id, draw(P), hold?, music? }`) e la mostra. La cutscene iniziale è la prima
+// `{ id, draw(P), hold?, music?, sfx?, bed? }`) e la mostra. La cutscene iniziale è la prima
 // che passa di qui, le dodici missioni useranno lo stesso oggetto.
 //
 // **Si salta sempre**, dal primo avvio: è una decisione presa con l'utente
@@ -17,6 +17,9 @@
 import { panelRect, clipPanel, unclip, hexA, PAPER } from '../render/panelkit.js';
 import { uiLayout, ellipsisText } from './layout.js';
 
+// Regia sonora (§5.37). `bed: { kkachi, sirenFar }` sono letti tenuti finché il pannello
+// è a schermo; `sfx: [{ at, kind, vol }]` sono colpi a `at` secondi dall'inizio del
+// pannello. Un pannello senza i due campi spegne i letti e non suona niente.
 const TRANS = 0.26;        // lo stacco fra due pannelli, in secondi
 // Il salto è più lungo dello stacco normale, e apposta: si esce su un nero pieno
 // invece che su un taglio secco, che è la differenza fra «ho saltato» e «si è rotto».
@@ -34,6 +37,7 @@ export class Cutscene {
     this.pending = -1;
     this.skipped = false;
     this.onDone = null;
+    this.sfxI = 0;         // prossimo colpo del pannello ancora da suonare
   }
 
   /**
@@ -52,7 +56,15 @@ export class Cutscene {
     this.pending = -1;
     this.skipped = false;
     this.onDone = onDone;
+    this.enter(game);
     game.emit('cutsceneStart', id);
+  }
+
+  /** Il pannello corrente prende la parola: letti nuovi, colpi da riprogrammare. */
+  enter(game) {
+    if (this.skipped) return;   // il salto ha già zittito tutto: non riaccendere la rampa lenta
+    this.sfxI = 0;
+    game.audio?.scene(this.panel?.bed || null);
   }
 
   get panel() {
@@ -72,6 +84,11 @@ export class Cutscene {
     if (!this.active) return;
     this.t += dt;
     const input = game.input;
+    const shots = this.panel?.sfx;
+    while (shots && !this.skipped && this.sfxI < shots.length && this.t >= shots[this.sfxI].at) {
+      const s = shots[this.sfxI++];
+      game.audio?.sceneSfx(s.kind, s.vol ?? 1);
+    }
 
     if (this.trans > 0) {
       this.trans -= dt;
@@ -79,6 +96,7 @@ export class Cutscene {
         this.i = this.pending;
         this.pending = -1;
         this.t = 0;
+        this.enter(game);
       }
       if (this.trans <= 0 && this.i >= this.seq.length) this.finish(game, this.skipped);
       return;
@@ -103,6 +121,7 @@ export class Cutscene {
   skip(game) {
     if (this.skipped) return;
     this.skipped = true;
+    game.audio?.sceneStop();
     game.audio?.ui('close');
     this.cut(this.seq.length, SKIP_FADE);
   }
@@ -118,6 +137,7 @@ export class Cutscene {
   finish(game, skipped) {
     if (!this.active) return;
     this.active = false;
+    game.audio?.sceneStop();
     const id = this.id;
     const done = this.onDone;
     this.seq = null;

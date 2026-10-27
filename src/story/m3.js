@@ -22,7 +22,7 @@
 // 한성개발, la paga. La riga di Kkachi che lo dice (`a1-itaewon`) era già scritta
 // nella tappa D e aspettava solo questa missione per avverarsi.
 import { panelPhase } from '../core/missions.js';
-import { findShop, tillPoint } from './places.js';
+import { findShop, findTower, tillPoint, mandaA, arrivata } from './places.js';
 import {
   AMBER, PAPER, BLOOD,
   px, py, flat, wash, vignette, glow, hash,
@@ -51,7 +51,7 @@ function sites(game) {
   // una torre con l'insegna 한성개발»: il parcheggio non esiste come luogo
   // percorribile, la torre sì, e la rampa è la sua porta — è dove la berlina si
   // ferma e dove finisce il pedinamento.
-  const torre = findShop(game, 'office', { district: 'gangnam', near: conv || from });
+  const torre = findTower(game, conv || from);
   M3._sites = { conv, torre };
   return M3._sites;
 }
@@ -78,32 +78,6 @@ function sgombera(game) {
     if (i >= 0) game.vehicles.splice(i, 1);
     M3[key] = null;
   }
-}
-
-/**
- * Un'auto che arriva in un posto. Nasce fuori vista, sulla corsia più vicina a un
- * punto a un paio di isolati di distanza, e ci va davvero (`traffic.sendTo`).
- * Quando le strade non ci arrivano — non succede a Seoul, ma una missione non può
- * dipendere da questo — si restituisce `null` e la fase si chiude lo stesso.
- */
-function mandaA(game, kind, from, to, opts = {}) {
-  const v = game.traffic.spawnScripted(kind, from.x, from.y, game, {
-    lightsOn: true, speed: opts.speed || 120, radius: 900, colorIndex: opts.colorIndex ?? 0,
-  });
-  if (!v) return null;
-  if (!game.traffic.sendTo(v, to.x, to.y, game)) {
-    const i = game.vehicles.indexOf(v);
-    if (i >= 0) game.vehicles.splice(i, 1);
-    return null;
-  }
-  return v;
-}
-
-/** Vera quando l'auto mandata è arrivata, o quando non c'era nessuna auto. */
-function arrivata(v, to) {
-  if (!v) return true;
-  if (v.dead) return true;
-  return !!v.ai?.arrived || Math.hypot(v.x - to.x, v.y - to.y) < 70;
 }
 
 // --- i pannelli -------------------------------------------------------------------

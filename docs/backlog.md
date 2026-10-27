@@ -17,7 +17,7 @@ sigillate, marcatori, testo su più righe). Quello che resta è **contenuto**, i
 | ~~3~~ | ~~**C**~~ | ~~**cortili persistenti** (nel salvataggio, con effetto sul commercio)~~ — **fatta**, §5.31 | — |
 | ~~4~~ | ~~**D**~~ | ~~Kkachi: stazione `91.45`, tabella con predicato, le otto chiamate dell'Atto I e le dodici righe di servizio~~ — **fatta**, §5.32 | — |
 | ~~5~~ | ~~**E**~~ | ~~Atto I completo (M3, M4) + R1~~, e con loro **pedinamento** e **oggetto trasportabile** — **fatta**, §5.33 | — |
-| 6 | **F** | Atto II (M5-M8) + R2, R3 + le otto chiamate dell'Atto II | l'atto che chiede più cose nuove al motore — **è la prossima** |
+| ~~6~~ | ~~**F**~~ | ~~Atto II (M5-M8) + R2, R3 + le otto chiamate dell'Atto II~~ — **fatta**, §5.40 (M5, M6, R2, tre chiamate, Jo) e §5.42 (M7, M8, R3, le altre cinque chiamate, il commesso) | — |
 | 7 | **G** | Atto III (M9-M12) + R4 + le otto chiamate dell'Atto III **e l'incontro facoltativo di Busan** | il viaggio: ha bisogno di tutto quello di prima |
 | 8 | **H** | i tre finali, i titoli di coda, la scena dopo | e a quel punto la Fase 3 è chiusa |
 
@@ -88,14 +88,13 @@ regola che conta: **ogni battuta è copiata da qualcun altro**, e il commento `/
 prova, non una nota.
 
 **Quello che la tappa D lascia indietro:**
-- **la regia sonora dell'apertura** (fruscio di banda sotto la voce che conta, il cane, la
-  sirena lontana). Il timbro del fruscio adesso c'è ed è quello giusto (`audio.beds.kkachi`),
-  quindi resta da fare un **aggancio dei suoni ai pannelli** — `ui/cutscene.js` non ce l'ha — e
-  tre suoni nuovi;
+- ~~la regia sonora dell'apertura~~: **fatta**, §5.37 (campi `bed` e `sfx` sul pannello). Restano
+  senza suono i pannelli di M3 e M4, per scelta;
 - ~~l'ottava chiamata dell'Atto I aspetta M3~~: **fatto**, §5.33 — quella riga adesso esce, e il
   predicato non è stato toccato;
 - **le «visite che cambiano»** (Jo dopo M6, Chun-sik dopo M9, il commesso dopo M8) stanno nello
-  stesso capitolo del copione ma non sono chiamate radio: restano alle tappe delle loro missioni.
+  stesso capitolo del copione ma non sono chiamate radio: restano alle tappe delle loro missioni
+  (Jo: **fatto**, §5.40).
 
 **Cosa la tappa E (§5.33) ha già tolto di mezzo**, e che quindi le tappe F e G non devono più
 affrontare — sono le due meccaniche che M1 e M2 avevano lasciato indietro, più tre cose che sono
@@ -114,13 +113,27 @@ saltate fuori scrivendo l'atto:
   (`actors.die`), che serve a chiunque debba far cadere un personaggio a metà di un'altra cosa.
 
 **Quello che la tappa E lascia indietro:**
-- **Jo che risponde in modo diverso dopo M6** (le «visite che cambiano»,
-  [`storia/07-radio-kkachi.md`](storia/07-radio-kkachi.md)): oggi il banco dice sempre le stesse
-  cose una volta finita M2. È della tappa F, che è quella di M6;
+- ~~**Jo che risponde in modo diverso dopo M6**~~ (le «visite che cambiano»,
+  [`storia/07-radio-kkachi.md`](storia/07-radio-kkachi.md)): **fatto**, §5.40 — e con lei il
+  meccanismo (`missions.standing`, `afterRestore`) per le altre due, che restano alle loro missioni
+  (Chun-sik dopo M9, il commesso dopo M8);
 - **la gru non si scala.** È l'unica cosa del copione di M4 che non si è potuta fare: una quota
   percorribile non c'è, e dalla gru si vede il porto perché la camera si allarga. Il giorno che
   qualcuno vorrà i tetti, quella scena ne è il primo cliente;
 - **un secondo oggetto in mano insieme al primo**, il giorno che una missione ne chiederà due.
+
+**Cosa la tappa T7 (§5.40) lascia alla seconda metà della F.** M5, M6 e R2 non hanno chiesto niente di nuovo
+al motore oltre a **punti fissi** (`missions.standing`: un personaggio che c'è sempre e risponde in modo
+diverso), **un hook dopo il caricamento** (`afterRestore`) e **un evento** (`vehicleSold`). Quello che manca
+per M7 e M8:
+
+- **M7**: l'interno di un commissariato e una cella percorribile, e una missione che chiede di **farsi**
+  arrestare (`busted` c'è, §5.35: la scena della cella è il pezzo mancante);
+- **M8**: un inseguimento «a vista» senza marcatore, un pedinamento **a piedi** (`core/tail.js` vuole un
+  veicolo: `begin` accetta solo quello) e un secondo personaggio con lo sprite del giocatore;
+- **la torre di M6** non sale: l'ottavo e il ventesimo piano sono lo stesso piano, e l'allarme non ha una
+  volante fuori (§5.40, in fondo). Se M7 la vuole, il posto è la fase `allarme` di `story/m6.js`;
+- **un tetto da cui entrare**: la terza strada d'ingresso di M6.
 
 **Rimasto indietro da 까치** (§5.32):
 - **Le chiamate perse non si vedono da nessuna parte.** Il conto c'è (`kkachi.missed`) e per
@@ -134,6 +147,18 @@ saltate fuori scrivendo l'atto:
   regia vera vorrebbe che aspettasse un momento.
 
 ---
+
+## 6.1 — Dopo la vita negli isolati (§5.39)
+
+- **Busan resta sotto Seoul per insegne** (0,29 → ~0,62 per edificio contro ~1,07): solo 364 edifici
+  su 815 hanno un lato strada e quasi tutti avevano già un'insegna. Il resto lo dirà la forma nuova di
+  Busan (T9d): il passo `blocklife` si limita a leggere quello che trova.
+- **Le tipologie dei parchi sono statiche**: niente gente che gioca a basket, niente bancarelle
+  servite. I pedoni non sanno che l'area giochi o il mercato esistono (`life.js` potrebbe dare loro un
+  motivo per andarci).
+- **La campagna del corridoio** (`campagna`, nessun blocco `rural`) non riceve niente: è il lavoro di T9c,
+  e le funzioni di `blocklife` valgono per qualunque blocco con `fields`.
+- **Gli animali** non ci sono: i pascoli hanno recinto e abbeveratoio, non mucche.
 
 ## 6. Backlog successivo (già concordato con l'utente)
 
@@ -163,11 +188,20 @@ prima: il §5.12 ha pagato diciannove voci di questo elenco, il §5.13 ha chiuso
 il §5.21 altre undici — fra cui le due che erano tornate in cima.
 
 **Le cose che si sentono di più, oggi:**
-- **Non ti caricano in volante.** L'arresto c'è (§5.16), ma è uno stacco: manette, nero,
-  commissariato. Vedere l'agente che ti ammanetta e la volante che parte vorrebbe
-  un'animazione e un pezzo di regia della camera. **È la voce più visibile rimasta.**
-- **Nessuno sorpassa.** Sull'arteria le due corsie per senso restano inutilizzate, ed è
-  **l'ultimo debito grosso del traffico** (dettagli più sotto).
+- ~~Non ti caricano in volante.~~ Fatto in §5.35 (`entities/arrest.js`). Resta indietro: nei dieci posti provati la volante
+  arriva sempre, ma i casi lenti (una nascita lontana, 10-11 s) restano; non c'è un pannello a pixel del
+  momento in cui ti caricano.
+- ~~Nessuno sorpassa.~~ Fatto in §5.34 (`traffic.OVERTAKE`): la corsia segue la svolta.
+
+**Scene che a volte falliscono sotto carico** (rilevato nel rework):
+- `atto-1.scene` → `gruSiSale` e `arresto.scene` → `attraversaLeFasi`/`campione9su10` sono falliti una volta ciascuno
+  con la macchina carica di altri probe, e passano alla riprova (tre su tre anche su `main`). Aspettano a tempo
+  di orologio, non di simulazione: vanno portate a passi di `game.loop` prima di farne un controllo di CI.
+
+**Rimasto indietro dalle cuciture** (§5.38):
+- **Fra l'ultimo isolato di Seoul e il prato resta una striscia di terra scura** (~150 px a zoom 1, a sud e a est):
+  la sfumatura parte da `GROUND_RIM` px dentro il confine dell'area, non dal bordo dell'ultimo isolato. Va
+  ancorata agli isolati di bordo: è naturale farlo in T9c, che su quel bordo prolunga i viali in provinciali.
 
 **Rimasto indietro dai cortili** (§5.31):
 - **Le guardie del cortile tuo non sono tue.** Ci stanno e non ti sparano, ma non ti seguono,
@@ -257,18 +291,27 @@ il §5.21 altre undici — fra cui le due che erano tornate in cima.
 - **La granata è solo della SWAT e solo a cinque stelle**: niente lanci dal finestrino.
 
 **Rimasto indietro dal traffico** (§5.10):
-- **Nessuno sorpassa.** Sull'arteria le due corsie per senso restano inutilizzate. Un tentativo
-  è già stato fatto e misurato peggiore: manca la scelta della corsia in base alla svolta
-  successiva. **È l'ultimo debito grosso del traffico**, adesso che il ciclo del semaforo è
-  stato misurato (§5.12).
+- **Il sorpasso è fatto (§5.34) ma prudente**: il facoltativo scatta solo sui tratti lunghi, perché
+  gli archi sono corti. Resta il 22% di auto in corsia sbagliata all'incrocio (code ai rossi).
 - **Il traffico non sa niente della quota**: un'auto in salita rallenta per fisica ma non se lo
   aspetta, e alza il gas dopo.
 - **`MAX_TRAFFIC` resta a 44, e adesso si sa che il semaforo non lo sblocca.** §5.10 lo aveva
   sceso da 54 indicando il ciclo del semaforo come la leva per rialzarlo; §5.12 l'ha misurata e
   la leva non c'è (accorciare non dà niente, allungare fa danni). Chi vuole più densità deve
-  cercare la capacità da un'altra parte — il sorpasso, o la priorità fra i mezzi.
+  cercare la capacità da un'altra parte — la priorità fra i mezzi.
 - **Non c'è priorità fra i mezzi**: un autobus (158 px) e uno scooter (44 px) trattano l'incrocio
   allo stesso modo, e il primo lo occupa per il doppio del tempo.
+- **Le sirene fanno cedere il traffico e le volanti passano (§5.36), ma con prudenza**: la volante
+  supera dalla corsia opposta solo se per ~400 px laggiù non c'è nessuno, altrimenti resta il freno
+  a 60. Con traffico fitto in senso opposto non passa; per passare lo stesso servirebbe che chi
+  viene contromano si fermasse (`sirenWatch` lo fa rallentare e scostare, non fermare).
+- **Il traffico cede solo alle volanti di `driver === 'cop'`**: non ci sono ambulanze né mezzi
+  di soccorso, e una sirena sul tetto del giocatore (la volante rubata) non fa cedere nessuno.
+- **I pedoni attraversano agli angoli dell'isolato, non sulle strisce**: `city.crosswalks` esiste
+  ed è disegnato, ma `planCrossing` parte dal marciapiede e va dritto. Dove l'incrocio ha le
+  strisce sarebbe giusto passare da lì, e non cambierebbe niente per la larghezza o il semaforo.
+- **Il clacson si sente per distanza, non per linea di vista**: un muro non lo ferma
+  (`hearHonk`, 240 px). Costa zero e si sente comunque, ma non è un modello di propagazione.
 - **I pedoni aggirano le lamiere ferme ma non si aggirano fra loro**: dal §5.21 un passante
   scarta un'auto in sosta, due passanti che si incontrano invece si compenetrano. Si nota molto
   meno (sono sagome della stessa taglia che si sovrappongono per un istante), ma è lo stesso
@@ -286,10 +329,10 @@ il §5.21 altre undici — fra cui le due che erano tornate in cima.
   banchina e treno si vedono e si percorrono; dopo la scelta, però, il tempo avanza e il
   personaggio arriva senza tariffa, biglietto né sequenza di KTX. Adesso però è una comodità e
   non l'unica via, quindi pesa meno di prima.
-- **Il bordo di una città resta leggibile a terra.** La tinta del terreno si interpola fra i
-  distretti e la campagna si dirada, ma dove finiscono gli isolati la trama cambia di colpo. Si
-  legge come «qui finisce Seoul», che è quasi giusto — una periferia vera vorrebbe capannoni,
-  svincoli e case sparse.
+- **Il bordo di una città resta leggibile a terra, ma adesso sfuma** (§5.38: niente più bande
+  per tile né spuntoni di asfalto; le vie cieche hanno una testata). Una periferia vera
+  vorrebbe ancora capannoni, svincoli e case sparse. **T9c**: prolungando un viale in provinciale
+  si toglie la testata del nodo con `rimuoviTestata` e si allunga il segmento. (T9d, fatta: §5.41; `accorciaStrade` rigenera le testate da sola.)
 - **Lasciare una città non conserva il suo stato locale.** `ShopSystem` e gli interni non
   ricordano casse svuotate, spese e vendite di una città quando si è dall'altra parte del paese.
   Con una mappa sola non c'è più un momento in cui «si lascia una regione», quindi il difetto è
@@ -330,3 +373,8 @@ posto in cui riprenderla (§5.15), una sconfitta che non sia solo la morte (§5.
 musicale a cui aggiungere una riga per far partire un pezzo (§5.19: si tocca `music.direct` e
 nient'altro) e un modo di ricominciare da capo senza ricaricare la pagina (§5.21:
 `game.newGame()`).
+
+- **Dopo T9d (§5.41).** (1) I ponti hanno piloni solo ai bordi dell'impalcato e nessuna campata alta: sotto, la barca è semplicemente coperta. (2) Densità riportata sopra i livelli di prima (§5.41). (3) I quartieri a
+  gradoni sono solo quota (`TERRACES`), niente muri di sostegno. (4) Su Jeju resta una banda verticale
+  più chiara nel mare (gradiente del mare di Seoul, già presente prima). (5) Due barche di Seoul stanno
+  in secco (x≈2526, y 4120 e 4664): difetto preesistente. (6) Busan e Jeju non hanno stato locale dei negozi.
