@@ -193,6 +193,8 @@ export class MetroSystem {
     const pl = game.player;
     const e = this.entranceOf(station);
     this.station = station;
+    this.insideT = 0;
+    this.dwelled = false;
     // Con l'accesso solido il centro della scala non è più un punto valido in
     // cui riapparire: conserviamo il punto reale dal quale il giocatore entra.
     this.outside = { x: pl.x, y: pl.y, angle: pl.angle };
@@ -216,6 +218,9 @@ export class MetroSystem {
     game.hud.showVenue(this.floor);
     game.stats.visits = (game.stats.visits || 0) + 1;
     // Per 까치: «prima volta che si prende la metro» (chiamata 13).
+    // Quante volte si è scesi: «prima volta che si prende la metro» è una cosa che il salvataggio
+    // sa (`stats` ci passa intero), e 까치 lo legge prima di scendere (chiamata 13).
+    game.stats.metro = (game.stats.metro || 0) + 1;
     game.emit('metroEnter', station);
     return true;
   }
@@ -338,6 +343,12 @@ export class MetroSystem {
 
     if (!this.open) {
       this.updatePeople(dt, game);
+      // Sette secondi in stazione: lo dice a chi ascolta (`metroDwell`), una volta per discesa.
+      this.insideT += dt;
+      if (!this.dwelled && this.insideT >= 7) {
+        this.dwelled = true;
+        game.emit('metroDwell', this.station);
+      }
       if (game.player.enterCooldown > 0) return false;
       if (dist(game.player.x, game.player.y, this.floor.exit.x, this.floor.exit.y) < ACTION_REACH
         && input.wasPressed('KeyE')) {

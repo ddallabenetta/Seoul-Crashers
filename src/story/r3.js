@@ -10,10 +10,10 @@
 //   · **ci si va di notte.** «Notte, luce dei monitor» è nella tavola, e il blip porta dove si
 //     aspetta (decisione 3 di `08-domande-aperte.md`): chi arriva di giorno aspetta le 23:00
 //     senza guardare l'orologio girare, come in M6 e M8;
-//   · **la scena è di quattro pannelli e non di tre.** La battuta di Mi-rae sulla natura di
+//   · **la scena è di cinque pannelli e non di tre.** La battuta di Mi-rae sulla natura di
 //     까치 è più lunga di un riquadro con sotto altre due frasi: si divide in due tavole, come
-//     si divide ogni tavola troppo piena (§5.33). Le ultime tre righe sono quelle che «servono»
-//     secondo il copione, e stanno insieme;
+//     si divide ogni tavola troppo piena (§5.33), e le ultime tre righe — quelle che «servono»
+//     secondo il copione — hanno la tavola loro;
 //   · **l'ultimo pannello è il quadrante** — la frequenza `91.45` ferma, cinque secondi, senza
 //     nessuno che parli (`hold`). Il fruscio sotto è quello di sempre (`bed`, §5.37): è tutto
 //     quello che 까치 ha al posto di una voce, e qui è l'unica cosa che c'è.
@@ -95,6 +95,34 @@ function onda(P, x, y, w, h, ampiezza) {
   ctx.stroke();
 }
 
+/** Il monitor della forma d'onda, in alto a sinistra, e Mi-rae a destra: la stessa inquadratura per due tavole. */
+function monitor(P) {
+  const ctx = P.ctx;
+  retro(P);
+  const x = px(P, 0.08);
+  const y = py(P, 0.1);
+  const w = P.w * 0.6;
+  const h = P.h * 0.38;
+  ctx.fillStyle = '#12161d';
+  ctx.fillRect(x - 8, y - 8, w + 16, h + 16);
+  ctx.fillStyle = '#05080c';
+  ctx.fillRect(x, y, w, h);
+  glow(P, x + w / 2, y + h / 2, P.h * 0.5, CYAN, 0.12);
+  ctx.strokeStyle = 'rgba(56,214,255,0.14)';
+  ctx.lineWidth = 1;
+  for (let i = 1; i < 5; i++) {
+    ctx.beginPath(); ctx.moveTo(x, y + (h * i) / 5); ctx.lineTo(x + w, y + (h * i) / 5); ctx.stroke();
+  }
+  onda(P, x + w * 0.04, y + h * 0.12, w * 0.92, h * 0.7, 0.9);
+  ctx.fillStyle = 'rgba(56,214,255,0.7)';
+  ctx.font = `600 ${Math.round(P.h * 0.03)}px ui-monospace, monospace`;
+  ctx.fillText('91.45 · 까치', x + w * 0.04, y + h * 0.09);
+  ctx.fillStyle = '#1b2029';                                   // il piede del monitor
+  ctx.fillRect(x + w * 0.44, y + h + 8, w * 0.12, P.h * 0.04);
+  const f = figure(P, 'mirae', px(P, 0.84), py(P, 0.5), unitScale(P, 0.34, 32), 'stand', { crop: 32, mood: 'parla' });
+  cuffie(P, f);
+}
+
 export const PANNELLI = [
   {
     // **Nove hard disk** — nove, come i nove oggetti di Jo — collegati male, e un ventilatore da
@@ -105,9 +133,9 @@ export const PANNELLI = [
     draw(P) {
       const ctx = P.ctx;
       retro(P);
-      const x0 = px(P, 0.34);
-      const y0 = py(P, 0.1);
-      const w = P.w * 0.5;
+      const x0 = px(P, 0.42);
+      const y0 = py(P, 0.26);
+      const w = P.w * 0.48;
       const h = P.h * 0.62;
       ctx.fillStyle = '#4a5260';                                   // l'armadio, di metallo
       ctx.fillRect(x0 - 8, y0 - 8, w + 16, h + 16);
@@ -162,39 +190,28 @@ export const PANNELLI = [
     },
   },
   {
-    // Il monitor con la forma d'onda **che si muove mentre 까치 parla**. Mi-rae a destra; le tre
-    // battute sono la prima metà della scena: la risposta più lunga ha il suo riquadro intero.
+    // Il monitor con la forma d'onda **che si muove mentre 까치 parla**. Mi-rae a destra. La
+    // battuta più lunga del raccordo è divisa in due tavole: in una sola, il testo si mangia
+    // il monitor, che è il soggetto.
     id: 'r3-2',
     bed: { kkachi: 0.035 },
     draw(P) {
-      const ctx = P.ctx;
-      retro(P);
-      const x = px(P, 0.08);
-      const y = py(P, 0.1);
-      const w = P.w * 0.6;
-      const h = P.h * 0.4;
-      ctx.fillStyle = '#12161d';
-      ctx.fillRect(x - 8, y - 8, w + 16, h + 16);
-      ctx.fillStyle = '#05080c';
-      ctx.fillRect(x, y, w, h);
-      glow(P, x + w / 2, y + h / 2, P.h * 0.5, CYAN, 0.12);
-      ctx.strokeStyle = 'rgba(56,214,255,0.14)';
-      ctx.lineWidth = 1;
-      for (let i = 1; i < 5; i++) {
-        ctx.beginPath(); ctx.moveTo(x, y + (h * i) / 5); ctx.lineTo(x + w, y + (h * i) / 5); ctx.stroke();
-      }
-      onda(P, x + w * 0.04, y + h * 0.12, w * 0.92, h * 0.7, 0.9);
-      ctx.fillStyle = 'rgba(56,214,255,0.7)';
-      ctx.font = `600 ${Math.round(P.h * 0.03)}px ui-monospace, monospace`;
-      ctx.fillText('91.45 · 까치', x + w * 0.04, y + h * 0.09);
-      ctx.fillStyle = '#1b2029';                                   // il piede del monitor
-      ctx.fillRect(x + w * 0.44, y + h + 8, w * 0.12, P.h * 0.05);
-      const f = figure(P, 'mirae', px(P, 0.82), py(P, 0.62), unitScale(P, 0.46, 32), 'stand', { crop: 32, mood: 'parla' });
-      cuffie(P, f);
+      monitor(P);
       vignette(P, 0.4);
       speech(P, [
         { who: 'Jae-min', text: '«Chi è?»' },
-        { who: 'Mi-rae', text: '«Non è un chi. Sono trent\'anni di roba registrata: citofoni, cimici, telefonate al minimarket, videocassette di famiglia. Qualcuno l\'ha messa insieme e le ha insegnato a rispondere. Io la tengo accesa e ogni tanto le spiego le cose nuove.»' },
+        { who: 'Mi-rae', text: '«Non è un chi. Sono trent\'anni di roba registrata: citofoni, cimici, telefonate al minimarket, videocassette di famiglia.»' },
+      ]);
+    },
+  },
+  {
+    id: 'r3-3',
+    bed: { kkachi: 0.035 },
+    draw(P) {
+      monitor(P);
+      vignette(P, 0.4);
+      speech(P, [
+        { who: 'Mi-rae', text: '«Qualcuno l\'ha messa insieme e le ha insegnato a rispondere. Io la tengo accesa e ogni tanto le spiego le cose nuove.»' },
         { who: 'Jae-min', text: '«E la voce di chi è?»' },
       ]);
     },
@@ -202,7 +219,7 @@ export const PANNELLI = [
   {
     // **L'unica cosa che fa male**, e il copione dice di dirla: di chi è la voce che il
     // giocatore ascolta da otto ore. Un fatto, non un indizio, e i fatti si dicono una volta.
-    id: 'r3-3',
+    id: 'r3-4',
     bed: { kkachi: 0.03 },
     draw(P) {
       retro(P);
@@ -220,7 +237,7 @@ export const PANNELLI = [
   {
     // Il quadrante, **fermo, e nessuno che dica niente per cinque secondi buoni**. Il fruscio è
     // la stazione accesa: è quello che c'è al posto di una voce.
-    id: 'r3-4',
+    id: 'r3-5',
     hold: 5,
     bed: { kkachi: 0.04 },
     draw(P) {
