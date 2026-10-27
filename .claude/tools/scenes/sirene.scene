@@ -40,7 +40,7 @@ async function trial(edge, dir) {
   tp(mx, my + 260);
   await wait(900);
   tp(mx, my);
-  const A = 110, B = edge.len - 110;
+  const A = 110, B = Math.min(edge.len - 110, 110 + 560);  // il tratto finisce 130 px dopo l'ultima berlina: oltre si misurerebbero gli incroci, non il passaggio
   const cars = [];
   // Berline lente: lasciano due corsie piene davanti alla volante.
   const lanes = [0, 1, 0, 0, 1];
@@ -102,7 +102,8 @@ async function trial(edge, dir) {
 
 async function runTrials(label) {
   const rows = [];
-  for (const e of near) rows.push(await trial(e, 1));
+  near.forEach((e, i) => { e.__i = i; });
+  for (const e of near) if (window.__EDGE == null || window.__EDGE === e.__i) rows.push(await trial(e, 1));
   const ok = rows.filter((r) => r.arrivata);
   const avg = (k) => +(rows.reduce((a, r) => a + r[k], 0) / rows.length).toFixed(1);
   out[label] = {
@@ -117,7 +118,7 @@ const SOLO = window.__SOLO || null;
 if (!SOLO || SOLO === 'volante') {
   if (YIELD) {
     YIELD.on = false;
-    await runTrials('volante_spento');
+    if (!window.__SOLOON) await runTrials('volante_spento');
     YIELD.on = true;
     await runTrials('volante_acceso');
   } else {
