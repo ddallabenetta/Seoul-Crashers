@@ -467,6 +467,60 @@ const FURNITURE = {
       ctx.fillRect(x + 2, y + 2, w - 4, h - 4);
     },
   },
+  // --- le due stanze della storia (§5.42) ---
+  grate: {
+    color: '#2a2d33',
+    top: '#3b4048',
+    // Sbarre: da sopra sono una fila di tratti chiari su una rotaia scura.
+    detail: (ctx, x, y, w, h) => {
+      ctx.fillStyle = 'rgba(170,184,200,0.6)';
+      if (w >= h) for (let i = 4; i < w - 2; i += 8) ctx.fillRect(x + i, y + 1, 1.6, h - 2);
+      else for (let j = 4; j < h - 2; j += 8) ctx.fillRect(x + 1, y + j, w - 2, 1.6);
+    },
+  },
+  cot: {
+    color: '#575c63',
+    top: '#8b9199',
+    detail: (ctx, x, y, w, h) => {
+      ctx.fillStyle = '#6a7467';
+      ctx.fillRect(x + 12, y + 2, w - 14, h - 4);
+      ctx.fillStyle = '#d6d3c8';
+      ctx.fillRect(x + 2, y + 3, 9, h - 6);
+    },
+  },
+  crate: {
+    color: '#5d4930',
+    top: '#85683f',
+    detail: (ctx, x, y, w, h) => {
+      ctx.strokeStyle = 'rgba(30,20,10,0.55)';
+      ctx.lineWidth = 1.4;
+      ctx.strokeRect(x + 2, y + 2, w - 4, h - 4);
+      ctx.beginPath();
+      ctx.moveTo(x + 2, y + 2); ctx.lineTo(x + w - 2, y + h - 2);
+      ctx.moveTo(x + w - 2, y + 2); ctx.lineTo(x + 2, y + h - 2);
+      ctx.stroke();
+    },
+  },
+  drum: {
+    color: '#33424f',
+    top: '#4d6275',
+    detail: (ctx, x, y, w, h) => {
+      ctx.strokeStyle = 'rgba(10,16,24,0.6)';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.arc(x + w / 2, y + h / 2, Math.min(w, h) * 0.34, 0, 6.2832); ctx.stroke();
+    },
+  },
+  // La telecamera: una scatola scura sul muro con il led rosso che lampeggia. Sono quattro, e
+  // il pannello dice che guardano tutte nello stesso punto.
+  cam: {
+    color: '#1d2026',
+    top: '#2c313a',
+    detail: (ctx, x, y, w, h, pal, game) => {
+      const on = Math.sin((game ? game.time : 0) * 4) > -0.2;
+      ctx.fillStyle = on ? '#ff4a3a' : '#5a1d19';
+      ctx.fillRect(x + w - 6, y + 2, 4, 4);
+    },
+  },
   plant: {
     color: '#4a463f',
     top: '#3f6b40',

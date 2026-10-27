@@ -215,6 +215,8 @@ export class MetroSystem {
     game.audio?.ui('open');
     game.hud.showVenue(this.floor);
     game.stats.visits = (game.stats.visits || 0) + 1;
+    // Per 까치: «prima volta che si prende la metro» (chiamata 13).
+    game.emit('metroEnter', station);
     return true;
   }
 

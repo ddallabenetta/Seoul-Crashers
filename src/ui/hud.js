@@ -355,6 +355,9 @@ export class Hud {
     const m = game.missions;
     const def = m?.def;
     if (!def) return;
+    // La cella di M7 non ha un riquadro: nessuna radio, nessuna musica, nessun HUD di
+    // missione (`quiet` sulla fase). È l'unico pezzo del gioco in cui non c'è niente da fare.
+    if (m.phaseDef?.quiet) return;
     const w = opts.w || CLOCK_W;
     const L = opts.L || uiLayout(game.camera.viewW, game.camera.viewH, game);
     const hint = m.hint || '';

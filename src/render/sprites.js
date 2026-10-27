@@ -807,6 +807,12 @@ export function getHeroSprite(frame = 0, pose = 'walk', outfit = 0) {
     } else if (aiming) {
       g.beginPath(); g.moveTo(cx + 0.6, cy + 6.6); g.lineTo(cx + 8.6, cy + 4); g.stroke();
       g.beginPath(); g.moveTo(cx + 0.6, cy - 6.6); g.lineTo(cx + 7.4, cy + 1.4); g.stroke();
+    } else if (pose === 'pocket') {
+      // L'altro Jae-min (M8) tiene la mano **destra** in tasca, sempre, anche quando corre: è
+      // l'unica cosa che lo distingue (`01-personaggi.md`). Dall'alto il braccio destro (+y,
+      // guardando verso +x) resta attaccato al fianco e non oscilla; il sinistro cammina.
+      g.beginPath(); g.moveTo(cx + 0.6, cy + 6.6); g.lineTo(cx - 3.4, cy + 6.2); g.stroke();
+      g.beginPath(); g.moveTo(cx + 0.6, cy - 6.6); g.lineTo(cx - 2.8 - ph * 3.6, cy - 8.8); g.stroke();
     } else {
       g.beginPath(); g.moveTo(cx + 0.6, cy + 6.6); g.lineTo(cx - 2.8 + ph * 3.6, cy + 8.8); g.stroke();
       g.beginPath(); g.moveTo(cx + 0.6, cy - 6.6); g.lineTo(cx - 2.8 - ph * 3.6, cy - 8.8); g.stroke();

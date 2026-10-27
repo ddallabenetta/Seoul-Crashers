@@ -442,6 +442,10 @@ export class ShopSystem {
     // saracinesca abbassata. Senza questo, metà delle missioni andrebbe spostata
     // all'ora di apertura di un negozio.
     this.held = new Set();
+    // Quello che la storia mette sopra un interno **senza cambiare la città** (M8): `stage`
+    // dice che dietro *quella* porta, per ora, c'è un'altra stanza (il cortile cieco dietro un
+    // 분식). Non sta nel salvataggio: la rimette la fase della missione a ogni rientro.
+    this.stage = new Map();
     this.active = null;
     this.outside = null;      // dove si torna uscendo
     this.backSpot = null;     // dove si sbuca dal retro, se là dietro c'è posto
@@ -471,6 +475,7 @@ export class ShopSystem {
     this.pending = null;
     this.sealed.clear();
     this.held.clear();
+    this.stage.clear();
     this.active = null;
     this.outside = null;
     this.backSpot = null;
@@ -509,8 +514,13 @@ export class ShopSystem {
 
   /** Interno dell'edificio, costruito alla prima visita e poi ricordato. */
   interiorOf(shop, game) {
-    let it = this.cache.get(shop.id);
+    // Una stanza di scena: stessa porta (stesso `id`, stessa strada), altra pianta. Sta in
+    // cache sotto una chiave sua, così la vera non si perde e tornerà com'era.
+    const alt = this.stage.get(shop.id);
+    const key = alt ? `stage:${shop.id}` : shop.id;
+    let it = this.cache.get(key);
     if (it) return it;
+    if (alt) shop = alt;
     // Il retro si decide qui, una volta sola: se dietro l'edificio non c'è un punto
     // buono in cui sbucare, il varco non viene proprio aperto. Un buco nel muro che
     // non porta da nessuna parte è peggio di un muro — ci si infila e ci si resta.
@@ -536,7 +546,7 @@ export class ShopSystem {
     // alla prima visita dopo il caricamento: gli interni nascono pigri (139
     // vetrine × fino a 4 piani sarebbero 369 piante costruite per niente) e
     // ricostruirli tutti a mano al caricamento butterebbe via quel vantaggio.
-    const rec = this.pending && this.pending.get(shop.id);
+    const rec = !alt && this.pending && this.pending.get(shop.id);
     if (rec) {
       this.pending.delete(shop.id);
       for (const i of rec.robbed || []) if (it.floors[i]) it.floors[i].robbed = true;
@@ -545,7 +555,7 @@ export class ShopSystem {
         if (p) { p.dead = true; p.deadT = 40; }
       }
     }
-    this.cache.set(shop.id, it);
+    this.cache.set(key, it);
     return it;
   }
 
@@ -577,6 +587,9 @@ export class ShopSystem {
       return robbed.length || dead.length ? { robbed, dead } : null;
     };
     for (const [id, it] of this.cache) {
+      // Le stanze della storia (`stage:…`, la cella) si rifanno da sole: nel salvataggio
+      // vanno solo le vetrine vere.
+      if (typeof id !== 'number') continue;
       const rec = record(it);
       if (rec) interiors[id] = rec;
     }

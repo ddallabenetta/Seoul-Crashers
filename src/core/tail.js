@@ -52,6 +52,8 @@ export class TailSystem {
     this.lose = LOSE;
     this.spot = SPOT;
     this.ended = null;
+    /** Il bersaglio va a piedi (M8): non sta in `game.vehicles` e si perde se muore o se lo streaming lo porta via. */
+    this.foot = false;
   }
 
   get active() {
@@ -59,14 +61,18 @@ export class TailSystem {
   }
 
   /**
-   * Comincia. `target` è un veicolo — un pedone verrebbe da sé, ma l'unico
-   * pedinamento scritto finora è in macchina e non vale la pena indovinare il
-   * resto adesso.
+   * Comincia. `target` è un veicolo **o un pedone** (M8, §5.42): chi sta a piedi nella
+   * folla non ha né la lamiera né i fari, ma ha le stesse due soglie con altri numeri —
+   * le passa chi chiama (`lose`, `spot`), perché cosa voglia dire «troppo vicino» fra i
+   * marciapiedi di Myeongdong non è lo stesso che su una strada a quattro corsie. Il
+   * criterio è dove sta il bersaglio e non come lo si chiama: se non è in
+   * `game.vehicles` è a piedi. M3 e M6 non cambiano di una riga.
    */
   begin(game, target, opts = {}) {
     this.reset();
     if (!target) return false;
     this.target = target;
+    this.foot = !game.vehicles.includes(target);
     this.label = opts.label || null;
     this.lose = opts.lose || LOSE;
     this.spot = opts.spot || SPOT;
@@ -92,7 +98,8 @@ export class TailSystem {
     // (§3): un pedinamento misurato da lì direbbe sempre «l'hai perso» a chi si è
     // solo fermato a comprare un caffè. Il tempo si congela come tutto il resto.
     if (game.indoors || game.player.dying) return;
-    if (v.dead || !game.vehicles.includes(v)) {
+    // A piedi «sparito» è `gone` (lo streaming) o `dead`; in macchina è fuori dall'elenco.
+    if (v.dead || v.gone || (!this.foot && !game.vehicles.includes(v))) {
       this.finish(game, 'lost');
       return;
     }

@@ -86,7 +86,13 @@ export class MissionSystem {
    */
   attach(game) {
     game.on('respawn', () => this.replay(game));
-    game.on('busted', () => this.replay(game));
+    // Di norma un arresto rimette nella fase. **Una fase che lo chiede** (M7: farsi
+    // arrestare *è* l'obiettivo) lo prende lei: `busted(ctx)` decide se passare avanti.
+    game.on('busted', () => {
+      const ph = this.phaseDef;
+      if (this.active && ph?.busted) ph.busted(this.context(game));
+      else this.replay(game);
+    });
   }
 
   get def() {
@@ -125,6 +131,21 @@ export class MissionSystem {
     this.phase++;
     if (this.phase >= this.def.phases.length) this.complete(game);
     else this.enterPhase(game);
+  }
+
+  /**
+   * Salta a una fase **per id**, tornando indietro o andando avanti. Serve a chi ha un
+   * fallimento che non è «riprova da qui» (M6: l'archivio chiuso fino a domani, M7: il fermo
+   * è chiuso per stanotte). Come `advance` non si chiama da `enter`.
+   */
+  goto(game, id) {
+    if (!this.active) return false;
+    const i = this.def.phases.findIndex((p) => p.id === id);
+    if (i < 0) return false;
+    this.leavePhase(game);
+    this.phase = i;
+    this.enterPhase(game);
+    return true;
   }
 
   /** Ripresa dall'ultima fase: si rientra dov'eri, non da capo. */
@@ -246,6 +267,7 @@ export class MissionSystem {
         return wait;
       },
       next: () => this.advance(game),
+      goto: (id) => this.goto(game, id),
       flag: (name, on) => this.setFlag(name, on),
       has: (name) => this.flags.has(name),
     };
