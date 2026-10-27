@@ -118,6 +118,8 @@ export class MusicSystem {
     else if (game.wanted.level >= 2 && !game.indoors && !game.player.dying) want = 'chase';
     // La radio è la musica che ha scelto il giocatore: non gliela si copre.
     if (want === 'chase' && game.radio?.on) want = null;
+    // La confessione di M9 si dice senza musica (`core/passenger.js`, `hush`).
+    if (game.passenger?.hush) want = null;
     this.want = want;
     this.intensity = clamp((game.wanted.level - 1) / 4, 0, 1);
 

@@ -313,6 +313,8 @@ export class Radio {
   contextGain(game) {
     const a = this.audio;
     if (a.muted || a.mix.master <= 0) return 0;
+    // Il passeggero che confessa vuole il silenzio (`core/passenger.js`): la radio si mette in pausa.
+    if (game.passenger?.hush) return 0;
     const base = a.mix.master * a.mix.radio;
     // La radio si abbassa meno del mondo: è la musica che ha scelto il giocatore.
     // Ha un valore suo nella tabella delle modalità, per questo.

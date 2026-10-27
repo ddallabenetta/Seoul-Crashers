@@ -287,7 +287,23 @@ export class Scene {
     }
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
+    if (dc.fog > 0.01) this.drawFog(ctx, dc, w, h);
     this.drawWeather(ctx, dc, game.time, w, h);
+  }
+
+  /**
+   * La nebbia bassa di M9: un velo chiaro che si addensa verso i bordi e lascia limpido un cerchio
+   * attorno a chi guida (la vista corta è questo, non un grigio uniforme). Di notte è più scura.
+   */
+  drawFog(ctx, dc, w, h) {
+    const lit = 150 + Math.round(70 * (1 - Math.min(1, dc.light.k * 1.6)));
+    const r0 = Math.min(w, h) * (0.16 + 0.1 * (1 - dc.fog));
+    const r1 = Math.hypot(w, h) * 0.5;
+    const g = ctx.createRadialGradient(w / 2, h / 2, r0, w / 2, h / 2, r1);
+    g.addColorStop(0, `rgba(${lit},${lit + 6},${lit + 14},${(dc.fog * 0.1).toFixed(3)})`);
+    g.addColorStop(1, `rgba(${lit},${lit + 6},${lit + 14},${(dc.fog * 0.82).toFixed(3)})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
   }
 
   /**

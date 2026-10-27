@@ -173,6 +173,8 @@ export class KkachiSystem {
     if (!game.started || game.indoors) return false;
     const pl = game.player;
     if (pl.dying || pl.onFoot || !pl.vehicle || pl.vehicle.dead) return false;
+    // Con qualcuno a bordo la radio non parla (`core/passenger.js`): 까치 sta con chi è solo.
+    if (game.passenger?.aboard) return false;
     return !!game.radio?.isKkachi;
   }
 

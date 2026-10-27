@@ -9,6 +9,7 @@ import { Radio } from './core/radio.js';
 import { KkachiSystem } from './core/kkachi.js';
 import { TailSystem } from './core/tail.js';
 import { CarrySystem } from './core/carry.js';
+import { PassengerSystem } from './core/passenger.js';
 import { DynamicGrid } from './core/spatial.js';
 import { KMH, clamp, dist } from './core/math.js';
 import { createRegion, REGION_IDS } from './world/regions.js';
@@ -44,6 +45,7 @@ import { Cutscene } from './ui/cutscene.js';
 import { MobileControls } from './ui/mobilecontrols.js';
 import { Dialogue } from './ui/dialogue.js';
 import { drawRadioCall } from './ui/radiocall.js';
+import { drawPassengerCall } from './ui/passengercall.js';
 import { MissionSystem } from './core/missions.js';
 import { INTRO, handoff } from './story/intro.js';
 import { registerCampaign, beginCampaign } from './story/campaign.js';
@@ -218,6 +220,8 @@ class Game {
     // tornano più avanti (M6, M9), quindi stanno nel motore e non in una missione.
     this.tail = new TailSystem();
     this.carry = new CarrySystem();
+    // Chi parla in macchina mentre si guida (M9): non è 까치 e non è un dialogo, vedi `core/passenger.js`.
+    this.passenger = new PassengerSystem();
     // **Prima delle missioni**, e non è indifferente: quando si muore, quello che
     // si aveva in mano deve toccare terra prima che la fase si riapparecchi, o la
     // fase cercherebbe per terra una cosa che è ancora in mano a un cadavere.
@@ -366,6 +370,7 @@ class Game {
     // Il mezzo pedinato era uno di quelli appena tolti dalla lista: un pedinamento
     // che sopravvive al mondo insegue un fantasma.
     this.tail?.stop();
+    this.passenger?.reset();
     // L'itinerario è disegnato fra due punti che stanno per non voler più dire
     // niente (una partita caricata, un treno per Busan): si rifà al primo frame.
     this.route?.clear();
@@ -458,6 +463,7 @@ class Game {
     this.kkachi.reset();
     this.tail.stop();
     this.carry.reset();
+    this.passenger.reset();
     this.markers.length = 0;
     this.dayCycle.reset();
     this.radio.off(this);
@@ -1041,6 +1047,7 @@ class Game {
     // gira: un menu aperto mette in pausa la battuta, scendere dall'auto la perde
     // (regola 5). Sta qui in fondo perché non muove niente — legge e basta.
     this.kkachi.update(dt, this);
+    this.passenger.update(dt, this);
     // Dopo la fisica: la volante ha già mosso le ruote e il giocatore ci sta dentro.
     this.arrest.update(dt, this);
     this.hud.update(dt);
@@ -1173,6 +1180,7 @@ class Game {
     // Sopra l'HUD e sotto i menu: è una cosa che succede in strada, non un
     // pannello. Il mondo continua a girare mentre si legge.
     drawRadioCall(ctx, this);
+    drawPassengerCall(ctx, this);
     this.mapView.draw(ctx, this);
     this.menu.draw(ctx, this);
     this.shopMenu.draw(ctx, this);
