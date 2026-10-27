@@ -492,3 +492,34 @@ un'ascissa del mondo (`SEA_X0`), non al bordo del tile che si sta disegnando (§
 `segments`: allungare un segmento per far stare una testata faceva sparire edifici. Le testate si
 dipingono (`ground.drawTestata`), non si aggiungono alla carreggiata (§5.38).
 
+
+**`teleport` di una scena esce dal negozio, e il punto di piano non compare.** Una prova che porta il
+giocatore su un faldone, su Jo o su un punto di una pianta con la stessa funzione con cui lo porta in
+strada lo **fa uscire** (`shops.leave`): il suggerimento non c'è e `p.run` gira lo stesso, quindi la
+prova dice `true` su un'azione che nessuno vedrebbe. Dentro si cambia `pl.x/y` e si fa `camera.snapTo`
+(§5.40, `atto-2.scene`).
+
+**Un indirizzo di `places.js` non ha la normale della porta.** `{ shop, id, level, x, y }`: `nx`/`ny`
+stanno su `addr.shop`. `addr.nx` è `undefined` e `x + nx * 18` è `NaN`, che il teletrasporto accetta
+senza lamentarsi — e il giocatore finisce dove non c'è niente (§5.40).
+
+**Una fase di soli pannelli si chiama come le dai.** `panelPhase('m6-chiusura', …)` è la fase
+`m6/m6-chiusura`, non `m6/chiusura`: una scena che aspetta il nome «giusto» resta ferma e il
+`finoA` scade senza dire perché.
+
+**Una chiamata di 까치 che deve uscire in una prova viene rubata da un'altra.** La tabella è una
+priorità, e basta che piova (`a1-pioggia`) o sia notte perché la chiamata che si sta provando non parta.
+Per provarne una sola si segnano le altre come `done` (§5.40).
+
+**Una definizione di attore nata in una missione finita non sopravvive a un caricamento.** `prepare`
+gira solo per la missione in corso: Jo, definita da M2, dopo un salvataggio non c'era più e il banco
+tornava a un commesso qualunque. Chi deve esserci **dopo** la sua missione si ridefinisce da sé in
+`missions.afterRestore` (§5.40).
+
+**`moored` + `protect` sopravvive a `clearWorld`.** Un'auto della storia che deve sparire con un
+caricamento (le tre del cortile di M5) è solo `protect`: `moored` la farebbe restare in `game.vehicles`
+attraverso ogni partita nuova e ogni ricarica.
+
+**`figure(..., 'seat', { crop })` con un `crop` piccolo è una testa sola.** Il corpo comincia alla cella
+24: `crop: 26` per un bambino seduto dà una faccia che galleggia, `crop: 46` dà busto e gambe. E sotto il
+60% del pannello c'è il riquadro delle battute (§5.33).

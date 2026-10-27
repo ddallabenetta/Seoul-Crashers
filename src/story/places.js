@@ -141,3 +141,43 @@ export function behindTill(f) {
 function overlap(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
+
+/**
+ * La torre di 한성개발 a Gangnam. È **una sola per tutta la campagna** — M3 ci scende
+ * con la busta, M6 ci sale a leggere i faldoni — e la ricerca vuole gli stessi
+ * argomenti in tutti e due i posti, o sarebbero due torri. Per questo sta qui e non in
+ * una missione. `near` è il 편의점 di Itaewon da cui M3 la cerca.
+ */
+export function findTower(game, near = null) {
+  const from = near || findShop(game, 'conv', { district: 'itaewon', near: game.city.spawn }) || game.city.spawn;
+  return findShop(game, 'office', { district: 'gangnam', near: from });
+}
+
+/**
+ * Un'auto che arriva in un posto. Nasce fuori vista, sulla corsia più vicina a un
+ * punto a un paio di isolati di distanza, e ci va davvero (`traffic.sendTo`).
+ * Quando le strade non ci arrivano — non succede a Seoul, ma una missione non può
+ * dipendere da questo — si restituisce `null` e la fase si chiude lo stesso.
+ *
+ * Sta qui e non in M3 perché la usa anche M6: un'auto della storia che arriva è
+ * un fatto di traffico, non di una missione.
+ */
+export function mandaA(game, kind, from, to, opts = {}) {
+  const v = game.traffic.spawnScripted(kind, from.x, from.y, game, {
+    lightsOn: true, speed: opts.speed || 120, radius: opts.radius || 900, colorIndex: opts.colorIndex ?? 0,
+  });
+  if (!v) return null;
+  if (!game.traffic.sendTo(v, to.x, to.y, game)) {
+    const i = game.vehicles.indexOf(v);
+    if (i >= 0) game.vehicles.splice(i, 1);
+    return null;
+  }
+  return v;
+}
+
+/** Vera quando l'auto mandata è arrivata, o quando non c'era nessuna auto. */
+export function arrivata(v, to) {
+  if (!v) return true;
+  if (v.dead) return true;
+  return !!v.ai?.arrived || Math.hypot(v.x - to.x, v.y - to.y) < 70;
+}

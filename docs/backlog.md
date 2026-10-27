@@ -17,7 +17,7 @@ sigillate, marcatori, testo su più righe). Quello che resta è **contenuto**, i
 | ~~3~~ | ~~**C**~~ | ~~**cortili persistenti** (nel salvataggio, con effetto sul commercio)~~ — **fatta**, §5.31 | — |
 | ~~4~~ | ~~**D**~~ | ~~Kkachi: stazione `91.45`, tabella con predicato, le otto chiamate dell'Atto I e le dodici righe di servizio~~ — **fatta**, §5.32 | — |
 | ~~5~~ | ~~**E**~~ | ~~Atto I completo (M3, M4) + R1~~, e con loro **pedinamento** e **oggetto trasportabile** — **fatta**, §5.33 | — |
-| 6 | **F** | Atto II (M5-M8) + R2, R3 + le otto chiamate dell'Atto II | l'atto che chiede più cose nuove al motore — **è la prossima** |
+| 6 | **F** | Atto II (M5-M8) + R2, R3 + le otto chiamate dell'Atto II | l'atto che chiede più cose nuove al motore — **metà fatta (T7, §5.40): M5, M6, R2, le chiamate 11, 12 e 14, Jo dopo M6. Resta T8: M7, M8, R3 e le chiamate 9, 10, 13, 15, 16** |
 | 7 | **G** | Atto III (M9-M12) + R4 + le otto chiamate dell'Atto III **e l'incontro facoltativo di Busan** | il viaggio: ha bisogno di tutto quello di prima |
 | 8 | **H** | i tre finali, i titoli di coda, la scena dopo | e a quel punto la Fase 3 è chiusa |
 
@@ -93,7 +93,8 @@ prova, non una nota.
 - ~~l'ottava chiamata dell'Atto I aspetta M3~~: **fatto**, §5.33 — quella riga adesso esce, e il
   predicato non è stato toccato;
 - **le «visite che cambiano»** (Jo dopo M6, Chun-sik dopo M9, il commesso dopo M8) stanno nello
-  stesso capitolo del copione ma non sono chiamate radio: restano alle tappe delle loro missioni.
+  stesso capitolo del copione ma non sono chiamate radio: restano alle tappe delle loro missioni
+  (Jo: **fatto**, §5.40).
 
 **Cosa la tappa E (§5.33) ha già tolto di mezzo**, e che quindi le tappe F e G non devono più
 affrontare — sono le due meccaniche che M1 e M2 avevano lasciato indietro, più tre cose che sono
@@ -112,13 +113,27 @@ saltate fuori scrivendo l'atto:
   (`actors.die`), che serve a chiunque debba far cadere un personaggio a metà di un'altra cosa.
 
 **Quello che la tappa E lascia indietro:**
-- **Jo che risponde in modo diverso dopo M6** (le «visite che cambiano»,
-  [`storia/07-radio-kkachi.md`](storia/07-radio-kkachi.md)): oggi il banco dice sempre le stesse
-  cose una volta finita M2. È della tappa F, che è quella di M6;
+- ~~**Jo che risponde in modo diverso dopo M6**~~ (le «visite che cambiano»,
+  [`storia/07-radio-kkachi.md`](storia/07-radio-kkachi.md)): **fatto**, §5.40 — e con lei il
+  meccanismo (`missions.standing`, `afterRestore`) per le altre due, che restano alle loro missioni
+  (Chun-sik dopo M9, il commesso dopo M8);
 - **la gru non si scala.** È l'unica cosa del copione di M4 che non si è potuta fare: una quota
   percorribile non c'è, e dalla gru si vede il porto perché la camera si allarga. Il giorno che
   qualcuno vorrà i tetti, quella scena ne è il primo cliente;
 - **un secondo oggetto in mano insieme al primo**, il giorno che una missione ne chiederà due.
+
+**Cosa la tappa T7 (§5.40) lascia alla seconda metà della F.** M5, M6 e R2 non hanno chiesto niente di nuovo
+al motore oltre a **punti fissi** (`missions.standing`: un personaggio che c'è sempre e risponde in modo
+diverso), **un hook dopo il caricamento** (`afterRestore`) e **un evento** (`vehicleSold`). Quello che manca
+per M7 e M8:
+
+- **M7**: l'interno di un commissariato e una cella percorribile, e una missione che chiede di **farsi**
+  arrestare (`busted` c'è, §5.35: la scena della cella è il pezzo mancante);
+- **M8**: un inseguimento «a vista» senza marcatore, un pedinamento **a piedi** (`core/tail.js` vuole un
+  veicolo: `begin` accetta solo quello) e un secondo personaggio con lo sprite del giocatore;
+- **la torre di M6** non sale: l'ottavo e il ventesimo piano sono lo stesso piano, e l'allarme non ha una
+  volante fuori (§5.40, in fondo). Se M7 la vuole, il posto è la fase `allarme` di `story/m6.js`;
+- **un tetto da cui entrare**: la terza strada d'ingresso di M6.
 
 **Rimasto indietro da 까치** (§5.32):
 - **Le chiamate perse non si vedono da nessuna parte.** Il conto c'è (`kkachi.missed`) e per

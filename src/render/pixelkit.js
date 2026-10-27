@@ -332,6 +332,104 @@ const HEADS = {
     '......############......',
     '.........#ssss#.........',
   ],
+
+  // Pyo Man-deok, sessantasei anni, l'usura di Gangnam. **La testa pelata è la sua
+  // faccia**: una cupola di pelle con una frangia bianca ai lati e un pizzetto
+  // bianco sotto — nel cast è l'unico senza capelli sopra, e a questa scala si
+  // riconosce prima di vedergli gli occhi. Le sopracciglia bianche e folte stanno
+  // sulla riga 10 e le palpebre pesanti sulla 11: guarda a mezz'asta, come chi ha
+  // già contato quello che hai in tasca. Le rughe della fronte e le borse sotto gli
+  // occhi sono la sua età; il resto è fermo, perché lui si muove col ventaglio.
+  pyo: [
+    '........................',
+    '.......##########.......',
+    '.....##sssSSSSsss##.....',
+    '...##sssssSSSSsssss##...',
+    '..#hhsssssssssssssshh#..',
+    '..#hHssssssSSssssssHh#..',
+    '..#hhsssssssssssssshh#..',
+    '..#shhsssssssssssshhs#..',
+    '..#ssssssssssssssssss#..',
+    '..#sssddddddddddddsss#..',
+    '..#sHHHHssssssssHHHHs#..',
+    '..#s####ssssssss####s#..',
+    '..#ssw##wssssssw##wss#..',
+    '..#sddddssssssssdddds#..',
+    '..#ssssssss##ssssssss#..',
+    '..#sssssssdd#ssssssss#..',
+    '..#ssdssssssssssssdss#..',
+    '..#ssssss######ssssss#..',
+    '..#ssssssssssssssssss#..',
+    '...#ssssHHHHHHHHssss#...',
+    '...#sssssHHHHHHsssss#...',
+    '....##ssssHHHHssss##....',
+    '......############......',
+    '.........#ssss#.........',
+  ],
+
+  // Il bambino. Non ha un nome nel copione ed è lo stesso nella cucina di R2 e nella
+  // foto di Pyo: tre mesi, forse quattro. Quello che lo fa piccolo non è il corpo —
+  // che è lo stesso parametrico di tutti — ma la testa: tonda, con la fronte alta e
+  // il ciuffo di capelli neri **solo in cima**, gli occhi bassi e larghi, due
+  // guance rosa (`a`) e una bocca da quattro celle. Sta in una pagina di pannelli
+  // dove tutti gli altri hanno sessant'anni, quindi basta che sia rotondo.
+  bambino: [
+    '........................',
+    '........########........',
+    '......##hhhhhhhh##......',
+    '....##hhhhhhhhhhhh##....',
+    '...#ssshhhhhhhhhhsss#...',
+    '..#ssssssshhhhsssssss#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssssssssssssssSS#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssw##wssssssw##wss#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssssssssdsssssss#..',
+    '..#saassssssssssssaas#..',
+    '..#saassssssssssssaas#..',
+    '..#ssssssss####ssssss#..',
+    '..#ssssssssssssssssss#..',
+    '...#ssssssssssssssss#...',
+    '....#ssssssssssssss#....',
+    '.....##ssssssssss##.....',
+    '.......##########.......',
+    '.........#ssss#.........',
+  ],
+
+  // Ku Man-gi a trent'anni, nella foto che Pyo tiene dentro il ventaglio. Parente
+  // stretto di Jae-min, e va letto così: stessa mascella, ma **le basette e i baffi**
+  // — che Jae-min non ha — e la scriminatura da una parte. Non ha cicatrici: è la
+  // sola cosa che il narratore dice di lui, e il pannello deve lasciarla vedere.
+  kumangi: [
+    '........................',
+    '......############......',
+    '....##hhhhhhhhhhhh##....',
+    '...#hhhhhhhhhhhhhhhh#...',
+    '..#hhhhhhhHhhhhhhhhhh#..',
+    '..#hhhhhhHHhhhhhhhhhh#..',
+    '..#hhhhhhHhhhhhhhhhhh#..',
+    '..#hhhhHhhhhhhhhhhhhh#..',
+    '..#hhhhhhhhhhhhhhhhhh#..',
+    '..#hssssssssssssssssh#..',
+    '..#hsssssssssssssssSh#..',
+    '..#hs###ssssssss###sh#..',
+    '..#hsw##wssssssw##wsh#..',
+    '..#ssssssssssssssssss#..',
+    '..#ssssssss##ssssssss#..',
+    '..#sssssssdd#ssssssss#..',
+    '..#sssssshhhhhhssssss#..',
+    '..#ssssss######ssssss#..',
+    '..#ssssssssssssssssss#..',
+    '...#ssssssssssssssss#...',
+    '...#ssssssssssssssss#...',
+    '....##ssssssssssss##....',
+    '......############......',
+    '.........#ssss#.........',
+  ],
 };
 
 // --- le tinte ------------------------------------------------------------------
@@ -412,6 +510,28 @@ export const CAST = {
     // di corsia è quello che lo separa dal letto.
     coat: '#dbe1ea', coatHi: '#f1f4f9', shirt: '#93a8bd', pants: '#39424f',
     accent: '#5fe0a8', build: 9, name: 'Jeong Han-su',
+  },
+
+  pyo: {
+    head: 'pyo',
+    hair: '#aeabb8', hairHi: '#e4e2ea',
+    // Il gilet giallo del Bue Giallo: sul fondo scuro di una tenda è la sola
+    // macchia calda del pannello, ed è quello che deve fare.
+    coat: '#b8942f', coatHi: '#d9b64a', shirt: '#efe9d8', pants: '#3a3a44',
+    accent: '#7a5a14', build: 13, name: 'Pyo Man-deok',
+  },
+  bambino: {
+    head: 'bambino',
+    hair: '#1f1a24', hairHi: '#3b3346',
+    coat: '#e8d58a', coatHi: '#f5e6a6', shirt: '#fff4d8', pants: '#b9c4d6',
+    // Il rosa delle guance (`a` nella griglia), e della cintura della tutina.
+    accent: '#e79a9a', build: 4, name: 'Bambino',
+  },
+  kumangi: {
+    head: 'kumangi',
+    hair: '#1c1824', hairHi: '#4a4458',
+    coat: '#6b5a3a', coatHi: '#85734d', shirt: '#e9eaf0', pants: '#2b2b33',
+    accent: '#c2384a', build: 11, name: 'Ku Man-gi',
   },
 };
 
@@ -569,7 +689,9 @@ export const FIGURE_UNITS = 50;  // testa + corpo in piedi
  */
 export function figure(P, id, cx, groundY, k, pose = 'stand', opts = {}) {
   const { mood = 'fermo', flip = false, coat = null, crop = FIGURE_UNITS, dim = 0, rim = true } = opts;
-  const spec = CAST[id];
+  // `accent` ridipinge la cravatta e la banda sulla schiena: per Dong-hyeok è il colore
+  // della cicatrice, e su un bomber diventa una striscia chiara di mezzo pannello.
+  const spec = opts.accent ? { ...CAST[id], accent: opts.accent } : CAST[id];
   const topY = groundY - crop * k;
   const ox = Math.round(cx - (HEAD_UNITS * k) / 2);
   const oy = Math.round(topY);

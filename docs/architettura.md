@@ -100,7 +100,9 @@ src/story/
   intro.js            «12년», i 28 pannelli dell'apertura e il passaggio di consegne
   places.js           dove succedono le cose: la storia non piazza indirizzi, li cerca
   m1.js … m4.js       una missione per file: le sue fasi e i suoi pannelli
-  r1.js               il raccordo che chiude l'Atto I: una missione con una fase sola
+  m5.js, m6.js        l'Atto II, prima metà: tre cortili da contare, la torre e i faldoni (§5.40)
+  r1.js, r2.js        i raccordi: una missione con una fase sola e i suoi pannelli
+  visite.js           le «visite che cambiano»: un punto fisso, non di fase (Jo dopo M6)
   hospital.js         il 병원 «성심»: una battuta a ogni morte, e quattro pannelli
   kkachi.js           quello che 까치 dice e quando: le chiamate e le righe di servizio
 
@@ -426,6 +428,16 @@ regole della campagna sono cablate lì e non nelle missioni — **un blip solo**
 `busted`, non a `playerDeath`: quando arrivano quei due il giocatore è già stato spostato), **una
 cutscene non si rivede mai** (`seen`, che sta nel salvataggio). Nel salvataggio va la *posizione*
 nella storia, non la storia: ~122 byte, e il ripristino **rientra nella fase** invece di saltarla.
+
+**Non tutto quello che la storia fa sta in una fase** (§5.40). Un personaggio che risponde in modo
+diverso a seconda di quanto la storia è avanzata (Jo dopo M6) è lì **sempre**, con una missione in
+corso o senza: `MissionSystem.standing(p)` è un punto interattivo **fuori dalle fasi**, che non si
+smonta al cambio e ha un `when(game)` che dice quando vale; e `MissionSystem.afterRestore(fn)` rifà
+dopo ogni caricamento quello che `prepare` — che gira solo per la missione in corso — non rifà più:
+una definizione di attore nata in una missione finita non sopravvive a un salvataggio. Sono le due
+cose che servono anche alle visite di Chun-sik e del commesso. Il resto del bus ha guadagnato un
+evento, `vehicleSold(v, place, price)`, da cui M5 conta le auto portate via a un cortile: **la
+missione ascolta, il sistema dei cortili (`turfs.claim`) decide chi è il padrone**.
 
 **Chi segue qualcuno e chi porta qualcosa non sono missioni: sono due sistemi** (§5.33).
 `core/tail.js` tiene **due** serbatoi — «l'hai perso» e «ti ha visto» — e quando uno arriva in
