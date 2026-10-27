@@ -111,7 +111,29 @@ all'auto (`life.besideCar`: fianco, poi muso e coda, scartando i punti dentro un
 spara via il pedone) e **toglie la componente di velocità contro la lamiera**; la valvola misura
 lo **spostamento**.
 
-@@MISURA@@
+## 6. Misura fianco a fianco
+
+Due alberi (`origin/claude/rework-t1-sorpasso` e questo), le run **in coppia, contemporanee**, tre
+coppie, medie. I numeri assoluti dipendono dalla macchina e sotto il 7% è rumore.
+
+| Misura | Prima | Dopo |
+| --- | --- | --- |
+| Volante a sirena su un tratto di arteria con 5 berline lente (`sirene.scene`, 2 coppie) | 15,8 s, 2 arrivate su 5, 69 px/s | **3,5 s, 5 su 5**, 180 px/s (con `YIELD.on = false` sullo stesso albero: 15,6 s, 2 su 5) |
+| Danno alla volante nel passaggio | 3 | 6-10: passa a 200+ km/h sfiorando le berline, il prezzo del sorpasso |
+| Attraversamenti partiti con il verde alle auto | 29 | **0** |
+| Attraversamenti partiti / arrivati / tornati (4 zone, 18 s l'una) | 128 / 76 / 26 | 78 / 58 / 14: si aspetta il verde e si torna meno |
+| Pedoni che cambiano rotta al clacson vicino (quota, 3 run) | = controllo | volti verso il rumore 3, 4, 13 contro 0, 0, 1 |
+| `traffic-census`: urti/min · flusso mediano · fps | 31 · 3700 · 37 | 28 · 3860 · 36 (entro il rumore) |
+| `traffic-census`: auto immobili (3 coppie) | 11 | 19 (sull'albero con tutto spento 21-28, con i soli pedoni spenti 20-24, con tutto acceso in altre due run 9 e 14: la spaziatura fra run è 9-24 anche sull'albero di partenza, non è attribuibile a un interruttore) |
+| `walkers-census`: `dentroLamiera` (6 run) | 50, 0, 0, 18, 114, 204 | **0, 0, 0, 0, 0, 0** |
+| `walkers-census`: pedoni che «corrono sul posto» (px/s > 30, spostati < 10 px in 1 s) | 5,0 | **2,6** |
+
+`piantati` di `walkers-census` sale da 0,03 a 0,7: non è un peggioramento ma una misura diversa.
+`stuckT` guarda adesso lo spostamento (§5), e conta chi correva sul posto contro un muro e prima
+non risultava; la colonna `correSulPosto`, calcolata da fuori e uguale su ogni albero, dice che
+sono la metà.
+
+
 
 ## Cose da sapere
 
