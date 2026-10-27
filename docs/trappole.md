@@ -141,6 +141,19 @@ gli "stalli dell'AI" erano problemi di ingombri, corsie o posizionamento.
 
 ---
 
+**Una guardia di un cortile tuo diventava ostile a *te* appena sparavi lì dentro.** `pedestrians.alarm` rende ostile
+chi ha `fights` entro metà raggio da chi spara (e il gangster ce l'ha), e non guardava di chi fosse il cortile: sotto una
+raffica la scorta si rivoltava o scappava. Le guardie di un cortile `held` sono ora escluse dall'allarme (§5.44).
+
+**Un percorso A* di una volante non parte dalla sua posizione ma dal nodo *davanti*.** La volante è su un arco e va
+avanti fino alla fine: partire dal nodo dietro la farebbe tornare indietro, e partire da quello davanti senza vietare l'arco
+da cui arriva produce un'inversione a U in mezzo all'incrocio. `route.solve(…, avoid)` salta quell'arco solo dal nodo di
+partenza (§5.44).
+
+**Il greedy della polizia non dice «sono bloccata»: dice «ti vedo e non arrivo».** Con una baia in mezzo la linea di vista
+c'è, la distanza non cala, e lo speronamento (`tier.ram`) punta dritto nell'acqua. Il segnale è `ai.stallT` (3,5 s senza
+guadagnare 30 px), e finché dura lo speronamento è sospeso (§5.44).
+
 ## 4bis. Chiuso: il traffico si muoveva male
 
 **Segnalazione dell'utente:** *«il traffico si muove spesso in modo strano e fanno molti

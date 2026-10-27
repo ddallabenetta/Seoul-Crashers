@@ -172,9 +172,10 @@ export class RouteGuide {
    *
    * `avoid` (opzionale) è un arco che dal nodo di partenza non si può riprendere:
    * lo usa la polizia, che parte dal nodo *davanti* alla volante e non può rientrare
-   * per la strada da cui sta arrivando.
+   * per la strada da cui sta arrivando. `into` (opzionale) è un array in cui scrivere gli
+   * *id* dei nodi del percorso invece di restituire i nodi.
    */
-  solve(graph, start, goal, avoid = null) {
+  solve(graph, start, goal, avoid = null, into = null) {
     if (!start || !goal) return null;
     const nodes = graph.nodes;
     const n = nodes.length;
@@ -200,6 +201,14 @@ export class RouteGuide {
       if (closed[cur] === gen) continue;
       closed[cur] = gen;
       if (cur === goal.id) {
+        // `into`: si riempie un array di **id** dato da chi chiama, senza allocare la
+        // catena di nodi (la polizia chiede un percorso per volante ogni secondo).
+        if (into) {
+          into.length = 0;
+          for (let id = cur; id >= 0; id = from[id]) into.push(id);
+          into.reverse();
+          return into;
+        }
         const chain = [];
         for (let id = cur; id >= 0; id = from[id]) chain.push(nodes[id]);
         chain.reverse();

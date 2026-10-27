@@ -1170,18 +1170,13 @@ export class PoliceSystem {
     const start = graph.nodeById(ai.dir > 0 ? ai.edge.b : ai.edge.a);
     const goal = graph.nearestNode(tx, ty);
     // `avoid`: dal nodo davanti non si rientra per l'arco da cui si arriva (niente U).
-    const chain = game.route.solve(graph, start, goal, ai.edge);
+    const buf = ai.pathBuf || (ai.pathBuf = []);
+    const ids = game.route.solve(graph, start, goal, ai.edge, buf);
     const cs = this.chaseStats;
     const ms = performance.now() - t0;
     cs.n++; cs.ms += ms; cs.frameMs += ms;
     if (ms > cs.peak) cs.peak = ms;
-    if (!chain) {
-      // Meta in un'altra componente (Jeju, un'isola): resta il greedy, e si riprova fra un po'.
-      ai.path = { ids: null, gx: tx, gy: ty, stale: false };
-      return;
-    }
-    const ids = new Int32Array(chain.length);
-    for (let i = 0; i < chain.length; i++) ids[i] = chain[i].id;
+    // Meta in un'altra componente (Jeju, un'isola): `ids` è null, resta il greedy e si riprova.
     ai.path = { ids, gx: tx, gy: ty, stale: false };
   }
 

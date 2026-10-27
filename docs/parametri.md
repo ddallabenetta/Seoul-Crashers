@@ -326,6 +326,16 @@
 | Raggio con cui Jo parla | `story/visite` | 56 px, come `joPoint` di M2 |
 | Fruscio dei pannelli dell'Atto II | `r2-1.bed.kkachi` · `m6-7.bed.kkachi` | 0,03 · 0,03. Misurati sul master: rms 0,0048 e 0,0049 contro 0,0030 della cucina vuota di R2-2, che non ha letto |
 
+| **— polizia e guardie (§5.44) —** | | |
+| Volanti su percorso A* | `police.CHASE.on` | `true`; spento = greedy puro di prima |
+| Quando la volante segue l'A* | `CHASE.near` · `stall` | oltre 520 px dal bersaglio (si spegne sotto 364) · o dopo 3,5 s senza avvicinarsi di 30 px |
+| Ricalcolo del percorso | `CHASE.moved` · `every` · `perFrame` | bersaglio spostato di 160 px · 1 s ±20% · **un** calcolo per frame per tutta la polizia |
+| Guardie che scortano | `pedestrians.GUARD_TUNE.escort` · `max` | `true` · 4 |
+| Corona della scorta | `GUARD_TUNE.ringMin` · `ringStep` | 90 px dal giocatore, +14 px a guardia; ventaglio dietro di te a ±0,8 e ±1,6 rad |
+| Fine della scorta | `GUARD_TUNE.leave` | a 70 px oltre il recinto (isteresi) |
+| Un ostile «è nel cortile» · un agente è ostile | `GUARD_TUNE.foeMargin` · `copRange` | recinto +70 px · solo se ha il giocatore a meno di 340 px, ricercato, e non sta ammanettando |
+| Ingaggio delle guardie | `GUARD_TUNE.hold` · `range` | 150 px · 330 px (`life.engage`) |
+
 | **— l'Atto II, seconda metà (§5.42) —** | | |
 | Fascia del fermo di M7 | `m7.SERA` · mezzanotte | si può farsi arrestare dalle **20:00 alla mezzanotte**; prima si aspetta, dopo «il fermo è chiuso» e si riparte da domani sera. Con le sei ore del `bustPlayer` l'uscita cade fra le 02 e le 06 |
 | L'ora dell'uscita · le nove | `m7.USCITA` · `M7.finish` | 06:10 (`10-continuita.md`: Byeon muore alle 06:40) · poi 09:00, perché il pannello 6 lo dice |

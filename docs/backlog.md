@@ -204,8 +204,8 @@ il §5.21 altre undici — fra cui le due che erano tornate in cima.
   ancorata agli isolati di bordo: è naturale farlo in T9c, che su quel bordo prolunga i viali in provinciali.
 
 **Rimasto indietro dai cortili** (§5.31):
-- **Le guardie del cortile tuo non sono tue.** Ci stanno e non ti sparano, ma non ti seguono,
-  non si possono chiamare e non difendono niente più di prima.
+- **Le guardie del cortile tuo ti seguono ma non si possono chiamare** (§5.44): ti scortano e ti
+  difendono dentro il recinto, ma non escono con te e non c'è un comando per mandarle da qualche parte.
 - **Comprare un cortile è una riga di listino, non una trattativa.** Funziona e si capisce, ma
   il capocortile che si fa da parte non dice niente: è la scena che M5 avrà e la città no.
 - **Un cortile non produce lavoro, solo una busta.** È la superficie naturale delle attività

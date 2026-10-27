@@ -57,6 +57,7 @@ l'impianto delle missioni con M1 e M2 (§5.29). Le tappe precedenti sono §5.8-5
 | **pedinare qualcuno**, far portare un oggetto, mandare un'auto in un posto | `docs/storico/22-atto-i-completo.md` (§5.33) |
 | **contare cortili**, far leggere dei faldoni, un punto fisso come «Jo dopo M6», le chiamate dell'Atto II | `docs/storico/29-atto-ii-m5-m6-r2.md` (§5.40) |
 | **una cella o un cortile percorribili**, far arrestare apposta, **pedinare a piedi** nella folla, mettere un'altra stanza dietro una porta vera | `docs/storico/31-atto-ii-m7-m8-r3.md` (§5.42) |
+| **toccare come la polizia raggiunge il giocatore** (A* sul grafo, ricalcolo a scaglioni) o le **guardie del cortile tuo** (scorta, difesa) | `docs/storico/33-polizia-e-guardie.md` (§5.44) |
 | **scrivere una battuta di Kkachi**, o toccare la radio e la `91.45` | `docs/storico/21-kkachi.md` (§5.32) |
 | verificare headless, usare `probe.mjs`, le scene o le skill | [`docs/strumenti.md`](docs/strumenti.md) |
 | capire *perché* una parte esistente è fatta così | [`docs/storico/`](docs/storico/) |
@@ -104,6 +105,7 @@ commenti resta valido: si risolve qui.
 | §5.40 L'Atto II, prima metà: M5, M6, R2, tre chiamate di 까치, Jo dopo M6 | `docs/storico/29-atto-ii-m5-m6-r2.md` |
 | §5.41 La forma di Busan e Jeju: coste a maschera, strade da tracciati, luoghi dell'Atto III | `docs/storico/30-busan-e-jeju.md` |
 | §5.42 L'Atto II, seconda metà: M7, M8, R3, cinque chiamate di 까치, il commesso dopo M8 | `docs/storico/31-atto-ii-m7-m8-r3.md` |
+| §5.44 Polizia e guardie: volanti con A*, guardie del cortile tuo che ti scortano | `docs/storico/33-polizia-e-guardie.md` |
 | §6 Backlog | `docs/backlog.md` |
 | §8 Parametri | `docs/parametri.md` |
 | §9 Strumenti (`.claude/`) | `docs/strumenti.md` |
