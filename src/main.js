@@ -28,6 +28,7 @@ import { PickupSystem } from './entities/pickups.js';
 import { ProjectileSystem } from './entities/projectiles.js';
 import { WantedSystem } from './entities/wanted.js';
 import { PoliceSystem } from './entities/police.js';
+import { ArrestSequence } from './entities/arrest.js';
 import { ShopSystem, won } from './entities/shops.js';
 import { TurfSystem } from './entities/turfs.js';
 import { autosave, tickAutosave } from './core/save.js';
@@ -233,6 +234,7 @@ class Game {
     this.projectiles = new ProjectileSystem();
     this.wanted = new WantedSystem();
     this.police = new PoliceSystem(this.city, this.rng);
+    this.arrest = new ArrestSequence();
     this.shops = new ShopSystem(this.city);
     // I cortili. È l'unico sistema che riscrive un dato di generazione — il
     // padrone di un territorio — e l'unico pezzo di mondo che una partita cambia
@@ -356,6 +358,7 @@ class Game {
     // Gli attori non si perdono: quello che sparisce è il loro pedone, e la
     // definizione (con la morte, se è morto) resta a `ActorSystem`.
     this.actors.clearPeds();
+    this.arrest?.reset();
     this.police.standDown(this, true);
     this.projectiles.clear();
     this.fx.clear();
@@ -918,7 +921,8 @@ class Game {
     if (input.wasPressed('Escape')) {
       // `backOut` è il pannello audio del menu: ESC lì dentro torna alle voci
       // invece di chiudere tutto.
-      if (this.metro.open) this.metro.close(this);
+      if (this.mode.id === 'arrest') this.arrest.skip(this);
+      else if (this.metro.open) this.metro.close(this);
       else if (this.shopMenu.open) this.shopMenu.close(this);
       else if (this.mapView.open) { this.mapView.open = false; this.audio.ui('close'); }
       else if (!this.menu.backOut()) { this.menu.toggle(); this.audio.ui(this.menu.open ? 'open' : 'close'); }
@@ -936,7 +940,7 @@ class Game {
       this.hud.toast(this.audio.toggleMute() ? 'Audio: muto' : 'Audio: acceso', 1.6);
     }
 
-    const canUseMetro = this.metro.open || (!this.menu.open && !this.mapView.open && !this.shopMenu.open);
+    const canUseMetro = this.metro.open || (!this.menu.open && !this.mapView.open && !this.shopMenu.open && this.mode.playerRuns);
     const metroUsed = canUseMetro ? this.metro.update(dt, this) : false;
     this.updateRadioKeys();
     // L'audio gira anche in pausa: i letti si abbassano invece di spegnersi (uno
@@ -976,9 +980,14 @@ class Game {
     // giocatore è lì per la missione, la missione vince.
     // Prima delle missioni: se il pedinamento finisce in questo frame, la fase che
     // lo ascolta lo sa adesso e non al giro dopo.
-    this.tail.update(dt, this);
-    this.carry.update(dt, this);
-    this.missions.update(dt, this);
+    // Con le manette addosso (`mode.playerRuns` falso) il giocatore non fa niente
+    // di suo: né missioni, né porte, né cortili. La fase riprende da `busted`.
+    const live = this.mode.playerRuns;
+    if (live) {
+      this.tail.update(dt, this);
+      this.carry.update(dt, this);
+      this.missions.update(dt, this);
+    }
     // Subito dopo, e prima dei negozi: una fase che è appena cambiata ha già
     // spostato il blip, e l'itinerario che si disegna in questo frame è quello
     // della meta nuova. Dentro un edificio si ferma da sé (`route.update`).
@@ -987,16 +996,16 @@ class Game {
     // dentro lo stesso recinto stanno il banco della banda e la busta del cortile,
     // e chi consuma il tasto per primo alza `enterCooldown`. I due tasti sono
     // diversi apposta (`E` il banco, `F` la busta), ma l'ordine resta quello.
-    this.turfs.update(dt, this);
+    if (live) this.turfs.update(dt, this);
     // I negozi girano poi: decidono se il frame si svolge in strada o dentro
     // un edificio, e il giocatore deve muoversi già nello spazio giusto.
-    if (this.metro.inside) {
+    if (this.metro.inside || !live) {
       this.shops.actions.length = 0;
       this.shops.near = null;
     } else {
       this.shops.update(dt, this);
     }
-    this.player.update(dt, this);
+    if (live) this.player.update(dt, this);
     // Dentro un edificio la città si ferma — traffico, pedoni, raccolte — e il
     // ricercato **resta congelato**: se si raffreddasse, la porta diventerebbe il
     // nascondiglio che §5.8 non vuole. La polizia è l'unica eccezione: continua a
@@ -1006,7 +1015,8 @@ class Game {
       // Il ricercato legge l'avvistamento calcolato dalla polizia, la polizia scrive
       // gas e sterzo delle volanti: la fisica di quei veicoli la integra `traffic`,
       // che deve girare dopo.
-      this.wanted.update(dt, this);
+      // Le stelle si congelano finché dura la scena: niente raffreddamento a metà.
+      if (live) this.wanted.update(dt, this);
       this.police.update(dt, this);
       // Come la polizia: `life` scrive gas e sterzo dei mezzi che pilota (aerei,
       // barche, trattori, l'auto della fuga e le volanti di quartiere), e la
@@ -1031,12 +1041,14 @@ class Game {
     // gira: un menu aperto mette in pausa la battuta, scendere dall'auto la perde
     // (regola 5). Sta qui in fondo perché non muove niente — legge e basta.
     this.kkachi.update(dt, this);
+    // Dopo la fisica: la volante ha già mosso le ruote e il giocatore ci sta dentro.
+    this.arrest.update(dt, this);
     this.hud.update(dt);
     tickAutosave(dt, this);
 
     // Statistiche di guida. Entrare e uscire da una porta è un salto di coordinate,
     // non un chilometro percorso: durante lo stacco non si conta.
-    if (!this.indoors && this.shops.fade < 0.5) {
+    if (!this.indoors && this.shops.fade < 0.5 && live) {
       this.stats.distance += dist(prevX, prevY, this.player.x, this.player.y);
     }
     const sp = this.player.onFoot ? 0 : Math.abs(this.player.vehicle?.speed || 0);
@@ -1157,6 +1169,7 @@ class Game {
       return;
     }
     this.hud.draw(ctx, this);
+    this.arrest.draw(ctx, this);
     // Sopra l'HUD e sotto i menu: è una cosa che succede in strada, non un
     // pannello. Il mondo continua a girare mentre si legge.
     drawRadioCall(ctx, this);

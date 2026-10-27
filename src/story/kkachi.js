@@ -20,6 +20,8 @@
 // predicato è già quello definitivo e resta falso finché quella missione non
 // esiste. Non è un pezzo mancante, è una riga che non si è ancora avverata.
 import { PLAYER_GANG } from '../entities/turfs.js';
+import { HERO_OUTFITS } from '../render/sprites.js';
+import { findTurf } from './places.js';
 import { dist } from '../core/math.js';
 
 /**
@@ -65,6 +67,12 @@ function sulPonte(game) {
   const { x, y } = game.player;
   if (y < r.y0 - 10 || y > r.y1 + 10) return false;
   return r.bridges.some((b) => Math.abs(x - b.x) < b.w / 2 + 6);
+}
+
+/** Il cortile di una banda a portata di sguardo: un raggio, non un'inquadratura. */
+function davantiAlCortile(game, gangId, raggio = 520) {
+  const y = findTurf(game, gangId, game.player);
+  return !!y && dist(game.player.x, game.player.y, y.x, y.y) < raggio;
 }
 
 /** Una volante ferma nei paraggi: quelle di quartiere e quelle della caccia. */
@@ -168,6 +176,55 @@ export const CHIAMATE = [
       { kkachi: true, text: '«I martedì e i venerdì. Dodici anni. Se moltiplichi, fa una cifra che in una busta non ci sta.»' },
       { who: 'Jae-min', text: '«E dove va a finire?»' },
       { kkachi: true, text: '«Nelle perizie. Le paga qualcuno, e quel qualcuno siete voi.»' },
+    ],
+  },
+
+  // === Le chiamate dell'Atto II legate a M5 e M6 ===============================
+  //
+  // Delle otto dell'Atto II **tre** stanno qui perché il copione le lega a un momento
+  // preciso di queste due missioni; le altre cinque (campagna, primo volo, metro, la
+  // mezzanotte senza stelle, il 장례식장) sono della seconda metà della tappa F. Come le
+  // altre, ognuna è copiata da qualcosa che qualcun altro dice. L'ordine è la
+  // priorità: la riga del 1992, che vale un quarto d'ora, sopra la geografica, e questa
+  // sopra quella che dipende da un abito.
+  {
+    // origine: nessuna. Il copione la dà come «—»: è la riga in cui Kkachi, domandato
+    // su una parola che ha appena letto in un faldone, risponde con la stessa due volte.
+    // Vale **dopo aver letto la pagina del 1992** (M6, `kkachi.mark('riga1992')`) e dura
+    // un quarto d'ora di gioco: oltre, la domanda non ha più niente a cui appoggiarsi.
+    id: 'a2-riga',
+    when: (game, k) => k.since('riga1992', game) < 900,
+    lines: [
+      { who: 'Jae-min', text: '«Cos\'è un\'acquisizione?»' },
+      { kkachi: true, text: '«Una voce di bilancio.»' },
+      { who: 'Jae-min', text: '«E un bambino?»' },
+      { kkachi: true, text: '«Una voce di bilancio.»' },
+    ],
+  },
+  {
+    // origine: Kkachi, M6 (pannello 8: «So quello che è stato detto ad alta voce») —
+    // **anticipata**: il giocatore la sente passando davanti a Pyo, e la riga di M6 che
+    // la spiega arriva dopo. Aspetta M5, perché «un altro nome» è quello che Pyo ha
+    // detto e ha corretto.
+    id: 'a2-pyo',
+    when: (game) => game.missions.isDone('m5') && davantiAlCortile(game, 'hwangso'),
+    lines: [
+      { kkachi: true, text: '«Il vecchio Pyo ti ha chiamato con un altro nome.»' },
+      { who: 'Jae-min', text: '«Come lo sai?»' },
+      { kkachi: true, text: '«Perché l\'ha detto ad alta voce.»' },
+    ],
+  },
+  {
+    // origine: Ha-eun, M3 («Bel giubbotto. Le sta grande.»). Aspetta M3 per la stessa
+    // ragione per cui `a1-itaewon` aspetta la sua: la copia non esiste prima dell'originale.
+    // Il predicato è l'**abito addosso**, non l'acquisto: `HERO_OUTFITS` ha cinque giacche
+    // e quella che conta è `suit`.
+    id: 'a2-completo',
+    when: (game) => game.missions.isDone('m3') && HERO_OUTFITS[game.player.outfit]?.id === 'suit',
+    lines: [
+      { kkachi: true, text: '«Ti sta male.»' },
+      { who: 'Jae-min', text: '«È della mia taglia.»' },
+      { kkachi: true, text: '«Non ho detto che è piccolo. Ho detto che ti sta male.»' },
     ],
   },
 ];

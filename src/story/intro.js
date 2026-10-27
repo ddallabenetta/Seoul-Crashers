@@ -68,6 +68,11 @@ export const INTRO = [
   // --- Parte prima — la frequenza -------------------------------------------
   {
     id: 1,
+    // Regia sonora (`02-cutscene-iniziale.md`, pannello 1): il fruscio di banda sotto la
+    // voce, e «alla terza conta» il cane lontano. La conta dura ~3,75 s (vedi `beat`
+    // qui sotto), quindi la terza comincia a 7,5 s: il latrato cade a metà.
+    bed: { kkachi: 0.05 },
+    sfx: [{ at: 8.6, kind: 'dog', vol: 1 }],
     // Nessuna immagine: solo il fruscio e una donna che conta in coreano. Il cane
     // che abbaia sotto la terza conta torna nel 27.
     draw(P) {
@@ -322,6 +327,9 @@ export const INTRO = [
   },
   {
     id: 8,
+    // «Fruscio. Una sillaba, mangiata.»: il quadrante è il primo momento in cui la
+    // frequenza si sente dopo il pannello 1, e il copione dice dove.
+    bed: { kkachi: 0.04 },
     // Prima apparizione della frequenza, e nessuno la nomina. La lancetta si ferma
     // **fra le due tacche**: è tutto quello che c'è da vedere, e a schermo, piccola
     // com'è, non si vede — per questo lo dice il narratore.
@@ -828,6 +836,9 @@ export const INTRO = [
   },
   {
     id: 23,
+    // «Passa una volante, rallenta, non si ferma.» Il copione non dice quanto lontana:
+    // lontanissima e bassa, è un'altra strada, non un pericolo.
+    bed: { sirenFar: 0.015 },
     draw(P) {
       const ctx = P.ctx;
       wash(P, '#0c0a11', '#060509');
@@ -884,6 +895,9 @@ export const INTRO = [
   },
   {
     id: 25,
+    // «Il quadro si accende, e con lui la radio»: il fruscio rientra nel silenzio
+    // dell'auto e la lancetta si sposta senza che nessuno la tocchi.
+    bed: { kkachi: 0.035 },
     // La lancetta si sposta **da sola** di mezza tacca. Nessuno la tocca.
     draw(P) {
       const ctx = P.ctx;
@@ -934,6 +948,9 @@ export const INTRO = [
   },
   {
     id: 26,
+    // Le battute di Kkachi sono lette, non sentite: sotto resta la banda, bassa come
+    // in strada quando c'è una riga a schermo (`updateBeds`, 0.02).
+    bed: { kkachi: 0.02 },
     // TERZO INDIZIO SEMINATO QUI, ed è il più pesante: la prima frase di Kkachi.
     // Torna in M4 e in R4. Le sue righe non hanno un nome davanti — hanno il
     // quadrante — e stanno da sole nel pannello.
@@ -969,6 +986,8 @@ export const INTRO = [
   // --- Parte quinta — il titolo -----------------------------------------------
   {
     id: 27,
+    // «lo stesso cane del pannello 1»: attraversa il vicolo in fondo, dopo un secondo.
+    sfx: [{ at: 1.6, kind: 'dog', vol: 1 }],
     // I fari accesi, e non parte. In fondo al vicolo il cane del pannello 1.
     draw(P) {
       const ctx = P.ctx;

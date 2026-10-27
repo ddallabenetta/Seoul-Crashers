@@ -5,30 +5,27 @@ resta corto apposta.** Il contenuto vero sta in `docs/`, e si apre un documento 
 non tutti. Il `README.md` descrive il gioco e i comandi; qui c'è quello che serve a
 *sviluppare*. Avvio e vincoli stanno in `CLAUDE.md`, che si carica da solo.
 
-Ultimo aggiornamento: **la strada reagisce** (§5.36, tappa T2 del rework): il traffico cede il passo alle
-sirene e le volanti passano, i pedoni sentono clacson e sirene e attraversano in base alla larghezza
-vera e al semaforo, e l'invariante `dentroLamiera = 0` di `walkers-census` torna a tenere. Prima:
-**il sorpasso sulle arterie** (§5.34, tappa T1): la corsia si sceglie
-in base alla svolta, e `traffic.OVERTAKE` lo accende. Prima: **l'Atto I completo** (§5.33, tappa E) — **M3**, **M4** e il raccordo
+Ultimo aggiornamento: **il rework** — **la strada reagisce** (§5.36, T2: il traffico cede il passo alle sirene, i pedoni sentono clacson e sirene e attraversano in base alla carreggiata e al semaforo, `dentroLamiera = 0` torna a tenere), **l'Atto II, prima metà** (§5.40, T7: **M5** i tre cortili di Pyo, **M6** la torre di
+한성개발 alle 14:00, il raccordo **R2**, tre chiamate di 까치 e Jo che risponde dopo M6), **le cuciture e i bordi
+della mappa** (§5.38, T9a), **la vita negli isolati** (§5.39, T9b), **l'arresto in volante** (§5.35, T3), **la
+regia sonora dei pannelli** (§5.37, T6) e **il sorpasso sulle arterie** (§5.34, T1). Prima: **l'Atto I completo** (§5.33, tappa E) — **M3**, **M4** e il raccordo
 **R1** chiudono il primo atto, e con loro entrano le due meccaniche che il copione chiedeva da due
 tappe: il **pedinamento con soglia di distanza** e l'**oggetto di missione trasportabile**. Prima
 c'era 까치 sulla `91.45` (§5.32), i cortili persistenti (§5.31), l'itinerario sulla carta (§5.30) e
 l'impianto delle missioni con M1 e M2 (§5.29). Le tappe precedenti sono §5.8-5.28.
 
-> 📌 **Il prossimo lavoro è la tappa F**: l'Atto II — **M5-M8**, i raccordi **R2** e **R3** e le
-> **otto chiamate dell'Atto II** — ed è l'atto che chiede più cose nuove al motore. L'ordine di
-> tutte le tappe sta **in testa a [`docs/backlog.md`](docs/backlog.md) (§6.0)**, che è la prima
-> cosa da leggere prima di cominciare, e le nove decisioni d'impianto prese con l'utente stanno in
-> [`docs/storia/08-domande-aperte.md`](docs/storia/08-domande-aperte.md): leggi quelle, non
-> ricavarle dal copione. Resta aperta una domanda sola (se le missioni si rigiocano) e non blocca
-> niente. **M5 conta fino a tre** e non deve scrivere niente di quello che fa una `claim` (§5.31);
-> **M6 ha un pedinamento e un'ora** e non deve scrivere né l'uno né l'altra (§5.33). **Chi scrive
-> una missione nuova parte da §5.29 e §5.33**: un file sotto `src/story/`, una riga in
-> `story/campaign.js`, e il motore fa il resto. **Chi scrive una battuta di Kkachi parte da
-> §5.32**, con la sua `// origine:`. **Chi disegna pannelli parte da §5.28**, e li guarda con
-> `cutscene-sheet.scene` e `cutscene-panel.scene` *prima* di dire che funzionano — metà dei difetti
-> di questa tappa erano una faccia sotto al riquadro delle battute. Il resto del §6 resta ordinato
-> per impatto: arresto che ti carica in volante, e il **corridoio fra Seoul e Busan**.
+> 📌 **Il prossimo lavoro è la seconda metà della tappa F** (T8): **M7, M8, R3** e le **cinque chiamate
+> restanti dell'Atto II** (campagna, primo volo, metro, mezzanotte senza stelle, 장례식장). La prima metà
+> — M5, M6, R2 — è fatta ed è **§5.40**: lì c'è anche l'elenco di cosa lascia indietro. L'ordine di tutte
+> le tappe sta **in testa a [`docs/backlog.md`](docs/backlog.md) (§6.0)**, e le nove decisioni d'impianto prese
+> con l'utente in [`docs/storia/08-domande-aperte.md`](docs/storia/08-domande-aperte.md): leggi quelle, non
+> ricavarle dal copione. **Chi scrive una missione nuova parte da §5.29 e §5.33** (un file sotto `src/story/`,
+> una riga in `story/campaign.js`; M7 chiede una cella percorribile, M8 un pedinamento a piedi nella folla),
+> **chi scrive una battuta di Kkachi da §5.32** con la sua `// origine:`, **chi disegna pannelli da §5.28** e li
+> guarda con `cutscene-sheet.scene` e `cutscene-panel.scene` *prima* di dire che funzionano. Chi vuole una
+> «visita che cambia» (Chun-sik dopo M9, il commesso dopo M8) trova il meccanismo in §5.40
+> (`missions.standing`). Il resto del §6 resta ordinato per impatto: il **corridoio fra Seoul e Busan**. **Chi
+> tocca l'arresto parte da §5.35.**
 
 ---
 
@@ -47,9 +44,14 @@ l'impianto delle missioni con M1 e M2 (§5.29). Le tappe precedenti sono §5.8-5
 | **implementare una missione**: fasi, blip, punti, dialoghi, ripresa | `docs/storico/18-missioni-m1-m2.md` (§5.29) |
 | disegnare su mappa o minimappa, o toccare il percorso verso il blip | `docs/storico/19-itinerario-sulla-carta.md` (§5.30) |
 | toccare la proprietà di un cortile, il suo banco o la sua busta | `docs/storico/20-cortili-persistenti.md` (§5.31) |
+| dare un suono a un pannello (fruscio, cane, sirena lontana) | `docs/storico/26-regia-sonora.md` (§5.37) |
+| **toccare gli estremi delle strade**, le testate dei vicoli ciechi, il terreno attorno alle città o il bordo del mondo | `docs/storico/27-cuciture-della-mappa.md` (§5.38) |
 | toccare la corsia, il cambio corsia o il car-following del traffico | `docs/storico/23-sorpasso.md` (§5.34) |
 | toccare le **sirene sul traffico**, il clacson, come i pedoni attraversano o perché finiscono nelle lamiere | `docs/storico/25-la-strada-reagisce.md` (§5.36) |
+| toccare l'**arresto**: manette, agente che accompagna, volante che parte, `ESC` | `docs/storico/24-arresto-in-volante.md` (§5.35) |
+| **arredare** un parco, un campo, un molo o un marciapiede; aggiungere insegne o un tipo di prop | `docs/storico/28-vita-negli-isolati.md` (§5.39) |
 | **pedinare qualcuno**, far portare un oggetto, mandare un'auto in un posto | `docs/storico/22-atto-i-completo.md` (§5.33) |
+| **contare cortili**, far leggere dei faldoni, un punto fisso come «Jo dopo M6», le chiamate dell'Atto II | `docs/storico/29-atto-ii-m5-m6-r2.md` (§5.40) |
 | **scrivere una battuta di Kkachi**, o toccare la radio e la `91.45` | `docs/storico/21-kkachi.md` (§5.32) |
 | verificare headless, usare `probe.mjs`, le scene o le skill | [`docs/strumenti.md`](docs/strumenti.md) |
 | capire *perché* una parte esistente è fatta così | [`docs/storico/`](docs/storico/) |
@@ -90,6 +92,11 @@ commenti resta valido: si risolve qui.
 | §5.33 L'Atto I completo: M3, M4, R1, pedinamento e fogli | `docs/storico/22-atto-i-completo.md` |
 | §5.34 Il sorpasso: corsia in base alla svolta | `docs/storico/23-sorpasso.md` |
 | §5.36 La strada reagisce: sirene, clacson, attraversamenti | `docs/storico/25-la-strada-reagisce.md` |
+| §5.35 L'arresto in volante | `docs/storico/24-arresto-in-volante.md` |
+| §5.37 La regia sonora dei pannelli: `bed` e `sfx` | `docs/storico/26-regia-sonora.md` |
+| §5.38 Le cuciture della mappa: spuntoni, testate, fascia scura, bordi del mondo | `docs/storico/27-cuciture-della-mappa.md` |
+| §5.39 Vita negli isolati: tipologie di parchi e campi, arredo, insegne, moli | `docs/storico/28-vita-negli-isolati.md` |
+| §5.40 L'Atto II, prima metà: M5, M6, R2, tre chiamate di 까치, Jo dopo M6 | `docs/storico/29-atto-ii-m5-m6-r2.md` |
 | §6 Backlog | `docs/backlog.md` |
 | §8 Parametri | `docs/parametri.md` |
 | §9 Strumenti (`.claude/`) | `docs/strumenti.md` |
@@ -216,6 +223,13 @@ meccaniche che tornano in M6 e M9: **il pedinamento** (troppo lontano lo perdi, 
 vede) e **l'oggetto che si porta in mano**, che morendo resta per terra dov'eri. E quando Kkachi
 dice «abbassa», il gioco abbassa **la manopola vera** e non la rialza.
 
+**E il nome è stato detto** (§5.40). Un vecchio strozzino presta *un mese in cui nessuno bussa* in cambio di tre
+cortili — si prendono sparando, comprando, o portando via le tre auto che il 철마파 smontava e rivendendole — e
+sbaglia il nome di Jae-min di mezzo secondo. Poi la torre di 한성개발 alle 14:00, dalla porta in completo o
+dietro una berlina che si pedina: sette faldoni, e in uno una riga del 1992 che il gioco **non commenta**, solo
+tre secondi di silenzio. R2 è la stessa cucina due volte, una con la radio accesa. Jo, dopo, mette sul banco
+l'accendino inciso.
+
 **E adesso si sa dove andare** (§5.30). La meta della missione è un rombo con l'alone su tutte
 e due le carte, con il suo nome sulla mappa piena e, quando esce dal ritaglio della minimappa,
 una punta sul bordo che la guarda con scritto quanto manca. Sotto ci passa **la strada da
@@ -227,7 +241,7 @@ La Fase 2 era divisa in tre tappe, concordate con l'utente: **A** combattimento 
 **B** polizia e ricercato a 5 livelli, **C** armi pesanti ed esplosivi. **Sono tutte fatte.**
 La Fase 3 (contenuti) è cominciata da **negozi e interni** (§5.8), poi la mappa (§5.9) e il
 ciclo giorno-notte (§5.11); il §5.12 ha chiuso gli arretrati. **Dei tre atti della campagna il
-primo è fatto** (M1-M4 e R1): restano l'Atto II, l'Atto III e i finali, §6.
+primo è fatto** (M1-M4 e R1) **e il secondo è a metà** (M5, M6, R2): restano M7, M8, R3, l'Atto III e i finali, §6.
 
 ---
 

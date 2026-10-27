@@ -17,7 +17,7 @@ sigillate, marcatori, testo su più righe). Quello che resta è **contenuto**, i
 | ~~3~~ | ~~**C**~~ | ~~**cortili persistenti** (nel salvataggio, con effetto sul commercio)~~ — **fatta**, §5.31 | — |
 | ~~4~~ | ~~**D**~~ | ~~Kkachi: stazione `91.45`, tabella con predicato, le otto chiamate dell'Atto I e le dodici righe di servizio~~ — **fatta**, §5.32 | — |
 | ~~5~~ | ~~**E**~~ | ~~Atto I completo (M3, M4) + R1~~, e con loro **pedinamento** e **oggetto trasportabile** — **fatta**, §5.33 | — |
-| 6 | **F** | Atto II (M5-M8) + R2, R3 + le otto chiamate dell'Atto II | l'atto che chiede più cose nuove al motore — **è la prossima** |
+| 6 | **F** | Atto II (M5-M8) + R2, R3 + le otto chiamate dell'Atto II | l'atto che chiede più cose nuove al motore — **metà fatta (T7, §5.40): M5, M6, R2, le chiamate 11, 12 e 14, Jo dopo M6. Resta T8: M7, M8, R3 e le chiamate 9, 10, 13, 15, 16** |
 | 7 | **G** | Atto III (M9-M12) + R4 + le otto chiamate dell'Atto III **e l'incontro facoltativo di Busan** | il viaggio: ha bisogno di tutto quello di prima |
 | 8 | **H** | i tre finali, i titoli di coda, la scena dopo | e a quel punto la Fase 3 è chiusa |
 
@@ -88,14 +88,13 @@ regola che conta: **ogni battuta è copiata da qualcun altro**, e il commento `/
 prova, non una nota.
 
 **Quello che la tappa D lascia indietro:**
-- **la regia sonora dell'apertura** (fruscio di banda sotto la voce che conta, il cane, la
-  sirena lontana). Il timbro del fruscio adesso c'è ed è quello giusto (`audio.beds.kkachi`),
-  quindi resta da fare un **aggancio dei suoni ai pannelli** — `ui/cutscene.js` non ce l'ha — e
-  tre suoni nuovi;
+- ~~la regia sonora dell'apertura~~: **fatta**, §5.37 (campi `bed` e `sfx` sul pannello). Restano
+  senza suono i pannelli di M3 e M4, per scelta;
 - ~~l'ottava chiamata dell'Atto I aspetta M3~~: **fatto**, §5.33 — quella riga adesso esce, e il
   predicato non è stato toccato;
 - **le «visite che cambiano»** (Jo dopo M6, Chun-sik dopo M9, il commesso dopo M8) stanno nello
-  stesso capitolo del copione ma non sono chiamate radio: restano alle tappe delle loro missioni.
+  stesso capitolo del copione ma non sono chiamate radio: restano alle tappe delle loro missioni
+  (Jo: **fatto**, §5.40).
 
 **Cosa la tappa E (§5.33) ha già tolto di mezzo**, e che quindi le tappe F e G non devono più
 affrontare — sono le due meccaniche che M1 e M2 avevano lasciato indietro, più tre cose che sono
@@ -114,13 +113,27 @@ saltate fuori scrivendo l'atto:
   (`actors.die`), che serve a chiunque debba far cadere un personaggio a metà di un'altra cosa.
 
 **Quello che la tappa E lascia indietro:**
-- **Jo che risponde in modo diverso dopo M6** (le «visite che cambiano»,
-  [`storia/07-radio-kkachi.md`](storia/07-radio-kkachi.md)): oggi il banco dice sempre le stesse
-  cose una volta finita M2. È della tappa F, che è quella di M6;
+- ~~**Jo che risponde in modo diverso dopo M6**~~ (le «visite che cambiano»,
+  [`storia/07-radio-kkachi.md`](storia/07-radio-kkachi.md)): **fatto**, §5.40 — e con lei il
+  meccanismo (`missions.standing`, `afterRestore`) per le altre due, che restano alle loro missioni
+  (Chun-sik dopo M9, il commesso dopo M8);
 - **la gru non si scala.** È l'unica cosa del copione di M4 che non si è potuta fare: una quota
   percorribile non c'è, e dalla gru si vede il porto perché la camera si allarga. Il giorno che
   qualcuno vorrà i tetti, quella scena ne è il primo cliente;
 - **un secondo oggetto in mano insieme al primo**, il giorno che una missione ne chiederà due.
+
+**Cosa la tappa T7 (§5.40) lascia alla seconda metà della F.** M5, M6 e R2 non hanno chiesto niente di nuovo
+al motore oltre a **punti fissi** (`missions.standing`: un personaggio che c'è sempre e risponde in modo
+diverso), **un hook dopo il caricamento** (`afterRestore`) e **un evento** (`vehicleSold`). Quello che manca
+per M7 e M8:
+
+- **M7**: l'interno di un commissariato e una cella percorribile, e una missione che chiede di **farsi**
+  arrestare (`busted` c'è, §5.35: la scena della cella è il pezzo mancante);
+- **M8**: un inseguimento «a vista» senza marcatore, un pedinamento **a piedi** (`core/tail.js` vuole un
+  veicolo: `begin` accetta solo quello) e un secondo personaggio con lo sprite del giocatore;
+- **la torre di M6** non sale: l'ottavo e il ventesimo piano sono lo stesso piano, e l'allarme non ha una
+  volante fuori (§5.40, in fondo). Se M7 la vuole, il posto è la fase `allarme` di `story/m6.js`;
+- **un tetto da cui entrare**: la terza strada d'ingresso di M6.
 
 **Rimasto indietro da 까치** (§5.32):
 - **Le chiamate perse non si vedono da nessuna parte.** Il conto c'è (`kkachi.missed`) e per
@@ -134,6 +147,18 @@ saltate fuori scrivendo l'atto:
   regia vera vorrebbe che aspettasse un momento.
 
 ---
+
+## 6.1 — Dopo la vita negli isolati (§5.39)
+
+- **Busan resta sotto Seoul per insegne** (0,29 → ~0,62 per edificio contro ~1,07): solo 364 edifici
+  su 815 hanno un lato strada e quasi tutti avevano già un'insegna. Il resto lo dirà la forma nuova di
+  Busan (T9d): il passo `blocklife` si limita a leggere quello che trova.
+- **Le tipologie dei parchi sono statiche**: niente gente che gioca a basket, niente bancarelle
+  servite. I pedoni non sanno che l'area giochi o il mercato esistono (`life.js` potrebbe dare loro un
+  motivo per andarci).
+- **La campagna del corridoio** (`campagna`, nessun blocco `rural`) non riceve niente: è il lavoro di T9c,
+  e le funzioni di `blocklife` valgono per qualunque blocco con `fields`.
+- **Gli animali** non ci sono: i pascoli hanno recinto e abbeveratoio, non mucche.
 
 ## 6. Backlog successivo (già concordato con l'utente)
 
@@ -163,10 +188,20 @@ prima: il §5.12 ha pagato diciannove voci di questo elenco, il §5.13 ha chiuso
 il §5.21 altre undici — fra cui le due che erano tornate in cima.
 
 **Le cose che si sentono di più, oggi:**
-- **Non ti caricano in volante.** L'arresto c'è (§5.16), ma è uno stacco: manette, nero,
-  commissariato. Vedere l'agente che ti ammanetta e la volante che parte vorrebbe
-  un'animazione e un pezzo di regia della camera. **È la voce più visibile rimasta.**
+- ~~Non ti caricano in volante.~~ Fatto in §5.35 (`entities/arrest.js`). Resta indietro: nei dieci posti provati la volante
+  arriva sempre, ma i casi lenti (una nascita lontana, 10-11 s) restano; non c'è un pannello a pixel del
+  momento in cui ti caricano.
 - ~~Nessuno sorpassa.~~ Fatto in §5.34 (`traffic.OVERTAKE`): la corsia segue la svolta.
+
+**Scene che a volte falliscono sotto carico** (rilevato nel rework):
+- `atto-1.scene` → `gruSiSale` e `arresto.scene` → `attraversaLeFasi`/`campione9su10` sono falliti una volta ciascuno
+  con la macchina carica di altri probe, e passano alla riprova (tre su tre anche su `main`). Aspettano a tempo
+  di orologio, non di simulazione: vanno portate a passi di `game.loop` prima di farne un controllo di CI.
+
+**Rimasto indietro dalle cuciture** (§5.38):
+- **Fra l'ultimo isolato di Seoul e il prato resta una striscia di terra scura** (~150 px a zoom 1, a sud e a est):
+  la sfumatura parte da `GROUND_RIM` px dentro il confine dell'area, non dal bordo dell'ultimo isolato. Va
+  ancorata agli isolati di bordo: è naturale farlo in T9c, che su quel bordo prolunga i viali in provinciali.
 
 **Rimasto indietro dai cortili** (§5.31):
 - **Le guardie del cortile tuo non sono tue.** Ci stanno e non ti sparano, ma non ti seguono,
@@ -294,10 +329,12 @@ il §5.21 altre undici — fra cui le due che erano tornate in cima.
   banchina e treno si vedono e si percorrono; dopo la scelta, però, il tempo avanza e il
   personaggio arriva senza tariffa, biglietto né sequenza di KTX. Adesso però è una comodità e
   non l'unica via, quindi pesa meno di prima.
-- **Il bordo di una città resta leggibile a terra.** La tinta del terreno si interpola fra i
-  distretti e la campagna si dirada, ma dove finiscono gli isolati la trama cambia di colpo. Si
-  legge come «qui finisce Seoul», che è quasi giusto — una periferia vera vorrebbe capannoni,
-  svincoli e case sparse.
+- **Il bordo di una città resta leggibile a terra, ma adesso sfuma** (§5.38: niente più bande
+  per tile né spuntoni di asfalto; le vie cieche hanno una testata). Una periferia vera
+  vorrebbe ancora capannoni, svincoli e case sparse. **T9c**: prolungando un viale in provinciale
+  si toglie la testata del nodo con `rimuoviTestata` e si allunga il segmento. **T9d** rifà la
+  forma di Busan e Jeju: le testate di quei bordi (nodi di Busan nord/costa e i sette di Jeju) vanno
+  ricalcolate, `accorciaStrade` le rigenera da sola.
 - **Lasciare una città non conserva il suo stato locale.** `ShopSystem` e gli interni non
   ricordano casse svuotate, spese e vendite di una città quando si è dall'altra parte del paese.
   Con una mappa sola non c'è più un momento in cui «si lascia una regione», quindi il difetto è

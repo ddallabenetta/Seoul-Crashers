@@ -292,3 +292,32 @@
 | Sorpasso della volante | `police.followRoads` | passa dalla corsia opposta (scarto `-2·laneOffset`, a 120 px/s) solo se la fascia è libera per `len/2 + 170 + 0,75·v` px; tetto 280 px/s mentre passa, altrimenti il vecchio freno a 60 |
 | Reazioni dei pedoni | `pedestrians.PED_TUNE` | `react` (clacson e sirene) e `crossSmart` (attraversamenti) li spengono. `hornR` 240 px · `hornNear` 120 px · `sirenR` 320 px · `greenMargin` 1 s di rosso che deve avanzare oltre la traversata · `maxWait` 10 s oltre cui non si aspetta il verde |
 | Passo svelto | `p.hurryT` | ×2,0 al posto di ×1,45 per 1,8 s dopo un clacson, 3 s dopo una sirena |
+| **— vita negli isolati (§5.39) —** | | |
+| Seme del passo | `blocklife.SALT` | `0x5eb1fe`, mescolato con la posizione del blocco: un rng per blocco, indipendente dall'ordine di visita e da quello principale |
+| Peso delle tipologie di parco | `blocklife.PARK_TYPES[k].w` · `.min` | stagno 1 · campo 1,2 · 정자 0,9 · giochi 1,1 · mercato 0,8 · orti 1 · piazzale 0,8 · bosco 0,25; ogni vicino uguale entro 900 px divide il peso per `1 + 3n` |
+| Temi della campagna | `blocklife.RURAL_THEMES` | pesi per regione (Jeju: frutteto 3,2; Busan: serre 2,2); 66% degli appezzamenti segue il tema, 20% un altro, 14% resta com'è |
+| Zona vietata dei cortili di banda | `blocklife.makeCtx` | il centro, 56% per lato: lì si sgombra e si resta sei secondi |
+| Arredo urbano | `blocklife.STREET_MIX` · passo 74 px | probabilità per candidato = deficit di densità rispetto a Seoul × 1,1 (max 0,9); Seoul ha deficit 0 |
+| Insegne | `blocklife.addSigns` | probabilità = deficit di insegne per edificio × 1,5 (max 0,9); fino a 2 insegne sul palazzo con lato strada, 1 sugli altri |
+| Testate e spuntoni | `korea.TESTATA_LUNGHEZZA` · `SPUNTONE_MIN` | asfalto oltre il nodo di un vicolo cieco = larghezza + 44 px (l'auto che inverte sborda) · apron dipinto di 44 px se la via finiva sul nodo · sotto 40 px di spuntone non si taglia (§5.38) |
+| Terreno attorno alle città | `ground.GROUND_BLEND` · `GROUND_RIM` · `GROUND_N` | 80 px di sfumatura oltre il bordo; la rampa comincia 260 px dentro e arriva a prato 130 px dentro · 17 campioni per tile (§5.38) |
+| Rilievo sul bordo | `ground.RELIEF_EDGE` · `RELIEF_EDGE_MIN` · `korea.EDGE_BLEND` | ombreggiatura al 10% sul bordo, piena a 800 px · raccordo di quota 1300 px (§5.38) |
+| Foce del Han | `ground.BLEND_FOCE` · `SEA_X0` | 260 px di sfumatura fiume→mare · il mare occidentale si sfuma da x=-900 (§5.38) |
+
+| **— l'Atto II, prima metà (§5.40) —** | | |
+| Quanti cortili chiede Pyo | `m5.CORTILI` | 3: due degli 흑사파 passano al 철마파 all'inizio della missione, più quello che Seoul ha già |
+| Auto da smontare per cortile | `m5.AUTO_PER_CORTILE` | 3, ferme nel mezzo del recinto a 40 px una dall'altra; ne nasce una nuova per ogni rovinata o abbandonata finché non ne sono state **vendute** tre |
+| Dove nascono le auto | `m5.RAGGIO_AUTO` | 900 px dal cortile: più vicino di così non si vedono nascere |
+| Dove comincia la scena con Pyo · dove saluta il ragazzo | `m5.INGRESSO` · `m5.USCITA` | 170 px dal centro del cortile · 210 px |
+| Morti nella fase dei cortili per cui Pyo se ne accorge | `m5.MORTI_PER_PYO` | 3: una riga in più al ritorno, nessun prezzo che sale |
+| Appuntamento della torre | `m6.APPUNTAMENTO` · `FINESTRA` · `CHIUSURA_ORE` | 14:00, con 0,6 h di anticipo concesso, e **fino alle 17**: oltre l'ufficio non riceve e si aspetta il giorno dopo |
+| Silenzio dopo la riga del 1992 | `m6.SILENZIO` | 3 s senza pannello, battuta né musica, prima dell'allarme |
+| Dove comincia la fase della porta | `m6.ARRIVO` | 170 px dalla porta della torre |
+| Sosta della berlina al 편의점 | `m6.SOSTA` | 3 s, poi riparte per la torre. Velocità del giro: 112 px/s (`avviaGiro`) |
+| Fasce del pedinamento di M6 | `tail.SPOT` · `LOSE` | **quelle di §5.33**: 132 e 620 px. M6 non ne passa di proprie |
+| Faldoni sul piano | `m6.DOCS` | sette, di cui tre inutili e uno solo che esce dopo l'atto di cessione; stanno ad almeno 60 px dalle scale e a 44 px l'uno dall'altro |
+| Sparare dentro la torre | `m6.controllaTorre` | tre stelle **mentre si è dentro**: chiude l'archivio fino alle 14:00 del giorno dopo |
+| Quanto vale la riga del 1992 per 까치 | `story/kkachi` `a2-riga` | 900 s di gioco dopo la lettura |
+| Raggio della chiamata davanti a Pyo | `story/kkachi.davantiAlCortile` | 520 px dal centro del cortile del 황소파 |
+| Raggio con cui Jo parla | `story/visite` | 56 px, come `joPoint` di M2 |
+| Fruscio dei pannelli dell'Atto II | `r2-1.bed.kkachi` · `m6-7.bed.kkachi` | 0,03 · 0,03. Misurati sul master: rms 0,0048 e 0,0049 contro 0,0030 della cucina vuota di R2-2, che non ha letto |

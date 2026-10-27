@@ -182,7 +182,7 @@ export class Scene {
       if (p.x < view.x || p.x > view.x + view.w || p.y < view.y || p.y > view.y + view.h) continue;
       list.push({ t: 3, o: p, d: (p.x - ccx) ** 2 + (p.y - ccy) ** 2 });
     }
-    if (game.player.onFoot) {
+    if (game.player.onFoot && !game.arrest.hidden) {
       list.push({ t: 4, o: game.player, d: (game.player.x - ccx) ** 2 + (game.player.y - ccy) ** 2 });
     }
     if (game.pickups) {
@@ -1066,8 +1066,9 @@ export class Scene {
     const oy = (pl.y - cam.cy) * f;
     const frame = pl.dying ? 0 : Math.floor(pl.animT) % PED_FRAMES;
     // Con un'arma da fuoco in pugno la posa cambia: braccia tese verso il mirino.
-    const aiming = !pl.dying && !WEAPONS[pl.weapon].melee;
-    const spr = getHeroSprite(frame, aiming ? 'aim' : 'walk', pl.outfit);
+    const cuffed = !!game?.arrest.active;
+    const aiming = !pl.dying && !cuffed && !WEAPONS[pl.weapon].melee;
+    const spr = getHeroSprite(frame, cuffed ? 'cuffed' : aiming ? 'aim' : 'walk', pl.outfit);
     ctx.save();
     ctx.translate(pl.x + ox * 0.7, pl.y + oy * 0.7);
     ctx.rotate(pl.angle);
@@ -1077,7 +1078,7 @@ export class Scene {
     }
     ctx.drawImage(spr.canvas, -spr.w / 2, -spr.h / 2, spr.w, spr.h);
     // L'arma va sopra la sagoma, non sotto: è quello che si deve leggere per primo.
-    if (!pl.dying) drawHeldWeapon(ctx, pl.weapon, game ? game.time * 34 * pl.spin : 0);
+    if (!pl.dying && !cuffed) drawHeldWeapon(ctx, pl.weapon, game ? game.time * 34 * pl.spin : 0);
     ctx.restore();
   }
 

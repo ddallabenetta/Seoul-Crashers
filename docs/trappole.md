@@ -455,3 +455,76 @@ due quinti in alto a sinistra: un personaggio disegnato con `groundY` sul bordo 
 sotto il gradiente e sparisce. Peggio: con cinque voci il riquadro **esce dal pannello** e la
 prima riga finisce oltre il bordo di sopra. Si guarda con `cutscene-panel.scene`, non si indovina
 — e quando non ci sta, si taglia la battuta o si divide la tavola in due (§5.33).
+
+**Dentro un negozio `police.update` non gira, e con lui ogni cronometro che ci vive.** La barra del
+fermo (`arresting`/`bustT`) restava congelata a metà mentre si era al riparo, e riprendeva da dov'era
+all'uscita (§5.35). Vale per qualunque stato di polizia che si aggiorna in `update` e non in `siege`:
+quello che deve smettere di contare entrando da una porta va azzerato **in `siege`**.
+
+**`followRoads` non porta a una destinazione ferma.** Sceglie a ogni incrocio l'arco che *avvicina di
+più* al bersaglio: regge un inseguimento (il bersaglio si avvicina da sé) ma su un punto fermo una
+volante su due girava attorno all'isolato. Per mandarla in un posto si passa il **nodo dopo di un A\***
+(`police.escortWaypoint`, ricalcolato solo quando cambia arco) e non il posto (§5.35).
+
+**Una modalità con `playerRuns: false` non ferma niente da sola.** `mode.playerRuns` non lo legge
+nessuno per conto suo: chi vuole il giocatore fermo mentre il mondo gira deve gatare a mano
+`player.update` e **ogni sistema che consuma tasti** (negozi, metro, cortili, missioni) — in
+`main.update` lo fa `live` (§5.35). Un tasto che resta vivo è una porta che si apre sotto le manette.
+
+**Una scena che campiona «ogni mezzo secondo» con `floor(t/500) > tr.length` campiona ogni decimo.**
+Il contatore recupera finché non raggiunge l'orologio, quindi dopo una pausa (una fase che comincia)
+sembra di vedere un agente che cammina a 8 px/s: è un'illusione dello script, non del gioco.
+**Un'aggiunta in coda può spostare una missione.** M4 cerca il prop `crane` più vicino all'ufficio
+del molo: una gru nuova con lo stesso tipo cambia il bersaglio. Le gru del §5.39 sono `harborcrane`.
+
+**`queryRect` dice «c'è un edificio» e non è vero.** Restituisce i candidati delle *celle*, non chi
+sovrappone: il test esatto va rifatto sul risultato (`blocklife.hasSolid`). E contare i prop
+solidi come «già occupato» salta i campi di Jeju (ci sono `ac_unit` dei cortili, che nei campi si
+tolgono); un `turf` può coprire un intero molo, quindi si vieta solo il suo centro (§5.39).
+**Un `x1` di area è già fuori dall'area.** `areaAt` è aperto a destra (`x < x1`), quindi
+`districtAt(7200, y)` risponde campagna: campionare il bordo esatto di Seoul dipingeva una
+riga verde larga un passo di campionamento. Per leggere il distretto del bordo si clampa a `x1 - 1`
+(§5.38).
+
+**Uno smoothstep non è un raccordo.** Parte con derivata zero: se la città scende di 0,09 px/px
+sul bordo e la campagna la prosegue piatta, l'hillshade disegna una striscia chiara e una parete
+scura. Il raccordo di quota deve continuare la pendenza uscente (`korea.elevationAt`, §5.38).
+
+**Un `createLinearGradient(left, …)` per tile è un mare a scacchi.** Il gradiente va ancorato a
+un'ascissa del mondo (`SEA_X0`), non al bordo del tile che si sta disegnando (§5.38).
+
+**Accorciare una via non è allungarla.** `regions.reindex` scarta gli edifici che toccano i
+`segments`: allungare un segmento per far stare una testata faceva sparire edifici. Le testate si
+dipingono (`ground.drawTestata`), non si aggiungono alla carreggiata (§5.38).
+
+
+**`teleport` di una scena esce dal negozio, e il punto di piano non compare.** Una prova che porta il
+giocatore su un faldone, su Jo o su un punto di una pianta con la stessa funzione con cui lo porta in
+strada lo **fa uscire** (`shops.leave`): il suggerimento non c'è e `p.run` gira lo stesso, quindi la
+prova dice `true` su un'azione che nessuno vedrebbe. Dentro si cambia `pl.x/y` e si fa `camera.snapTo`
+(§5.40, `atto-2.scene`).
+
+**Un indirizzo di `places.js` non ha la normale della porta.** `{ shop, id, level, x, y }`: `nx`/`ny`
+stanno su `addr.shop`. `addr.nx` è `undefined` e `x + nx * 18` è `NaN`, che il teletrasporto accetta
+senza lamentarsi — e il giocatore finisce dove non c'è niente (§5.40).
+
+**Una fase di soli pannelli si chiama come le dai.** `panelPhase('m6-chiusura', …)` è la fase
+`m6/m6-chiusura`, non `m6/chiusura`: una scena che aspetta il nome «giusto» resta ferma e il
+`finoA` scade senza dire perché.
+
+**Una chiamata di 까치 che deve uscire in una prova viene rubata da un'altra.** La tabella è una
+priorità, e basta che piova (`a1-pioggia`) o sia notte perché la chiamata che si sta provando non parta.
+Per provarne una sola si segnano le altre come `done` (§5.40).
+
+**Una definizione di attore nata in una missione finita non sopravvive a un caricamento.** `prepare`
+gira solo per la missione in corso: Jo, definita da M2, dopo un salvataggio non c'era più e il banco
+tornava a un commesso qualunque. Chi deve esserci **dopo** la sua missione si ridefinisce da sé in
+`missions.afterRestore` (§5.40).
+
+**`moored` + `protect` sopravvive a `clearWorld`.** Un'auto della storia che deve sparire con un
+caricamento (le tre del cortile di M5) è solo `protect`: `moored` la farebbe restare in `game.vehicles`
+attraverso ogni partita nuova e ogni ricarica.
+
+**`figure(..., 'seat', { crop })` con un `crop` piccolo è una testa sola.** Il corpo comincia alla cella
+24: `crop: 26` per un bambino seduto dà una faccia che galleggia, `crop: 46` dà busto e gambe. E sotto il
+60% del pannello c'è il riquadro delle battute (§5.33).

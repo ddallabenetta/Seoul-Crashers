@@ -1204,7 +1204,8 @@ export class Hud {
     if (metroHint) lines.push(L.controls
       ? metroHint.replace(/^\s*E\s*[—-]\s*/i, '')
       : metroHint);
-    if (!game.indoors) {
+    // Ammanettato non si sale in macchina da soli: l'invito sarebbe una presa in giro.
+    if (!game.indoors && !game.arrest.active) {
       if (p.onFoot) {
         const v = p.findNearbyVehicle(game);
         if (v) lines.push(L.controls
