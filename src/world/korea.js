@@ -862,6 +862,19 @@ export function createKorea() {
     const a = areaAt(x, y);
     return a ? a.city.isWater(x - a.x0, y - a.y0) : geo.seaAt(x, y);
   };
+  // Acqua per chi **naviga**: sotto un ponte l'impalcato è terra per le auto (`isWater`
+  // falso) ma c'è mare fra i piloni (§5.41).
+  korea.isNavigable = (x, y) => {
+    if (korea.isWater(x, y)) return true;
+    const a = areaAt(clamp(x, 0, KOREA.w - 1), clamp(y, 0, KOREA.h - 1));
+    return !!(a && a.city.underDeck && a.city.underDeck(x - a.x0, y - a.y0));
+  };
+  korea.bridges = [];
+  korea.pylons = [];
+  for (const part of parts) {
+    for (const b of part.city.bridges || []) korea.bridges.push({ ...b, x: b.x + part.x, y: b.y + part.y });
+    for (const q of part.city.pylons || []) korea.pylons.push({ ...q, x: q.x + part.x, y: q.y + part.y });
+  }
   korea.elevationAt = (x, y) => {
     const a = areaAt(x, y);
     if (a) return a.city.elevationAt(x - a.x0, y - a.y0);

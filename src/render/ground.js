@@ -816,6 +816,11 @@ export class GroundRenderer {
       }
     }
 
+    // Ponti (§5.41): l'impalcato è terra per chi guida, ma sotto c'è mare. Niente battigia
+    // sui suoi bordi; il disegno (ombra sull'acqua, cordoli, piloni) sta in fondo.
+    const ponti = (city.bridges || []).filter((b) => b.x < xEnd + 40 && b.x + b.w > ox - 40 && b.y < yEnd + 40 && b.y + b.h > oy - 40);
+    const suPonte = (x, y) => ponti.some((b) => x > b.x - 14 && x < b.x + b.w + 14 && y > b.y - 14 && y < b.y + b.h + 14);
+
     // Spiaggia (§5.41): Busan e Jeju hanno una maschera con la distanza dalla riva
     // (`shoreDist`). La terra entro `SHORE_R` px dall'acqua diventa sabbia o basalto
     // (`shoreKind`, a macchie larghe): prima restava il fondo scuro del distretto,
@@ -843,7 +848,7 @@ export class GroundRenderer {
       let prevWet = city.isWater(ox - step / 2, y + step / 2);
       for (let x = ox; x <= xEnd; x += step) {
         const wet = city.isWater(x + step / 2, y + step / 2);
-        if (wet !== prevWet && !inSa(x, y + step / 2) && !inSa(x - 1, y + step / 2)) {
+        if (wet !== prevWet && !inSa(x, y + step / 2) && !inSa(x - 1, y + step / 2) && !suPonte(x, y + step / 2)) {
           const shoreX = x;
           const landSide = wet ? -1 : 1;
           g.fillStyle = 'rgba(102,91,67,0.72)';
@@ -864,7 +869,7 @@ export class GroundRenderer {
       let prevWet = city.isWater(x + step / 2, oy - step / 2);
       for (let y = oy; y <= yEnd; y += step) {
         const wet = city.isWater(x + step / 2, y + step / 2);
-        if (wet !== prevWet && !inSa(x + step / 2, y)) {
+        if (wet !== prevWet && !inSa(x + step / 2, y) && !suPonte(x + step / 2, y)) {
           const shoreY = y;
           const landSide = wet ? -1 : 1;
           // Entro `BLEND_FOCE` dal bordo di Seoul la riva ricalca la banchina grigia
@@ -888,6 +893,21 @@ export class GroundRenderer {
       if (!city.isWater(x, y)) continue;
       g.fillStyle = `rgba(155,205,228,${0.035 + hash2(i, i * 3) * 0.05})`;
       g.fillRect(x, y, 22 + hash2(i * 5, oy) * 88, 2);
+    }
+
+    for (const b of ponti) {
+      g.fillStyle = 'rgba(0,0,0,0.26)';
+      g.fillRect(b.x + 14, b.y + 18, b.w, b.h);
+      g.fillStyle = '#5d6064';
+      g.fillRect(b.x, b.y, b.w, b.h);
+      g.fillStyle = 'rgba(255,255,255,0.18)';
+      if (b.w > b.h) { g.fillRect(b.x, b.y, b.w, 3); g.fillRect(b.x, b.y + b.h - 3, b.w, 3); } else { g.fillRect(b.x, b.y, 3, b.h); g.fillRect(b.x + b.w - 3, b.y, 3, b.h); }
+    }
+    for (const q of city.pylons || []) {
+      if (q.x > xEnd || q.x + q.w < ox || q.y > yEnd || q.y + q.h < oy) continue;
+      g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(q.x + 5, q.y + 6, q.w, q.h);
+      g.fillStyle = '#8d9094'; g.fillRect(q.x, q.y, q.w, q.h);
+      g.fillStyle = '#b8bbbf'; g.fillRect(q.x + 4, q.y + 4, q.w - 8, q.h - 8);
     }
 
     // I moli sono superfici calpestabili e devono tornare sopra la maschera.

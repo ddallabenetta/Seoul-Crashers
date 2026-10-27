@@ -87,7 +87,7 @@ const DISTRICTS = [
   {
     id: 'hongdae', name: 'Seomyeon', hangul: '서면', subtitle: 'Nightlife, neon e il crocevia del metro',
     seed: { x: 0.55, y: 0.36 }, block: { minLot: 58, maxLot: 116, gapChance: 0.12 }, grid: { step: [128, 222], superblock: 0.12, jog: 0.32 },
-    heights: [42, 150], styles: ['brick', 'concrete', 'panel', 'glass'], facade: ['#6e5a8c', '#8f4f70', '#4f7f9c', '#9a7b50', '#5a6a9a'], roof: '#3c3846',
+    heights: [70, 230], styles: ['brick', 'concrete', 'panel', 'glass'], facade: ['#6e5a8c', '#8f4f70', '#4f7f9c', '#9a7b50', '#5a6a9a'], roof: '#3c3846',
     accent: '#ff4fa8', accent2: '#4fe0ff', ground: '#2c2d36', sidewalk: '#565a66', signDensity: 0.95, treeDensity: 0.12,
     signWords: ['서면', '돼지국밥', '노래방', '술집', '밀면', 'PC방', '호프', '치킨', '편의점'],
     mix: {
@@ -143,7 +143,7 @@ const DISTRICTS = [
   },
   {
     id: 'gimpo', name: 'Sasang', hangul: '사상', subtitle: 'Il Nakdong, le officine e lo scalo ferroviario',
-    seed: { x: 0.34, y: 0.2 }, block: { minLot: 154, maxLot: 292, gapChance: 0.28 }, grid: { step: [310, 520], superblock: 0.38, jog: 0.08 },
+    seed: { x: 0.34, y: 0.2 }, block: { minLot: 90, maxLot: 190, gapChance: 0.2 }, grid: { step: [310, 520], superblock: 0.38, jog: 0.08 },
     heights: [22, 62], styles: ['warehouse', 'panel', 'warehouse', 'concrete'], facade: ['#65727a', '#586872', '#727a7d', '#7a6a58', '#8a5a48'], roof: '#424d55',
     accent: '#59c9ff', accent2: '#ffe879', ground: '#2b322f', sidewalk: '#505856', signDensity: 0.22, treeDensity: 0.2,
     signWords: ['사상', '철마', '공업사', '정비', '카센터', '철강', '타이어'],
@@ -152,7 +152,7 @@ const DISTRICTS = [
   },
   {
     id: 'gyeonggi', name: 'Dongnae', hangul: '동래', subtitle: 'Colline, terme e case basse',
-    seed: { x: 0.56, y: 0.14 }, block: { minLot: 150, maxLot: 320, gapChance: 0.34 }, grid: { step: [300, 560], superblock: 0.46, jog: 0.12 },
+    seed: { x: 0.56, y: 0.14 }, block: { minLot: 80, maxLot: 170, gapChance: 0.2 }, grid: { step: [300, 560], superblock: 0.46, jog: 0.12 },
     heights: [22, 80], styles: ['panel', 'brick', 'concrete', 'stone'], facade: ['#7f745d', '#6d6c57', '#857963', '#596a55', '#8a7a68'], roof: '#494638',
     accent: '#a6df52', accent2: '#ffbd4c', ground: '#333722', sidewalk: '#504f43', signDensity: 0.2, treeDensity: 0.45,
     signWords: ['동래', '온천', '파전', '민박', '약국', '한의원'],
@@ -248,16 +248,21 @@ function townGrid(rng, { x0, y0, x1, y1, sx, sy, artX = [], artY = [] }) {
 // Le griglie dei quartieri, con le coordinate scritte a mano: le strade principali
 // si attaccano a queste linee, quindi devono stare esattamente dove le si cerca.
 const GRIDS = [
-  { id: 'seomyeon', xs: [2880, 3140, 3300, 3560, 3820, 4120], ys: [1640, 1880, 2120, 2340, 2560], artX: [3300], artY: [2120] },
-  { id: 'dongnae', xs: [3200, 3450, 3700, 3950, 4200], ys: [440, 700, 960, 1220], artX: [3700], artY: [] },
-  { id: 'sasang', xs: [1700, 2030, 2360, 2680], ys: [720, 980, 1240, 1500], artX: [], artY: [1240] },
-  { id: 'jungang', xs: [2660, 2980, 3300], ys: [2780, 3040, 3300, 3640], artX: [3300], artY: [] },
-  { id: 'suyeong', xs: [3300, 3540, 3780, 3960], ys: [2780, 3040, 3260, 3520, 3780, 4120], artX: [], artY: [4120] },
-  { id: 'yeonje', xs: [4120, 4390, 4660], ys: [2120, 2380, 2640], artX: [4660], artY: [2120] },
+  // Le celle sono grandi (350-500 px): un centro denso è fatto di palazzi pieni e di
+  // pochi incroci, non di un incrocio ogni 80 px.
+  { id: 'seomyeon', xs: [2880, 3300, 3680, 4120], ys: [1640, 2120, 2560], artX: [3300], artY: [2120] },
+  { id: 'dongnae', xs: [3200, 3700, 4200], ys: [440, 830, 1220], artX: [3700], artY: [] },
+  { id: 'oncheon', xs: [4200, 4640, 5080, 5520], ys: [300, 660, 1020], artX: [], artY: [] },
+  { id: 'sasang', xs: [1700, 2190, 2680], ys: [720, 1110, 1500], artX: [], artY: [1110] },
+  { id: 'jungang', xs: [2660, 3300], ys: [2780, 3200, 3640], artX: [3300], artY: [] },
+  { id: 'suyeong', xs: [3300, 3640, 3960], ys: [2780, 3200, 3620, 4120], artX: [], artY: [4120] },
+  { id: 'yeonje', xs: [4120, 4390, 4660], ys: [2120, 2640], artX: [4660], artY: [2120] },
   { id: 'centum', xs: [4660, 4990, 5320], ys: [2320, 2640, 2980], artX: [], artY: [2640] },
-  { id: 'marine', xs: [4980, 5160], ys: [3400, 3640, 3880, 4120], artX: [], artY: [] },
-  { id: 'gaya', xs: [2330, 2610, 2880], ys: [1880, 2120, 2340, 2560], artX: [], artY: [] },
-  { id: 'nampo', xs: [2340, 2540, 2760, 2980], ys: [3640, 3880, 4120], artX: [2540], artY: [3640, 4120] },
+  { id: 'marine', xs: [4980, 5160], ys: [3400, 3760, 4120], artX: [], artY: [] },
+  { id: 'gaya', xs: [2330, 2880], ys: [1880, 2220, 2560], artX: [], artY: [] },
+  { id: 'gimhae', xs: [1000, 1350, 1700], ys: [500, 880, 1240], artX: [], artY: [] },
+  { id: 'daeyeon', xs: [3300, 3600, 3880], ys: [4120, 4480, 4840], artX: [], artY: [] },
+  { id: 'nampo', xs: [2340, 2660, 2980], ys: [3640, 3880, 4120], artX: [], artY: [3640, 4120] },
 ];
 
 function gridLegs(g) {
@@ -280,6 +285,7 @@ const inRect = (x, y, r) => x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1;
 /** Rettangoli d'impalcato dove una strada attraversa l'acqua: sono terra per auto e pedoni. */
 function bridgeDecks(city, mask) {
   const out = [];
+  out.pylons = [];
   for (const l of [...city.vLines, ...city.hLines]) {
     const leg = l.leg;
     const vert = leg.axis === 'v';
@@ -287,11 +293,23 @@ function bridgeDecks(city, mask) {
       a -= 28; b += 28;
       out.push(vert ? { x: leg.c - l.width / 2 - 18, y: a, w: l.width + 36, h: b - a } : { x: a, y: leg.c - l.width / 2 - 18, w: b - a, h: l.width + 36 });
     };
+    // Piloni: quadrati di cemento ai due bordi dell'impalcato ogni 260 px di campata.
+    // Sono terra solo per chi naviga: le barche passano **fra** un pilone e l'altro.
+    const pyl = (a, b) => {
+      const n = Math.max(1, Math.round((b - a) / 260));
+      for (let k = 0; k <= n; k++) {
+        const t = a + ((b - a) * k) / n;
+        for (const side of [-1, 1]) {
+          const o = side * (l.width / 2 + 10);
+          out.pylons.push(vert ? { x: leg.c + o - 14, y: t - 14, w: 28, h: 28 } : { x: t - 14, y: leg.c + o - 14, w: 28, h: 28 });
+        }
+      }
+    };
     let run = null;
     for (let t = leg.a - 40; t <= leg.b + 40; t += 8) {
       const wet = !mask.land(vert ? leg.c : t, vert ? t : leg.c);
       if (wet && run === null) run = t;
-      if (!wet && run !== null) { push(run, t); run = null; }
+      if (!wet && run !== null) { push(run, t); if (t - run > 120) pyl(run, t); run = null; }
     }
     if (run !== null) push(run, leg.b + 40);
   }
@@ -304,8 +322,8 @@ export function createBusanCity(seed = BUSAN_SEED) {
   const { w: W, h: H, margin: M } = BUSAN_WORLD;
   const districts = DISTRICTS.map((d) => kit.cloneDistrict(d, REGION));
   // Lotti più stretti e meno vuoti di quelli di Seoul: sulla costa si costruisce fitto.
-  const LOT = { hongdae: 0.7, myeongdong: 0.72, itaewon: 0.7, gangnam: 0.85, docks: 0.9, gimpo: 0.85, gyeonggi: 0.85 };
-  for (const d of districts) { d.lotScale = LOT[d.id] ?? 0.85; d.gapScale = 0.7; }
+  const LOT = { hongdae: 0.6, myeongdong: 0.62, itaewon: 0.6, gangnam: 0.8, docks: 0.9, gimpo: 0.85, gyeonggi: 0.85 };
+  for (const d of districts) { d.lotScale = (LOT[d.id] ?? 0.85) * 0.78; d.gapScale = 0.5; }
   const byId = Object.fromEntries(districts.map((d) => [d.id, d]));
   const city = {
     w: W, h: H, margin: M, seed, region: { id: 'busan', name: 'Busan', hangul: '부산' }, name: 'Busan', nameIt: 'Busan', hangul: '부산',
@@ -375,12 +393,18 @@ export function createBusanCity(seed = BUSAN_SEED) {
   // Il capo di Taejongdae e il ponte di Yeongdo.
   street([[3300, 4120], [3300, 4960]]);
   arterial([[2540, 4120], [2540, 4850]]);
+  // Dongnae ↔ Oncheon: il raccordo dei quartieri del nord.
+  street([[4200, 830], [4200, 660]]);
   street([[2540, 4850], [2800, 4850]]);
 
   buildNetwork(city, legs);
   city.isOnRoad = makeRoadHit(city);
   city.debugLegs = legs;
   city.bridges = bridgeDecks(city, mask);
+  city.pylons = city.bridges.pylons;
+  // Sotto l'impalcato c'è acqua per chi naviga (fuori dai piloni): `isWater` resta falso per chi guida.
+  city.underDeck = (x, y) => !mask.land(x, y) && city.bridges.some((b) => x > b.x && x < b.x + b.w && y > b.y && y < b.y + b.h)
+    && !city.pylons.some((q) => x > q.x && x < q.x + q.w && y > q.y && y < q.y + q.h);
   // --- moli ------------------------------------------------------------------
   // Banchine che escono dalla riva occidentale nel porto: container a nord,
   // i moli di Jagalchi e di Nampo, e il molo dei traghetti.
@@ -406,7 +430,7 @@ export function createBusanCity(seed = BUSAN_SEED) {
 
   // --- isolati ---------------------------------------------------------------
   const urbanRects = GRIDS.map((g) => ({ x0: g.xs[0] - 130, x1: g.xs[g.xs.length - 1] + 130, y0: g.ys[0] - 130, y1: g.ys[g.ys.length - 1] + 130 }));
-  urbanRects.push({ x0: 5320, x1: 6100, y0: 2250, y1: 3500 }, { x0: 4880, x1: 5450, y0: 3000, y1: 4250 }, { x0: 2300, x1: 3050, y0: 4450, y1: 5000 });
+  urbanRects.push({ x0: 4100, x1: 5650, y0: 170, y1: 1150 }, { x0: 5320, x1: 6100, y0: 2250, y1: 3500 }, { x0: 4880, x1: 5450, y0: 3000, y1: 4250 }, { x0: 2300, x1: 3050, y0: 4450, y1: 5000 });
   city.urbanZones = urbanRects;
   const PORT = { x0: 1000, x1: 2350, y0: 2750, y1: 4250 };
   const PLAZA = { x0: 3320, x1: 3540, y0: 2140, y1: 2320 };

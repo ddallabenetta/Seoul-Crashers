@@ -131,12 +131,16 @@ export function fillUrban(city, rng, block, d, region, sides, opts = {}) {
       block.yards.push(block.courtyard);
       // Qualche edificio nel cortile: le città di mare sono fitte, pensioni e
       // magazzini dietro le fasce di negozi.
-      if (opts.inner && cw > 150 && ih > 110) {
-        const n = cw > 300 && ih > 240 ? 3 : 2;
-        for (let i = 0; i < n; i++) {
-          const iw = Math.min(108, Math.max(54, cw * 0.32));
-          const ih2 = Math.min(90, Math.max(46, ih * 0.38));
-          city.buildings.push(makeBuilding(rng, d, region, cx + cw * ((i + 0.5) / n) - iw / 2, iy + ih * 0.5 - ih2 / 2, iw, ih2, { streetEdges: [], signChance: 0.06 }));
+      if (opts.inner && cw > 90 && ih > 80) {
+        // Il cuore dell'isolato: due o tre file di edifici bassi e alti fra le fasce di negozi.
+        const cols = Math.max(1, Math.round(cw / 110));
+        const rows = Math.max(1, Math.round(ih / 100));
+        for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
+          if (rng.chance(0.12)) continue;
+          const iw = cw / cols - 8;
+          const ih2 = ih / rows - 8;
+          if (iw < 34 || ih2 < 30) continue;
+          city.buildings.push(makeBuilding(rng, d, region, cx + (i * cw) / cols + 4, iy + (j * ih) / rows + 4, iw, ih2, { streetEdges: [], signChance: 0.06 }));
         }
       }
       if (rng.chance(0.55)) {
@@ -333,7 +337,7 @@ export function placeShops(city, districts) {
   for (const b of city.buildings) {
     if (!shopCandidate(b)) continue;
     const d = byId[b.district];
-    if (!d || !rng.chance((d.signDensity || 0.4) * 0.6)) continue;
+    if (!d || !rng.chance((d.signDensity || 0.4) * 0.9 * (d.shopScale ?? 1))) continue;
     const mix = mixOf(d);
     const edge = rng.pick(b.edges);
     const p = doorPoint(b, edge);

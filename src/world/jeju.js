@@ -70,7 +70,7 @@ const DISTRICTS = [
   },
   {
     id: 'docks', name: 'Jeju Port', hangul: '제주항', subtitle: 'Traghetti, container e carichi senza domande',
-    seed: { x: 0.68, y: 0.22 }, block: { minLot: 180, maxLot: 330, gapChance: 0.3 }, grid: { step: [300, 520], superblock: 0.5, jog: 0.04 },
+    seed: { x: 0.68, y: 0.22 }, block: { minLot: 120, maxLot: 230, gapChance: 0.25 }, grid: { step: [300, 520], superblock: 0.5, jog: 0.04 },
     heights: [24, 70], styles: ['warehouse', 'warehouse', 'panel'], facade: ['#5c7a80', '#4d6a72', '#6f7a70', '#58666a'], roof: '#34464a',
     accent: '#ffd15a', accent2: '#63e0aa', ground: '#292e30', sidewalk: '#4a5351', signDensity: 0.25, treeDensity: 0.04,
     signWords: ['여객터미널', '물류', '냉동창고', '수산', '해운', '세관'],
@@ -79,7 +79,7 @@ const DISTRICTS = [
   },
   {
     id: 'gimpo', name: 'Jeju Airport', hangul: '제주공항', subtitle: 'Piste, hangar e la porta dell’isola',
-    seed: { x: 0.33, y: 0.3 }, block: { minLot: 150, maxLot: 290, gapChance: 0.35 }, grid: { step: [320, 560], superblock: 0.52, jog: 0.04 },
+    seed: { x: 0.33, y: 0.3 }, block: { minLot: 90, maxLot: 190, gapChance: 0.25 }, grid: { step: [320, 560], superblock: 0.52, jog: 0.04 },
     heights: [22, 62], styles: ['warehouse', 'panel', 'warehouse'], facade: ['#c8d0d4', '#aab4ba', '#8d99a0', '#b4bcc0'], roof: '#46525a',
     accent: '#6fd8ff', accent2: '#ffe77c', ground: '#30362e', sidewalk: '#4e5a55', signDensity: 0.2, treeDensity: 0.18,
     signWords: ['공항', '렌터카', '택시', '주차', '면세점'],
@@ -88,7 +88,7 @@ const DISTRICTS = [
   },
   {
     id: 'gyeonggi', name: 'Hallasan', hangul: '한라산', subtitle: 'Mandarini, muretti di basalto e boschi di cedro',
-    seed: { x: 0.5, y: 0.52 }, block: { minLot: 170, maxLot: 340, gapChance: 0.46 }, grid: { step: [380, 680], superblock: 0.62, jog: 0.02 },
+    seed: { x: 0.5, y: 0.52 }, block: { minLot: 80, maxLot: 170, gapChance: 0.25 }, grid: { step: [380, 680], superblock: 0.62, jog: 0.02 },
     heights: [18, 52], styles: ['stone', 'stone', 'greenhouse'], facade: ['#6a6c5a', '#5f705a', '#7c7462', '#586a54'], roof: '#3f4a36',
     accent: '#a7e45a', accent2: '#ffd05a', ground: '#343b28', sidewalk: '#4f5542', signDensity: 0.1, treeDensity: 0.58,
     signWords: ['감귤', '농장', '민박', '흑돼지'],
@@ -230,6 +230,7 @@ function villageLegs(legs, target, { cols = 3, spacing = 300, depth = 380 }, ok)
     out.push({ axis: l.axis === 'h' ? 'v' : 'h', c: p, a: Math.min(l.c, far), b: Math.max(l.c, far), arterial: false });
   }
   out.push({ axis: l.axis, c: far, a: p0, b: p0 + cols * spacing, arterial: false });
+  out.push({ axis: l.axis, c: Math.round((l.c + far) / 40) * 20, a: p0, b: p0 + cols * spacing, arterial: false });
   const lo = Math.min(l.c, far) - 80;
   const hi = Math.max(l.c, far) + 80;
   const rect = l.axis === 'h'
@@ -243,6 +244,9 @@ function villageLegs(legs, target, { cols = 3, spacing = 300, depth = 380 }, ok)
 // GENERAZIONE
 // ---------------------------------------------------------------------------
 
+const SUBURBS = [
+  { x0: 1000, x1: 2400, y0: 1850, y1: 3200 }, { x0: 4700, x1: 6300, y0: 1750, y1: 3300 }, { x0: 1900, x1: 4900, y0: 3050, y1: 3700 }, { x0: 2000, x1: 3100, y0: 1750, y1: 2500 }, { x0: 4700, x1: 6000, y0: 3300, y1: 3800 },
+];
 const inRect = (x, y, r) => x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1;
 
 export function createJejuCity(seed = JEJU_SEED) {
@@ -250,8 +254,8 @@ export function createJejuCity(seed = JEJU_SEED) {
   const { w: W, h: H } = JEJU_WORLD;
   const districts = DISTRICTS.map((d) => kit.cloneDistrict(d, REGION));
   // Lotti più stretti e meno vuoti di quelli di Seoul: sulla costa si costruisce fitto.
-  const LOT = { hongdae: 0.7, myeongdong: 0.72, itaewon: 0.7, gangnam: 0.85, docks: 0.9, gimpo: 0.85, gyeonggi: 0.85 };
-  for (const d of districts) { d.lotScale = LOT[d.id] ?? 0.85; d.gapScale = 0.7; }
+  const LOT = { hongdae: 0.6, myeongdong: 0.62, itaewon: 0.6, gangnam: 0.7, docks: 0.9, gimpo: 0.85, gyeonggi: 0.85 };
+  for (const d of districts) { d.lotScale = (LOT[d.id] ?? 0.85) * 0.78; d.gapScale = 0.5; d.shopScale = 1.6; }
   const byId = Object.fromEntries(districts.map((d) => [d.id, d]));
   const city = {
     w: W, h: H, margin: JEJU_WORLD.margin, seed, region: { id: 'jeju', name: 'Jeju', hangul: '제주' }, name: 'Jeju', nameIt: 'Jeju', hangul: '제주',
@@ -338,7 +342,7 @@ export function createJejuCity(seed = JEJU_SEED) {
   const wfSamples = [];
   for (let x = JEJU_SI.x0; x <= JEJU_SI.x1; x += 40) wfSamples.push([x, scan.north(x) + 190]);
   const xsN = [];
-  for (let x = JEJU_SI.x0 + 100; x <= JEJU_SI.x1 - 60; x += 330 + Math.round(rng.range(-25, 30))) xsN.push(Math.round(x / 20) * 20);
+  for (let x = JEJU_SI.x0 + 100; x <= JEJU_SI.x1 - 60; x += 290 + Math.round(rng.range(-25, 30))) xsN.push(Math.round(x / 20) * 20);
   const wfN = clipLegs(pathLegs(staircase(wfSamples, { thr: 200, snap: 20 }), false), xsN[0], xsN[xsN.length - 1]);
   legs.push(...wfN);
   const townRowY = JEJU_SI.ringY + 340;
@@ -358,7 +362,7 @@ export function createJejuCity(seed = JEJU_SEED) {
   const wfSSamples = [];
   for (let x = SEOGWIPO.lo + 100; x <= SEOGWIPO.hi - 100; x += 40) wfSSamples.push([x, scan.south(x) - 190]);
   const xsS = [];
-  for (let x = SEOGWIPO.lo + 200; x <= SEOGWIPO.hi - 220; x += 340 + Math.round(rng.range(-25, 30))) xsS.push(Math.round(x / 20) * 20);
+  for (let x = SEOGWIPO.lo + 200; x <= SEOGWIPO.hi - 220; x += 290 + Math.round(rng.range(-25, 30))) xsS.push(Math.round(x / 20) * 20);
   const wfS = clipLegs(pathLegs(staircase(wfSSamples, { thr: 200, snap: 20 }), false), xsS[0], xsS[xsS.length - 1]);
   legs.push(...wfS);
   const ringSouth = (x) => { let best = null; for (const l of ringLegsAll) if (l.axis === 'h' && l.c > HALLA.y && x >= l.a + 30 && x <= l.b - 30) best = l; return best; };
@@ -393,7 +397,9 @@ export function createJejuCity(seed = JEJU_SEED) {
   for (const v of VILLAGES) {
     const free = (axis, c, a, b) => sampleOk(axis, c, a, b)
       && !legs.some((l) => l.axis === axis && !l.arterial && Math.abs(l.c - c) < 200 && Math.min(b, l.b) - Math.max(a, l.a) > 60);
-    const g = villageLegs(ringLegs, v.at, { cols: v.cols, spacing: 300, depth: 400 }, free)
+    const g = villageLegs(ringLegs, v.at, { cols: v.cols + 1, spacing: 280, depth: 560 }, free)
+      || villageLegs(ringLegs, v.at, { cols: v.cols, spacing: 300, depth: 560 }, free)
+      || villageLegs(ringLegs, v.at, { cols: v.cols, spacing: 300, depth: 400 }, free)
       || villageLegs(ringLegs, v.at, { cols: 2, spacing: 300, depth: 400 }, free);
     if (!g) continue;
     legs.push(...g.legs);
@@ -413,7 +419,7 @@ export function createJejuCity(seed = JEJU_SEED) {
 
   // Strade di campagna: reticolo largo fra anello e anello interno.
   const lat = (from, to, step) => { const out = []; for (let v = from; v <= to; v += step) out.push(v); return out; };
-  legs.push(...farmRoads(legs, { axis: 'v', lattice: lat(1000, 6400, 450), ok: okFarm, clearance: 190, minGap: 380 }));
+  legs.push(...farmRoads(legs, { axis: 'v', lattice: lat(1000, 6400, 360), ok: okFarm, clearance: 170, minGap: 330 }));
   legs.push(...farmRoads(legs, { axis: 'h', lattice: lat(1700, 3400, 420), ok: okFarm, clearance: 190, minGap: 380 }));
 
   buildNetwork(city, legs);
@@ -446,10 +452,12 @@ export function createJejuCity(seed = JEJU_SEED) {
   city.airport = { ...AP, district: 'gimpo' };
   kit.makeBlocks(city, rng, {
     reserved: [AP], land: landFn, hit: roadHit, districtAt: city.districtAt, byId, region: REGION,
-    carve: { steps: [200, 100], minSize: 56, maxW: 700, maxH: 700, inset: 120 },
+    carve: { steps: [200, 100], minSize: 56, maxW: 480, maxH: 480, inset: 120 },
     classify: ({ cx, cy, rect, roadSides }) => {
       const d = Math.hypot((cx - HALLA.x) / HALLA.rx, (cy - HALLA.y) / HALLA.ry);
       const town = inRect(cx, cy, townN) || inRect(cx, cy, townS) || villages.some((v) => inRect(cx, cy, v.rect));
+      // Periferia: dove le strade di campagna chiudono due lati la campagna si fa abitata.
+      if (SUBURBS.some((z) => inRect(cx, cy, z)) && roadSides >= 2 && rect.w >= 110 && rect.h >= 100 && d > 1.0) return 'urban';
       if (town && roadSides >= 1 && rect.w >= 70 && rect.h >= 60) return inRect(cx, cy, townN) && cx > DOCK_X0 ? 'dock' : 'urban';
       if (d < 0.97 || mask.shoreDist(cx, cy) < 280) return 'park';
       return 'rural';
