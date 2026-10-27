@@ -29,6 +29,7 @@ import { lanePoint, laneCount, laneOffset } from '../world/roadgraph.js';
 import { YIELD } from './traffic.js';
 import { WEAPONS, shoot, hasLineOfSight } from './weapons.js';
 import { angleDiff, clamp, damp, dist, pointSegment } from '../core/math.js';
+import { BoatNav } from './boatnav.js';
 
 // Cosa scende in strada a ogni livello di ricercato.
 const TIERS = [
@@ -116,6 +117,8 @@ export class PoliceSystem {
     this.cops = [];
     this.cars = [];
     this.boats = [];
+    // La rotta per acqua delle motovedette (§5.43): senza, davanti a una penisola si piantano.
+    this.nav = new BoatNav(city);
     this.blocks = [];
     this.spikes = [];
     this.chopper = null;
@@ -466,6 +469,9 @@ export class PoliceSystem {
     // non se la riprende nessuno e resta lì per tutta la partita.
     for (const v of this.boats) this.dropVehicle(v, game, false);
     this.boats.length = 0;
+    // Il tempo d'attesa fra due motovedette è di una caccia sola: una seconda corsa in barca non parte
+    // quattro secondi dopo l'inizio per colpa di quella di prima (§5.43).
+    this.boatT = 0;
     for (const p of this.cops) {
       p.state = 'walk';
       p.cop = false;
@@ -1391,15 +1397,21 @@ export class PoliceSystem {
     const reach = Math.max(pier.w, pier.h) * 0.6 + 70;
     let spot = null;
     let spotD = Infinity;
-    for (let i = 0; i < 12; i++) {
-      const a = (i * Math.PI) / 6;
-      const x = cx + Math.cos(a) * reach;
-      const y = cy + Math.sin(a) * reach;
-      if (!this.city.isWater(x, y)) continue;
-      const d = dist(x, y, pl.x, pl.y);
-      if (d < 300 || d > spotD) continue;
-      spotD = d;
-      spot = { x, y };
+    // Anelli sempre più larghi attorno al molo: su una costa con la terra da un lato (Busan, §5.43) il
+    // primo anello cade tutto a terra o a meno di trecento passi dal giocatore, e il tentativo costava
+    // quattro secondi — quelli in cui una motovedetta dietro di te dovrebbe già esserci.
+    for (const extra of [0, 150, 320, 560]) {
+      for (let i = 0; i < 12; i++) {
+        const a = (i * Math.PI) / 6;
+        const x = cx + Math.cos(a) * (reach + extra);
+        const y = cy + Math.sin(a) * (reach + extra);
+        if (!this.city.isWater(x, y)) continue;
+        const d = dist(x, y, pl.x, pl.y);
+        if (d < 300 || d > spotD) continue;
+        spotD = d;
+        spot = { x, y };
+      }
+      if (spot) break;
     }
     if (!spot) return null;
 
@@ -1440,9 +1452,22 @@ export class PoliceSystem {
     }
 
     const d = dist(v.x, v.y, pl.x, pl.y);
-    const aim = Math.atan2(pl.y - v.y, pl.x - v.x);
+    // **Da che parte girare** (§5.43): in linea retta se l'acqua è libera, altrimenti verso il punto
+    // della rotta per mare. Si riguarda ogni 0,6 s per scafo, e non a ogni frame.
+    ai.navT = (ai.navT || 0) - dt;
+    if (ai.navT <= 0) {
+      ai.navT = 0.45 + Math.random() * 0.3;
+      ai.way = this.nav.clear(v.x, v.y, pl.x, pl.y) ? null : this.nav.way(this.city.areaAt ? this.city.areaAt(pl.x, pl.y) : null, v.x, v.y, pl.x, pl.y);
+    }
+    // **Gomma elastica**: una motovedetta (355) è più lenta di un motoscafo (400), e a un giocatore che
+    // taglia bene le curve si stacca di mille passi in dieci secondi — una corsa che nessuno vede.
+    // Oltre cinquecento passi lo scafo guadagna fino al 30%; a distanza di tiro torna normale.
+    v.pace = 1 + clamp((d - 520) / 1600, 0, 0.3);
+    const way = ai.way && dist(v.x, v.y, ai.way.x, ai.way.y) > 40 ? ai.way : null;
+    const aim = way ? Math.atan2(way.y - v.y, way.x - v.x) : Math.atan2(pl.y - v.y, pl.x - v.x);
     v.steer = clamp(angleDiff(v.angle, aim) * 2.2, -1, 1);
-    v.throttle = d > 300 ? 1 : d > 170 ? 0.3 : -0.35;
+    // Con una rotta da seguire si corre: il «tenersi a distanza» vale solo quando lo si vede.
+    v.throttle = way ? (Math.abs(angleDiff(v.angle, aim)) > 1.3 ? 0.4 : 1) : d > 300 ? 1 : d > 170 ? 0.3 : -0.35;
     v.handbrake = false;
 
     if (Math.abs(v.speed) < 14 && d > 190) {

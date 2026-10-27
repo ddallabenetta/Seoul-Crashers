@@ -149,6 +149,13 @@ export const BUSINESSES = {
     crowd: 0, open: [0, 24],
     pal: { floor: '#3b3a37', wall: '#55514b', trim: '#77716a', accent: '#e8595e' },
   },
+  // **La sala d'attesa del terminal** (§5.43, «Le sedie arancioni»). Niente personale e niente
+  // clienti: chi c'è lo mette la storia, e di notte non c'è nessuno. Sempre aperta, come il molo.
+  waiting: {
+    id: 'waiting', hangul: '대합실', label: 'sala d\'attesa', where: 'story', layout: 'waiting',
+    crowd: 0, open: [0, 24],
+    pal: { floor: '#5d646e', wall: '#464d58', trim: '#808a99', accent: '#f08a2a' },
+  },
 };
 
 /** Un tipo di attività è aperto a quell'ora? Fascia chiusa a sinistra, aperta a destra. */
@@ -615,6 +622,28 @@ const LAYOUTS = {
     put(f, { x: WALL + 22, y: front + 28, w: 74, h: 18, type: 'desk', z: 26 });
     put(f, { x: WALL + 46, y: front + 50, w: 14, h: 14, type: 'chair', z: 16 });
     npc(f, biz.keeper, WALL + 70, front + 62, 'keeper');
+  },
+
+  /**
+   * La sala d'attesa del terminal dei traghetti: **tre file di sei sedie di plastica arancioni**, un
+   * distributore acceso sul fondo e un bancone spento. Le sedie non sono solide — ci si sta sopra, ed è
+   * così che si siede un personaggio visto dall'alto — e stanno sempre negli stessi posti: la storia
+   * ne sceglie due per riga (`story/terminale.js`).
+   */
+  waiting(rng, f, a, biz) {
+    const rows = 3;
+    const seats = 6;
+    const sw = 22;
+    const gap = 9;
+    const total = seats * sw + (seats - 1) * gap;
+    const x0 = Math.round((f.w - total) / 2);
+    for (let r = 0; r < rows; r++) {
+      for (let k = 0; k < seats; k++) {
+        put(f, { x: x0 + k * (sw + gap), y: WALL + 62 + r * 50, w: sw, h: 20, type: 'seat', z: 12, solid: false });
+      }
+    }
+    put(f, { x: f.w - WALL - 50, y: WALL + 2, w: 36, h: 20, type: 'vend', z: 46 });
+    put(f, { x: WALL + 14, y: WALL + 2, w: 78, h: 16, type: 'counter', z: 26 });
   },
 
   /**

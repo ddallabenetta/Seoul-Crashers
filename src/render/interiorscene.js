@@ -396,6 +396,29 @@ const FURNITURE = {
     },
   },
   stool: { color: '#4d4a46', top: '#635e57' },
+  // La sedia di plastica arancione di una sala d'attesa, vista dall'alto: il sedile e lo schienale.
+  seat: {
+    color: '#c46a1c',
+    top: '#f08a2a',
+    detail: (ctx, x, y, w, h) => {
+      ctx.fillStyle = 'rgba(0,0,0,0.18)';
+      ctx.fillRect(x + 2, y + 2, w - 4, 4);
+      ctx.fillStyle = 'rgba(255,214,150,0.45)';
+      ctx.fillRect(x + 3, y + h - 6, w - 6, 3);
+    },
+  },
+  // Il distributore automatico acceso: l'unica luce della sala.
+  vend: {
+    color: '#2b3a52',
+    top: '#3d5a80',
+    detail: (ctx, x, y, w, h, pal, game) => {
+      const puls = 0.78 + 0.12 * Math.sin((game ? game.time : 0) * 2.2);
+      ctx.fillStyle = `rgba(150,225,255,${puls})`;
+      ctx.fillRect(x + 3, y + 3, w - 6, h - 9);
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      for (let i = 0; i < 4; i++) ctx.fillRect(x + 6 + i * ((w - 14) / 4), y + 6, 3, h - 15);
+    },
+  },
   chair: { color: '#3e434b', top: '#525963' },
   desk: {
     color: '#5d5a54',
