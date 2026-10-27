@@ -1,0 +1,155 @@
+// Le guardie del cortile tuo (§5.44), sul gioco vero. Non misura: **asserisce**. Ogni voce
+// `false` è un difetto.
+//
+//   node .claude/tools/probe.mjs --seconds 1 --quiet \
+//     --script .claude/tools/scenes/guardie.scene \
+//     --eval "Object.entries(window.__OUT).filter(([k,v]) => v===false).map(([k])=>k)"
+//
+// `[]` vuol dire tutto a posto; con `--eval "window.__OUT"` si vedono anche i numeri. Con
+// `--shot-dir` fa due scatti (la scorta in formazione, l'ingaggio). Il percorso è quello di una
+// partita: cortile preso, ci si cammina dentro, uno sparo ostile, la polizia che entra, si esce.
+//
+//   · `nonTiBloccano` e `nonHostili` sono invarianti: una scorta che ti impedisce di passare, o
+//     che dopo il tuo sparo diventa ostile, è peggio di nessuna scorta
+//   · `poliziaNonPerPrime` — con zero stelle un agente nel cortile non viene toccato
+//   · `stelleInvariate` — le guardie che stendono un agente non fanno salire il ricercato
+const { PLAYER_GANG } = await import('/src/entities/turfs.js');
+const { GUARD_TUNE } = await import('/src/entities/pedestrians.js');
+const { createPed } = await import('/src/entities/pedestrians.js');
+const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
+const frame = () => new Promise((r) => requestAnimationFrame(r));
+const out = (window.__OUT = {});
+const pl = game.player;
+const T = game.turfs;
+const shot = async (n) => { if (window.__shot) await window.__shot(n); };
+
+pl.damage = () => {};          // la scena prova le guardie, non la mira degli agenti
+pl.setWeapon('pistol');
+pl.onFoot = true;
+
+const yard = game.city.turfs.find((t) => game.city.areaAt?.(t.cx, t.cy)?.id === 'seoul' && t.w > 150 && t.h > 150);
+out.cortileTrovato = !!yard;
+const tp = (x, y) => { pl.x = x; pl.y = y; pl.vx = 0; pl.vy = 0; game.camera.snapTo(x, y); };
+const inside = (p, pad = 0) => p.x > yard.x - pad && p.x < yard.x + yard.w + pad && p.y > yard.y - pad && p.y < yard.y + yard.h + pad;
+const guards = () => game.peds.filter((p) => p.turf === yard && !p.dead && !p.gone);
+const crew = () => guards().filter((p) => !p.dealer);
+
+// ---- 1. Un cortile tuo, con le sue guardie ----------------------------------
+T.claim(yard, PLAYER_GANG, game, 'force');
+out.cortileTuo = T.mine(yard);
+// I successori arrivano dallo streaming quando ci si avvicina da fuori (§4: sette secondi).
+tp(yard.cx, yard.y - 520);
+for (let i = 0; i < 30 && crew().length < 2; i++) await wait(1);
+out.guardieNate = guards().length;
+out.guardieAlMassimoQuattro = guardie_max();
+function guardie_max() { return guards().length <= 4; }
+await wait(1);
+
+// ---- 2. Entri: ti seguono, a distanza ---------------------------------------
+tp(yard.cx, yard.cy);
+pl.angle = 0;
+await wait(0.2);
+const dists = [];
+const sample = () => crew().map((p) => Math.hypot(p.x - pl.x, p.y - pl.y));
+let minD = Infinity;
+// Cammini per il cortile a ~110 px/s: da un lato all'altro e ritorno.
+const t0 = game.time;
+let dir = 1;
+while (game.time - t0 < 9) {
+  await frame();
+  const dt = 1 / 60;
+  const nx = pl.x + dir * 110 * dt;
+  if (nx > yard.x + yard.w - 30) dir = -1; else if (nx < yard.x + 30) dir = 1;
+  pl.x += dir * 110 * dt; pl.vx = dir * 110; pl.vy = 0;
+  pl.angle = dir > 0 ? 0 : Math.PI;
+  for (const d of sample()) minD = Math.min(minD, d);
+  if (game.time - t0 > 4) dists.push(...sample());
+}
+const avg = dists.length ? dists.reduce((a, b) => a + b, 0) / dists.length : 999;
+out.guardieNate = guards().length;
+out.seguiti = crew().filter((p) => p.escortSlot >= 0).length;
+out.distanzaMediaScorta = Math.round(avg);
+out.minimaDistanza = Math.round(minD);
+out.tiSeguono = out.guardieNate >= 2 && out.seguiti > 0 && avg < 330;
+out.nonTiBloccano = minD > 50;
+out.restanoNelCortile = crew().every((p) => inside(p, 30));
+out.nonHostili = guards().every((p) => !p.hostile);
+pl.vx = 0;
+await wait(2);
+await shot('scorta');
+
+// ---- 3. Spari tu: la scorta non si spaventa e non ti si rivolta -------------
+game.alarm(pl.x, pl.y, 420, pl);
+await wait(0.5);
+out.sparoNonLaSpaventa = crew().every((p) => p.state === 'guard' && p.panic <= 0);
+out.sparoNonLaRivolta = guardsOk();
+function guardsOk() { return guards().every((p) => !p.hostile); }
+
+// ---- 4. Uno ti spara: ingaggiano --------------------------------------------
+const rngLike = { range: (a, b) => (a + b) / 2, chance: () => true, int: (a) => a, pick: (a) => a[0], next: () => 0.5 };
+function spawnFoe(x, y, o = {}) {
+  const p = createPed(o.kind || 'gangster', x, y, game.pedSystem.rng || rngLike);
+  p.gang = o.gang || 'altri';
+  p.armed = true;
+  if (o.hostile) { p.hostile = true; p.state = 'hostile'; }
+  if (o.cop) { p.cop = true; p.state = 'duty'; p.copWeapon = 'pistol'; }
+  game.peds.push(p);
+  return p;
+}
+const foe = spawnFoe(yard.x + yard.w - 40, yard.cy, { hostile: true });
+foe.hp = foe.maxHp = 40;
+let hpMin = foe.hp;
+const tF = game.time;
+while (game.time - tF < 10 && !foe.dead) { await frame(); hpMin = Math.min(hpMin, foe.hp); if (game.time - tF === 3) await shot('ingaggio'); }
+out.ostileColpito = hpMin < 40 || foe.dead;
+out.nonHostiliDopoIngaggio = guardsOk();
+if (!foe.dead) { foe.dead = true; foe.hp = 0; }
+await shot('ingaggio');
+
+// ---- 5. La polizia: mai per prime, sì se ti ha a tiro -----------------------
+const lvl0 = game.wanted.level;
+const cop0 = spawnFoe(yard.x + 60, yard.y + 60, { kind: 'cop', cop: true });
+cop0.hp = cop0.maxHp = 200;
+await wait(5);
+out.poliziaNonPerPrime = lvl0 === 0 && cop0.hp === 200 && !cop0.dead;
+cop0.dead = true;
+game.wanted.add(100, game);   // sopra le tre stelle nessuno ammanetta: l'agente spara
+const lvl = game.wanted.level;
+const cop1 = spawnFoe(pl.x + 150, pl.y + 20, { kind: 'cop', cop: true });
+cop1.hp = cop1.maxHp = 60;
+cop1.armed = true;
+const tC = game.time;
+while (game.time - tC < 12 && !cop1.dead) { await frame(); game.wanted.unseenT = 0; }
+out.poliziaAtiroIngaggiata = cop1.hp < 60 || cop1.dead;
+out.stelleInvariate = game.wanted.level === lvl;
+game.police.standDown(game, true);
+game.wanted.reset();
+
+// ---- 6. Esci: tornano alla ronda --------------------------------------------
+const ids = crew().map((p) => p.id);
+tp(yard.cx, yard.y - 115);   // fuori dall'isteresi (70 px) ma vicino: più lontano lo streaming le porta via
+await wait(7);
+const rest = crew().filter((p) => ids.includes(p.id));
+out.escono = rest.length > 0;
+out.nonTiSeguonoFuori = rest.every((p) => inside(p, 10));
+out.tornanoAllaRonda = rest.every((p) => p.state === 'guard');
+
+// ---- 7. Spenta la costante, tutto com'era ------------------------------------
+GUARD_TUNE.escort = false;
+tp(yard.cx, yard.cy);
+await wait(6);
+const off = crew().map((p) => Math.hypot(p.x - pl.x, p.y - pl.y));
+out.costanteSpentaNonSegue = crew().every((p) => p.state === 'guard') && crew().length > 0;
+out.costanteSpentaDistanze = off.map(Math.round);
+GUARD_TUNE.escort = true;
+
+// ---- 8. Un cortile non tuo: guardie di sempre, nessuna scorta -----------------
+const other = game.city.turfs.find((t) => t !== yard && game.city.areaAt?.(t.cx, t.cy)?.id === 'seoul');
+tp(other.cx, other.y - 520);
+for (let i = 0; i < 20 && !game.peds.some((p) => p.turf === other); i++) await wait(1);
+tp(other.cx, other.cy);
+await wait(3);
+const theirs = game.peds.filter((p) => p.turf === other && !p.dead);
+out.cortileAltrui = theirs.length;
+out.altruiNessunaScorta = theirs.every((p) => !(p.escortSlot >= 0) || !T.mine(other));
+return out;

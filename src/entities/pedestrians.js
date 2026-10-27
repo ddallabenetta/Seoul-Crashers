@@ -56,6 +56,20 @@ export const PED_TUNE = {
   maxWait: 10,        // oltre questa attesa del verde si gira l'angolo invece di aspettare
 };
 
+// Le guardie del cortile tuo (§5.44). Spegnere `escort` riporta le guardie di prima: stanno nel
+// recinto, non ti seguono e non difendono niente.
+export const GUARD_TUNE = {
+  escort: true,   // nel cortile tuo ti vengono dietro a distanza e ti guardano le spalle
+  max: 4,         // quante ti seguono (un cortile ne ha comunque 4 al massimo)
+  ringMin: 90,    // distanza minima dal giocatore: la formazione è larga e non lo blocca
+  ringStep: 14,   // di quanto si allarga la corona a ogni guardia in più
+  leave: 70,      // px oltre il recinto prima che smettano di scortare (isteresi sul bordo)
+  foeMargin: 70,  // px oltre il recinto in cui un ostile conta ancora come «nel cortile»
+  copRange: 340,  // un agente è ostile solo se ti ha a tiro (COP_FIRE_RANGE): mai per primi
+  hold: 150,      // distanza di tiro tenuta contro un ostile (come `life.engage`)
+  range: 330,
+};
+
 /** Tinte degli ombrelli. La trasparente è quella coreana per eccellenza. */
 export const UMBRELLAS = ['#1c2029', '#2f4f7a', '#8c2f3c', '#3f6b4a', '#d9dde4', '#b8b0d8'];
 
@@ -122,6 +136,7 @@ export function createPed(kind, x, y, rng) {
     armed,
     actor: null,      // personaggio nominato: lo possiede `entities/actors.js`
     turf: null,       // territorio presidiato: lo guida lo stato `guard`
+    escortSlot: -1,   // posto nella scorta del giocatore nel cortile tuo (`watchYard`); -1 = ronda
     dealer: false,    // 거래책: l'uomo con cui si tratta (vedi `spawnTurf`)
     cop: false,       // in servizio: lo stato lo guida `police.copBehavior`
     escort: false,    // sta portando via il giocatore (`entities/arrest.js`)
@@ -241,6 +256,8 @@ export class PedestrianSystem {
     this._sirens = []; // le volanti a sirena in movimento, rifatte a ogni frame
     this._eq = [];     // scratch: archi attorno a un attraversamento
     this._rp = {};     // scratch: il punto dell'anello sotto il pedone
+    // Il cortile tuo in cui sta il giocatore, la scorta e gli ostili (`watchYard`, §5.44).
+    this._yard = { turf: null, dx: 1, dy: 0, escort: [], foes: [] };
   }
 
   /**
@@ -327,9 +344,110 @@ export class PedestrianSystem {
     }
   }
 
+  /**
+   * Il cortile tuo in cui sei adesso, e chi lo minaccia (§5.44). Gira una volta per frame
+   * e prepara tutto quello che serve alle guardie: **chi ti scorta** (fino a `max`, in ordine
+   * di id, senza il 거래책 che sta al suo banco) e **chi è ostile** là dentro. L'elenco è per
+   * ruolo — chi spara a te, l'agente che ti ha a tiro — e non «tutti tranne i miei»
+   * (docs/trappole.md): una guardia non scambia mai sé stessa o un compagno per un nemico.
+   * Un agente conta solo se ti ha a tiro: le guardie non attaccano la polizia per prime,
+   * e il suo sangue non fa salire il ricercato (non è un reato tuo).
+   */
+  watchYard(game) {
+    const y = this._yard;
+    const was = y.turf;
+    y.turf = null;
+    y.foes.length = 0;
+    y.escort.length = 0;
+    if (!GUARD_TUNE.escort || !game.turfs || game.indoors) return;
+    const pl = game.player;
+    if (pl.dying) return;
+    // Isteresi: dentro si entra a recinto, e se ne esce a `leave` px dal recinto.
+    const t = game.turfs.turfAt(pl.x, pl.y, was ? GUARD_TUNE.leave : 0);
+    if (!t || !game.turfs.mine(t)) return;
+    y.turf = t;
+
+    // Il dietro-le-spalle: direzione del passo, smorzata; da fermo resta l'ultima.
+    const sp = Math.hypot(pl.vx, pl.vy);
+    if (was !== t) {
+      y.dx = Math.cos(pl.angle);
+      y.dy = Math.sin(pl.angle);
+    } else if (sp > 25) {
+      y.dx += (pl.vx / sp - y.dx) * 0.08;
+      y.dy += (pl.vy / sp - y.dy) * 0.08;
+      const l = Math.hypot(y.dx, y.dy) || 1;
+      y.dx /= l;
+      y.dy /= l;
+    }
+
+    const m = GUARD_TUNE.foeMargin;
+    const escort = y.escort;
+    const w = game.wanted ? game.wanted.level : 0;
+    const arrest = game.arrest?.active || game.police?.arresting;
+    for (const p of this.peds) {
+      if (p.dead || p.gone) continue;
+      if (p.turf === t) {
+        if (!p.dealer && !p.hostile && p.state === 'guard') escort.push(p);
+        continue;
+      }
+      if (p.x < t.x - m || p.x > t.x + t.w + m || p.y < t.y - m || p.y > t.y + t.h + m) continue;
+      if (p.hostile) y.foes.push(p);
+      else if (p.cop && w > 0 && !arrest && dist(p.x, p.y, pl.x, pl.y) < GUARD_TUNE.copRange) y.foes.push(p);
+    }
+    escort.sort((a, b) => a.id - b.id);
+    for (let i = 0; i < escort.length; i++) escort[i].escortSlot = i < GUARD_TUNE.max ? i : -1;
+  }
+
+  /**
+   * Cosa fa una guardia del cortile tuo mentre ci sei dentro, o `null` se resta alla ronda.
+   * Prima gli ostili — si ingaggia il più vicino con la stessa manovra degli eventi di
+   * `life.js`, che tiene la distanza di tiro e gira l'angolo se c'è un muro in mezzo — poi la
+   * scorta: un posto fisso dietro e di lato, abbastanza lontano da non intralciarti. Il posto
+   * resta dentro il recinto, che è anche quello che le riporta alla ronda quando esci.
+   */
+  guardOrder(p, dt, game, y) {
+    const pl = game.player;
+    p.fireT -= dt;
+    let foe = null;
+    let bd = Infinity;
+    for (const f of y.foes) {
+      const d = dist(p.x, p.y, f.x, f.y);
+      if (d < bd) { bd = d; foe = f; }
+    }
+    if (foe && game.life) {
+      p.idleT = 0;
+      return game.life.engage(p, foe, game, GUARD_TUNE.hold, GUARD_TUNE.range);
+    }
+    if (p.escortSlot < 0 || !pl.onFoot) return null;
+
+    const t = y.turf;
+    const back = Math.atan2(-y.dy, -y.dx);
+    // Una corona a ventaglio dietro di te: ±0,8 e ±1,6 rad dal retro.
+    const k = p.escortSlot;
+    const a = back + (k % 2 ? 1 : -1) * (0.8 + 0.8 * (k >> 1));
+    const r = GUARD_TUNE.ringMin + k * GUARD_TUNE.ringStep;
+    const gx = clamp(pl.x + Math.cos(a) * r, t.x + 16, t.x + t.w - 16);
+    const gy = clamp(pl.y + Math.sin(a) * r, t.y + 16, t.y + t.h - 16);
+    p.idleT = 0;
+    const dp = dist(p.x, p.y, pl.x, pl.y);
+    if (dp < GUARD_TUNE.ringMin * 0.75) {
+      // Troppo addosso: un passo indietro invece di restare fra i piedi.
+      const l = dp || 1;
+      return { x: p.x + ((p.x - pl.x) / l) * 40, y: p.y + ((p.y - pl.y) / l) * 40, speed: p.baseSpeed * 0.7 };
+    }
+    const dg = dist(p.x, p.y, gx, gy);
+    if (dg < 22) {
+      // Al suo posto: si guarda fuori, dalla parte opposta a te.
+      p.angle = approachAngle(p.angle, Math.atan2(p.y - pl.y, p.x - pl.x), dt * 3);
+      return { x: p.x, y: p.y, speed: 0 };
+    }
+    return { x: gx, y: gy, speed: p.baseSpeed * (dg > 170 ? 1.45 : 0.95) };
+  }
+
   update(dt, game) {
     this.stream(dt, game);
     this.watchTurfs(game, dt);
+    this.watchYard(game);
     const sir = this._sirens;
     sir.length = 0;
     if (PED_TUNE.react) {
@@ -659,6 +777,11 @@ export class PedestrianSystem {
         // davanti a un magazzino non ha bisogno né dell'uno né degli altri.
         const t = p.turf;
         if (!t) { p.state = 'walk'; break; }
+        // Cortile tuo e ci sei dentro: ti scorta e ti difende (§5.44); il banco resta al banco.
+        if (this._yard.turf === t && !p.dealer) {
+          const o = this.guardOrder(p, dt, game, this._yard);
+          if (o) { tx = o.x; ty = o.y; targetSpeed = o.speed; break; }
+        }
         if (p.idleT > 0) {
           p.idleT -= dt;
           targetSpeed = 0;
@@ -676,9 +799,9 @@ export class PedestrianSystem {
         }
         targetSpeed = p.baseSpeed * 0.55;
         if (!p.postX || dist(p.x, p.y, p.postX, p.postY) < 22) {
-          p.postX = t.x + 18 + Math.random() * Math.max(1, t.w - 36);
-          p.postY = t.y + 18 + Math.random() * Math.max(1, t.h - 36);
-          if (Math.random() < 0.45) p.idleT = 1.5 + Math.random() * 4;
+          p.postX = t.x + 18 + this.rng.range(0, Math.max(1, t.w - 36));
+          p.postY = t.y + 18 + this.rng.range(0, Math.max(1, t.h - 36));
+          if (this.rng.chance(0.45)) p.idleT = this.rng.range(1.5, 5.5);
         }
         tx = p.postX;
         ty = p.postY;
@@ -1198,6 +1321,9 @@ export class PedestrianSystem {
       // Chi ha un compito non si spaventa per uno sparo: o è suo, o è di quello a
       // cui sta sparando. Vale anche per la divisa, per la stessa ragione.
       if (p.dead || p.hostile || p.cop || p.state === 'errand' || p.state === 'goto') continue;
+      // Le guardie del cortile tuo: lo sparo è di uno di casa. Prima diventavano ostili a te
+      // (`fights` + vicino) o scappavano, e sotto una raffica il cortile si svuotava.
+      if (GUARD_TUNE.escort && p.turf && game.turfs?.mine(p.turf)) continue;
       const d2 = (p.x - x) ** 2 + (p.y - y) ** 2;
       if (d2 > r2) continue;
       if (source === game.player && PED_KINDS[p.kind]?.fights && d2 < near2) {
