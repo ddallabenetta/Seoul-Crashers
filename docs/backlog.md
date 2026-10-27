@@ -332,9 +332,7 @@ il §5.21 altre undici — fra cui le due che erano tornate in cima.
 - **Il bordo di una città resta leggibile a terra, ma adesso sfuma** (§5.38: niente più bande
   per tile né spuntoni di asfalto; le vie cieche hanno una testata). Una periferia vera
   vorrebbe ancora capannoni, svincoli e case sparse. **T9c**: prolungando un viale in provinciale
-  si toglie la testata del nodo con `rimuoviTestata` e si allunga il segmento. **T9d** rifà la
-  forma di Busan e Jeju: le testate di quei bordi (nodi di Busan nord/costa e i sette di Jeju) vanno
-  ricalcolate, `accorciaStrade` le rigenera da sola.
+  si toglie la testata del nodo con `rimuoviTestata` e si allunga il segmento. (T9d, fatta: §5.41; `accorciaStrade` rigenera le testate da sola.)
 - **Lasciare una città non conserva il suo stato locale.** `ShopSystem` e gli interni non
   ricordano casse svuotate, spese e vendite di una città quando si è dall'altra parte del paese.
   Con una mappa sola non c'è più un momento in cui «si lascia una regione», quindi il difetto è
@@ -375,3 +373,8 @@ posto in cui riprenderla (§5.15), una sconfitta che non sia solo la morte (§5.
 musicale a cui aggiungere una riga per far partire un pezzo (§5.19: si tocca `music.direct` e
 nient'altro) e un modo di ricominciare da capo senza ricaricare la pagina (§5.21:
 `game.newGame()`).
+
+- **Dopo T9d (§5.41).** (1) I ponti hanno piloni solo ai bordi dell'impalcato e nessuna campata alta: sotto, la barca è semplicemente coperta. (2) Densità riportata sopra i livelli di prima (§5.41). (3) I quartieri a
+  gradoni sono solo quota (`TERRACES`), niente muri di sostegno. (4) Su Jeju resta una banda verticale
+  più chiara nel mare (gradiente del mare di Seoul, già presente prima). (5) Due barche di Seoul stanno
+  in secco (x≈2526, y 4120 e 4664): difetto preesistente. (6) Busan e Jeju non hanno stato locale dei negozi.

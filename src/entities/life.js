@@ -426,7 +426,7 @@ export class LifeSystem {
       const px = x + Math.cos(a) * d;
       const py = y + Math.sin(a) * d;
       if (px < 120 || py < 120 || px > city.w - 120 || py > city.h - 120) continue;
-      if (!city.isWater(px, py)) continue;
+      if (!(city.isNavigable || city.isWater).call(city, px, py)) continue;
       return { x: px, y: py };
     }
     return null;
@@ -437,7 +437,7 @@ export class LifeSystem {
     const city = this.city;
     for (let i = 1; i <= 8; i++) {
       const t = i / 8;
-      if (!city.isWater(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t)) return false;
+      if (!(city.isNavigable || city.isWater).call(city, x0 + (x1 - x0) * t, y0 + (y1 - y0) * t)) return false;
     }
     return true;
   }
@@ -488,10 +488,11 @@ export class LifeSystem {
     // sensore lungo mezzo fiume trova sempre l'altra sponda — la barca passa la
     // vita a scansare una riva che non stava per toccare, e non arriva mai in
     // velocità (misurato: 112 px/s contro i 208 di crociera).
+    const nav = (x, y) => (city.isNavigable ? city.isNavigable(x, y) : city.isWater(x, y));
     const look = 130 + Math.abs(v.speed) * 0.35;
-    if (!city.isWater(v.x + cos * look, v.y + sin * look)) {
-      const left = city.isWater(v.x + Math.cos(v.angle - 1) * look, v.y + Math.sin(v.angle - 1) * look);
-      const right = city.isWater(v.x + Math.cos(v.angle + 1) * look, v.y + Math.sin(v.angle + 1) * look);
+    if (!nav(v.x + cos * look, v.y + sin * look)) {
+      const left = nav(v.x + Math.cos(v.angle - 1) * look, v.y + Math.sin(v.angle - 1) * look);
+      const right = nav(v.x + Math.cos(v.angle + 1) * look, v.y + Math.sin(v.angle + 1) * look);
       if (left && !right) ai.turn = -1;
       else if (right && !left) ai.turn = 1;
       aim = v.angle + ai.turn * 1.3;

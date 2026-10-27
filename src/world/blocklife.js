@@ -406,6 +406,9 @@ function decoratePark(ctx, b, placed) {
   let pick = rng.next() * weights.reduce((a, c) => a + c, 0);
   let kind = names[names.length - 1];
   for (let i = 0; i < names.length; i++) { pick -= weights[i]; if (pick <= 0) { kind = names[i]; break; } }
+  // Un isolato che una regione ha scelto come luogo (il piazzale di Seomyeon) non lo
+  // decide il caso: `b.theme` vince, se la taglia lo permette.
+  if (b.theme && names.includes(b.theme)) kind = b.theme;
 
   const out = { decor: [], avoid: [], keepPath: false };
   const nTrees = PARK_TYPES[kind].build(ctx, rng, b, I, out);
@@ -510,6 +513,10 @@ function decorateRural(ctx, b, placed) {
   b.decor = [];
   b.life = theme;
   placed.push({ type: theme, cx, cy });
+  // Jeju: ogni campo è chiuso da un muretto di basalto (§5.41).
+  if (area === 'jeju') {
+    for (const f of b.fields) if (f.w >= 56 && f.h >= 56) b.decor.push({ kind: 'stonewall', x: f.x, y: f.y, w: f.w, h: f.h, seed: Math.round(f.x * 3 + f.y) });
+  }
 
   for (const f of b.fields) {
     if (f.w < 56 || f.h < 56) continue;

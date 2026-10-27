@@ -499,8 +499,10 @@ export class GroundRenderer {
   drawSiepi(g, view) {
     const city = this.city;
     const STEP = 34;
-    const lati = [];
+    const lati = [...(city.siepi || [])];
     for (const a of city.areas || []) {
+      // Busan e Jeju non hanno la siepe sul rettangolo ma sul confine reale (`korea.siepi`).
+      if (a.id !== 'seoul') continue;
       if (a.x1 < city.w - 200) lati.push({ a, v: true, c: a.x1 - 22, from: a.y0, to: a.y1 });
       if (a.y1 < city.h - 200) lati.push({ a, v: false, c: a.y1 - 22, from: a.x0, to: a.x1 });
       if (a.x0 > 200) lati.push({ a, v: true, c: a.x0 + 22, from: a.y0, to: a.y1 });
@@ -522,7 +524,7 @@ export class GroundRenderer {
         const y = l.v ? q : c;
         if (city.isWater(x, y) || city.isOnRoad(x, y)) continue;
         // `queryRect` restituisce i candidati della cella, non solo chi si sovrappone.
-        if (city.blockGrid.queryRect(x - 14, y - 14, 28, 28).some((b) =>
+        if (!l.borda && city.blockGrid.queryRect(x - 14, y - 14, 28, 28).some((b) =>
           x + 14 > b.x && x - 14 < b.x + b.w && y + 14 > b.y && y - 14 < b.y + b.h)) continue;
         if (h1 < 0.12) continue;
         const r = 14 + h2 * 9;
@@ -814,6 +816,31 @@ export class GroundRenderer {
       }
     }
 
+    // Ponti (§5.41): l'impalcato è terra per chi guida, ma sotto c'è mare. Niente battigia
+    // sui suoi bordi; il disegno (ombra sull'acqua, cordoli, piloni) sta in fondo.
+    const ponti = (city.bridges || []).filter((b) => b.x < xEnd + 40 && b.x + b.w > ox - 40 && b.y < yEnd + 40 && b.y + b.h > oy - 40);
+    const suPonte = (x, y) => ponti.some((b) => x > b.x - 14 && x < b.x + b.w + 14 && y > b.y - 14 && y < b.y + b.h + 14);
+
+    // Spiaggia (§5.41): Busan e Jeju hanno una maschera con la distanza dalla riva
+    // (`shoreDist`). La terra entro `SHORE_R` px dall'acqua diventa sabbia o basalto
+    // (`shoreKind`, a macchie larghe): prima restava il fondo scuro del distretto,
+    // e fra l'ultimo isolato e il mare si leggeva come un piazzale d'asfalto.
+    if (city.shoreDist) {
+      const SHORE_R = 120;
+      for (let y = oy; y < yEnd; y += step) {
+        for (let x = ox; x < xEnd; x += step) {
+          const cx = x + step / 2;
+          const cy = y + step / 2;
+          if (inSa(cx, cy) || city.isWater(cx, cy)) continue;
+          const d = city.shoreDist(cx, cy);
+          if (d === undefined || d >= SHORE_R) continue;
+          const a = Math.pow(1 - d / SHORE_R, 0.85);
+          g.fillStyle = city.shoreKind(cx, cy) === 'sand' ? `rgba(214,198,148,${(0.92 * a).toFixed(3)})` : `rgba(56,56,54,${(0.86 * a).toFixed(3)})`;
+          g.fillRect(x, y, step + 0.8, step + 0.8);
+        }
+      }
+    }
+
     // Battigia locale: la maschera geografica decide terra/acqua, questa fascia
     // le dà spessore visivo con rocce, sabbia scura e schiuma. Senza, soprattutto
     // sul lato est di Jeju, la costa sembrava il taglio verticale di una tile.
@@ -821,7 +848,7 @@ export class GroundRenderer {
       let prevWet = city.isWater(ox - step / 2, y + step / 2);
       for (let x = ox; x <= xEnd; x += step) {
         const wet = city.isWater(x + step / 2, y + step / 2);
-        if (wet !== prevWet && !inSa(x, y + step / 2) && !inSa(x - 1, y + step / 2)) {
+        if (wet !== prevWet && !inSa(x, y + step / 2) && !inSa(x - 1, y + step / 2) && !suPonte(x, y + step / 2)) {
           const shoreX = x;
           const landSide = wet ? -1 : 1;
           g.fillStyle = 'rgba(102,91,67,0.72)';
@@ -842,7 +869,7 @@ export class GroundRenderer {
       let prevWet = city.isWater(x + step / 2, oy - step / 2);
       for (let y = oy; y <= yEnd; y += step) {
         const wet = city.isWater(x + step / 2, y + step / 2);
-        if (wet !== prevWet && !inSa(x + step / 2, y)) {
+        if (wet !== prevWet && !inSa(x + step / 2, y) && !suPonte(x + step / 2, y)) {
           const shoreY = y;
           const landSide = wet ? -1 : 1;
           // Entro `BLEND_FOCE` dal bordo di Seoul la riva ricalca la banchina grigia
@@ -866,6 +893,21 @@ export class GroundRenderer {
       if (!city.isWater(x, y)) continue;
       g.fillStyle = `rgba(155,205,228,${0.035 + hash2(i, i * 3) * 0.05})`;
       g.fillRect(x, y, 22 + hash2(i * 5, oy) * 88, 2);
+    }
+
+    for (const b of ponti) {
+      g.fillStyle = 'rgba(0,0,0,0.26)';
+      g.fillRect(b.x + 14, b.y + 18, b.w, b.h);
+      g.fillStyle = '#5d6064';
+      g.fillRect(b.x, b.y, b.w, b.h);
+      g.fillStyle = 'rgba(255,255,255,0.18)';
+      if (b.w > b.h) { g.fillRect(b.x, b.y, b.w, 3); g.fillRect(b.x, b.y + b.h - 3, b.w, 3); } else { g.fillRect(b.x, b.y, 3, b.h); g.fillRect(b.x + b.w - 3, b.y, 3, b.h); }
+    }
+    for (const q of city.pylons || []) {
+      if (q.x > xEnd || q.x + q.w < ox || q.y > yEnd || q.y + q.h < oy) continue;
+      g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(q.x + 5, q.y + 6, q.w, q.h);
+      g.fillStyle = '#8d9094'; g.fillRect(q.x, q.y, q.w, q.h);
+      g.fillStyle = '#b8bbbf'; g.fillRect(q.x + 4, q.y + 4, q.w - 8, q.h - 8);
     }
 
     // I moli sono superfici calpestabili e devono tornare sopra la maschera.

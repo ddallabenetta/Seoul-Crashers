@@ -174,6 +174,21 @@ const PAINT = {
     for (let yy = y; yy <= y + h + 1; yy += 20) { g.fillRect(x - 1.5, yy - 1.5, 3, 3); g.fillRect(x + w - 1.5, yy - 1.5, 3, 3); }
   },
 
+  stonewall(g, d) {
+    // Muretto a secco di basalto (돌담): i campi di Jeju sono tutti chiusi da pietre
+    // nere ammassate, senza malta. Un ellisse scura ogni sette pixel lungo il bordo.
+    const { x, y, w, h, seed } = d;
+    let i = 0;
+    const stone = (px, py) => {
+      const k = i++;
+      const r = 2.8 + h2(seed, k) * 3.2;
+      g.fillStyle = h2(seed, k + 99) > 0.5 ? '#3d3c3a' : '#2b2b2a';
+      g.beginPath(); g.ellipse(px, py, r * 1.35, r, h2(seed, k + 7) * 3, 0, 6.2832); g.fill();
+    };
+    for (let xx = x; xx <= x + w; xx += 7) { stone(xx, y); stone(xx, y + h); }
+    for (let yy = y + 7; yy < y + h; yy += 7) { stone(x, yy); stone(x + w, yy); }
+  },
+
   paddy(g, d) {
     // Risaia con le piantine in file regolari sull'acqua bassa.
     const { x, y, w, h } = d;

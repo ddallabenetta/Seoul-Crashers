@@ -16,7 +16,7 @@ import { SpatialGrid } from '../core/spatial.js';
 import { generateCity } from './citygen.js';
 import { DISTRICTS as SEOUL_DISTRICTS } from './districts.js';
 import { expandSeoul } from './seoul_expansion.js';
-import { createBusanCity } from './busan.js';
+import { createBusanCity, BUSAN_WORLD, SEAM } from './busan.js';
 import { createJejuCity } from './jeju.js';
 
 // Dimensione del mondo unificato. Le tre città conservano la taglia che avevano;
@@ -152,6 +152,8 @@ function shiftCity(city, dx, dy) {
 function buildLaneMarks(city) {
   const axis = (lines, perp) => {
     for (const l of lines) {
+      // Le linee di `netgen` (Busan, Jeju) portano già i loro `marks`.
+      if (!l.on && l.marks) continue;
       l.marks = [];
       if (!l.on) { for (const [a, b] of l.segments) l.marks.push([a, b]); continue; }
       for (let j = 0; j < l.on.length && j < perp.length - 1; j++) {
@@ -187,19 +189,38 @@ function makeGeography(seoul) {
     + 280 * Math.sin((y - seoul.h) / 950);
   // Costa meridionale: la penisola finisce qui, e sotto c'è solo il mare che
   // separa la terraferma da Jeju.
-  const southCoast = (x) => 14200 + 1900 * sm((x - 1500) / 11000) + 400 * Math.sin(x / 1600 + 0.7);
+  const southCoastBase = (x) => 14200 + 1900 * sm((x - 1500) / 11000) + 400 * Math.sin(x / 1600 + 0.7);
+  // A sud di Busan è tutto mare: la maschera della città ha l'acqua sul bordo basso, e
+  // fuori dal rettangolo la terra non deve ricominciare (§5.41). Il raccordo parte
+  // a ovest, dove la costa della penisola scende da sola.
+  const busanSouth = busan.y + BUSAN_WORLD.h - 12;
+  const southCoast = (x) => {
+    const k = sm((x - 8300) / 1300);
+    return southCoastBase(x) * (1 - k) + busanSouth * k;
+  };
   // Costa orientale (Mar dell'Est): stretta a nord, larga all'altezza di Busan.
-  const eastCoast = (y) => Math.min(KOREA.w - 120, 13000 + 3400 * sm((y - 1000) / 9000)
+  const eastCoastBase = (y) => Math.min(KOREA.w - 120, 13000 + 3400 * sm((y - 1000) / 9000)
     + 320 * Math.sin(y / 1300));
+  // Il litorale di Haeundae: dal confine est di Busan in giù il mare comincia sul
+  // bordo del rettangolo, e la costa del Mar dell'Est vi si raccorda dall'alto.
+  const busanEast = busan.x + BUSAN_WORLD.w;
+  const eastBlendY = busan.y + SEAM.eastY - 940;
+  const eastCoast = (y) => {
+    const t = sm((y - eastBlendY) / 940);
+    return eastCoastBase(y) * (1 - t) + busanEast * t;
+  };
   // La baia di Jinhae, a ovest di Busan: senza, l'acqua che Busan ha sul proprio
   // bordo occidentale finirebbe contro una parete di terra dritta.
-  const bayWest = (y) => busan.x - (300 + 1500 * sm((y - busan.y) / 2600));
+  // La fascia comincia dove comincia il mare di Busan sul suo bordo ovest (`SEAM`) e
+  // si allarga piano: partire dal bordo nord faceva una tacca dritta sul rettangolo.
+  const bayY0 = busan.y + SEAM.westY;
+  const bayWest = (y) => busan.x - (300 + 1500 * sm((y - bayY0) / 2400)) * sm((y - bayY0) / 450);
 
   const seaAt = (x, y) => {
     if (x < westCoast(y)) return true;
     if (y > southCoast(x)) return true;
     if (x > eastCoast(y)) return true;
-    if (y > busan.y && x < busan.x && x > bayWest(y)) return true;
+    if (y > bayY0 && x < busan.x && x > bayWest(y)) return true;
     // La coda del Han a est di Seoul: il fiume non può interrompersi sul bordo
     // di un rettangolo, quindi si assottiglia fino a sparire fra le colline.
     if (x >= seoul.w && x < seoul.w + 1300) {
@@ -636,6 +657,61 @@ export function rimuoviTestata(city, node) {
   return true;
 }
 
+
+// ---------------------------------------------------------------------------
+// SIEPI SUL CONFINE REALE
+// ---------------------------------------------------------------------------
+
+/**
+ * Le siepi di Busan e Jeju (§5.41). Quelle di Seoul stanno sul bordo del rettangolo
+ * (`ground.drawSiepi`), perché lì la città finisce davvero contro la campagna. Busan
+ * e Jeju hanno un'isola, un cuneo e una costa che non coincidono con il loro
+ * rettangolo: il confine va cercato dove l'isolato urbano **guarda un campo** (o
+ * terra aperta) e non una strada, il mare, un parco o un altro isolato urbano.
+ * Restituisce i tratti nel formato di `drawSiepi`: `{ v, c, from, to }`.
+ */
+function calcolaSiepi(korea) {
+  const grid = new SpatialGrid(KOREA.w, KOREA.h, 420);
+  for (const b of korea.blocks) grid.insertRect({ x: b.x, y: b.y, w: b.w, h: b.h, block: b });
+  const blockAt = (x, y, self) => {
+    for (const o of grid.queryRect(x - 1, y - 1, 2, 2)) {
+      if (o.block !== self && x > o.x && x < o.x + o.w && y > o.y && y < o.y + o.h) return o.block;
+    }
+    return null;
+  };
+  const out = [];
+  const STEP = 34;
+  const OFF = 26;
+  for (const b of korea.blocks) {
+    if (b.type !== 'urban') continue;
+    const area = korea.areaAt(b.x + b.w / 2, b.y + b.h / 2);
+    if (!area || area.id === 'seoul') continue;
+    for (const side of ['top', 'bottom', 'left', 'right']) {
+      const vert = side === 'left' || side === 'right';
+      const len = vert ? b.h : b.w;
+      const c = side === 'left' ? b.x - OFF : side === 'right' ? b.x + b.w + OFF : side === 'top' ? b.y - OFF : b.y + b.h + OFF;
+      let run = null;
+      const close = (t) => {
+        if (run !== null && t - run >= STEP * 2) {
+          const from = (vert ? b.y : b.x) + run;
+          out.push({ v: vert, c, from, to: (vert ? b.y : b.x) + t, borda: true });
+        }
+        run = null;
+      };
+      for (let t = 0; t <= len; t += STEP) {
+        const x = vert ? c : b.x + t;
+        const y = vert ? b.y + t : c;
+        const nb = blockAt(x, y, b);
+        const open = !korea.isWater(x, y) && !korea.isOnRoad(x, y) && (nb === null || nb.type === 'rural');
+        if (open && run === null) run = t;
+        if (!open) close(t);
+      }
+      close(len);
+    }
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // COSTRUZIONE
 // ---------------------------------------------------------------------------
@@ -786,6 +862,22 @@ export function createKorea() {
     const a = areaAt(x, y);
     return a ? a.city.isWater(x - a.x0, y - a.y0) : geo.seaAt(x, y);
   };
+  // Acqua per chi **naviga**: sotto un ponte l'impalcato è terra per le auto (`isWater`
+  // falso) ma c'è mare fra i piloni (§5.41).
+  korea.isNavigable = (x, y) => {
+    if (korea.isWater(x, y)) return true;
+    return korea.underDeck(x, y);
+  };
+  korea.underDeck = (x, y) => {
+    const a = areaAt(clamp(x, 0, KOREA.w - 1), clamp(y, 0, KOREA.h - 1));
+    return !!(a && a.city.underDeck && a.city.underDeck(x - a.x0, y - a.y0));
+  };
+  korea.bridges = [];
+  korea.pylons = [];
+  for (const part of parts) {
+    for (const b of part.city.bridges || []) korea.bridges.push({ ...b, x: b.x + part.x, y: b.y + part.y });
+    for (const q of part.city.pylons || []) korea.pylons.push({ ...q, x: q.x + part.x, y: q.y + part.y });
+  }
   korea.elevationAt = (x, y) => {
     const a = areaAt(x, y);
     if (a) return a.city.elevationAt(x - a.x0, y - a.y0);
@@ -827,6 +919,16 @@ export function createKorea() {
     return country[0];
   };
   korea.districtAtNorm = (nx, ny) => korea.districtAt(nx * KOREA.w, ny * KOREA.h);
+  // Distanza dalla riva e natura della riva (sabbia o basalto): le regioni con una
+  // maschera di costa (Busan, Jeju) le espongono, il resto del mondo no.
+  korea.shoreDist = (x, y) => {
+    const a = areaAt(x, y);
+    return a && a.city.shoreDist ? a.city.shoreDist(x - a.x0, y - a.y0) : undefined;
+  };
+  korea.shoreKind = (x, y) => {
+    const a = areaAt(x, y);
+    return a && a.city.shoreKind ? a.city.shoreKind(x - a.x0, y - a.y0) : 'sand';
+  };
   // Su tre maglie messe insieme la scansione lineare delle linee smette di
   // essere gratis: la stessa domanda («questo rettangolo invade una strada?»)
   // arriva una volta per edificio e una per prop. Le carreggiate finiscono
@@ -871,6 +973,7 @@ export function createKorea() {
   for (const b of korea.blocks) {
     if (!b.districtRef) b.districtRef = korea.districtAt(b.x + b.w / 2, b.y + b.h / 2);
   }
+  korea.siepi = calcolaSiepi(korea);
   for (const part of parts) {
     for (const s of part.city.transitStations || []) {
       s.region = part.id;

@@ -447,7 +447,8 @@ export class PedestrianSystem {
         const cars = game.vehicleGrid.queryCircle(pt.x, pt.y, 46);
         if (cars.some((v) => !v.spot)) continue;
       }
-      const district = DISTRICT_BY_ID[block.district] || DISTRICT_BY_ID.hongdae;
+      const dr = block.districtRef;
+      const district = dr && dr.region && dr.region !== 'seoul' ? dr : (DISTRICT_BY_ID[block.district] || DISTRICT_BY_ID.hongdae);
       const ped = createPed(rng.pick(district.pedMix), pt.x, pt.y, rng);
       ped.block = block;
       ped.side = side;

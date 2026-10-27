@@ -498,6 +498,12 @@ un'ascissa del mondo (`SEA_X0`), non al bordo del tile che si sta disegnando (§
 dipingono (`ground.drawTestata`), non si aggiungono alla carreggiata (§5.38).
 
 
+**Busan e Jeju: ponti, landmark e gradini (§5.41).** Un ponte è terra per `isWater` (le auto
+non affondano) ma `isNavigable`/`underDeck` lasciano passare le barche fra i piloni: chi scrive codice per
+barche usa `isNavigable`, non `isWater`, o una barca non passa sotto il ponte. Un landmark vicino alla riva va
+riservato prima di `carveBlocks` o `reindex` lancia «Landmark sulla carreggiata». Un tracciato libero
+che taglia in diagonale una griglia ne sovrappone le strade: attaccarlo a una sua linea (`exactEnd`).
+Gradini di `staircase` più piccoli della somma delle mezze carreggiate sovrappongono gli asfalti.
 **`teleport` di una scena esce dal negozio, e il punto di piano non compare.** Una prova che porta il
 giocatore su un faldone, su Jo o su un punto di una pianta con la stessa funzione con cui lo porta in
 strada lo **fa uscire** (`shops.leave`): il suggerimento non c'è e `p.run` gira lo stesso, quindi la
