@@ -455,6 +455,16 @@ non ha. Sotto, il traffico ha imparato una cosa sola in più: un'auto della stor
 **una meta** (`traffic.sendTo`, l'A* del §5.30 calcolato una volta) e a ogni incrocio prendere
 l'arco che ci porta, invece di scegliere a caso come tutte le altre.
 
+**Una stanza di scena non cambia la città** (§5.42). M7 e M8 chiedono due posti che Seoul non ha — una
+cella percorribile e un cortile cieco — e **nessuno dei due è una vetrina nuova nella generazione**
+(`jail` e `yard` stanno in `BUSINESSES` con `where: 'story'`, in nessuna riga di `DISTRICT_MIX`: l'rng non
+si sposta). La cella è una vetrina **inventata** (`id: 'm7-cella'`) davanti al punto del commissariato;
+il cortile sta dietro una porta **vera** di Myeongdong via `shops.stageShop(id, alt)`: stesso `id`, altra
+pianta, cache sotto `stage:<id>`, e `unstage` ripristina quella di prima. Una fase può prendersi l'arresto
+(`phase.busted(ctx)`) invece di rientrare, e nascondere il proprio riquadro (`phase.quiet`). Chi cammina
+in una scena a piedi usa lo stato `goto` dei pedoni (una fila di punti, `p.goto.arrived`) e `tail.begin` accetta
+un pedone: le soglie le passa la missione.
+
 **Un dialogo non è una cutscene: è la stessa scena, ferma** (§5.29). Metà del copione delle
 missioni sono scambi di due righe *nel posto in cui succedono*, e coprire quel posto con una
 tavola toglie l'unica cosa che li distingue da un pannello. `ui/dialogue.js` è la modalità che

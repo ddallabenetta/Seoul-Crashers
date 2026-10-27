@@ -534,3 +534,23 @@ attraverso ogni partita nuova e ogni ricarica.
 **`figure(..., 'seat', { crop })` con un `crop` piccolo è una testa sola.** Il corpo comincia alla cella
 24: `crop: 26` per un bambino seduto dà una faccia che galleggia, `crop: 46` dà busto e gambe. E sotto il
 60% del pannello c'è il riquadro delle battute (§5.33).
+
+**`put()` scarta in silenzio quello che tocca un mobile già messo.** Il divisorio fra le due celle di M7
+sparì perché era attaccato alla sbarra della fronte (`pad(o, 2)` sovrapposto): a schermo c'era una cella
+sola, e nessun errore. Si mettono per primi i pezzi lunghi, e il secondo si ferma due pixel prima (§5.42).
+
+**`shop.district` non è il distretto che legge il giocatore.** L'etichetta con cui la generazione marca una
+vetrina e `districtAt` (quella dell'HUD) si separano sui bordi: la prima porta «di Myeongdong» stava a
+Hongdae. Chi manda in un quartiere e lo scrive a schermo passa `visible: true` a `findShop` (§5.42).
+
+**`actors.restore` azzera `d.ped` di chi è nato durante il caricamento.** Un attore d'interno definito dalla
+fase mentre `missions.restore` rientra (Byeon) ha il pedone sul piano ma `actors.get(id)` dice `null`: una
+prova guarda `floor.people`, non `actors.get` (§5.42).
+
+**Un pedone `goto` che arriva lascia `p.goto` com'è.** `goto.arrived` è il modo in cui la missione sa che ci
+è arrivato: azzerarlo all'arrivo (la prima versione lo faceva) vuol dire che nessuno lo vede mai, e la fase
+resta ad aspettare un pedone fermo (§5.42).
+
+**`shops.snapshot` ignora le chiavi non numeriche della cache.** Le stanze della storia stanno sotto
+`stage:<id>` o sotto un id inventato (`m7-cella`) e si rifanno da sole: scriverle nel salvataggio vorrebbe
+dire un'altra pianta per ogni vetrina (§5.42).

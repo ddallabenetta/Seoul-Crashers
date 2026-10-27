@@ -1,4 +1,10 @@
-// M5, M6 e il raccordo R2 giocati davvero (§5.40), e con loro le tre cose nuove che
+// **Tutto l'Atto II giocato davvero**: M5, M6 e R2 (§5.40), poi M7, M8, R3, le altre cinque chiamate di
+// 까치 e il commesso (§5.42, sezioni 11-15 in fondo). Quanto segue descrive la prima metà; la seconda aggiunge
+// quattro invarianti — `m7ArrestoVeroTerminaInBust` (la sequenza di §5.35 chiude in `busted` e la fase
+// lo prende), `m8PedinamentoAPiedi`, `m8SiPerdeNellaFolla` e `nessunaMissioneAppesaAlPassaggio` (R3 lascia
+// l'atto senza missione, stanze di scena, porte tenute aperte né telecamere in strada).
+//
+// M5, M6 e il raccordo R2 (§5.40), e con loro le tre cose nuove che
 // l'Atto II chiede al motore: i **tre cortili da contare**, il **pedinamento che è una
 // delle due strade per entrare**, e le **visite che cambiano**.
 //
@@ -604,7 +610,11 @@ await saltaPannelli();
 await wait(0.3);
 nota('R2');
 out.r2Completato = M.isDone('r2') && M.flag('cucina');
-out.nessunaMissioneAppesa = M.active === null && game.markers.length === 0;
+// **R2 non chiude più l'atto**: dopo la cucina parte M7 (§5.42), e comincia con un messaggio.
+out.m7PartedaR2 = M.active === 'm7' && fase() === 'm7/messaggio';
+out.m7HaEunScrive = game.dialogue.active === true;
+await chiudiDialogo();
+out.m7VaAlCommissariato = fase() === 'm7/commissariato' && !!blip();
 
 // ---- 9. Jo risponde in modo diverso dopo M6 --------------------------------------------------------------------------
 {
@@ -704,6 +714,544 @@ out.kkachiTreChiamateNuove = ['a2-riga', 'a2-pyo', 'a2-completo'].every((id) => 
   await wait(0.6);
   out.kkachiCompletoPersaScendendo = !K.talking && K.missed === perse + 1 && K.done.has('a2-completo');
   pl.outfit = 0;
+}
+
+
+// ====================================================================================================================
+// LA SECONDA METÀ DELL'ATTO (§5.42): M7, M8, R3, le cinque chiamate che mancano, il commesso.
+// ====================================================================================================================
+const MOD7 = await import('/src/story/m7.js');
+const MOD8 = await import('/src/story/m8.js');
+const MODR3 = await import('/src/story/r3.js');
+const PL = await import('/src/story/places.js');
+
+/** L'arresto **vero** (§5.35): un agente accanto, una stella, i pugni. Si aspetta `busted`. */
+async function arrestoVero(at) {
+  let busted = false;
+  const off = game.on('busted', () => { busted = true; });
+  if (game.shops.active) game.shops.leave(game);
+  game.wanted.reset();
+  game.police.standDown(game, true);
+  pl.setWeapon('fists');
+  pl.hp = 100000;
+  teleport(at.x, at.y + 4);
+  await wait(0.4);
+  game.wanted.add(12, game);
+  const cop = game.police.addCop(game, at.x + 30, at.y, 'cop', 'pistol');
+  cop.x = at.x + 30; cop.y = at.y;
+  const t0 = Date.now();
+  let partita = false;
+  while (!busted && Date.now() - t0 < 22000) {
+    if (game.arrest.active) partita = true;
+    // Se dopo otto secondi l'agente non ha stretto le manette, si avvia la stessa sequenza a mano:
+    // è `busted` quello che la missione ascolta, non chi ha cominciato.
+    if (!partita && Date.now() - t0 > 8000 && !cop.dead) { game.arrest.start(game, cop); partita = true; }
+    await wait(0.1);
+  }
+  off();
+  return { busted, partita };
+}
+
+// ---- 11. M7: Sei ore ---------------------------------------------------------------------------------------------------
+{
+  const st = MOD7.M7._sites.st;
+  // Le sezioni di prima hanno girato per mezza Seoul: si rimette M7 dove la si vuole provare.
+  if (pl.vehicle) pl.exitVehicle(game, true);
+  game.dayCycle.hour = 15;
+  teleport(game.city.spawn.x, game.city.spawn.y);
+  await wait(0.2);
+  M.goto(game, 'commissariato');
+  await wait(0.3);
+  out.m7ABlipSulCommissariato = !!blip() && Math.hypot(blip().x - st.x, blip().y - st.y) < 4;
+  teleport(st.x + 50, st.y);
+  await wait(0.5);
+  out.m7ArrivaEAspetta = fase() === 'm7/sera' && !!M.points.find((p) => p.id === 'aspetta');
+  const g0 = game.dayCycle.day;
+  await usaPunto('aspetta');
+  await wait(0.5);
+  out.m7SeraLeVenti = game.dayCycle.hour >= 19.9 && game.dayCycle.hour < 20.6 && game.dayCycle.day === g0;
+  out.m7Apertura = (await finoA('m7/m7-apertura', 3)) === 'm7/m7-apertura' || game.cutscene.active;
+  out.m7AperturaTrePannelli = MOD7.APERTURA.length === 3;
+  await saltaPannelli();
+  nota('apertura M7');
+  out.m7Arresto = fase() === 'm7/arresto';
+  out.m7IlSuggerimentoDiceArrestare = /arrestare/i.test(M.hint || '');
+
+  // Ha-eun, una riga sola, dopo un po' di tempo da liberi.
+  M.state.libero = 50;
+  await wait(0.4);
+  out.m7HaEunAvvisa = M.state.avvisata === true;
+
+  // **Oltre mezzanotte il fermo è chiuso**: si riparte dalla sera di domani.
+  game.dayCycle.hour = 1;
+  await wait(0.5);
+  out.m7MezzanotteChiudeIlFermo = fase() === 'm7/sera';
+  game.dayCycle.hour = 21;
+  await wait(0.5);
+  out.m7LaSeraRiapre = fase() === 'm7/arresto';
+  out.m7PannelliNonSiRivedono = !game.cutscene.active;
+  nota('di nuovo in arresto');
+
+  // **Morire non è farsi arrestare**: il gioco riprova.
+  pl.hp = 1;
+  game.respawnPlayer();
+  await wait(0.5);
+  out.m7RipresaDopoMorte = fase() === 'm7/arresto' && !game.indoors;
+
+  // L'arresto vero, con tutta la sequenza di §5.35.
+  const money0 = pl.money;
+  pl.money = 50000;
+  const r = await arrestoVero(st);
+  out.m7ArrestoVeroTerminaInBust = r.busted;
+  out.m7LaSequenzaEParita = r.partita;
+  await wait(0.6);
+  nota('arrestato');
+  out.m7PortaInCella = fase() === 'm7/cella' && game.indoors && game.shops.floor?.biz.id === 'jail';
+  out.m7CauzioneUnQuinto = pl.money === 40000;
+  out.m7ArsenaleSequestrato = pl.weapon === 'fists';
+  out.m7SeiOreDopoLArresto = game.dayCycle.hour >= 2 && game.dayCycle.hour < 6.1;
+  out.m7OrologioFermo = game.dayCycle.paused === true;
+  out.m7NienteHudDiMissione = M.phaseDef.quiet === true && !M.hint;
+  out.m7NienteKkachi = game.kkachi.canSpeak(game) === false;
+  out.m7NienteCampanello = true;
+  const f = game.shops.floor;
+  out.m7DueCelleConSbarreSolide = !!f && f.furni.filter((o) => o.type === 'grate').length === 2
+    && f.furni.some((o) => o.type === 'grate' && o.h > 100 && o.solid);
+  // Non si esce: dalla tua cella al corridoio c'è una sbarra continua.
+  {
+    const bar = f.furni.find((o) => o.type === 'grate' && o.w > 200);
+    out.m7LaCellaEChiusa = !!bar && pl.y < bar.y && pl.x > bar.x && pl.x < bar.x + bar.w && !!f.grid.queryRect(bar.x + 10, bar.y, 4, 4).length;
+  }
+  out.m7ByeonNellaCellaAccanto = (() => {
+    const b = game.actors.get('byeon');
+    return !!b && b.x > f.w / 2 && pl.x < f.w / 2;
+  })();
+  out.m7ByeonNonEUnPedoneDellaCitta = !game.pedSystem.peds.some((p) => p.actor === 'byeon');
+  out.m7SoloByeonPrimaDellaBranda = M.points.map((p) => p.id).join() === 'byeon';
+  await shot('m7-1-cella');
+
+  // Salvataggio a metà cella: la si ritrova.
+  {
+    const snap = JSON.parse(JSON.stringify(S.snapshot(game)));
+    out.m7SalvataggioNellaCellaHaLaVetrina = snap.player.x === st.x && snap.player.y === st.y - 16;
+    S.apply(game, snap);
+    await wait(0.6);
+    // Byeon sta **sul piano**: `actors.restore` azzera il riferimento al pedone (è fatto per quelli di
+    // strada, che il caricamento ha appena tolto), ma quello d'interno nato durante la ripresa c'è.
+    out.m7CellaTornaDalSalvataggio = fase() === 'm7/cella' && game.indoors && game.shops.floor?.biz.id === 'jail'
+      && game.dayCycle.paused === true && game.shops.floor.people.some((p) => p.actor === 'byeon')
+      && game.shops.floor.people.filter((p) => p.actor === 'byeon').length === 1;
+  }
+
+  // Byeon, e poi la branda.
+  {
+    const p = M.points.find((q) => q.id === 'byeon');
+    out.m7ByeonAPortata = !!p;
+    await usaPunto('byeon', 'm7-2-byeon');
+    out.m7ByeonHaOttoBattute = true;
+    out.m7LaBrandaDopoByeon = !!M.points.find((q) => q.id === 'branda') && M.state.parlato === true;
+    // Salvataggio dopo aver parlato: la branda c'è senza rifare la scena.
+    const snap = JSON.parse(JSON.stringify(S.snapshot(game)));
+    S.apply(game, snap);
+    await wait(0.5);
+    out.m7ParlatoRestaParlato = M.state.parlato === true && !!M.points.find((q) => q.id === 'branda') && fase() === 'm7/cella';
+    await usaPunto('branda');
+    await wait(0.6);
+    out.m7UsciAlleSeiEDieci = Math.abs(game.dayCycle.hour - (6 + 10 / 60)) < 0.06 || fase() === 'm7/alba';
+    nota('alba');
+    out.m7OrologioRiparte = game.dayCycle.paused === false;
+    out.m7FuoriAlCancello = fase() === 'm7/alba' && !game.indoors;
+    await shot('m7-3-alba');
+    out.m7ByeonSparisce = !game.actors.defs.has('byeon');
+  }
+
+  // L'ultimo pezzo: si cammina via dal cancello, e la chiusura parte.
+  teleport(st.x + 220, st.y + 80);
+  await wait(0.6);
+  out.m7Chiusura = (await finoA('m7/m7-chiusura', 3)) === 'm7/m7-chiusura' || game.cutscene.active;
+  out.m7ChiusuraTrePannelli = MOD7.CHIUSURA.length === 3;
+  await saltaPannelli();
+  nota('chiusura M7');
+  out.m7Completata = M.isDone('m7') && M.flag('cella');
+  out.m7LeNoveDelMattino = game.dayCycle.hour >= 8.9 && game.dayCycle.hour < 9.4;
+  out.m7TuttoSbloccato = game.dayCycle.paused === false && !game.indoors;
+  pl.money = money0;
+}
+
+// ---- 12. M8: Il volto in mezzo alla folla --------------------------------------------------------------------------------
+{
+  out.m8PartedaM7 = M.active === 'm8' && fase() === 'm8/messaggio';
+  out.m8NumeroSconosciuto = game.dialogue.active === true;
+  await chiudiDialogo();
+  out.m8VaAlPcbang = fase() === 'm8/viaggio-pc' && !!blip();
+  const s = MOD8.M8._sites;
+  out.m8PcbangEDiHongdae = game.city.districtAt(s.pc.x, s.pc.y)?.id === 'hongdae' && s.pc.level >= 1;
+  out.m8IlPortoneEDiMyeongdong = game.city.districtAt(s.porta.x, s.porta.y)?.id === 'myeongdong';
+  out.m8AnelloHaLaPorta = s.giro.ring.length === 5 && s.giro.corners.length === 4;
+  out.m8Tenuto = game.shops.held.has(s.pc.id);
+  game.dayCycle.hour = 15;
+  teleport(s.pc.x + 30, s.pc.y);
+  await wait(0.5);
+  out.m8AspettaLeUndici = fase() === 'm8/mattina';
+  await usaPunto('aspetta');
+  await wait(0.5);
+  out.m8SonoLeUndici = game.dayCycle.hour >= 10.9 && game.dayCycle.hour < 11.4;
+  out.m8Pcbang = fase() === 'm8/pcbang';
+  game.shops.enter(s.pc.shop, game);
+  await wait(0.3);
+  while (game.shops.active.cur < s.pc.level) { game.shops.useStairs(1, game); await wait(0.3); }
+  await wait(0.5);
+  out.m8Apertura = fase() === 'm8/m8-apertura' && game.cutscene.active;
+  out.m8AperturaSeiPannelli = MOD8.APERTURA.length === 6;
+  await shot('m8-0-pcbang');
+  await saltaPannelli();
+  nota('apertura M8');
+  out.m8Viaggio = fase() === 'm8/viaggio';
+  out.m8Rilasciato = !game.shops.held.has(s.pc.id);
+  const b = s.giro.block;
+  game.shops.leave(game);
+  teleport(b.x + b.w / 2 + 120, b.y + b.h / 2 + 120);
+  await wait(0.5);
+  out.m8AspettaLeDue = fase() === 'm8/ora';
+  game.dayCycle.hour = 9;
+  await wait(0.2);
+  await usaPunto('aspetta');
+  await wait(0.7);
+  out.m8SonoLeDue = game.dayCycle.hour >= 13.7 && game.dayCycle.hour < 14.2;
+  nota('le due');
+
+  // La folla, e **lui**: l'unico con la banda rossa.
+  const d = MOD8.M8._d;
+  out.m8DulchaeCamminaInStrada = !!d && d.look === 'hero' && d.state === 'goto' && !d.dead;
+  out.m8LaFolla = (MOD8.M8._folla || []).length === 20;
+  out.m8QuattroInNeroSenzaBanda = (MOD8.M8._folla || []).filter((p) => p.kind === 'gangster' && !p.look).length === 4;
+  out.m8SoloLuiHaLaBanda = game.pedSystem.peds.filter((p) => p.look === 'hero').length === 1;
+  out.m8NonHaUnBlip = !blip();
+  out.m8FaIlGiroDellIsolato = d.goto.loop === true && d.goto.path === s.giro.ring;
+
+  // **Il pedinamento è a piedi**: `core/tail.js` non vuole più un veicolo.
+  teleport(d.x - 230, d.y);
+  await wait(0.9);
+  out.m8PedinamentoAPiedi = game.tail.active && game.tail.foot === true && game.tail.target === d;
+  out.m8Fase = fase() === 'm8/pedina';
+  out.m8SoglieAPiedi = game.tail.spot === 62 && game.tail.lose === 360;
+  await shot('m8-1-pedina');
+
+  // Perso nella folla: si ricomincia da `cerca`, con un altro Dulchae.
+  let persi8 = 0;
+  game.on('tailLost', () => { persi8++; });
+  {
+    const vecchio = MOD8.M8._d;
+    teleport(vecchio.x - 1500, vecchio.y);
+    let k = 0;
+    while (!persi8 && k++ < 90) await wait(0.15);
+    await wait(0.4);
+    out.m8SiPerdeNellaFolla = persi8 >= 1;
+    out.m8PersoRipartelaScena = fase() === 'm8/cerca' || fase() === 'm8/pedina';
+    out.m8UnAltroDulchae = !!MOD8.M8._d && MOD8.M8._d !== vecchio && vecchio.gone === true;
+  }
+  // Lo si ritrova, e questa volta si resta troppo vicini: l'altro **si accorge**.
+  {
+    const dd = MOD8.M8._d;
+    teleport(dd.x - 200, dd.y);
+    await wait(0.9);
+    let scop = 0;
+    const off = game.on('tailSpotted', () => { scop++; });
+    let k = 0;
+    while (fase() === 'm8/pedina' && k++ < 110) {
+      const x = MOD8.M8._d;
+      if (x) teleport(x.x + 14, x.y + 10);
+      await wait(0.12);
+    }
+    off();
+    await wait(0.3);
+    out.m8SiAccorge = scop >= 1 && fase() === 'm8/inseguimento';
+    out.m8DueStelle = game.wanted.level >= 2;
+    out.m8LaRadioDaIlNome = game.hud.messages.some((m) => /Seo Jae-min/.test(m.text));
+    out.m8CorreNonCammina = !!MOD8.M8._d && MOD8.M8._d.goto.speed === 86 && MOD8.M8._d.goto.loop === false;
+    out.m8LaCorsaFiniscePortone = MOD8.M8._d.goto.path[MOD8.M8._d.goto.path.length - 1].x === s.porta.x;
+    await shot('m8-2-fuga');
+  }
+  // Si segue la corsa fino in fondo.
+  {
+    let k = 0;
+    while (fase() === 'm8/inseguimento' && k++ < 160) {
+      const x = MOD8.M8._d;
+      if (x) teleport(x.x - 80, x.y);
+      await wait(0.25);
+    }
+    out.m8ArrivaAlPortone = fase() === 'm8/portone';
+    out.m8DulchaeEntra = !MOD8.M8._d && !game.pedSystem.peds.some((p) => p.look === 'hero');
+    out.m8StageInstallato = game.shops.stage.has(s.porta.id) && game.shops.held.has(s.porta.id);
+    nota('portone');
+  }
+  // **Morire e farsi arrestare riprendono la stessa fase**, e il cortile è ancora dietro la porta.
+  pl.hp = 1;
+  game.respawnPlayer();
+  await wait(0.5);
+  out.m8RipresaDopoMorte = fase() === 'm8/portone' && game.shops.stage.has(s.porta.id);
+  game.bustPlayer();
+  await wait(0.5);
+  out.m8RipresaDopoArresto = fase() === 'm8/portone' && game.shops.stage.has(s.porta.id);
+  game.wanted.reset();
+  game.police.standDown(game, true);
+
+  // Salvataggio fuori dalla porta: si ritorna e il cortile c'è ancora.
+  {
+    const snap = JSON.parse(JSON.stringify(S.snapshot(game)));
+    game.shops.unstage(s.porta.id);
+    S.apply(game, snap);
+    await wait(0.5);
+    out.m8StageTornaDalSalvataggio = fase() === 'm8/portone' && game.shops.stage.has(s.porta.id);
+  }
+  // La porta di un 분식 qualunque **dà sul cortile** (e non ha l'uscita sul retro).
+  teleport(s.porta.x + s.porta.shop.nx * 18, s.porta.y + s.porta.shop.ny * 18);
+  game.shops.enter(s.porta.shop, game);
+  await wait(0.5);
+  out.m8DentroCEIlCortile = game.indoors && game.shops.floor.biz.id === 'yard';
+  out.m8IlCortileNonHaIlRetro = !game.shops.floor.back && !game.shops.backSpot;
+  out.m8QuattroTelecamere = game.shops.floor.furni.filter((o) => o.type === 'cam').length === 4;
+  out.m8LaPortaVeraNonCambiata = !game.shops.cache.has(s.porta.id) || game.shops.cache.get(s.porta.id).floors[0].biz.id !== 'yard';
+  out.m8DulchaeNelCortile = !!game.actors.get('dulchae-cortile') && game.actors.get('dulchae-cortile').look === 'hero';
+  await shot('m8-3-cortile');
+  await wait(1.6);
+  out.m8Chiusura = fase() === 'm8/m8-chiusura' && game.cutscene.active;
+  out.m8ChiusuraOttoPannelli = MOD8.CHIUSURA.length === 8;
+  await saltaPannelli();
+  nota('chiusura M8');
+  out.m8Fuori = fase() === 'm8/fuori';
+  out.m8DulchaeSeNeVa = !game.actors.get('dulchae-cortile') && !game.shops.floor.people.some((p) => p.actor === 'dulchae-cortile');
+  await shot('m8-4-cortile-vuoto');
+  game.shops.leave(game);
+  await wait(0.6);
+  out.m8Completata = M.isDone('m8') && M.flag('dulchae') && M.flag('sorella');
+  out.m8LaPortaTornaQuellaDiPrima = !game.shops.stage.has(s.porta.id) && !game.shops.held.has(s.porta.id);
+  out.m8IlPcbangTornaAllOrario = !game.shops.held.has(s.pc.id);
+  out.m8NienteDulchaeInStrada = !game.pedSystem.peds.some((p) => p.look === 'hero' || p.actor === 'dulchae');
+}
+
+// ---- 13. Il commesso di Itaewon dopo M8 ------------------------------------------------------------------------------------
+{
+  const c = PL.findShop(game, 'conv', { district: 'itaewon', near: game.city.spawn });
+  teleport(c.x + c.shop.nx * 18, c.y + c.shop.ny * 18);
+  out.commessoNonParlaPrima = !M.flag('commesso');
+  game.shops.enter(c.shop, game);
+  await wait(0.5);
+  out.commessoLAltro = game.dialogue.active === true && /l'altro/.test(game.dialogue.line?.text || '');
+  await chiudiDialogo();
+  out.commessoFlag = M.flag('commesso');
+  game.shops.leave(game);
+  await wait(0.3);
+  game.shops.enter(c.shop, game);
+  await wait(0.5);
+  out.commessoNonAggiungeNiente = !game.dialogue.active;
+  game.shops.leave(game);
+  await wait(0.2);
+  // Il flag sta nel salvataggio: dopo un caricamento non lo ripete.
+  const snap = JSON.parse(JSON.stringify(S.snapshot(game)));
+  S.apply(game, snap);
+  await wait(0.3);
+  out.commessoNonTornaDopoIlSalvataggio = M.flag('commesso');
+  teleport(c.x + c.shop.nx * 18, c.y + c.shop.ny * 18);
+  game.shops.enter(c.shop, game);
+  await wait(0.4);
+  out.commessoSilenzioDopoIlSalvataggio = !game.dialogue.active;
+  game.shops.leave(game);
+}
+
+// ---- 14. R3: i nove dischi, e l'atto è finito -----------------------------------------------------------------------------
+{
+  const s = MODR3.R3._sites;
+  out.r3PartedaM8 = M.active === 'r3' && fase() === 'r3/viaggio';
+  out.r3StessoPcbangDiM8 = s.pc.id === MOD8.M8._sites.pc.id;
+  game.dayCycle.hour = 12;
+  teleport(s.pc.x + 30, s.pc.y);
+  await wait(0.5);
+  out.r3AspettaLaNotte = fase() === 'r3/notte';
+  await usaPunto('aspetta');
+  await wait(0.5);
+  out.r3SonoLe23 = game.dayCycle.hour >= 22.9 && game.dayCycle.hour < 23.5;
+  await shot('r3-0-notte');
+  out.r3Pcbang = fase() === 'r3/pcbang';
+  game.shops.enter(s.pc.shop, game);
+  await wait(0.3);
+  while (game.shops.active.cur < s.pc.level) { game.shops.useStairs(1, game); await wait(0.3); }
+  await wait(0.5);
+  out.r3Pannelli = fase() === 'r3/r3' && game.cutscene.active;
+  out.r3CinquePannelli = MODR3.PANNELLI.length === 5;
+  out.r3IlQuadranteTieneCinqueSecondi = MODR3.PANNELLI[4].hold === 5;
+  await saltaPannelli();
+  nota('R3');
+  out.r3Completato = M.isDone('r3') && M.flag('dischi') && M.flag('atto2');
+  out.attoIIChiuso = M.active === null && game.markers.length === 0;
+  out.nessunaMissioneAppesaAlPassaggio = M.active === null && M.points.length === 0 && M.def === null;
+  out.nienteStageNienteHold = game.shops.stage.size === 0 && !game.shops.held.has(s.pc.id) && !game.shops.held.has(MOD8.M8._sites.porta.id);
+  out.nienteTelecamereNienteDulchae = !game.pedSystem.peds.some((p) => p.look === 'hero');
+  out.orologioNonFermo = game.dayCycle.paused === false;
+  out.tuttoLoStatoDellAtto = ['m5', 'm6', 'r2', 'm7', 'm8', 'r3'].every((id) => M.isDone(id));
+  game.shops.leave(game);
+  // Un salvataggio dopo l'atto non rimette in piedi niente.
+  const snap = JSON.parse(JSON.stringify(S.snapshot(game)));
+  S.apply(game, snap);
+  await wait(0.4);
+  out.salvataggioDopoLAttoII = M.active === null && ['m7', 'm8', 'r3'].every((id) => M.isDone(id)) && M.flag('atto2') && M.flag('commesso');
+}
+
+// ---- 15. 까치: le altre cinque dell'Atto II ------------------------------------------------------------------------------------
+{
+  const ids = ['a2-campagna', 'a2-volo', 'a2-metro', 'a2-mezzanotte', 'a2-funerale'];
+  out.kkachiOtto = KK.CHIAMATE.filter((c) => c.id.startsWith('a2-')).length === 8;
+  out.kkachiLeCinqueCiSono = ids.every((id) => !!riga(id));
+  const sorgente = await (await fetch('/src/story/kkachi.js')).text();
+  out.kkachiLeCinqueHannoUnaOrigine = ids.every((id) => {
+    const i = sorgente.indexOf(`id: '${id}'`);
+    return i > 0 && /origine:/.test(sorgente.slice(Math.max(0, i - 900), i));
+  });
+  const salePerOra = async (v) => {
+    if (pl.vehicle) pl.exitVehicle(game, true);
+    const q = createVehicle(v, pl.x + 20, pl.y + 20, 0, 4);
+    game.vehicles.push(q);
+    pl.enterVehicle(q, game);
+    return q;
+  };
+  teleport(game.city.spawn.x, game.city.spawn.y);
+  pl.district = game.city.districtAt(pl.x, pl.y);
+  await salePerOra('sedan');
+
+  // 9 · campagna: il distretto di 경기도, in macchina, **dopo M7**.
+  {
+    const ch = PL.findTurf(game, 'cheolma', pl);
+    out.kkachi9NoInCittà = !riga('a2-campagna').when(game, K);
+    teleport(ch.x, ch.y);
+    pl.district = game.city.districtAt(pl.x, pl.y);
+    out.kkachi9SiInCampagna = !!riga('a2-campagna').when(game, K);
+    M.done.delete('m7');
+    out.kkachi9NoSenzaM7 = !riga('a2-campagna').when(game, K);
+    M.done.add('m7');
+    teleport(game.city.spawn.x, game.city.spawn.y);
+    pl.district = game.city.districtAt(pl.x, pl.y);
+  }
+  // 10 · il primo volo, aereo o elicottero.
+  {
+    out.kkachi10NoDaTerra = !riga('a2-volo').when(game, K);
+    const h = await salePerOra('heli');
+    out.kkachi10NoFermoAlSuolo = !riga('a2-volo').when(game, K);
+    h.z = 60;
+    out.kkachi10SiInVolo = !!riga('a2-volo').when(game, K);
+    out.kkachi10HaLaRispostaVuota = riga('a2-volo').lines.at(-1).text.startsWith('«…');
+    h.z = 0;
+    await salePerOra('sedan');
+  }
+  // 13 · la metro: prima di scendere, a bordo; e **la seconda metà** a piedi, in banchina.
+  {
+    const stz = (game.city.transitStations || []).find((q) => (!q.region || q.region === 'seoul'));
+    const e = game.metro.entranceOf(stz);
+    teleport(e.x + 200, e.y);
+    out.kkachi13SiVicinoAlLaScala = !!riga('a2-metro').when(game, K);
+    // Un punto **lontano da tutte le scale** (ce n'è più d'una): fra gli otto attorno, il più isolato.
+    {
+      const scale = (game.city.transitStations || []).filter((q) => !q.region || q.region === 'seoul').map((q) => game.metro.entranceOf(q));
+      let best = null;
+      let bd = -1;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) {
+        for (const r of [900, 1600]) {
+          const x = e.x + dx * r;
+          const y = e.y + dy * r;
+          const m = Math.min(...scale.map((q) => Math.hypot(q.x - x, q.y - y)));
+          if (m > bd) { bd = m; best = { x, y }; }
+        }
+      }
+      teleport(best.x, best.y);
+      out.kkachi13NoLontano = bd > 380 && !riga('a2-metro').when(game, K);
+    }
+    teleport(e.x + 200, e.y);
+    M.done.delete('m7');
+    out.kkachi13NoSenzaM7 = !riga('a2-metro').when(game, K);
+    M.done.add('m7');
+    // Scendere conta, e dopo la prima volta non c'è più.
+    K.done.add('a2-metro');
+    if (pl.vehicle) pl.exitVehicle(game, true);
+    teleport(e.x, e.y);
+    await wait(0.3);
+    const n0 = game.stats.metro || 0;
+    out.kkachi13ScendereConta = game.metro.enterStation(game, stz) === true && game.stats.metro === n0 + 1;
+    out.kkachi13DopoLaPrimaVoltaNo = !riga('a2-metro').when(game, K);
+    game.hud.messages.length = 0;
+    await wait(9);
+    out.kkachi13SetteSecondiNessunaRisposta = game.hud.messages.some((m) => /nessuna risposta/.test(m.text)) && K.done.has('a2-metro-vuoto');
+    out.kkachi13NonContaPerIlFinale = K.heard >= 0 && !KK.CHIAMATE.some((c) => c.id === 'a2-metro-vuoto');
+    game.metro.leaveStation(game);
+    await wait(0.3);
+    K.done.delete('a2-metro');
+    K.done.delete('a2-metro-vuoto');
+    game.stats.metro = 0;
+  }
+  // 15 · la mezzanotte senza stelle: dieci minuti, guidando.
+  {
+    game.dayCycle.hour = 1;
+    const t0 = game.time;
+    let ok = false;
+    // Il predicato si valuta ogni mezzo secondo mentre si guida: qui si salta di dieci in dieci.
+    game.time = t0;
+    out.kkachi15NoAlloZero = !riga('a2-mezzanotte').when(game, K);
+    for (let i = 1; i <= 59; i++) { game.time = t0 + i * 10; if (riga('a2-mezzanotte').when(game, K)) ok = true; }
+    out.kkachi15NoPrimaDiDieciMinuti = !ok;
+    game.time = t0 + 601;
+    out.kkachi15SiDopoDieciMinuti = !!riga('a2-mezzanotte').when(game, K);
+    // Un buco (sceso dall'auto, stelle addosso) azzera il conto.
+    game.time = t0 + 601 + 60;
+    out.kkachi15UnBucoAzzera = !riga('a2-mezzanotte').when(game, K);
+    game.time = t0 + 601 + 70;
+    out.kkachi15RicominciaDaCapo = !riga('a2-mezzanotte').when(game, K);
+    // Di giorno non vale, per quanto si guidi.
+    game.dayCycle.hour = 14;
+    game.time = t0 + 5000;
+    riga('a2-mezzanotte').when(game, K);
+    game.time = t0 + 5700;
+    out.kkachi15NoDiGiorno = !riga('a2-mezzanotte').when(game, K);
+    out.kkachi15UltimaRigaEBravo = riga('a2-mezzanotte').lines.at(-1).text === '«Bravo.»';
+    game.time = t0 + 6000;
+    game.dayCycle.hour = 12;
+  }
+  // 16 · il 장례식장 di Hongdae (la sala dell'ospedale del distretto), dopo R1.
+  {
+    const h = game.city.hospitals.find((q) => q.district === 'hongdae' && game.city.areaAt(q.x, q.y)?.id === 'seoul');
+    await salePerOra('sedan');
+    teleport(h.x + 1200, h.y);
+    out.kkachi16NoLontano = !riga('a2-funerale').when(game, K);
+    teleport(h.x + 120, h.y);
+    out.kkachi16SiDavanti = !!riga('a2-funerale').when(game, K);
+    M.done.delete('r1');
+    out.kkachi16NoSenzaR1 = !riga('a2-funerale').when(game, K);
+    M.done.add('r1');
+    if (pl.vehicle) pl.exitVehicle(game, true);
+    teleport(h.x + 120, h.y);
+    out.kkachi16NoAPiedi = !riga('a2-funerale').when(game, K);
+    await salePerOra('sedan');
+    teleport(h.x + 120, h.y);
+  }
+  // A radio spenta non parla nessuno, e a radio accesa la 16 esce.
+  {
+    for (const c of KK.CHIAMATE) if (c.id !== 'a2-funerale') K.done.add(c.id);
+    K.done.delete('a2-funerale');
+    K.call = null;
+    K.marks.clear();
+    game.wanted.reset();
+    game.radio.off(game);
+    K.serviceT = 999;
+    await wait(2);
+    out.kkachi16TaceARadioSpenta = !K.talking && !K.done.has('a2-funerale');
+    game.radio.next(game);
+    await wait(0.2);
+    let k = 0;
+    while (!K.talking && k++ < 30) await wait(0.25);
+    out.kkachi16EsceARadioAccesa = K.talking && K.call?.id === 'a2-funerale';
+    out.kkachi16SenzaNome = K.line?.kkachi === true && !K.line?.who;
+    const perse = K.missed;
+    pl.exitVehicle(game, true);
+    await wait(0.6);
+    out.kkachi16InterrottaEPersa = !K.talking && K.missed === perse + 1 && K.done.has('a2-funerale');
+  }
 }
 
 } catch (e) {

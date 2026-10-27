@@ -5,8 +5,9 @@
 // fasi, non hanno un blip, non stanno nella catena di `campaign.js` — e non sono radio:
 // sono un personaggio che c'è sempre, nello stesso posto, e che dice una cosa diversa.
 //
-// Quella di Jo Ok-bun è la prima, perché M6 è la prima missione che la rende possibile.
-// Chun-sik dopo M9 e il commesso dopo M8 vengono con le loro missioni.
+// Quella di Jo Ok-bun è la prima, perché M6 è la prima missione che la rende possibile. La
+// seconda è **il commesso del 편의점 di Itaewon dopo M8** (§5.42). Chun-sik dopo M9 viene con la
+// sua missione.
 //
 // **Il punto è fisso, non di fase** (`MissionSystem.standing`): una fase sta in piedi finché
 // la missione è in corso, e Jo sta dietro il suo banco per tutta la partita. E come per
@@ -15,6 +16,7 @@
 // quella che il giocatore deve comporre da solo — è una delle tre condizioni del finale C
 // (`06-finali-ed-epilogo.md`).
 import { defineJo, sites as sitiM2 } from './m2.js';
+import { findShop } from './places.js';
 
 /**
  * Cosa succede **dopo M6**. «La domanda giusta è dirle che 구만기 è inciso sul proprio
@@ -66,6 +68,25 @@ export function attachVisite(game) {
     },
   };
   M.standing(punto);
+
+  // **Il commesso dopo M8.** «Ah, lei è l'altro» — e basta: non aggiunge niente, mai, per tutto il
+  // resto del gioco. A differenza di Jo **non è un punto da premere**: il 편의점 ha già il suo `E`
+  // (il listino), e una visita permanente sullo stesso bancone lo avrebbe tolto a chi ha fame. Parla
+  // da sé la prima volta che si entra dopo M8, **una volta sola** (`flag commesso`, che il
+  // salvataggio porta già). Scelta nostra. La riga di prima di M8 — «…di nuovo?» — è già nella
+  // cutscene e in M3, e non si ripete.
+  let conv;
+  game.on('floorShown', (shop, idx) => {
+    if (!M.isDone('m8') || M.flag('commesso')) return;
+    // La stessa ricerca di M3: due 편의점 sarebbero due commessi.
+    conv = conv || findShop(game, 'conv', { district: 'itaewon', near: game.city.spawn });
+    if (!conv || shop.id !== conv.id || idx !== conv.level) return;
+    M.setFlag('commesso');
+    game.dialogue.play(game, [
+      { who: 'Commesso', text: '«Ah, lei è l\'altro.»' },
+      { text: 'Alza gli occhi dal telefono, lo guarda un secondo, e li riabbassa.' },
+    ]);
+  });
 
   // Jo sta dove `actors` l'ha messa, non dove pare a noi: la posizione si riprende a ogni
   // volta che il piano si apre (è lo stesso trucco di `joPoint` in M2).

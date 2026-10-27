@@ -93,6 +93,30 @@ check('la cucina di R2 con la radio accesa suona sopra la cucina vuota',
 check('la cucina vuota di oggi è al pavimento', out.pannelli['r2-2'].rms < base.rms + 0.002, `${out.pannelli['r2-2'].rms} vs ${base.rms}`);
 check('il quadrante di M6 ha il suo fruscio', out.pannelli['m6-7'].rms > out.pannelli['r2-2'].rms + 0.001, `${out.pannelli['m6-7'].rms}`);
 check('il picco dei pannelli dell\'Atto II sta sotto una pistola (0.30)', Math.max(out.pannelli['r2-1'].picco, out.pannelli['m6-7'].picco) < 0.3);
+// 4. I pannelli della seconda metà dell'atto (§5.42). Il fruscio c'è dove c'è una radio (i due
+// pannelli di Kkachi di M7, i tre di R3 con i dischi accesi e il quadrante) e **non c'è** dove il
+// copione tace: la cella non ha pannelli sonori, e nemmeno la telefonata della notizia.
+const M7 = await import('/src/story/m7.js');
+const M8 = await import('/src/story/m8.js');
+const R3 = await import('/src/story/r3.js');
+const prove = [
+  ['m7-1', M7.APERTURA, 0], ['m7-2', M7.APERTURA, 1], ['m7-3', M7.APERTURA, 2], ['m7-6', M7.CHIUSURA, 2],
+  ['m8-1', M8.APERTURA, 0], ['m8-7', M8.CHIUSURA, 0],
+  ['r3-1', R3.PANNELLI, 0], ['r3-2', R3.PANNELLI, 1], ['r3-5', R3.PANNELLI, 4],
+];
+for (const [nome, seq, i] of prove) {
+  suona(seq, i, `prova-${nome}`);
+  await wait(1.0);
+  out.pannelli[nome] = await meas(1.4);
+}
+for (const n of ['m7-2', 'm7-3', 'r3-1', 'r3-2', 'r3-5']) {
+  check(`il pannello ${n} ha il suo fruscio`, out.pannelli[n].rms > base.rms + 0.0008, `${out.pannelli[n].rms} vs ${base.rms}`);
+}
+for (const n of ['m7-1', 'm7-6', 'm8-1', 'm8-7']) {
+  check(`il pannello ${n} è muto`, out.pannelli[n].rms < base.rms + 0.002, `${out.pannelli[n].rms} vs ${base.rms}`);
+}
+check('il fruscio di M7-3 è appena sopra quello di M7-2 (la sillaba mangiata)', out.pannelli['m7-3'].rms >= out.pannelli['m7-2'].rms * 0.9);
+check('il picco dei pannelli di M7 e R3 sta sotto una pistola (0.30)', Math.max(...['m7-2', 'm7-3', 'r3-1', 'r3-2', 'r3-5'].map((n) => out.pannelli[n].picco)) < 0.3);
 if (C.active) C.finish(game, true);
 out.letti = A.stats.letti;
 return out;

@@ -769,7 +769,8 @@ export const HERO_OUTFITS = [
 ];
 
 /**
- * Sprite del protagonista. `pose` vale 'walk', 'aim' o 'cuffed': con un'arma da
+ * Sprite del protagonista. `pose` vale 'walk', 'aim', 'cuffed' o 'pocket' (la mano destra in tasca
+ * dell'altro Jae-min, M8): con un'arma da
  * fuoco in pugno le braccia si tendono in avanti, ed è quello che rende leggibile
  * a schermo la differenza fra camminare e stare puntando qualcuno; ammanettato
  * (§5.35) le braccia stanno dietro la schiena e i polsi, sopra il bomber, hanno
@@ -807,6 +808,12 @@ export function getHeroSprite(frame = 0, pose = 'walk', outfit = 0) {
     } else if (aiming) {
       g.beginPath(); g.moveTo(cx + 0.6, cy + 6.6); g.lineTo(cx + 8.6, cy + 4); g.stroke();
       g.beginPath(); g.moveTo(cx + 0.6, cy - 6.6); g.lineTo(cx + 7.4, cy + 1.4); g.stroke();
+    } else if (pose === 'pocket') {
+      // L'altro Jae-min (M8) tiene la mano **destra** in tasca, sempre, anche quando corre: è
+      // l'unica cosa che lo distingue (`01-personaggi.md`). Dall'alto il braccio destro (+y,
+      // guardando verso +x) resta attaccato al fianco e non oscilla; il sinistro cammina.
+      g.beginPath(); g.moveTo(cx + 0.6, cy + 6.6); g.lineTo(cx - 3.4, cy + 6.2); g.stroke();
+      g.beginPath(); g.moveTo(cx + 0.6, cy - 6.6); g.lineTo(cx - 2.8 - ph * 3.6, cy - 8.8); g.stroke();
     } else {
       g.beginPath(); g.moveTo(cx + 0.6, cy + 6.6); g.lineTo(cx - 2.8 + ph * 3.6, cy + 8.8); g.stroke();
       g.beginPath(); g.moveTo(cx + 0.6, cy - 6.6); g.lineTo(cx - 2.8 - ph * 3.6, cy - 8.8); g.stroke();

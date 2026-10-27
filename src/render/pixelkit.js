@@ -430,6 +430,39 @@ const HEADS = {
     '......############......',
     '.........#ssss#.........',
   ],
+
+  // Seo Mi-rae, diciannove anni, il 피시방 di Hongdae. **I capelli lunghi sono la sua
+  // faccia**: la frangia dritta a tutta fronte e due ciocche lisce che scendono ai lati
+  // fino al mento, quindi il volto è più stretto di tutti gli altri del cast — a questa
+  // scala è la prima cosa che si legge. Il fermaglio (`a`, il ciano delle sue cuffie e dei
+  // suoi monitor) sta sulla ciocca di destra. Le cuffie al collo non sono nella griglia:
+  // le mette il pannello, perché stanno sul corpo.
+  mirae: [
+    '........................',
+    '......############......',
+    '....##hhhhhhhhhhhh##....',
+    '...#hhhhhhhhhhhhhhhh#...',
+    '..#hhhhhhhHHhhhhhhhhh#..',
+    '..#hhhhhhhhhhhhhhhhhh#..',
+    '..#hhhhhhhhhhhhhhhahh#..',
+    '..#hhhhhhhhhhhhhhhhhh#..',
+    '..#hhhhhhhhhhhhhhhhhh#..',
+    '..#hhsssssssssssssshh#..',
+    '..#hhsssssssssssssShh#..',
+    '..#hh###ssssssss###hh#..',
+    '..#hhw##wssssssw##whh#..',
+    '..#hhsssssssssssssshh#..',
+    '..#hhssssss##sssssshh#..',
+    '..#hhsssssdd#sssssshh#..',
+    '..#hhsssssssssssssshh#..',
+    '..#hhssss######sssshh#..',
+    '..#hhsssssssssssssshh#..',
+    '...#hhsssssssssssshh#...',
+    '...#hhsssssssssssshh#...',
+    '....##hssssssssssh##....',
+    '......############......',
+    '.........#ssss#.........',
+  ],
 };
 
 // --- le tinte ------------------------------------------------------------------
@@ -532,6 +565,24 @@ export const CAST = {
     hair: '#1c1824', hairHi: '#4a4458',
     coat: '#6b5a3a', coatHi: '#85734d', shirt: '#e9eaf0', pants: '#2b2b33',
     accent: '#c2384a', build: 11, name: 'Ku Man-gi',
+  },
+  mirae: {
+    head: 'mirae',
+    hair: '#1e1a2c', hairHi: '#4a4163',
+    // La felpa. Grigio-blu come i monitor spenti: sul fondo scuro di un 피시방 la distingue
+    // dal bomber nero di Jae-min, e il ciano dell'accento è quello delle cuffie.
+    coat: '#34465c', coatHi: '#4a6180', shirt: '#cfd8e4', pants: '#1f2430',
+    accent: '#38d6ff', build: 7, name: 'Seo Mi-rae',
+  },
+  // L'altro Jae-min (M8). Stessa testa, stessi capelli, **stesso bomber**: è il punto, e in
+  // un pannello si distingue da una cosa sola — la mano destra in tasca (`figure`, `pocket`).
+  // Non lo si vede mai in faccia: il copione lo tiene di spalle o a mezzo busto di nuca, e la
+  // sua faccia è quella del giocatore.
+  dulchae: {
+    head: 'jaemin',
+    hair: '#241f2e', hairHi: '#453d55',
+    coat: '#232a35', coatHi: '#333d4c', shirt: '#c9ced8', pants: '#1d212a',
+    accent: '#c2384a', build: 10, name: 'Dulchae',
   },
 };
 
@@ -685,10 +736,11 @@ export const FIGURE_UNITS = 50;  // testa + corpo in piedi
  * Un personaggio intero. `groundY` è dove poggiano i piedi; `k` la scala di una
  * cella (`unitScale`). `crop` taglia il corpo a una certa cella, e serve ai mezzi
  * busti: un primo piano che finisce nel nulla è meglio di un primo piano con due
- * gambe schiacciate in fondo.
+ * gambe schiacciate in fondo. `pocket` (-1 sinistra, +1 destra dello schermo) mette quella
+ * mano in tasca: è la sola cosa che distingue Dulchae da Jae-min.
  */
 export function figure(P, id, cx, groundY, k, pose = 'stand', opts = {}) {
-  const { mood = 'fermo', flip = false, coat = null, crop = FIGURE_UNITS, dim = 0, rim = true } = opts;
+  const { mood = 'fermo', flip = false, coat = null, crop = FIGURE_UNITS, dim = 0, rim = true, pocket = 0 } = opts;
   // `accent` ridipinge la cravatta e la banda sulla schiena: per Dong-hyeok è il colore
   // della cicatrice, e su un bomber diventa una striscia chiara di mezzo pannello.
   const spec = opts.accent ? { ...CAST[id], accent: opts.accent } : CAST[id];
@@ -733,6 +785,13 @@ export function figure(P, id, cx, groundY, k, pose = 'stand', opts = {}) {
       put(x + side * 2, NECK - 1, 2, 5, jacketHi);
       put(x + side * 4, NECK - 4, 2, 5, jacketHi);
       put(x + side * 4, NECK - 6, 2, 2, SKIN.s);
+      return;
+    }
+    if (pocket === side) {
+      // La mano in tasca (`dulchae`): il braccio si ferma al fianco e **la mano non c'è** —
+      // al suo posto la bocca scura della tasca. `pocket` è il lato dello schermo (+1 destra).
+      put(x, NECK + 2, 2, 9, jacketHi);
+      put(x - side, NECK + 10, 4, 3, '#12151c');
       return;
     }
     const len = pose === 'lean' ? 10 : 12;

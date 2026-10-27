@@ -17,7 +17,7 @@ sigillate, marcatori, testo su più righe). Quello che resta è **contenuto**, i
 | ~~3~~ | ~~**C**~~ | ~~**cortili persistenti** (nel salvataggio, con effetto sul commercio)~~ — **fatta**, §5.31 | — |
 | ~~4~~ | ~~**D**~~ | ~~Kkachi: stazione `91.45`, tabella con predicato, le otto chiamate dell'Atto I e le dodici righe di servizio~~ — **fatta**, §5.32 | — |
 | ~~5~~ | ~~**E**~~ | ~~Atto I completo (M3, M4) + R1~~, e con loro **pedinamento** e **oggetto trasportabile** — **fatta**, §5.33 | — |
-| 6 | **F** | Atto II (M5-M8) + R2, R3 + le otto chiamate dell'Atto II | l'atto che chiede più cose nuove al motore — **metà fatta (T7, §5.40): M5, M6, R2, le chiamate 11, 12 e 14, Jo dopo M6. Resta T8: M7, M8, R3 e le chiamate 9, 10, 13, 15, 16** |
+| ~~6~~ | ~~**F**~~ | ~~Atto II (M5-M8) + R2, R3 + le otto chiamate dell'Atto II~~ — **fatta**, §5.40 (M5, M6, R2, tre chiamate, Jo) e §5.42 (M7, M8, R3, le altre cinque chiamate, il commesso) | — |
 | 7 | **G** | Atto III (M9-M12) + R4 + le otto chiamate dell'Atto III **e l'incontro facoltativo di Busan** | il viaggio: ha bisogno di tutto quello di prima |
 | 8 | **H** | i tre finali, i titoli di coda, la scena dopo | e a quel punto la Fase 3 è chiusa |
 

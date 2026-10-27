@@ -512,7 +512,7 @@ export class PedestrianSystem {
     // in mezzo al traffico scioglierebbe la pattuglia. Vale identico per chi ha un
     // compito da `life.js`: una rapina in riva a un boulevard finirebbe prima di
     // cominciare, sciolta dal traffico invece che dalla polizia.
-    if (p.cop || p.state === 'errand') p.panic = 0;
+    if (p.cop || p.state === 'errand' || p.state === 'goto') p.panic = 0;
 
     if (p.hurryT > 0) p.hurryT -= dt;
     // Una sirena che arriva: chi è in carreggiata esce dalla parte più vicina, di corsa.
@@ -682,6 +682,31 @@ export class PedestrianSystem {
         }
         tx = p.postX;
         ty = p.postY;
+        break;
+      }
+      case 'goto': {
+        // Un personaggio della storia che segue una fila di punti (M8: chi si pedina e poi
+        // scappa). Non è `errand` perché non appartiene a un fatto di `life.js`, e non è
+        // `commute` perché la meta non è sua: la scrive la missione in `p.goto`. Non si
+        // spaventa — è lui che decide quando correre — e arrivato in fondo si ferma lì.
+        const g = p.goto;
+        if (!g || !g.path.length) { p.state = 'walk'; break; }
+        const wp = g.path[g.i];
+        tx = wp.x;
+        ty = wp.y;
+        targetSpeed = g.speed;
+        if (Math.hypot(wp.x - p.x, wp.y - p.y) < 14) {
+          g.i++;
+          if (g.i >= g.path.length) {
+            if (g.loop) g.i = 0;
+            else {
+              // `p.goto` resta: chi l'ha scritto legge `arrived` per sapere che ci è arrivato.
+              g.arrived = true;
+              p.state = 'post';
+              p.home = { x: wp.x, y: wp.y };
+            }
+          }
+        }
         break;
       }
       case 'errand': {
@@ -905,7 +930,7 @@ export class PedestrianSystem {
     // scavalcato: rifargli la query dei solidi a ogni frame, per venti persone,
     // è il grosso di quello che costa la pioggia.
     if (p.state === 'flee' || p.state === 'crossing' || p.state === 'hostile'
-      || p.state === 'duty' || p.state === 'errand' || p.state === 'commute'
+      || p.state === 'duty' || p.state === 'errand' || p.state === 'commute' || p.state === 'goto'
       || ((p.state === 'shelter' || p.state === 'gather' || p.state === 'work') && targetSpeed > 0)) {
       const solids = this.city.solidGrid.queryRect(p.x - 24, p.y - 24, 48, 48);
       for (const s of solids) {
@@ -1133,6 +1158,8 @@ export class PedestrianSystem {
       p.hostile = true;
       p.state = 'hostile';
       p.panic = 0;
+    } else if (p.state === 'goto') {
+      // Chi segue un percorso della storia non scappa e non risponde: continua.
     } else if (p.state === 'errand') {
       // Chi è già in mezzo a una sparatoria non scappa perché gli hanno sparato:
       // gira il ferro verso chi l'ha colpito. Senza questa riga la prima
@@ -1170,7 +1197,7 @@ export class PedestrianSystem {
     for (const p of this.peds) {
       // Chi ha un compito non si spaventa per uno sparo: o è suo, o è di quello a
       // cui sta sparando. Vale anche per la divisa, per la stessa ragione.
-      if (p.dead || p.hostile || p.cop || p.state === 'errand') continue;
+      if (p.dead || p.hostile || p.cop || p.state === 'errand' || p.state === 'goto') continue;
       const d2 = (p.x - x) ** 2 + (p.y - y) ** 2;
       if (d2 > r2) continue;
       if (source === game.player && PED_KINDS[p.kind]?.fights && d2 < near2) {

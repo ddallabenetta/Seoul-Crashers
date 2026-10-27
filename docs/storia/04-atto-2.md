@@ -3,11 +3,13 @@
 > Indice: [`README.md`](README.md). Precede: [`03-atto-1.md`](03-atto-1.md).
 > Segue: [`05-atto-3.md`](05-atto-3.md).
 >
-> **Implementati: M5, M6 e R2** (tappa T7, §5.40, [`../storico/29-atto-ii-m5-m6-r2.md`](../storico/29-atto-ii-m5-m6-r2.md)),
-> con le tre chiamate di 까치 che li riguardano e Jo che risponde dopo M6. **Dove l'implementazione si
-> scosta dal copione sta tutto in quel documento** (Pyo che non paga in contanti, tre cortili che sono
-> uno più due degli 흑사파, due strade d'ingresso invece di tre, l'ottavo e il ventesimo piano che sono
-> lo stesso piano, la data della controfirma assoluta). M7, M8 e R3 restano da fare (T8).
+> **L'atto è tutto implementato.** M5, M6 e R2 (T7, §5.40, [`../storico/29-atto-ii-m5-m6-r2.md`](../storico/29-atto-ii-m5-m6-r2.md))
+> con tre chiamate di 까치 e Jo dopo M6; M7, M8 e R3 (T8, §5.42, [`../storico/31-atto-ii-m7-m8-r3.md`](../storico/31-atto-ii-m7-m8-r3.md))
+> con le altre cinque e il commesso. **Dove l'implementazione si scosta dal copione sta tutto in quei due
+> documenti**: per la prima metà Pyo che non paga in contanti, due strade d'ingresso invece di tre, l'ottavo
+> e il ventesimo piano che sono lo stesso; per la seconda il fermo che si fa fra le 20 e la mezzanotte, un
+> inseguimento solo a piedi, un cortile cieco dietro una porta vera, e i pannelli di M8 (quattordici) e R3
+> (cinque) divisi perché le battute non stanno sotto una faccia.
 
 **Cosa fa questo atto.** L'Atto I ha ribaltato il morto; questo ribalta il vivo. Si scopre che
 Jae-min non è sangue Seo, che il registro del quartiere è stato comprato, e che **c'è un altro

@@ -177,8 +177,8 @@ try {
 // ---- 9. UNA PARTITA NUOVA NON EREDITA NIENTE -----------------------------------------
 game.newGame();
 out.nuovaPartitaAzzera = K.done.size === 0 && K.heard === 0 && K.direct.length === 0;
-// Otto dell'Atto I e tre dell'Atto II (§5.40): il numero cresce con le tappe, e la scena lo dice.
-out.tabellaRestaRegistrata = K.calls.length === 11 && K.service.length >= 16;
+// Otto dell'Atto I e otto dell'Atto II (§5.40, §5.42): il numero cresce con le tappe, e la scena lo dice.
+out.tabellaRestaRegistrata = K.calls.length === 16 && K.service.length >= 16;
 out.primaRigaDetta = primaRiga;
 out.primoIdDiServizio = primoId;
 

@@ -134,6 +134,21 @@ export const BUSINESSES = {
     shop: 'clinic', keeper: 'office', crowd: 2, blip: '#eef2f8', open: [0, 24],
     pal: { floor: '#5a5f66', wall: '#6c727a', trim: '#8f959e', accent: '#e8595e' },
   },
+
+  // **Le due stanze della storia** (§5.42). `where: 'story'` non è in nessuna riga di
+  // `DISTRICT_MIX`, quindi la generazione non le pesca mai e l'rng non si sposta: esistono
+  // solo perché una missione le chiede (`story/m7.js`, `story/m8.js`) e le mette dietro una
+  // porta con `shops.stage` o con una vetrina inventata.
+  jail: {
+    id: 'jail', hangul: '유치장', label: 'camera di sicurezza', where: 'story', layout: 'cells',
+    keeper: 'cop', crowd: 0, open: [0, 24],
+    pal: { floor: '#3a3d42', wall: '#4b4f56', trim: '#6c727c', accent: '#8fa6c2' },
+  },
+  yard: {
+    id: 'yard', hangul: '막다른 골목', label: 'cortile cieco', where: 'story', layout: 'yard',
+    crowd: 0, open: [0, 24],
+    pal: { floor: '#3b3a37', wall: '#55514b', trim: '#77716a', accent: '#e8595e' },
+  },
 };
 
 /** Un tipo di attività è aperto a quell'ora? Fascia chiusa a sinistra, aperta a destra. */
@@ -578,5 +593,45 @@ const LAYOUTS = {
     till(f, a.x + a.w - 22, a.y + a.h - 28, rng.int(3, 9) * 10000);
     npc(f, biz.keeper || 'civil', a.x + a.w - 40, a.y + a.h - 58, 'keeper');
     crowd(rng, f, a, biz);
+  },
+
+  /**
+   * La camera di sicurezza di M7: due celle affiancate sopra, un corridoio sotto con la
+   * scrivania di chi sorveglia. Le sbarre sono solide — **dentro la cella non si esce**, e
+   * non serve nessuna serratura nel motore: chi apre è la missione, all'ora giusta. Quella
+   * a sinistra è la tua; Byeon sta in quella a destra, dall'altra parte delle sbarre.
+   */
+  cells(rng, f, a, biz) {
+    const midX = Math.round(f.w / 2);
+    const front = WALL + 138;
+    // Il divisorio **prima** della fronte, e fermo due pixel sopra: `put` scarta ciò che tocca un
+    // mobile già messo, e con le due sbarre attaccate la seconda spariva senza un errore.
+    put(f, { x: midX - 4, y: WALL, w: 8, h: front - WALL - 4, type: 'grate', z: 40 });
+    put(f, { x: WALL, y: front, w: f.w - WALL * 2, h: 8, type: 'grate', z: 40 });
+    put(f, { x: WALL + 6, y: WALL + 8, w: 58, h: 26, type: 'cot', z: 16 });
+    put(f, { x: midX + 8, y: WALL + 8, w: 58, h: 26, type: 'cot', z: 16 });
+    put(f, { x: WALL + 6, y: front - 26, w: 20, h: 18, type: 'stool', z: 18 });
+    put(f, { x: f.w - WALL - 26, y: front - 26, w: 20, h: 18, type: 'stool', z: 18 });
+    put(f, { x: WALL + 22, y: front + 28, w: 74, h: 18, type: 'desk', z: 26 });
+    put(f, { x: WALL + 46, y: front + 50, w: 14, h: 14, type: 'chair', z: 16 });
+    npc(f, biz.keeper, WALL + 70, front + 62, 'keeper');
+  },
+
+  /**
+   * Il cortile cieco di M8: quattro muri, una sola porta, casse e fusti, e **una
+   * telecamera per angolo** (la 10ª tavola del copione: «quattro telecamere, tutte e quattro
+   * puntate lì»). Niente personale e niente clienti: chi c'è lo mette la missione.
+   */
+  yard(rng, f, a, biz) {
+    const slots = [[0.14, 0.16], [0.74, 0.14], [0.12, 0.52], [0.78, 0.5], [0.46, 0.3]];
+    for (const [u, v] of slots) {
+      const x = f.w * u;
+      const y = f.h * v;
+      if (rng.chance(0.5)) put(f, { x, y, w: 34, h: 28, type: 'crate', z: 26 });
+      else put(f, { x, y, w: 22, h: 22, type: 'drum', z: 28 });
+    }
+    for (const [x, y] of [[WALL + 2, WALL + 2], [f.w - WALL - 16, WALL + 2], [WALL + 2, f.h - WALL - 40], [f.w - WALL - 16, f.h - WALL - 40]]) {
+      put(f, { x, y, w: 14, h: 14, type: 'cam', z: 64, solid: false });
+    }
   },
 };

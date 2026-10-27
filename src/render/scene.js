@@ -914,7 +914,9 @@ export class Scene {
     const ox = (p.x - cam.cx) * f;
     const oy = (p.y - cam.cy) * f;
     const frame = p.dead ? 0 : Math.floor(p.animT) % PED_FRAMES;
-    const spr = getPedSprite(p.kind, p.colorIndex, frame);
+    // `look: 'hero'` è l'altro Jae-min (M8): lo stesso sprite del giocatore, con la mano
+    // destra in tasca. È l'unico che porta la banda rossa nella folla.
+    const spr = p.look === 'hero' ? getHeroSprite(frame, 'pocket', 0) : getPedSprite(p.kind, p.colorIndex, frame);
     // Chi ce l'ha con te va riconosciuto al volo: nella folla un teppista nero
     // è identico a un passante finché non ti spara.
     if ((p.hostile || p.cop) && !p.dead) {
