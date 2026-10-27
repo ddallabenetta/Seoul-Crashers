@@ -892,29 +892,11 @@ class Game {
       input.endFrame();
       return;
     }
-    // I pannelli sono l'unica modalità in cui il mondo non gira *e* qualcosa si
-    // muove lo stesso. Gira solo la cutscene e l'audio: i letti si abbassano da
-    // soli leggendo `mode.duck` e la musica passa al tema dell'apertura.
-    if (this.cutscene.active) {
-      this.cutscene.update(dt, this);
-      this.audio.update(dt, this);
-      input.endFrame();
-      return;
-    }
-    if (!this.started) {
-      this.updateAttract(dt);
-      return;
-    }
-    // Un dialogo ferma il mondo come un menu ma **non lo copre**: la città resta
-    // disegnata sotto, quindi qui gira solo il riquadro (e l'audio, che si abbassa
-    // da solo leggendo `mode.duck`). L'HUD continua ad aggiornarsi, o i toast
-    // scritti dalla battuta prima resterebbero appesi.
-    if (this.dialogue.active) {
-      this.dialogue.update(dt, this);
-      this.audio.update(dt, this);
-      this.radio.update(dt, this);
-      this.hud.update(dt);
-      input.endFrame();
+    // Le modalità che si prendono l'intero frame (i pannelli, il titolo, il dialogo) dicono da sé
+    // cosa fanno in `core/modes.js`: qui non c'è più un ramo per ognuna.
+    const step = this.mode.step;
+    if (step) {
+      step(this, dt);
       return;
     }
 
@@ -1153,19 +1135,18 @@ class Game {
 
   render() {
     const ctx = this.ctx;
-    // Sotto i pannelli c'è il nero pieno della tavola: disegnare anche la città
-    // sarebbe un frame intero buttato via.
-    if (this.cutscene.active) {
+    const mode = this.mode;
+    if (mode.frame) {
       this.camera.applyUI(ctx);
-      this.cutscene.draw(ctx, this);
+      mode.frame(this, ctx);
       return;
     }
     if (this.metro.inside) this.metroScene.render(ctx, this);
     else if (this.indoors) this.interiorScene.render(ctx, this);
     else this.scene.render(ctx, this);
     this.camera.applyUI(ctx);
-    if (!this.started) {
-      this.startMenu.draw(ctx, this);
+    if (mode.overlay) {
+      mode.overlay(this, ctx);
       return;
     }
     this.hud.draw(ctx, this);
