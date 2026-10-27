@@ -36,7 +36,7 @@ const NOTTE_A = 27;   // fino alle 03:00: il 피시방 chiude alle 04:00
 function sites(game) {
   if (R3._sites) return R3._sites;
   // **Lo stesso 피시방 di M8**, trovato con la stessa ricerca: sono due scene nella stessa sala.
-  R3._sites = { pc: findShop(game, 'pcbang', { district: 'hongdae', near: game.city.spawn, level: 2 }) };
+  R3._sites = { pc: findShop(game, 'pcbang', { district: 'hongdae', near: game.city.spawn, level: 2, visible: true }) };
   return R3._sites;
 }
 

@@ -37,12 +37,12 @@ function seoul(game, s) {
  */
 export function findShop(game, biz, opts = {}) {
   const { district = null, near = game.city.spawn, avoid = [], minDist = 0, level: wantLevel = null, visible = false } = opts;
+  const skip = new Set(avoid);
   // `district` è l'etichetta con cui la generazione ha marcato la vetrina; `visible` chiede il
   // quartiere **che il giocatore legge a schermo** (`districtAt`), che sui bordi fra due
   // distretti non è lo stesso. Chi manda in un posto e lo scrive nell'HUD vuole il secondo.
   const where = (s) => (visible ? game.city.districtAt(s.x, s.y)?.id : s.district);
-  const skip = new Set(avoid);
-  const pick = (wantDistrict, wantMin) => {
+  const pick = (wantDistrict, wantMin, lv) => {
     let best = null;
     let bestD = Infinity;
     for (const s of game.city.shops) {
@@ -50,9 +50,7 @@ export function findShop(game, biz, opts = {}) {
       if (wantDistrict && where(s) !== wantDistrict) continue;
       const level = s.biz.indexOf(biz);
       if (level < 0) continue;
-      // `level` è una **preferenza**: il copione dice «terzo piano», e se in quel quartiere non
-      // c'è, il ripiego sotto (senza vincolo) trova comunque un indirizzo.
-      if (wantLevel !== null && level !== wantLevel) continue;
+      if (lv !== null && level !== lv) continue;
       const d = dist(s.x, s.y, near.x, near.y);
       if (d < wantMin || d >= bestD) continue;
       bestD = d;
@@ -60,9 +58,12 @@ export function findShop(game, biz, opts = {}) {
     }
     return best;
   };
-  const found = pick(district, minDist) || pick(district, 0) || pick(null, minDist) || pick(null, 0);
-  if (found || wantLevel === null) return found;
-  return findShop(game, biz, { ...opts, level: null });
+  // Il piano (`level`) è una **preferenza**: il copione dice «terzo piano», e se in quel quartiere non
+  // c'è, meglio un altro piano **nel quartiere giusto** che il piano giusto in un altro quartiere.
+  const nel = (lv) => pick(district, minDist, lv) || pick(district, 0, lv);
+  return nel(wantLevel) || nel(null)
+    || pick(null, minDist, wantLevel) || pick(null, 0, wantLevel)
+    || pick(null, minDist, null) || pick(null, 0, null);
 }
 
 /**

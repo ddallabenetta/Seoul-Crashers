@@ -46,7 +46,7 @@ import { dist } from '../core/math.js';
 import { WALL } from '../world/interiors.js';
 import {
   BLOOD,
-  px, py, flat, wash, vignette, glow, hexA, hash,
+  px, py, flat, wash, vignette, glow, hash,
   block, sign, wetFloor, car, dial, narrator, speech,
 } from '../render/panelkit.js';
 import { figure, unitScale } from '../render/pixelkit.js';

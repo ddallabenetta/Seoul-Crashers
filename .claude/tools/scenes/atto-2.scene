@@ -1,4 +1,10 @@
-// M5, M6 e il raccordo R2 giocati davvero (§5.40), e con loro le tre cose nuove che
+// **Tutto l'Atto II giocato davvero**: M5, M6 e R2 (§5.40), poi M7, M8, R3, le altre cinque chiamate di
+// 까치 e il commesso (§5.42, sezioni 11-15 in fondo). Quanto segue descrive la prima metà; la seconda aggiunge
+// quattro invarianti — `m7ArrestoVeroTerminaInBust` (la sequenza di §5.35 chiude in `busted` e la fase
+// lo prende), `m8PedinamentoAPiedi`, `m8SiPerdeNellaFolla` e `nessunaMissioneAppesaAlPassaggio` (R3 lascia
+// l'atto senza missione, stanze di scena, porte tenute aperte né telecamere in strada).
+//
+// M5, M6 e il raccordo R2 (§5.40), e con loro le tre cose nuove che
 // l'Atto II chiede al motore: i **tre cortili da contare**, il **pedinamento che è una
 // delle due strade per entrare**, e le **visite che cambiano**.
 //
@@ -855,6 +861,7 @@ async function arrestoVero(at) {
     nota('alba');
     out.m7OrologioRiparte = game.dayCycle.paused === false;
     out.m7FuoriAlCancello = fase() === 'm7/alba' && !game.indoors;
+    await shot('m7-3-alba');
     out.m7ByeonSparisce = !game.actors.defs.has('byeon');
   }
 
@@ -878,7 +885,7 @@ async function arrestoVero(at) {
   await chiudiDialogo();
   out.m8VaAlPcbang = fase() === 'm8/viaggio-pc' && !!blip();
   const s = MOD8.M8._sites;
-  out.m8PcbangEIlTerzoPiano = s.pc.level === 2;
+  out.m8PcbangEDiHongdae = game.city.districtAt(s.pc.x, s.pc.y)?.id === 'hongdae' && s.pc.level >= 1;
   out.m8IlPortoneEDiMyeongdong = game.city.districtAt(s.porta.x, s.porta.y)?.id === 'myeongdong';
   out.m8AnelloHaLaPorta = s.giro.ring.length === 5 && s.giro.corners.length === 4;
   out.m8Tenuto = game.shops.held.has(s.pc.id);
@@ -1064,6 +1071,7 @@ async function arrestoVero(at) {
   await usaPunto('aspetta');
   await wait(0.5);
   out.r3SonoLe23 = game.dayCycle.hour >= 22.9 && game.dayCycle.hour < 23.5;
+  await shot('r3-0-notte');
   out.r3Pcbang = fase() === 'r3/pcbang';
   game.shops.enter(s.pc.shop, game);
   await wait(0.3);

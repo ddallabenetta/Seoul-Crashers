@@ -76,8 +76,10 @@ const TEPPISTI = 4;
 function sites(game) {
   if (M8._sites) return M8._sites;
   const from = game.city.spawn;
-  // **Terzo piano**, se esiste: il copione lo dice, e chi guarda la colonna di insegne lo vede.
-  const pc = findShop(game, 'pcbang', { district: 'hongdae', near: from, level: 2 });
+  // **Terzo piano**, se esiste: il copione lo dice. A Hongdae non esiste (i 피시방 al terzo piano sono a
+  // Myeongdong e a Gangnam), e vince il quartiere sul piano: qui sta al secondo, e il suggerimento
+  // di fase dice il piano vero.
+  const pc = findShop(game, 'pcbang', { district: 'hongdae', near: from, level: 2, visible: true });
   // La porta del cortile: un 분식 di Myeongdong, aperto a ora di pranzo e di pomeriggio.
   // `visible`: quello che dice l'HUD. A Myeongdong i bordi fra i distretti non coincidono con le
   // etichette di generazione. Si parte dal cortile del 황소파, che sta lì per costruzione.
@@ -118,8 +120,14 @@ function sgombera(game) {
 
 // --- Dulchae, e la folla --------------------------------------------------------------------
 
-/** L'altro Jae-min, se c'è ancora. */
-const dulchae = () => (M8._d && !M8._d.gone && !M8._d.dead ? M8._d : null);
+/**
+ * L'altro Jae-min, se c'è ancora **in questa partita**: dopo un caricamento il riferimento è a un
+ * pedone che `clearWorld` ha tolto dalla strada senza dirgli niente, e non deve sembrare vivo.
+ */
+const dulchae = (game) => {
+  const d = M8._d;
+  return d && !d.gone && !d.dead && game.pedSystem.peds.includes(d) ? d : null;
+};
 
 function tolgo(game) {
   const d = M8._d;
@@ -199,7 +207,7 @@ function mettiFolla(game) {
 /** Il percorso di corsa: da dove sta, in avanti sull'anello, fino alla porta. */
 function percorsoFuga(game) {
   const s = sites(game);
-  const d = dulchae();
+  const d = dulchae(game);
   const { ring, idx, door } = s.giro;
   const g = d.goto;
   const path = [];
@@ -216,7 +224,7 @@ function percorsoFuga(game) {
 /** Quanto manca alla porta, in px, se continua a camminare in senso orario. */
 function manca(game) {
   const s = sites(game);
-  const d = dulchae();
+  const d = dulchae(game);
   if (!d || !d.goto) return Infinity;
   const { ring, idx } = s.giro;
   let tot = dist(d.x, d.y, ring[d.goto.i].x, ring[d.goto.i].y);
@@ -822,7 +830,7 @@ export const M8 = {
       },
       tick(dt, ctx) {
         const game = ctx.game;
-        const d = dulchae();
+        const d = dulchae(game);
         if (!d) { ctx.goto('cerca'); return; }
         if (game.indoors) return;
         const pl = game.player;
@@ -843,8 +851,8 @@ export const M8 = {
         const game = ctx.game;
         ctx.state.t = 0;
         apparecchia(game);
-        if (!game.tail.active && dulchae()) {
-          game.tail.begin(game, dulchae(), { label: 'il bomber con la banda rossa', lose: LOSE, spot: SPOT });
+        if (!game.tail.active && dulchae(game)) {
+          game.tail.begin(game, dulchae(game), { label: 'il bomber con la banda rossa', lose: LOSE, spot: SPOT });
         }
         ctx.on('tailLost', () => {
           ctx.toast('L\'hai perso nella folla', 3.6);
@@ -854,7 +862,7 @@ export const M8 = {
       },
       tick(dt, ctx) {
         const game = ctx.game;
-        const d = dulchae();
+        const d = dulchae(game);
         if (!d) { ctx.goto('cerca'); return; }
         if (game.indoors) return;
         ctx.state.t += dt;
@@ -877,7 +885,7 @@ export const M8 = {
       tick(dt, ctx) {
         const game = ctx.game;
         const st = ctx.state;
-        const d = dulchae();
+        const d = dulchae(game);
         if (!d) {
           // È entrato (o non c'è più: una ripresa, un'altra partita). Se non è entrato **da solo**
           // la scena riparte dall'inizio.
@@ -986,7 +994,7 @@ export const M8 = {
  */
 function rottura(ctx) {
   const game = ctx.game;
-  const d = dulchae();
+  const d = dulchae(game);
   if (!d || !sites(game).giro) { ctx.goto('cerca'); return; }
   game.tail.stop();
   d.goto = { path: percorsoFuga(game), i: 0, loop: false, speed: CORRE };

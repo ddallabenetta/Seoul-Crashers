@@ -106,8 +106,9 @@ ne va (è `undefine`, e il piano lo perde). Si esce dalla stessa porta con le st
 - **Non c'è la scelta di sparare.** `10-continuita.md` conta il cortile cieco fra le tre occasioni di
   uccidere Dulchae: qui è una sequenza di pannelli, e quella decisione resta ai finali (tappa H).
 - **Il 피시방 è aperto dalla storia** (`shops.hold`): alle undici del mattino non apre mai, e l'orario si
-  aspetta come in M6. Cerca il **terzo piano** (`findShop` ha una preferenza nuova, `level`) e ripiega su
-  qualunque piano se in quartiere non c'è.
+  aspetta come in M6. Il copione dice **terzo piano**, e `findShop` ha adesso una preferenza di piano
+  (`level`); ma a Hongdae non ce n'è uno al terzo (quelli al terzo sono a Myeongdong e a Gangnam), e **vince
+  il quartiere sul piano**: sta al secondo, e il suggerimento di fase dice il piano vero.
 - **«Myeongdong» è quello che dice l'HUD.** Le etichette `shop.district` di generazione e `districtAt`
   non coincidono sui bordi (la prima porta trovata stava, per l'HUD, a Hongdae): `findShop` ha un'opzione
   nuova, `visible`, che chiede il distretto **come lo legge il giocatore**.
@@ -211,7 +212,7 @@ cella**, l'alba, la chiusura alle nove), M8 intera (il pedinamento a piedi **per
 la corsa, il cortile dietro la porta, la ripresa dopo una morte **e dopo un arresto**, il salvataggio fuori
 dalla porta, la porta che torna quella di prima), il commesso, R3, **nessuna missione appesa al passaggio
 all'Atto III** e le cinque chiamate a radio accesa e spenta. `window.__LOG` è la fila delle fasi. Con
-`--shot-dir` fotografa quattordici momenti giocati (`m7-1-cella`, `m7-2-byeon`, `m8-0-pcbang`, `m8-1-pedina`,
+`--shot-dir` fotografa sedici momenti giocati (`m7-1-cella`, `m7-2-byeon`, `m7-3-alba`, `r3-0-notte`, `m8-0-pcbang`, `m8-1-pedina`,
 `m8-2-fuga`, `m8-3-cortile`, `m8-4-cortile-vuoto` e quelli della prima metà). I pannelli si guardano con
 `cutscene-sheet.scene` e `cutscene-panel.scene` (`window.__SCENA = 'm7' | 'm8' | 'r3'`), i due personaggi nuovi con
 `cast-sheet.scene` (`window.__CAST = ['mirae', 'dulchae']`) e il fruscio con `cutscene-audio.scene` (nuova
