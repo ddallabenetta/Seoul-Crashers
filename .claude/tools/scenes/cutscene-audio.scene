@@ -71,5 +71,28 @@ for (const [n, t] of [[23, 0], [1, 8.0]]) {
   check(`ESC dal pannello ${n}: i letti di scena sono a zero`, A.sceneLv.kkachi === 0 && A.sceneLv.sirenFar === 0);
   await wait(1.2);
 }
+// 3. I pannelli dell'Atto II (§5.40). La radio sul frigo di R2 è **accesa** nel ricordo
+// (fruscio sotto la voce dell'uomo) e **muta** nella cucina di oggi — è il silenzio la cosa
+// che cambia fra i due pannelli —, e il quadrante di M6 ha lo stesso fruscio di M4/pannello 26.
+const R2 = await import('/src/story/r2.js');
+const M6 = await import('/src/story/m6.js');
+const suona = (seq, i, id) => {
+  if (C.active) C.finish(game, true);
+  C.play(game, seq, id);
+  C.i = i; C.t = 0; C.trans = 0; C.pending = -1;
+  C.enter(game);
+  A.mus.gain.value = 0;
+};
+for (const [nome, seq, i] of [['r2-2', R2.PANNELLI, 1], ['r2-1', R2.PANNELLI, 0], ['m6-7', M6.CHIUSURA, 2]]) {
+  suona(seq, i, `prova-${nome}`);
+  await wait(1.0);
+  out.pannelli[nome] = await meas(1.5);
+}
+check('la cucina di R2 con la radio accesa suona sopra la cucina vuota',
+  out.pannelli['r2-1'].rms > out.pannelli['r2-2'].rms + 0.001, `${out.pannelli['r2-1'].rms} vs ${out.pannelli['r2-2'].rms}`);
+check('la cucina vuota di oggi è al pavimento', out.pannelli['r2-2'].rms < base.rms + 0.002, `${out.pannelli['r2-2'].rms} vs ${base.rms}`);
+check('il quadrante di M6 ha il suo fruscio', out.pannelli['m6-7'].rms > out.pannelli['r2-2'].rms + 0.001, `${out.pannelli['m6-7'].rms}`);
+check('il picco dei pannelli dell\'Atto II sta sotto una pistola (0.30)', Math.max(out.pannelli['r2-1'].picco, out.pannelli['m6-7'].picco) < 0.3);
+if (C.active) C.finish(game, true);
 out.letti = A.stats.letti;
 return out;

@@ -50,11 +50,32 @@ export class MissionSystem {
     this.points = [];            // punti interattivi della fase corrente
     this.actions = [];           // quelli a portata, ricostruiti ogni frame per l'HUD
     this.hint = null;            // la riga che l'HUD mostra sotto il titolo
+    // I punti che non sono di nessuna fase: le «visite che cambiano» (Jo dopo M6) sono
+    // lì in ogni momento, con una missione in corso o senza. Non si smontano al cambio
+    // di fase e `when` dice quando valgono.
+    this.fixed = [];
+    // Chi deve rifare qualcosa dopo un caricamento (definire un personaggio che una
+    // missione finita aveva messo in piedi): `prepare` gira solo per la missione in corso.
+    this.restoreHooks = [];
   }
 
   register(def) {
     this.defs.set(def.id, def);
     return def;
+  }
+
+  /** Un punto interattivo fuori dalle fasi. Restituisce la funzione che lo toglie. */
+  standing(p) {
+    this.fixed.push(p);
+    return () => {
+      const i = this.fixed.indexOf(p);
+      if (i >= 0) this.fixed.splice(i, 1);
+    };
+  }
+
+  /** `fn(game)` gira dopo ogni `restore`, a `done` già riempito. */
+  afterRestore(fn) {
+    this.restoreHooks.push(fn);
   }
 
   /**
@@ -247,7 +268,7 @@ export class MissionSystem {
 
   update(dt, game) {
     this.actions.length = 0;
-    if (!this.active) return;
+    if (!this.active) { this.collectActions(game); return; }
     const ph = this.phaseDef;
     const ctx = this.context(game);
     if (ph?.tick) ph.tick(dt, ctx);
@@ -263,8 +284,9 @@ export class MissionSystem {
    */
   collectActions(game) {
     const pl = game.player;
-    if (pl.dying) return;
-    for (const p of this.points) {
+    if (pl.dying || (!this.points.length && !this.fixed.length)) return;
+    for (const p of this.points.concat(this.fixed)) {
+      if (p.when && !p.when(game)) continue;
       if (!this.pointHere(p, game)) continue;
       if (p.onFoot !== false && !pl.onFoot) continue;
       if (dist(pl.x, pl.y, p.x, p.y) > (p.reach || POINT_REACH)) continue;
@@ -321,6 +343,7 @@ export class MissionSystem {
     for (const id of d.done || []) this.done.add(id);
     for (const id of d.seen || []) this.seen.add(id);
     for (const f of d.flags || []) this.flags.add(f);
+    for (const fn of this.restoreHooks) fn(game);
     if (!d.active || !this.defs.has(d.active)) return;
     this.active = d.active;
     this.phase = Math.min(d.phase || 0, this.defs.get(d.active).phases.length - 1);

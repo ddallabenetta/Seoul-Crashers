@@ -294,3 +294,20 @@
 | Zona vietata dei cortili di banda | `blocklife.makeCtx` | il centro, 56% per lato: lì si sgombra e si resta sei secondi |
 | Arredo urbano | `blocklife.STREET_MIX` · passo 74 px | probabilità per candidato = deficit di densità rispetto a Seoul × 1,1 (max 0,9); Seoul ha deficit 0 |
 | Insegne | `blocklife.addSigns` | probabilità = deficit di insegne per edificio × 1,5 (max 0,9); fino a 2 insegne sul palazzo con lato strada, 1 sugli altri |
+| **— l'Atto II, prima metà (§5.40) —** | | |
+| Quanti cortili chiede Pyo | `m5.CORTILI` | 3: due degli 흑사파 passano al 철마파 all'inizio della missione, più quello che Seoul ha già |
+| Auto da smontare per cortile | `m5.AUTO_PER_CORTILE` | 3, ferme nel mezzo del recinto a 40 px una dall'altra; ne nasce una nuova per ogni rovinata o abbandonata finché non ne sono state **vendute** tre |
+| Dove nascono le auto | `m5.RAGGIO_AUTO` | 900 px dal cortile: più vicino di così non si vedono nascere |
+| Dove comincia la scena con Pyo · dove saluta il ragazzo | `m5.INGRESSO` · `m5.USCITA` | 170 px dal centro del cortile · 210 px |
+| Morti nella fase dei cortili per cui Pyo se ne accorge | `m5.MORTI_PER_PYO` | 3: una riga in più al ritorno, nessun prezzo che sale |
+| Appuntamento della torre | `m6.APPUNTAMENTO` · `FINESTRA` · `CHIUSURA_ORE` | 14:00, con 0,6 h di anticipo concesso, e **fino alle 17**: oltre l'ufficio non riceve e si aspetta il giorno dopo |
+| Silenzio dopo la riga del 1992 | `m6.SILENZIO` | 3 s senza pannello, battuta né musica, prima dell'allarme |
+| Dove comincia la fase della porta | `m6.ARRIVO` | 170 px dalla porta della torre |
+| Sosta della berlina al 편의점 | `m6.SOSTA` | 3 s, poi riparte per la torre. Velocità del giro: 112 px/s (`avviaGiro`) |
+| Fasce del pedinamento di M6 | `tail.SPOT` · `LOSE` | **quelle di §5.33**: 132 e 620 px. M6 non ne passa di proprie |
+| Faldoni sul piano | `m6.DOCS` | sette, di cui tre inutili e uno solo che esce dopo l'atto di cessione; stanno ad almeno 60 px dalle scale e a 44 px l'uno dall'altro |
+| Sparare dentro la torre | `m6.controllaTorre` | tre stelle **mentre si è dentro**: chiude l'archivio fino alle 14:00 del giorno dopo |
+| Quanto vale la riga del 1992 per 까치 | `story/kkachi` `a2-riga` | 900 s di gioco dopo la lettura |
+| Raggio della chiamata davanti a Pyo | `story/kkachi.davantiAlCortile` | 520 px dal centro del cortile del 황소파 |
+| Raggio con cui Jo parla | `story/visite` | 56 px, come `joPoint` di M2 |
+| Fruscio dei pannelli dell'Atto II | `r2-1.bed.kkachi` · `m6-7.bed.kkachi` | 0,03 · 0,03. Misurati sul master: rms 0,0048 e 0,0049 contro 0,0030 della cucina vuota di R2-2, che non ha letto |
