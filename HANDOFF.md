@@ -96,14 +96,14 @@ commenti resta valido: si risolve qui.
 | §5.32 까치 sulla `91.45` | `docs/storico/21-kkachi.md` |
 | §5.33 L'Atto I completo: M3, M4, R1, pedinamento e fogli | `docs/storico/22-atto-i-completo.md` |
 | §5.34 Il sorpasso: corsia in base alla svolta | `docs/storico/23-sorpasso.md` |
-| §5.36 La strada reagisce: sirene, clacson, attraversamenti | `docs/storico/25-la-strada-reagisce.md` |
 | §5.35 L'arresto in volante | `docs/storico/24-arresto-in-volante.md` |
+| §5.36 La strada reagisce: sirene, clacson, attraversamenti | `docs/storico/25-la-strada-reagisce.md` |
 | §5.37 La regia sonora dei pannelli: `bed` e `sfx` | `docs/storico/26-regia-sonora.md` |
 | §5.38 Le cuciture della mappa: spuntoni, testate, fascia scura, bordi del mondo | `docs/storico/27-cuciture-della-mappa.md` |
 | §5.39 Vita negli isolati: tipologie di parchi e campi, arredo, insegne, moli | `docs/storico/28-vita-negli-isolati.md` |
 | §5.40 L'Atto II, prima metà: M5, M6, R2, tre chiamate di 까치, Jo dopo M6 | `docs/storico/29-atto-ii-m5-m6-r2.md` |
-| §5.42 L'Atto II, seconda metà: M7, M8, R3, cinque chiamate di 까치, il commesso dopo M8 | `docs/storico/31-atto-ii-m7-m8-r3.md` |
 | §5.41 La forma di Busan e Jeju: coste a maschera, strade da tracciati, luoghi dell'Atto III | `docs/storico/30-busan-e-jeju.md` |
+| §5.42 L'Atto II, seconda metà: M7, M8, R3, cinque chiamate di 까치, il commesso dopo M8 | `docs/storico/31-atto-ii-m7-m8-r3.md` |
 | §6 Backlog | `docs/backlog.md` |
 | §8 Parametri | `docs/parametri.md` |
 | §9 Strumenti (`.claude/`) | `docs/strumenti.md` |
