@@ -1232,6 +1232,9 @@ export class ShopSystem {
     game.fx.addSmoke(v.x, v.y, 4, 1.3);
     const sign = gang ? place.hangul : '전당포';
     game.hud.toast(`${sign} — ${won(price)} per ${VEHICLE_TYPES[v.kind].label}, e non l'hai mai vista`, 3.2);
+    // Il mezzo è già fuori dalla lista, ma l'oggetto è ancora quello: chi ascolta
+    // può leggere i marchi che ci ha messo sopra (M5 conta le auto di un cortile).
+    game.emit('vehicleSold', v, place, price);
   }
 
   // --- il banco delle bande -----------------------------------------------------
