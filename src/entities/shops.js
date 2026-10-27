@@ -775,7 +775,7 @@ export class ShopSystem {
   }
 
   /** Ingresso. Torna `false` se la porta non si apre, ed è l'unico modo di fallire. */
-  enter(shop, game) {
+  enter(shop, game, opts = {}) {
     if (!this.shopOpen(shop, game)) {
       this.knock(shop, game);
       return false;
@@ -789,7 +789,8 @@ export class ShopSystem {
     this.showFloor(game, this.floor);
     // Il campanello della porta: a Seoul entrare in un 편의점 suona, ed è anche il
     // segnale che lo stacco è finito e adesso si è dentro.
-    game.audio?.bell();
+    // La cella di M7 non suona il campanello: è l'unico pezzo di gioco senza un suono.
+    if (!opts.silent) game.audio?.bell();
     game.fx.clear();
     game.projectiles.clear();
     game.player.enterCooldown = 0.4;

@@ -578,8 +578,10 @@ const LAYOUTS = {
   cells(rng, f, a, biz) {
     const midX = Math.round(f.w / 2);
     const front = WALL + 138;
-    put(f, { x: WALL, y: front, w: f.w - WALL * 2, h: 6, type: 'grate', z: 40 });
-    put(f, { x: midX - 3, y: WALL, w: 6, h: front - WALL, type: 'grate', z: 40 });
+    // Il divisorio **prima** della fronte, e fermo due pixel sopra: `put` scarta ciò che tocca un
+    // mobile già messo, e con le due sbarre attaccate la seconda spariva senza un errore.
+    put(f, { x: midX - 4, y: WALL, w: 8, h: front - WALL - 4, type: 'grate', z: 40 });
+    put(f, { x: WALL, y: front, w: f.w - WALL * 2, h: 8, type: 'grate', z: 40 });
     put(f, { x: WALL + 6, y: WALL + 8, w: 58, h: 26, type: 'cot', z: 16 });
     put(f, { x: midX + 8, y: WALL + 8, w: 58, h: 26, type: 'cot', z: 16 });
     put(f, { x: WALL + 6, y: front - 26, w: 20, h: 18, type: 'stool', z: 18 });

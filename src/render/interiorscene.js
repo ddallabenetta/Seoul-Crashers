@@ -473,9 +473,9 @@ const FURNITURE = {
     top: '#3b4048',
     // Sbarre: da sopra sono una fila di tratti chiari su una rotaia scura.
     detail: (ctx, x, y, w, h) => {
-      ctx.fillStyle = 'rgba(170,184,200,0.6)';
-      if (w >= h) for (let i = 4; i < w - 2; i += 8) ctx.fillRect(x + i, y + 1, 1.6, h - 2);
-      else for (let j = 4; j < h - 2; j += 8) ctx.fillRect(x + 1, y + j, w - 2, 1.6);
+      ctx.fillStyle = 'rgba(196,210,228,0.85)';
+      if (w >= h) for (let i = 4; i < w - 2; i += 7) ctx.fillRect(x + i, y + 1, 2, h - 2);
+      else for (let j = 4; j < h - 2; j += 7) ctx.fillRect(x + 1, y + j, w - 2, 2);
     },
   },
   cot: {

@@ -12,11 +12,12 @@ import { R1 } from './r1.js';
 import { M5 } from './m5.js';
 import { M6 } from './m6.js';
 import { R2 } from './r2.js';
+import { M7 } from './m7.js';
 import { attachHospital } from './hospital.js';
 import { attachKkachi } from './kkachi.js';
 import { attachVisite } from './visite.js';
 
-const CAMPAGNA = [M1, M2, M3, M4, R1, M5, M6, R2];
+const CAMPAGNA = [M1, M2, M3, M4, R1, M5, M6, R2, M7];
 
 /**
  * Cosa parte quando finisce cosa. **L'Atto I si susseguono tutte e cinque**, e
@@ -32,7 +33,7 @@ const CAMPAGNA = [M1, M2, M3, M4, R1, M5, M6, R2];
  * fase sola e tre pannelli, e fare altrimenti vorrebbe dire un secondo impianto
  * per quattro scene.
  */
-const DOPO = { m1: 'm2', m2: 'm3', m3: 'm4', m4: 'r1', r1: 'm5', m5: 'm6', m6: 'r2' };
+const DOPO = { m1: 'm2', m2: 'm3', m3: 'm4', m4: 'r1', r1: 'm5', m5: 'm6', m6: 'r2', r2: 'm7' };
 
 export function registerCampaign(game) {
   for (const m of CAMPAGNA) game.missions.register(m);
