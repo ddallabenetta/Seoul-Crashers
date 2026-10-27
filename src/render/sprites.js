@@ -769,7 +769,8 @@ export const HERO_OUTFITS = [
 ];
 
 /**
- * Sprite del protagonista. `pose` vale 'walk', 'aim' o 'cuffed': con un'arma da
+ * Sprite del protagonista. `pose` vale 'walk', 'aim', 'cuffed' o 'pocket' (la mano destra in tasca
+ * dell'altro Jae-min, M8): con un'arma da
  * fuoco in pugno le braccia si tendono in avanti, ed è quello che rende leggibile
  * a schermo la differenza fra camminare e stare puntando qualcuno; ammanettato
  * (§5.35) le braccia stanno dietro la schiena e i polsi, sopra il bomber, hanno

@@ -316,3 +316,25 @@
 | Raggio della chiamata davanti a Pyo | `story/kkachi.davantiAlCortile` | 520 px dal centro del cortile del 황소파 |
 | Raggio con cui Jo parla | `story/visite` | 56 px, come `joPoint` di M2 |
 | Fruscio dei pannelli dell'Atto II | `r2-1.bed.kkachi` · `m6-7.bed.kkachi` | 0,03 · 0,03. Misurati sul master: rms 0,0048 e 0,0049 contro 0,0030 della cucina vuota di R2-2, che non ha letto |
+
+| **— l'Atto II, seconda metà (§5.42) —** | | |
+| Fascia del fermo di M7 | `m7.SERA` · mezzanotte | si può farsi arrestare dalle **20:00 alla mezzanotte**; prima si aspetta, dopo «il fermo è chiuso» e si riparte da domani sera. Con le sei ore del `bustPlayer` l'uscita cade fra le 02 e le 06 |
+| L'ora dell'uscita · le nove | `m7.USCITA` · `M7.finish` | 06:10 (`10-continuita.md`: Byeon muore alle 06:40) · poi 09:00, perché il pannello 6 lo dice |
+| Dove comincia l'attesa · dove comincia la chiusura | `m7.ARRIVO` · `m7.LONTANO` | 170 px dal commissariato · 130 px dal cancello |
+| Ha-eun e la riga sola | `m7.ATTESA_HAEUN` | 45 s da liberi nella fase dell'arresto; il numero di ore è quello vero (1-4) |
+| La cella | `interiors.cells` | 138 px di cella sopra la sbarra, due celle da 174 px, divisorio e fronte solidi; `shop.w/h` 210×150 → pianta 378×270 |
+| Quando parla la missione di M8 | `m8.MATTINA` · `BUSTA` · `BUSTA_A` | 11:00 (finestra 10:30-12) · 13:45 (finestra fino alle 15:30) |
+| Soglie del pedinamento a piedi | `m8.SPOT` · `LOSE` | **62 e 360 px**, contro 132 e 620 di §5.33 (`tail.begin` le riceve) |
+| In vista · tempo del pedinamento | `m8.IN_VISTA` · `PEDINA_TEMPO` | 320 px: comincia il pedinamento · 36 s, **e** a meno di 520 px dalla porta: l'altro si accorge lo stesso |
+| Velocità di Dulchae | `m8.CAMMINA` · `CORRE` | 50 px/s (la folla va da 46 a 58) · 86 px/s: più del passo (74) e meno dello scatto (126) di Jae-min, che ha stamina per ~4,5 s |
+| Quando sfugge | `m8.SFUGGITO` · `SFUGGITO_TEMPO` | oltre 470 px per 6,5 s: la fase riparte da `cerca` |
+| La folla di M8 | `m8.PASSANTI` · `TEPPISTI` | 16 passanti e 4 in nero senza banda, sull'anello dell'isolato (rng degli attori, non quello dello streaming) |
+| Stelle alla rottura | `m8.rottura` | `wanted.add(26 - heat)`: due stelle, con la radio che dà il nome |
+| Il cortile cieco | `m8.cortile` | 200×170 → pianta 360×306, senza uscita sul retro; la sequenza parte 1,3 s dopo l'ingresso |
+| Ricerca in quartiere | `places.findShop` `level` · `visible` | preferenza di piano (ripiega su qualunque) · distretto come lo legge l'HUD (`districtAt`) invece dell'etichetta di generazione |
+| R3: la notte | `r3.NOTTE` · `NOTTE_DA` · `NOTTE_A` | si aspetta fino alle 23:00; vale dalle 22:30 alle 03:00 |
+| Il quadrante di R3 | `r3-5.hold` | 5 s, con il fruscio a 0,04 |
+| Fruscio dei pannelli di M7 e R3 | `m7-2.bed` · `m7-3.bed` · `r3-1…r3-5.bed` | 0,03 · 0,045 · 0,02 · 0,035 · 0,035 · 0,03 · 0,04. Misurati sul master: rms 0,0048 e 0,0070 (M7), da 0,0035 a 0,0063 (R3) contro 0,0023 del silenzio; picco massimo 0,025 |
+| Sette secondi in banchina | `metro.insideT` (evento `metroDwell`) | 7 s dalla discesa: scatta la seconda metà della chiamata 13 |
+| Raggio della chiamata 13 · della 16 | `story/kkachi.vicinoAllaMetro` · `a2-funerale` | 380 px da una scala di Seoul · 260 px dalla sala dell'ospedale di Hongdae |
+| La mezzanotte senza stelle | `story/kkachi.DIECI_MINUTI` · `BUCO` | 600 s di gioco guidando e senza stelle prima delle 05:00; un buco di oltre 20 s fra due valutazioni azzera il conto |
