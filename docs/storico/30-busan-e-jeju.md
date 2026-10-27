@@ -45,7 +45,7 @@ dall'acqua, `shoreKind`), stile di facciata `stone`. Resta un'isola: 0 nodi ragg
 ## Busan
 
 Cuneo che punta a sud-est (6400×5600): foce del Nakdong a ovest, porto con l'isola di Yeongdo
-(ponte-terrapieno), baia di Suyeong con il **ponte Gwangan**, penisola di Marine City, spiaggia di
+(ponte), baia di Suyeong con il **ponte Gwangan**, penisola di Marine City, spiaggia di
 Haeundae a est. Otto monti (Geumjeongsan, Hwangnyeongsan, Jangsan…) spezzano la scacchiera; le strade
 principali sono scalinate che seguono il fondovalle (asse Gyeongbu → Dongnae → Seomyeon → Nampo),
 le griglie dei quartieri hanno il perimetro chiuso (niente vicoli ciechi). **Gradoni**: nelle zone
@@ -55,10 +55,27 @@ diverse. Fronte mare occidentale con cinque moli (due container, traghetti, Jaga
 `korea.makeGeography` costa sud ed est sono raccordate (a sud di Busan è tutto mare, la Gyeongbu
 entra da nord a x locale 3700, arteria da 144).
 
-**Un ponte è terra.** I veicoli affondano su `isWater` e le barche sono bloccate dalla terra, quindi
-il ponte Gwangan e quello di Yeongdo sono terrapieni percorribili (`city.bridges`, calcolati dalle
-campate che attraversano l'acqua): in barca si gira attorno, non si passa *sotto*. Chi scrive la
-corsa in baia di M10 lo sappia (§6).
+**Un ponte è un ponte (seconda passata).** Il copione dell'Atto III («Sotto il ponte 광안대교»)
+chiede le barche *sotto* e le auto *sopra*. `bridgeDecks` (busan.js) ricava dalle campate che
+attraversano l'acqua gli **impalcati** (`city.bridges`, non `isWater`: le auto non affondano) e i
+**piloni** (`city.pylons`, quadrati 28 px ai due bordi, uno ogni ~260 px di campata lunga più di 120).
+`city.underDeck(x,y)` è vero sul mare sotto un impalcato fuori dai piloni; `korea.isNavigable` =
+`isWater || underDeck` ed è quello che leggono `vehicle.resolveMarine` e la navigazione di `life.js`.
+I piloni restano solidi **solo** per le barche (corridoio fra l'uno e l'altro). Il disegno sta in
+`ground.js` (impalcato, cordoli, piloni, niente battigia sui bordi) e in `scene.drawUnderDeck`: una
+barca con il centro sotto un impalcato è disegnata *prima* e poi il terreno è ridipinto ritagliato
+sul rettangolo del ponte, così l'impalcato la copre e le auto sul ponte restano sopra. Verificato
+con una barca che entra da nord ed esce da sud a x 13820 e una berlina guidata dal giocatore
+da una sponda all'altra a 330 px/s senza affondare.
+
+## Densità e Seomyeon (seconda passata)
+
+Busan 757 edifici e 200 negozi (prima del rifacimento 741 e 140; prima passata 450/90), Jeju 411 e 131
+(377/129; prima passata 150/40). Più griglie (`GRIDS`: oncheon, gimhae, daeyeon), lotti più stretti,
+**file di edifici nel cuore degli isolati grandi** (`fillUrban` con `inner`), periferia abitata a Jeju
+(`SUBURBS`), più villaggi pieni, `shopScale` per i negozi. **Seomyeon**: celle da 380-480 px (3×2
+isolati invece di 5×4), palazzi da 70 a 230 px; il piazzale (`PLAZA`) segue il blocco centrale.
+Busan ha 129 nodi (erano 163): meno incroci, e tutti raggiungibili.
 
 ## Identità
 

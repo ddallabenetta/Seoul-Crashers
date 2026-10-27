@@ -433,7 +433,7 @@ export function createBusanCity(seed = BUSAN_SEED) {
   urbanRects.push({ x0: 4100, x1: 5650, y0: 170, y1: 1150 }, { x0: 5320, x1: 6100, y0: 2250, y1: 3500 }, { x0: 4880, x1: 5450, y0: 3000, y1: 4250 }, { x0: 2300, x1: 3050, y0: 4450, y1: 5000 });
   city.urbanZones = urbanRects;
   const PORT = { x0: 1000, x1: 2350, y0: 2750, y1: 4250 };
-  const PLAZA = { x0: 3320, x1: 3540, y0: 2140, y1: 2320 };
+  const PLAZA = { x0: 3320, x1: 3660, y0: 2140, y1: 2540 };
   const landFn = (x, y) => mask.land(x, y);
   // Due luoghi dell'Atto III stanno a ridosso dei moli, in strisce di terra che gli
   // isolati ordinari non coprirebbero: il lotto si riserva prima di ritagliare.

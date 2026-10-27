@@ -367,10 +367,7 @@ musicale a cui aggiungere una riga per far partire un pezzo (§5.19: si tocca `m
 nient'altro) e un modo di ricominciare da capo senza ricaricare la pagina (§5.21:
 `game.newGame()`).
 
-- **Dopo T9d (§5.41).** (1) I ponti di Busan sono terrapieni: la corsa in baia di M10 gira attorno al
-  ponte Gwangan, non ci passa sotto — servirebbe un impalcato con campate d'acqua per le barche.
-  (2) Busan ha ~450 edifici e ~90 negozi, Jeju ~150 e ~40: meno di prima (741 e 129) perché gli isolati
-  sono costruiti solo sui lati con strada; densificare con più griglie in `GRIDS`. (3) I quartieri a
+- **Dopo T9d (§5.41).** (1) I ponti hanno piloni solo ai bordi dell'impalcato e nessuna campata alta: sotto, la barca è semplicemente coperta. (2) Densità riportata sopra i livelli di prima (§5.41). (3) I quartieri a
   gradoni sono solo quota (`TERRACES`), niente muri di sostegno. (4) Su Jeju resta una banda verticale
   più chiara nel mare (gradiente del mare di Seoul, già presente prima). (5) Due barche di Seoul stanno
   in secco (x≈2526, y 4120 e 4664): difetto preesistente. (6) Busan e Jeju non hanno stato locale dei negozi.
