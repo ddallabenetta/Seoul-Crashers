@@ -1,8 +1,8 @@
 // **Tutto l'Atto II giocato davvero**: M5, M6 e R2 (§5.40), poi M7, M8, R3, le altre cinque chiamate di
 // 까치 e il commesso (§5.42, sezioni 11-15 in fondo). Quanto segue descrive la prima metà; la seconda aggiunge
 // quattro invarianti — `m7ArrestoVeroTerminaInBust` (la sequenza di §5.35 chiude in `busted` e la fase
-// lo prende), `m8PedinamentoAPiedi`, `m8SiPerdeNellaFolla` e `nessunaMissioneAppesaAlPassaggio` (R3 lascia
-// l'atto senza missione, stanze di scena, porte tenute aperte né telecamere in strada).
+// lo prende), `m8PedinamentoAPiedi`, `m8SiPerdeNellaFolla` e `nessunaMissioneAppesaAlPassaggio` (R3 passa a M9
+// senza lasciare punti, stanze di scena, porte tenute aperte né telecamere in strada).
 //
 // M5, M6 e il raccordo R2 (§5.40), e con loro le tre cose nuove che
 // l'Atto II chiede al motore: i **tre cortili da contare**, il **pedinamento che è una
@@ -1083,8 +1083,11 @@ async function arrestoVero(at) {
   await saltaPannelli();
   nota('R3');
   out.r3Completato = M.isDone('r3') && M.flag('dischi') && M.flag('atto2');
-  out.attoIIChiuso = M.active === null && game.markers.length === 0;
-  out.nessunaMissioneAppesaAlPassaggio = M.active === null && M.points.length === 0 && M.def === null;
+  // Dal §5.43 R3 passa da solo a M9, come R1 passa a M5: l'atto è chiuso se la missione dopo è la prima del
+  // terzo, e niente di M7, M8 o R3 è rimasto appeso.
+  out.attoIIChiuso = M.active === 'm9' && game.markers.length <= 1;
+  out.attoTreParte = M.active === 'm9';
+  out.nessunaMissioneAppesaAlPassaggio = M.active === 'm9' && M.points.every((p) => !/^(m7|m8|r3)/.test(p.id || ''));
   out.nienteStageNienteHold = game.shops.stage.size === 0 && !game.shops.held.has(s.pc.id) && !game.shops.held.has(MOD8.M8._sites.porta.id);
   out.nienteTelecamereNienteDulchae = !game.pedSystem.peds.some((p) => p.look === 'hero');
   out.orologioNonFermo = game.dayCycle.paused === false;
@@ -1094,7 +1097,7 @@ async function arrestoVero(at) {
   const snap = JSON.parse(JSON.stringify(S.snapshot(game)));
   S.apply(game, snap);
   await wait(0.4);
-  out.salvataggioDopoLAttoII = M.active === null && ['m7', 'm8', 'r3'].every((id) => M.isDone(id)) && M.flag('atto2') && M.flag('commesso');
+  out.salvataggioDopoLAttoII = M.active === 'm9' && ['m7', 'm8', 'r3'].every((id) => M.isDone(id)) && M.flag('atto2') && M.flag('commesso');
 }
 
 // ---- 15. 까치: le altre cinque dell'Atto II ------------------------------------------------------------------------------------

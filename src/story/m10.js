@@ -141,7 +141,7 @@ function oggetto(P, x, y, w, h, i) {
   // Ognuno ha il suo segno: non sono nove scatole.
   if (i % 3 === 0) ctx.fillRect(x + w * 0.2, y + h * 0.2, w * 0.6, h * 0.12);
   else if (i % 3 === 1) ctx.fillRect(x + w * 0.4, y, w * 0.2, h);
-  else { ctx.beginPath(); ctx.arc(x + w / 2, y + h * 0.4, w * 0.22, 0, Math.PI * 2); ctx.fill(); }
+  else { ctx.beginPath(); ctx.arc(x + w / 2, y + h * 0.45, Math.min(w, h) * 0.3, 0, Math.PI * 2); ctx.fill(); }
 }
 
 export const APERTURA = [

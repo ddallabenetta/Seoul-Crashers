@@ -1,0 +1,286 @@
+// **L'Atto III fino a M10, giocato davvero** (§5.43): M9 «Gyeongbu» e M10 «자갈치», e con loro le tre
+// cose che l'atto chiede al motore — **il passeggero che parla mentre si guida** (`core/passenger.js`),
+// **la nebbia bassa** (`dayCycle.fogTarget`) e **il carico che in acqua cade a riva** (`carry.landNear`).
+//
+// Come `atto-1.scene` e `atto-2.scene`, non misura: **asserisce**. Ogni voce `false` è un difetto.
+//
+//   node .claude/tools/probe.mjs --seconds 1 --quiet \
+//     --script .claude/tools/scenes/atto-3.scene \
+//     --eval "Object.entries(window.__OUT).filter(([k,v]) => v===false).map(([k])=>k)"
+//
+// `[]` vuol dire tutto a posto; `window.__LOG` è la fila delle fasi attraversate. Con `--shot-dir` fa
+// cinque scatti (nebbia col passeggero, convoglio, confessione, corsa sotto il ponte, darsena). Se si
+// ferma a metà, `__errore` e `__fase` dicono dove. Quando arriveranno l'incontro di Busan, M11, R4 e
+// M12, la scena si allunga da qui in fondo.
+//
+// Cinque voci sono invarianti:
+//   · `unBlipSolo` — i marcatori a schermo non passano mai da uno
+//   · `m9MorteRiparteDallArea` — morire sulla Gyeongbu riporta all'area di servizio, in auto, con lui
+//   · `m9ConfessioneInSilenzio` — durante la confessione `hush` è acceso e la radio vera tace
+//   · `m10CassaCadeARiva` — la cassa persa in mare finisce sulla terra, non in mezzo alla baia
+//   · `m10ColpoAlMotore` — dopo la risata lo scafo è al 25% e non sotto la soglia
+const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
+const MOD9 = await import('/src/story/m9.js');
+const MOD10 = await import('/src/story/m10.js');
+const { createVehicle } = await import('/src/entities/vehicle.js');
+const out = {};
+const log = [];
+window.__OUT = out;
+window.__LOG = log;
+const M = game.missions;
+const pl = game.player;
+const P = game.passenger;
+const shot = async (n) => {
+  game.hud.messages.length = 0;
+  game.hud.districtToast = 0;
+  await wait(0.12);
+  if (window.__shot) await window.__shot(n);
+};
+const fase = () => `${M.active}/${M.phaseDef && M.phaseDef.id}`;
+const nota = (k) => log.push(`${k} → ${fase()} · ${game.dayCycle.hour.toFixed(2)}h`);
+const blip = () => game.markers.find((m) => m.id === 'mission');
+let maxBlip = 0;
+const contaBlip = () => { maxBlip = Math.max(maxBlip, game.markers.length); };
+
+function teleport(x, y, angle = null) {
+  if (game.shops.active) game.shops.leave(game);
+  pl.x = x;
+  pl.y = y;
+  pl.onFoot = !pl.vehicle;
+  if (pl.vehicle) {
+    pl.vehicle.x = x; pl.vehicle.y = y; pl.vehicle.speed = 0;
+    if (angle !== null) pl.vehicle.angle = angle;
+  }
+  pl.enterCooldown = 0;
+  game.camera.snapTo(x, y);
+}
+function inAuto(kind = 'sedan') {
+  if (pl.vehicle && pl.vehicle.kind === kind && !pl.vehicle.dead) return pl.vehicle;
+  if (pl.vehicle) pl.exitVehicle(game, true);
+  const v = createVehicle(kind, pl.x + 30, pl.y + 30, 0, 4);
+  game.vehicles.push(v);
+  pl.enterVehicle(v, game);
+  return v;
+}
+async function chiudiDialogo() {
+  let g = 0;
+  while (game.dialogue.active && g++ < 60) { game.dialogue.finish(game); await wait(0.06); }
+  await wait(0.2);
+}
+async function saltaPannelli() {
+  if (!game.cutscene.active) return false;
+  game.cutscene.skip(game);
+  let g = 0;
+  while (game.cutscene.active && g++ < 40) await wait(0.1);
+  await wait(0.15);
+  return true;
+}
+async function finoA(atteso, secondi = 8) {
+  const t0 = Date.now();
+  while (fase() !== atteso && Date.now() - t0 < secondi * 1000) {
+    contaBlip();
+    if (game.dialogue.active) await chiudiDialogo();
+    if (game.cutscene.active) await saltaPannelli();
+    await wait(0.15);
+  }
+  if (game.dialogue.active) await chiudiDialogo();
+  return fase();
+}
+async function usaPunto(id) {
+  contaBlip();
+  const p = M.points.concat(M.fixed).find((q) => q.id === id);
+  if (!p) return false;
+  if (p.onFoot !== false && pl.vehicle) pl.exitVehicle(game, true);
+  teleport(p.x, p.y);
+  await wait(0.2);
+  const visto = M.actions.some((a) => a.id === p.id);
+  p.run(M.context(game));
+  await chiudiDialogo();
+  return visto;
+}
+const ora = (h) => { game.dayCycle.hour = h; };
+
+try {
+// ---- 1. R3 → M9: si parte dall'Atto II chiuso -----------------------------------------------------
+game.newGame();
+for (const id of ['m1', 'm2', 'm3', 'm4', 'r1', 'm5', 'm6', 'r2', 'm7', 'm8']) M.done.add(id);
+ora(22);
+// **L'Atto III comincia dove l'Atto II finisce**: chiudere R3 accende M9, senza nessuno che lo chieda.
+M.start('r3', game);
+await wait(0.2);
+if (game.cutscene.active) await saltaPannelli();
+if (M.active === 'r3') M.complete(game);
+await wait(0.3);
+if (game.cutscene.active) await saltaPannelli();
+await chiudiDialogo();
+out.catenaR3PortaAM9 = M.active === 'm9' && M.isDone('r3');
+if (M.active !== 'm9') M.start('m9', game);
+ora(22);
+nota('start m9');
+await wait(0.3);
+const S9 = MOD9.M9._sites;
+out.m9LuoghiTrovati = !!(S9 && S9.ex && S9.A && S9.B && S9.ing && S9.piaz);
+out.m9BlipAlPrimoAutogrill = !!blip() && S9 && Math.hypot(blip().x - S9.A.x, blip().y - S9.A.y) < 10;
+
+// ---- 2. L'alba: si arriva in auto e si aspetta ----------------------------------------------------
+teleport(S9.A.x - 200, S9.ex.y + 38);
+inAuto();
+teleport(S9.A.x - 200, S9.ex.y + 38, 0);
+out.m9ArrivaAllAlba = (await finoA('m9/alba', 4)) === 'm9/alba';
+out.m9AspettaConUnTasto = await usaPunto('aspetta');
+await finoA('m9/nebbia', 6);
+nota('alba');
+const h = game.dayCycle.hour;
+out.m9AlleCinqueEDieci = h > 5.1 && h < 5.5;
+out.m9Nebbia = fase() === 'm9/nebbia';
+out.m9ChunsikABordo = P.aboard && P.who === 'Chun-sik';
+inAuto();
+teleport(S9.A.x + 120, S9.ex.y + 38, 0);
+await wait(1.2);
+out.m9ParlaGuidando = P.talking;
+out.m9NebbiaFitta = game.dayCycle.fogTarget > 0.5;
+await shot('m9-1-nebbia');
+// A piedi la coda si ferma.
+pl.exitVehicle(game, true);
+const riga = P.line;
+await wait(1.5);
+out.m9APiediNonParla = !P.talking || P.line === riga;
+inAuto();
+
+// ---- 3. Morire sulla Gyeongbu: si riparte dall'area di servizio, in auto, con lui -----------------
+// Lontano dall'area, così il ritorno si vede: una morte vera passa da `onPlayerDeath` (il conto).
+teleport(S9.A.x + 2000, S9.ex.y + 38, 0);
+await wait(0.3);
+const morti = game.stats.deaths || 0;
+pl.hp = 0;
+game.onPlayerDeath();
+game.respawnPlayer();
+await wait(0.6);
+if (game.dialogue.active) await chiudiDialogo();
+await finoA('m9/nebbia', 3);
+const vicinoAllArea = Math.hypot(pl.x - S9.A.x, pl.y - S9.A.y) < 500;
+out.m9MorteRiparteDallArea = fase() === 'm9/nebbia' && (game.stats.deaths || 0) > morti
+  && !pl.onFoot && vicinoAllArea && P.aboard;
+nota('morto nella nebbia');
+
+// ---- 4. Il convoglio ------------------------------------------------------------------------------
+teleport(9200, S9.ex.y + 38, 0);
+await wait(0.3);
+teleport(9400, S9.ex.y + 38, 0);
+out.m9Convoglio = (await finoA('m9/convoglio', 4)) === 'm9/convoglio';
+await wait(0.6);
+const conv = MOD9.M9._convoglio || [];
+out.m9QuattroMezzi = conv.length === 4;
+await shot('m9-2-convoglio');
+// Nessuno chiama il 112 per un convoglio privato.
+game.wanted.add(40, game);
+await wait(0.4);
+out.m9NienteStelleSullaGyeongbu = game.wanted.level === 0;
+for (const v of conv) game.damageVehicle(v, v.maxHp * 2, v.x, v.y, null);
+P.clear();
+out.m9Confessione = (await finoA('m9/confessione', 6)) === 'm9/confessione';
+nota('convoglio');
+await wait(0.4);
+out.m9ConfessioneInSilenzio = P.hush === true && P.talking;
+await shot('m9-3-confessione');
+P.clear();
+out.m9Blocco = (await finoA('m9/blocco', 4)) === 'm9/blocco';
+out.m9HushSpentoDopo = P.hush === false;
+
+// ---- 5. Il blocco e il piazzale di 서면 -----------------------------------------------------------
+const ing = S9.ing;
+teleport(ing.approach.x, ing.approach.y - 900);
+await wait(1.6);
+out.m9BloccoAQuattroStelle = game.wanted.level >= 4;
+teleport(S9.piaz.x, S9.piaz.y);
+await wait(0.4);
+await finoA('m10/messaggio', 8);
+out.m9Completata = M.isDone('m9') && M.flag('confessione') && M.flag('gyeongbu');
+out.m9ScendeChunsik = !P.aboard;
+out.m9NebbiaSparita = game.dayCycle.fogTarget === 0;
+nota('m9 → m10');
+
+// ---- 6. M10: Nam, Ko alle quattro -----------------------------------------------------------------
+out.m10PartedaM9 = M.active === 'm10';
+await finoA('m10/viaggio', 4);
+const S10 = MOD10.M10._sites;
+out.m10LuoghiTrovati = !!(S10 && S10.mercato && S10.officina && S10.moli && S10.ponte && S10.darsena);
+inAuto();
+teleport(S10.mercato.approach.x, S10.mercato.approach.y);
+out.m10Officina = (await finoA('m10/officina', 8)) === 'm10/officina';
+nota('prezzo');
+ora(11);
+await wait(0.2);
+out.m10KoNonRiceveAMezzogiorno = !M.points.find((p) => p.id === 'ko')?.when?.(game);
+out.m10AspettaLeQuattro = await usaPunto('aspetta');
+out.m10Alle4 = game.dayCycle.hour >= 15.5 && game.dayCycle.hour < 17;
+await usaPunto('ko');
+out.m10Carico = (await finoA('m10/carico', 4)) === 'm10/carico';
+out.m10HanseongSa = M.flag('hanseongSa');
+
+// ---- 7. La cassa, la barca, la corsa ---------------------------------------------------------------
+await usaPunto('carica');
+out.m10CassaInMano = game.carry.has(MOD10.CARICO.id);
+out.m10Barca = (await finoA('m10/barca', 3)) === 'm10/barca';
+const barca = MOD10.M10._barca;
+out.m10CeUnaBarca = !!barca && !barca.dead;
+if (barca) { teleport(barca.x, barca.y); pl.onFoot = true; pl.vehicle = null; pl.enterVehicle(barca, game); }
+out.m10Corsa = (await finoA('m10/corsa', 3)) === 'm10/corsa';
+nota('corsa');
+
+// Morire in mare: la cassa cade sulla terra più vicina, e la fase torna al carico.
+const mid = { x: S10.moli.x, y: S10.moli.y };
+let acqua = null;
+for (let r = 420; r < 1400 && !acqua; r += 60) {
+  for (let a = 0; a < 6.28 && !acqua; a += 0.4) {
+    const x = mid.x + Math.cos(a) * r, y = mid.y + Math.sin(a) * r;
+    if (game.city.isWater(x, y) && game.city.isWater(x + 60, y) && game.city.isWater(x, y + 60)) acqua = { x, y };
+  }
+}
+if (acqua) teleport(acqua.x, acqua.y);
+await wait(0.8);
+out.m10MotovedetteTiVedono = game.wanted.level >= 3;
+pl.hp = 0;
+game.onPlayerDeath();
+game.respawnPlayer();
+await wait(0.6);
+const dr = game.carry.dropped;
+out.m10CassaCadeARiva = !!dr && !game.city.isWater(dr.x, dr.y);
+out.m10TornaAlCarico = (await finoA('m10/carico', 3)) === 'm10/carico' && !!blip() && dr && Math.hypot(blip().x - dr.x, blip().y - dr.y) < 10;
+nota('morto in baia');
+game.wanted.reset();
+game.police.standDown(game, true);
+if (dr) { teleport(dr.x, dr.y); await wait(0.6); }
+if (!game.carry.has(MOD10.CARICO.id) && dr) game.carry.take(game, MOD10.CARICO);
+out.m10RiprendeLaCassa = game.carry.has(MOD10.CARICO.id);
+await finoA('m10/barca', 3);
+const b2 = MOD10.M10._barca;
+if (b2) { if (pl.vehicle) pl.exitVehicle(game, true); teleport(b2.x, b2.y); pl.enterVehicle(b2, game); }
+await finoA('m10/corsa', 3);
+
+// La risata sotto il ponte, poi il colpo al motore.
+const pn = S10.ponte;
+teleport(pn.x, pn.y + 300, -Math.PI / 2);
+await wait(1.0);
+out.m10LaRisataAlTelefono = P.talking || !!P.line || !!P.last;
+await wait(3.8);
+const sc = pl.vehicle;
+out.m10ColpoAlMotore = !!sc && sc.hp <= sc.maxHp * 0.26 && sc.hp >= 20;
+await shot('m10-1-ponte');
+teleport(S10.darsena.x, S10.darsena.y, -Math.PI / 2);
+await wait(0.5);
+await finoA('none', 6);
+await saltaPannelli();
+await wait(0.4);
+out.m10Completata = M.isDone('m10') && M.flag('nove');
+out.m10ManiVuote = !game.carry.has(MOD10.CARICO.id) && !game.carry.dropped;
+out.m10StelleCadute = game.wanted.level === 0;
+await shot('m10-2-darsena');
+nota('m10 fatta');
+contaBlip();
+out.unBlipSolo = maxBlip <= 1;
+} catch (e) {
+  window.__errore = String(e && e.stack || e);
+  window.__fase = fase();
+  out.__errore = false;
+}
