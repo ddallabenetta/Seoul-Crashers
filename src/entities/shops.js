@@ -67,8 +67,18 @@ const REST_CAP = 0.7;
 const REST_PER_HOUR = 9;
 
 /** ₩ con i punti delle migliaia: un prezzo a sei cifre senza va solo letto male. */
+// `toLocaleString` costa più di tutto il resto della riga e l'HUD la chiama a ogni frame con lo
+// stesso numero (§5.45): una cache piccola, svuotata quando cresce, basta e non cambia il testo.
+const wonCache = new Map();
 export function won(n) {
-  return `₩${Math.round(n).toLocaleString('it-IT')}`;
+  const r = Math.round(n);
+  let s = wonCache.get(r);
+  if (s === undefined) {
+    if (wonCache.size > 512) wonCache.clear();
+    s = `₩${r.toLocaleString('it-IT')}`;
+    wonCache.set(r, s);
+  }
+  return s;
 }
 
 // --- mercato nero -------------------------------------------------------------

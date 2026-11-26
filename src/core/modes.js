@@ -29,6 +29,17 @@
  * - `radioDuck`  moltiplicatore della radio — separato apposta: la radio è la
  *                musica che ha scelto il giocatore e si abbassa meno del mondo
  * - `cursor`     il puntatore del mouse si vede o no
+ *
+ * Tre campi facoltativi dicono **cosa fa il frame** quando la modalità non è il gioco normale
+ * (§5.45: erano tre rami scritti a mano in `main.update` e due in `main.render`):
+ *
+ * - `step(game, dt)`    la modalità si prende **tutto** l'update: `main.update` la chiama e ritorna.
+ *                       Chi la scrive chiude da sé il frame (`input.endFrame()`).
+ * - `frame(game, ctx)`  la modalità si prende **tutto** il disegno, senza la città sotto.
+ * - `overlay(game, ctx)` la città si disegna e poi si disegna questo **al posto** di HUD e pannelli.
+ *
+ * Una modalità senza questi campi gira come il gioco: è il caso di `menu`, `arrest` e `play`, che
+ * passano da `worldRuns`/`playerRuns` e dal resto di `main.update`.
  */
 export const MODES = [
   {
@@ -38,6 +49,14 @@ export const MODES = [
     id: 'cutscene',
     when: (game) => !!game.cutscene?.active,
     worldRuns: false, playerRuns: false, duck: 0.12, radioDuck: 0, cursor: 'default',
+    // Gira solo la cutscene e l'audio (i letti si abbassano da soli leggendo `duck`). Sotto i
+    // pannelli c'è il nero pieno della tavola: disegnare anche la città sarebbe un frame buttato.
+    step(game, dt) {
+      game.cutscene.update(dt, game);
+      game.audio.update(dt, game);
+      game.input.endFrame();
+    },
+    frame(game, ctx) { game.cutscene.draw(ctx, game); },
   },
   {
     // Il dialogo di missione: era **l'esempio** con cui questa tabella era stata
@@ -48,12 +67,24 @@ export const MODES = [
     id: 'dialogue',
     when: (game) => !!game.dialogue?.active,
     worldRuns: false, playerRuns: false, duck: 0.4, radioDuck: 0.5, cursor: 'default',
+    // Gira solo il riquadro. L'HUD continua ad aggiornarsi, o i toast scritti dalla battuta
+    // prima resterebbero appesi. Il disegno non ha un campo suo: la città, l'HUD e poi il
+    // riquadro (che `main.render` disegna per ultimo) sono il frame normale.
+    step(game, dt) {
+      game.dialogue.update(dt, game);
+      game.audio.update(dt, game);
+      game.radio.update(dt, game);
+      game.hud.update(dt);
+      game.input.endFrame();
+    },
   },
   {
     // Il titolo: il mondo gira eccome (è l'attract mode), il giocatore no.
     id: 'title',
     when: (game) => !game.started,
     worldRuns: true, playerRuns: false, duck: 1, radioDuck: 1, cursor: 'default',
+    step(game, dt) { game.updateAttract(dt); },
+    overlay(game, ctx) { game.startMenu.draw(ctx, game); },
   },
   {
     id: 'menu',

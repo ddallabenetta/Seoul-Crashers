@@ -73,6 +73,8 @@ export class Scene {
     this.city = city;
     this.ground = new GroundRenderer(city);
     this.list = [];
+    this._pool = [];   // voci `{t,o,d}` riusate fra un frame e l'altro (§5.45)
+    this._pn = 0;
     this._bq = [];
     this._pq = [];
     this._kq = [];
@@ -129,7 +131,7 @@ export class Scene {
 
     // 2) Decalcomanie sul terreno (sangue, gomma, rottami piatti), chiodi, pozze
     // di fuoco e mine: tutto quello che è *sull'* asfalto e non sopra.
-    if (game.fx) game.fx.drawDecals(ctx);
+    if (game.fx) game.fx.drawDecals(ctx, view);
     if (game.police) this.drawSpikes(ctx, game);
     if (game.projectiles) {
       this.drawFires(ctx, game);
@@ -160,16 +162,17 @@ export class Scene {
     // 5) Oggetti alti ordinati per profondità radiale
     const list = this.list;
     list.length = 0;
+    this._pn = 0;
     const ccx = cam.cx, ccy = cam.cy;
 
     for (const b of buildings) {
       const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
-      list.push({ t: 0, o: b, d: (cx - ccx) ** 2 + (cy - ccy) ** 2 });
+      this.entry(list, 0, b, (cx - ccx) ** 2 + (cy - ccy) ** 2);
     }
     const props = city.propGrid.queryRect(view.x, view.y, view.w, view.h, this._pq);
     for (const p of props) {
       const o = p.prop;
-      list.push({ t: 1, o, d: (o.x - ccx) ** 2 + (o.y - ccy) ** 2 });
+      this.entry(list, 1, o, (o.x - ccx) ** 2 + (o.y - ccy) ** 2);
     }
     const flying = this._fq;
     flying.length = 0;
@@ -179,18 +182,18 @@ export class Scene {
       if (airborne(v)) { flying.push(v); continue; }
       // Una barca sotto un ponte (§5.41) passa dietro l'impalcato, non sopra.
       if (city.underDeck && VEHICLE_TYPES[v.kind]?.marine && city.underDeck(v.x, v.y)) { under.push(v); continue; }
-      list.push({ t: 2, o: v, d: (v.x - ccx) ** 2 + (v.y - ccy) ** 2 });
+      this.entry(list, 2, v, (v.x - ccx) ** 2 + (v.y - ccy) ** 2);
     }
     for (const p of game.peds) {
       if (p.x < view.x || p.x > view.x + view.w || p.y < view.y || p.y > view.y + view.h) continue;
-      list.push({ t: 3, o: p, d: (p.x - ccx) ** 2 + (p.y - ccy) ** 2 });
+      this.entry(list, 3, p, (p.x - ccx) ** 2 + (p.y - ccy) ** 2);
     }
     if (game.player.onFoot && !game.arrest.hidden) {
-      list.push({ t: 4, o: game.player, d: (game.player.x - ccx) ** 2 + (game.player.y - ccy) ** 2 });
+      this.entry(list, 4, game.player, (game.player.x - ccx) ** 2 + (game.player.y - ccy) ** 2);
     }
     if (game.pickups) {
       for (const it of game.pickups.visible(view, this._kq)) {
-        list.push({ t: 5, o: it, d: (it.x - ccx) ** 2 + (it.y - ccy) ** 2 });
+        this.entry(list, 5, it, (it.x - ccx) ** 2 + (it.y - ccy) ** 2);
       }
     }
     // Quello che il giocatore si è lasciato dietro morendo (`core/carry.js`).
@@ -198,7 +201,7 @@ export class Scene {
     // come gli altri, e deve sparire dietro un'auto che gli si ferma sopra.
     const held = game.carry?.dropped;
     if (held && held.x > view.x && held.x < view.x + view.w && held.y > view.y && held.y < view.y + view.h) {
-      list.push({ t: 6, o: held, d: (held.x - ccx) ** 2 + (held.y - ccy) ** 2 });
+      this.entry(list, 6, held, (held.x - ccx) ** 2 + (held.y - ccy) ** 2);
     }
 
     list.sort((a, b) => b.d - a.d);
@@ -233,6 +236,20 @@ export class Scene {
     // disegnato. È l'unico modo di illuminare una città fatta di tile cachati
     // da 512 px senza rigenerarli a ogni minuto di orologio.
     this.drawLight(ctx, game);
+  }
+
+  /**
+   * Aggiunge una voce alla fila ordinata per profondità. Le voci sono oggetti riusati: erano
+   * qualche centinaio di letterali nuovi a ogni frame (§5.45). La fila si riordina subito dopo
+   * e nessuno tiene una voce oltre il frame, quindi riusarle è sicuro.
+   */
+  entry(list, t, o, d) {
+    const pool = this._pool;
+    let e = pool[this._pn];
+    if (!e) e = pool[this._pn] = { t: 0, o: null, d: 0 };
+    this._pn++;
+    e.t = t; e.o = o; e.d = d;
+    list.push(e);
   }
 
   /**

@@ -220,8 +220,18 @@ export class Fx {
     }
   }
 
-  drawDecals(ctx) {
+  /**
+   * `view` (facoltativo) è il rettangolo inquadrato: le macchie fuori campo non si disegnano.
+   * Prima ognuna costava un save/translate/rotate/restore anche a mille pixel dallo schermo, e
+   * dopo un inseguimento le tracce di gomma sono centinaia (§5.45). Il margine è la diagonale
+   * massima della macchia, quindi a schermo non cambia un pixel.
+   */
+  drawDecals(ctx, view) {
     for (const d of this.decals) {
+      if (view) {
+        const m = d.w + d.h;
+        if (d.x + m < view.x || d.x - m > view.x + view.w || d.y + m < view.y || d.y - m > view.y + view.h) continue;
+      }
       const fade = d.maxLife < 900 ? Math.min(1, d.life / d.maxLife) : 1;
       ctx.save();
       ctx.translate(d.x, d.y);
