@@ -971,7 +971,13 @@ export const M8 = {
         if (d) {
           d.hp = 30;
           d.maxHp = 30;
-          d.home = { x: f.entry.x, y: f.entry.y - 12 };
+          // Due tappe prima della porta: dritto davanti a lui c'è la cassa del mezzo (`interiors.yard`).
+          ctx.state.tappe = [
+            { x: Math.round(f.w * 0.36), y: Math.round(f.h * 0.28) },
+            { x: Math.round(f.w * 0.36), y: Math.round(f.h * 0.62) },
+            { x: f.entry.x, y: f.entry.y - 12 },
+          ];
+          d.home = ctx.state.tappe.shift();
           d.baseSpeed = 58;
           ctx.state.via = true;
         } else {
@@ -987,6 +993,7 @@ export const M8 = {
         const d = f.people.find((p) => p.actor === 'dulchae-cortile');
         if (!d || d.dead) { ctx.state.via = false; return; }
         if (dist(d.x, d.y, d.home.x, d.home.y) > 16) return;
+        if (ctx.state.tappe?.length) { d.home = ctx.state.tappe.shift(); return; }
         f.people.splice(f.people.indexOf(d), 1);
         game.pedGrid.rebuild(game.peds);
         game.actors.undefine('dulchae-cortile');

@@ -111,7 +111,9 @@ src/story/
   m1.js … m4.js       una missione per file: le sue fasi e i suoi pannelli
   m5.js, m6.js        l'Atto II, prima metà: tre cortili da contare, la torre e i faldoni (§5.40)
   r1.js, r2.js        i raccordi: una missione con una fase sola e i suoi pannelli
-  visite.js           le «visite che cambiano»: un punto fisso, non di fase (Jo dopo M6)
+  visite.js           le «visite che cambiano»: un punto fisso, non di fase (Jo, il commesso, Chun-sik)
+  terminale.js        le sedie arancioni di Busan: una vetrina inventata, nessuna missione (§5.46)
+  dulchae.js          il conto delle occasioni su Dulchae: un flag, dal bus (`pedKilled`)
   hospital.js         il 병원 «성심»: una battuta a ogni morte, e quattro pannelli
   kkachi.js           quello che 까치 dice e quando: le chiamate e le righe di servizio
 
@@ -444,7 +446,9 @@ corso o senza: `MissionSystem.standing(p)` è un punto interattivo **fuori dalle
 smonta al cambio e ha un `when(game)` che dice quando vale; e `MissionSystem.afterRestore(fn)` rifà
 dopo ogni caricamento quello che `prepare` — che gira solo per la missione in corso — non rifà più:
 una definizione di attore nata in una missione finita non sopravvive a un salvataggio. Sono le due
-cose che servono anche alle visite di Chun-sik e del commesso. Il resto del bus ha guadagnato un
+cose che servono anche alle visite di Chun-sik e del commesso. Un punto fisso può avere anche un
+`tick(dt, game)`, che gira a ogni frame (§5.46): è il posto di chi, fuori da ogni fase, deve fare qualcosa
+da solo — Dulchae che se ne va dalla sala d'attesa. Il resto del bus ha guadagnato un
 evento, `vehicleSold(v, place, price)`, da cui M5 conta le auto portate via a un cortile: **la
 missione ascolta, il sistema dei cortili (`turfs.claim`) decide chi è il padrone**.
 

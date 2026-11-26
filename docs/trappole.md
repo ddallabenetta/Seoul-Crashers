@@ -587,3 +587,12 @@ resta ad aspettare un pedone fermo (§5.42).
 **`shops.snapshot` ignora le chiavi non numeriche della cache.** Le stanze della storia stanno sotto
 `stage:<id>` o sotto un id inventato (`m7-cella`) e si rifanno da sole: scriverle nel salvataggio vorrebbe
 dire un'altra pianta per ogni vetrina (§5.42).
+
+**Un attore d'interno che deve camminare si incastra nell'arredo.** `shops.updateNpc` va dritto verso `home`
+e i solidi lo spingono soltanto, non lo fanno girare. Nel cortile di M8 c'è una cassa proprio fra Dulchae e la
+porta: restava fermo lì dietro, e la cassa faceva anche da riparo ai colpi. Chi deve attraversare una pianta va
+portato **a tappe** (`m8`, fase `fuori`) (§5.46).
+
+**La morte di un attore se ne va con `undefine`.** `actors.snapshot` salva solo le definizioni che esistono,
+quindi un'occasione che toglie il suo personaggio a scena finita perde anche il fatto che sia morto. Quello che
+deve sopravvivere va in un flag della storia (`story/dulchae.js`) (§5.46).

@@ -5,17 +5,13 @@ resta corto apposta.** Il contenuto vero sta in `docs/`, e si apre un documento 
 non tutti. Il `README.md` descrive il gioco e i comandi; qui c'è quello che serve a
 *sviluppare*. Avvio e vincoli stanno in `CLAUDE.md`, che si carica da solo.
 
-Ultimo aggiornamento: **chiusura del rework** (PR #30). Dentro: il sorpasso (§5.34), l'arresto in volante
-(§5.35), la strada che reagisce (§5.36), la regia sonora dei pannelli (§5.37), le cuciture e la vita della mappa
-(§5.38-5.39), Busan e Jeju rifatte (§5.41), **tutto l'Atto II** (§5.40, §5.42), **M9 e M10** (§5.43), la polizia
-con A* e le guardie tue (§5.44) e la misura del costo per sistema (§5.45). Prima, l'Atto I (§5.33) e le tappe
-§5.8-5.32.
+Ultimo aggiornamento: **tappa G1b** (PR #31, §5.46): le sedie arancioni di Busan, Chun-sik dopo M9, il conto
+delle occasioni su Dulchae, le chiamate 17 e 18. Prima, il rework della PR #30 (§5.34-5.45) e le tappe §5.8-5.33.
 
-> 📌 **Il prossimo lavoro è la tappa G1b**: l'incontro facoltativo di Busan, la visita di Chun-sik dopo M9, il
-> conto delle occasioni su Dulchae e le chiamate 17 e 18 di 까치. Poi **G2** (M11, R4, M12 e le altre chiamate
-> dell'Atto III) e **H** (i tre finali, i titoli di coda, la scena dopo). L'elenco con cosa contiene ogni tappa e
-> come si prova sta **in testa a [`docs/backlog.md`](docs/backlog.md) (§6.0)**; le decisioni d'impianto prese con
-> l'utente in [`docs/storia/08-domande-aperte.md`](docs/storia/08-domande-aperte.md).
+> 📌 **Il prossimo lavoro è la tappa G2**: M11, R4, M12 e le chiamate 19-24 dell'Atto III. Poi **H** (i tre
+> finali, i titoli di coda, la scena dopo). L'elenco con cosa contiene ogni tappa e come si prova sta **in testa a
+> [`docs/backlog.md`](docs/backlog.md) (§6.0)**; le decisioni d'impianto prese con l'utente in
+> [`docs/storia/08-domande-aperte.md`](docs/storia/08-domande-aperte.md).
 >
 > **Una tappa, un ramo da `main`, una PR**, che si chiude quando la tappa passa le sue scene. È la regola nata
 > dalla PR #30, rimasta aperta un mese con dentro undici tappe. Chi scrive una missione parte da §5.29 e §5.33
@@ -51,6 +47,7 @@ con A* e le guardie tue (§5.44) e la misura del costo per sistema (§5.45). Pri
 | **contare cortili**, far leggere dei faldoni, un punto fisso come «Jo dopo M6», le chiamate dell'Atto II | `docs/storico/29-atto-ii-m5-m6-r2.md` (§5.40) |
 | **una cella o un cortile percorribili**, far arrestare apposta, **pedinare a piedi** nella folla, mettere un'altra stanza dietro una porta vera | `docs/storico/31-atto-ii-m7-m8-r3.md` (§5.42) |
 | **un passeggero che parla mentre si guida**, la nebbia, una corsa in barca con le motovedette, un carico che cade a riva | `docs/storico/32-atto-iii-m9-m10.md` (§5.43) |
+| **un incontro senza missione** in un interno inventato, un punto fisso che fa qualcosa da solo, **contare le occasioni su Dulchae** | `docs/storico/35-sedie-arancioni.md` (§5.46) |
 | misurare quanto costa un frame per sistema, o aggiungere una modalità che si prende l'intero frame | `docs/storico/34-engine-e-prestazioni.md` (§5.45) |
 | sapere com'è il gioco a schermo, sistema per sistema, senza aprire il codice | [`docs/il-gioco-oggi.md`](docs/il-gioco-oggi.md) |
 | **toccare come la polizia raggiunge il giocatore** (A* sul grafo, ricalcolo a scaglioni) o le **guardie del cortile tuo** (scorta, difesa) | `docs/storico/33-polizia-e-guardie.md` (§5.44) |
@@ -104,6 +101,7 @@ commenti resta valido: si risolve qui.
 | §5.43 L'Atto III, prima parte: M9, M10, il passeggero, la nebbia, le motovedette | `docs/storico/32-atto-iii-m9-m10.md` |
 | §5.44 Polizia e guardie: volanti con A*, guardie del cortile tuo che ti scortano | `docs/storico/33-polizia-e-guardie.md` |
 | §5.45 Engine e prestazioni: `costo.scene`, quattro risparmi, modalità che si prendono il frame | `docs/storico/34-engine-e-prestazioni.md` |
+| §5.46 Le sedie arancioni, Chun-sik dopo M9, il conto su Dulchae, le chiamate 17 e 18 | `docs/storico/35-sedie-arancioni.md` |
 | §6 Backlog | `docs/backlog.md` |
 | §8 Parametri | `docs/parametri.md` |
 | §9 Strumenti (`.claude/`) | `docs/strumenti.md` |
@@ -118,8 +116,8 @@ Canvas 2D puro, moduli ES nativi, **zero dipendenze, nessun build step**. Tutta 
 
 Stato: Fasi 1, 1.5 e 2 complete; della Fase 3 sono fatti negozi e interni, mappa, giorno-notte,
 audio, radio, salvataggio, menu e musica, le tre regioni nella mappa unica della Corea, la vita degli
-NPC, l'impianto della campagna e **due atti e mezzo**: M1-M10 con R1, R2, R3 (§5.28-5.43). Restano
-M11, R4, M12, l'incontro di Busan e i finali (§6.0). ~50.000 righe in 94 moduli; 60 fps con ~44 veicoli e
+NPC, l'impianto della campagna e **due atti e mezzo**: M1-M10 con R1, R2, R3 (§5.28-5.43) e l'incontro di
+Busan (§5.46). Restano M11, R4, M12 e i finali (§6.0). ~50.000 righe in 94 moduli; 60 fps con ~44 veicoli e
 ~93 pedoni attivi, anche sotto raffica di SMG. Dove va il tempo di un frame lo dice `costo.scene` (§5.45);
 i veli a schermo intero restano non misurabili onestamente in headless (§5.11).
 

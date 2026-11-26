@@ -24,7 +24,7 @@ import { dist } from '../core/math.js';
 import { dulchaeVivo } from './dulchae.js';
 import {
   CYAN,
-  px, py, wash, vignette, glow, hexA,
+  px, py, wash, vignette, glow,
   narrator, speech,
 } from '../render/panelkit.js';
 import { figure, unitScale } from '../render/pixelkit.js';
@@ -306,16 +306,16 @@ export const PANNELLI = [
     // È lo stesso pannello due volte, e l'unica differenza è chi parla.
     id: 'sedie-2',
     draw(P) {
-      sala3(P, 0.62);
+      sala3(P, 0.5);
       const ctx = P.ctx;
-      ctx.fillStyle = ORANGE;
-      ctx.fillRect(P.x, py(P, 0.6), P.w, P.h * 0.08);
-      const k = unitScale(P, 0.5, 36);
-      figure(P, 'dulchae', px(P, 0.27), py(P, 0.66), k, 'stand', { crop: 36, mood: 'parla' });
-      figure(P, 'jaemin', px(P, 0.73), py(P, 0.66), k, 'stand', { crop: 36, mood: 'fermo' });
-      // Lo spazio vuoto in mezzo: le tre sedie fra loro.
-      ctx.fillStyle = hexA('#000000', 0.18);
-      ctx.fillRect(px(P, 0.42), py(P, 0.2), P.w * 0.16, P.h * 0.46);
+      const k = unitScale(P, 0.42, 34);
+      // Gli schienali dietro di loro: tre sedie vuote in mezzo.
+      for (let i = 0; i < 5; i++) {
+        ctx.fillStyle = i % 4 === 0 ? '#b85f17' : ORANGE;
+        ctx.fillRect(px(P, 0.06 + i * 0.18), py(P, 0.2), P.w * 0.15, P.h * 0.32);
+      }
+      figure(P, 'dulchae', px(P, 0.15), py(P, 0.52), k, 'stand', { crop: 34, mood: 'parla' });
+      figure(P, 'jaemin', px(P, 0.87), py(P, 0.52), k, 'stand', { crop: 34, mood: 'fermo' });
       vignette(P, 0.5);
       speech(P, [
         { who: 'Jae-min', text: '«Mi hai seguito.»' },
@@ -332,14 +332,14 @@ export const PANNELLI = [
     draw(P) {
       const ctx = P.ctx;
       wash(P, '#3a414b', '#22272f', 1);
-      const y1 = py(P, 0.2);
-      const y2 = py(P, 0.38);
+      const y1 = py(P, 0.14);
+      const y2 = py(P, 0.3);
       // Due braccioli d'acciaio su plastica arancione, a sinistra e a destra.
       for (const [x, w] of [[px(P, 0.04), P.w * 0.4], [px(P, 0.56), P.w * 0.4]]) {
         ctx.fillStyle = ORANGE;
-        ctx.fillRect(x, py(P, 0.1), w, P.h * 0.4);
+        ctx.fillRect(x, py(P, 0.05), w, P.h * 0.36);
         ctx.fillStyle = '#c96a1c';
-        ctx.fillRect(x, py(P, 0.46), w, P.h * 0.04);
+        ctx.fillRect(x, py(P, 0.38), w, P.h * 0.04);
         ctx.fillStyle = '#7b8592';
         ctx.fillRect(x, y1 + P.h * 0.03, w, P.h * 0.03);
         ctx.fillRect(x, y2 + P.h * 0.03, w, P.h * 0.03);
@@ -377,12 +377,13 @@ export const PANNELLI = [
       ctx.textAlign = 'center';
       ctx.fillText('출구', px(P, 0.69), py(P, 0.1));
       ctx.textAlign = 'left';
-      figure(P, 'dulchae', px(P, 0.69), py(P, 0.5), unitScale(P, 0.26, 50), 'back', { crop: 50 });
+      figure(P, 'dulchae', px(P, 0.69), py(P, 0.45), unitScale(P, 0.24, 50), 'back', { crop: 50 });
       const w = P.w * 0.07;
       const gap = P.w * 0.012;
       const x0 = px(P, 0.04);
-      filaSedie(P, x0, py(P, 0.8), 6, w, gap);
-      figure(P, 'jaemin', x0 + 4 * (w + gap) + w / 2, py(P, 0.8) + w * 0.1, unitScale(P, 0.3, 40), 'seat', { crop: 40, mood: 'giu' });
+      const yy = py(P, 0.66);
+      filaSedie(P, x0, yy, 6, w, gap);
+      figure(P, 'jaemin', x0 + 4 * (w + gap) + w / 2, yy + w * 0.1, unitScale(P, 0.3, 40), 'seat', { crop: 40, mood: 'giu' });
       vignette(P, 0.5);
       speech(P, [
         { who: 'Dulchae', text: '(senza voltarsi) «Portati una giacca. A Jeju piove poco, ma di notte tira.»' },

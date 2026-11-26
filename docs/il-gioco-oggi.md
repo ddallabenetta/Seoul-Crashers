@@ -140,3 +140,11 @@ molo. Sul cemento della darsena ci sono nove oggetti, e 까치 si corregge per l
 le vie larghe, e da vicino guida a vista come sempre: davanti al Han e alle baie di Busan non si pianta più a
 guardarti. Le guardie di un cortile preso ti vengono dietro a ventaglio, rispondono a chi ti spara, e lasciano
 stare la divisa finché non ti ha a tiro.
+
+**E a Busan, di notte, qualcuno aspetta** (§5.46). Il terminal dei traghetti di 부산항 ha una sala d'attesa con tre file
+di sedie arancioni e un distributore acceso. Fra le due e mezza e le quattro e dieci, dopo il molo di M10, sulla fila di
+mezzo è seduto un uomo con il tuo stesso bomber: chi si siede tre sedie più in là vede quattro tavole, e poi lo vede
+alzarsi e uscire camminando. Nessuno lo segnala, e niente impedisce di sparargli. Lo stesso vale nel cortile cieco di
+M8, dove adesso se ne va a piedi davanti a te, e il gioco si ricorda in silenzio se l'hai lasciato andare. Al 당구장
+Chun-sik ordina due 짜장면 prima della Gyeongbu e uno dopo. Sulla `91.45` ci sono la Gyeongbu fatta da soli e la prima
+volta a Busan, dove 까치 si corregge al contrario: «Dice».
