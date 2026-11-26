@@ -83,7 +83,12 @@ Le chiamate in tabella sono adesso **diciotto**.
   flag. Poi da capo: alle tre lui c'è già, gli si spara con la pistola vera, il conto dice `busan` e
   sopravvive a un giro di `snapshot`/`restore`. Fa due scatti in più (`g1b-1-sala`, `g1b-2-se-ne-va`).
 - `atto-2.scene`, in M8: intoccabile prima dei pannelli, poi cammina, e colpito conta `m8`. La voce
-  `m8DulchaeSeNeVa` ha cambiato significato: prima voleva dire «sparito», adesso vuol dire «cammina».
+  `m8DulchaeSeNeVa` ha cambiato significato: prima voleva dire «sparito», adesso vuol dire «cammina». Dopo lo
+  sparo la scena azzera il ricercato: con le stelle addosso i tornelli restano chiusi, e due voci della
+  chiamata 13, molto più giù, cadevano senza nessun difetto nel gioco.
+- Regressione, due probe per volta al massimo: `impianto-campagna`, `missioni-run`, `kkachi`, `cortili`,
+  `atto-1`, `atto-2`, `atto-3`, `arresto`, `guardie`, `walkers-census` (`dentroLamiera` 0) e `cutscene-run`
+  con `--menu` (19 su 19). Tutte passano.
 - `kkachi.scene`: la 17 non parte prima di M10, parte dopo; la 18 parte a Busan e si corregge al contrario.
 - `cutscene-sheet` e `cutscene-panel` accettano `terminale`. Le miniature hanno mostrato che in tre tavole
   su quattro il riquadro delle battute copriva le figure e le mani: la composizione adesso sta nella metà

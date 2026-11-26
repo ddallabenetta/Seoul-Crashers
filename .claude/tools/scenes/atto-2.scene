@@ -1039,6 +1039,9 @@ async function arrestoVero(at) {
   }
   await wait(0.3);
   out.m8OccasioneContata = !!dc?.dead && M.flag('dulchaeUcciso') && M.flag('dulchae@m8');
+  // Gli spari lasciano stelle addosso, e con le stelle i tornelli della metro (chiamata 13, più giù) restano chiusi.
+  game.wanted.reset();
+  game.police.standDown(game, true);
   game.shops.leave(game);
   await wait(0.6);
   out.m8Completata = M.isDone('m8') && M.flag('dulchae') && M.flag('sorella');
