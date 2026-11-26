@@ -53,6 +53,21 @@ function sites(game) {
   return M1._sites;
 }
 
+/** Chun-sik al suo sgabello del 당구장. Lo rimette anche `story/visite.js` dopo un caricamento. */
+export function defineChunsik(game) {
+  const s = sites(game);
+  if (!s.pool) return null;
+  game.actors.define('chunsik', {
+    indoor: true, shop: s.pool.id, level: s.pool.level,
+    kind: 'gangster', name: 'Chun-sik', hangul: '안춘식',
+    angle: Math.PI / 2,
+    place: (f) => ({ x: f.till.x - 62, y: f.till.y + 8 }),
+  });
+  return s.pool;
+}
+
+export const poolSite = (game) => sites(game).pool;
+
 function pay(ctx, amount, reason) {
   ctx.game.player.money += amount;
   ctx.toast(`${reason} · ${won(amount)}`, 3);
@@ -402,12 +417,7 @@ export const M1 = {
         ctx.mark(s.pool.x, s.pool.y, { label: '당구장' });
         // Adesso, e non a inizio missione: la prima volta la sala era di chi
         // gioca, e Chun-sik seduto lì dentro sarebbe stato uno dei quattro.
-        game.actors.define('chunsik', {
-          indoor: true, shop: s.pool.id, level: s.pool.level,
-          kind: 'gangster', name: 'Chun-sik', hangul: '안춘식',
-          angle: Math.PI / 2,
-          place: (f) => ({ x: f.till.x - 62, y: f.till.y + 8 }),
-        });
+        defineChunsik(game);
         ctx.on('shopEnter', (shop) => { if (shop.id === s.pool.id) ctx.next(); });
       },
     },

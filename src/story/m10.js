@@ -520,6 +520,8 @@ export const M10 = {
             c.talk([
               { text: '고은비 · Ko Eun-bi, 철마파. Compra e vende informazioni come le gomme: a chiunque paghi.' },
               { text: 'Ha già sollevato la berlina sul ponte e smonta una ruota prima che si dica niente.' },
+              // Origine della chiamata 17 (`story/kkachi.js`): il copione la dà a Ko, e Ko non la diceva.
+              { who: 'Ko', text: '«Viene da Seoul. Quattrocento chilometri e non cambia niente: è tutto lo stesso paese, e questo è il problema. Non c\'è un posto dove non arrivano.»' },
               { who: 'Ko', text: '«Alle sei devo dire a 한성개발 che lei è a Busan. Pagano come paga lei, e io non scelgo.» (avvita) «Sono le quattro. Vada piano verso una cosa veloce.»' },
             ], () => {
               c.flag('hanseongSa');

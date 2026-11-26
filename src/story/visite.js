@@ -6,8 +6,8 @@
 // sono un personaggio che c'è sempre, nello stesso posto, e che dice una cosa diversa.
 //
 // Quella di Jo Ok-bun è la prima, perché M6 è la prima missione che la rende possibile. La
-// seconda è **il commesso del 편의점 di Itaewon dopo M8** (§5.42). Chun-sik dopo M9 viene con la
-// sua missione.
+// seconda è **il commesso del 편의점 di Itaewon dopo M8** (§5.42). La terza è **Chun-sik dopo M9**
+// (tappa G1b, §5.46).
 //
 // **Il punto è fisso, non di fase** (`MissionSystem.standing`): una fase sta in piedi finché
 // la missione è in corso, e Jo sta dietro il suo banco per tutta la partita. E come per
@@ -16,6 +16,7 @@
 // quella che il giocatore deve comporre da solo — è una delle tre condizioni del finale C
 // (`06-finali-ed-epilogo.md`).
 import { defineJo, sites as sitiM2 } from './m2.js';
+import { defineChunsik, poolSite } from './m1.js';
 import { findShop } from './places.js';
 
 /**
@@ -86,6 +87,49 @@ export function attachVisite(game) {
       { who: 'Commesso', text: '«Ah, lei è l\'altro.»' },
       { text: 'Alza gli occhi dal telefono, lo guarda un secondo, e li riabbassa.' },
     ]);
+  });
+
+  // **Chun-sik al 당구장.** Prima di M9 ordina per due e parla di Dong-hyeok al presente; dopo, per uno
+  // e al passato, con la sola riga del copione. Scelte nostre, prese con l'utente: dopo M9 resta a
+  // Busan (scende a 서면), quindi **al suo sgabello non c'è** finché M10 non è finita — il tempo di un
+  // treno —; e come Jo è un punto da premere, non una battuta che parte da sola.
+  const lontano = () => M.active === 'm9' || M.active === 'm10' || (M.isDone('m9') && !M.isDone('m10'));
+  const chunsik = () => {
+    if (!M.isDone('m1') || game.actors.isDead('chunsik')) return;
+    if (lontano()) { game.actors.undefine('chunsik'); return; }
+    if (!game.actors.defs.has('chunsik')) defineChunsik(game);
+  };
+  M.afterRestore(chunsik);
+  game.on('missionStart', chunsik);
+  game.on('missionDone', chunsik);
+  const ordine = {
+    id: 'chunsik-visita', key: 'E', text: 'parla con Chun-sik', reach: 50, x: 0, y: 0,
+    when: () => {
+      const s = poolSite(game);
+      if (s) { ordine.shop = s.id; ordine.level = s.level; }
+      return !!s && M.isDone('m1') && !lontano() && !!game.actors.get('chunsik');
+    },
+    run: (ctx) => {
+      if (!M.isDone('m9')) {
+        ctx.talk([
+          { text: 'Chun-sik ordina al telefono: due 짜장면, uno senza cipolla.' },
+          { who: 'Chun-sik', text: '«Quello senza cipolla è di tuo padre. Lo prende sempre così.»' },
+        ]);
+        return;
+      }
+      ctx.talk([
+        { text: 'Chun-sik ordina al telefono un 짜장면. Uno solo, e riattacca.' },
+        { who: 'Chun-sik', text: '«Tuo padre lo prendeva senza cipolla.» (pausa) «Adesso lo posso dire.»' },
+      ]);
+    },
+  };
+  M.standing(ordine);
+  game.on('floorShown', (shop, idx, f) => {
+    const s = poolSite(game);
+    if (!s || shop.id !== s.id || idx !== s.level) return;
+    const p = game.actors.get('chunsik');
+    ordine.x = p ? p.x : f.entry.x;
+    ordine.y = p ? p.y + 22 : f.entry.y;
   });
 
   // Jo sta dove `actors` l'ha messa, non dove pare a noi: la posizione si riprende a ogni

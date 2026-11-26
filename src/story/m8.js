@@ -935,6 +935,8 @@ export const M8 = {
         });
         ctx.on('floorShown', (shop, idx, f) => {
           if (shop.id !== s.porta.id || f.biz.id !== 'yard') return;
+          // Prima dei pannelli è intoccabile, come in strada: l'occasione viene dopo, quando se ne va.
+          for (const p of f.people) if (p.actor === 'dulchae-cortile') { p.hp = 9999; p.maxHp = 9999; }
           ctx.state.visto = true;
           ctx.state.t = 0;
           ctx.unmark();
@@ -954,26 +956,45 @@ export const M8 = {
     panelPhase('m8-chiusura', CHIUSURA),
 
     {
-      // Il cortile è vuoto: lui se n'è andato camminando, e le telecamere restano. Si esce dalla
-      // stessa porta, con le stelle che aspettano fuori.
+      // **La prima occasione** (`story/dulchae.js`). Tavola 9: «Dulchae potrebbe sparare. Non lo fa. Se
+      // ne va camminando.» E lo fa davvero: attraversa il cortile fino all'unica porta, passando accanto
+      // a chi è entrato. Adesso è un uomo qualunque, con le ferite di un uomo qualunque, e **il gioco non
+      // dice niente**. Arrivato alla porta sparisce — non esce in strada: lì c'è la polizia, e cerca te.
       id: 'fuori',
       hint: 'Esci dal cortile: fuori c\'è la polizia',
       enter(ctx) {
         const game = ctx.game;
         const s = sites(game);
         ctx.unmark();
-        game.actors.undefine('dulchae-cortile');
         const f = game.shops.floor;
-        if (game.indoors && f?.biz.id === 'yard') {
-          for (const p of f.people.slice()) {
-            if (p.actor !== 'dulchae-cortile') continue;
-            const i = f.people.indexOf(p);
-            if (i >= 0) f.people.splice(i, 1);
-          }
-          game.pedGrid.rebuild(game.peds);
+        const d = game.indoors && f?.biz.id === 'yard' ? f.people.find((p) => p.actor === 'dulchae-cortile' && !p.dead) : null;
+        if (d) {
+          d.hp = 30;
+          d.maxHp = 30;
+          d.home = { x: f.entry.x, y: f.entry.y - 12 };
+          d.baseSpeed = 58;
+          ctx.state.via = true;
+        } else {
+          game.actors.undefine('dulchae-cortile');
         }
         ctx.on('shopLeave', (shop) => { if (shop.id === s.porta.id) ctx.next(); });
         if (!game.indoors) ctx.next();
+      },
+      tick(dt, ctx) {
+        const game = ctx.game;
+        const f = game.shops.floor;
+        if (!ctx.state.via || !game.indoors || !f) return;
+        const d = f.people.find((p) => p.actor === 'dulchae-cortile');
+        if (!d || d.dead) { ctx.state.via = false; return; }
+        if (dist(d.x, d.y, d.home.x, d.home.y) > 16) return;
+        f.people.splice(f.people.indexOf(d), 1);
+        game.pedGrid.rebuild(game.peds);
+        game.actors.undefine('dulchae-cortile');
+        ctx.state.via = false;
+      },
+      leave(ctx) {
+        // Chi esce prima di lui non lo ritrova: è uscito da un'altra parte, e da morto resta lì.
+        if (!ctx.game.actors.isDead('dulchae-cortile')) ctx.game.actors.undefine('dulchae-cortile');
       },
     },
   ],
