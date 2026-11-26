@@ -335,6 +335,18 @@
 | Fine della scorta | `GUARD_TUNE.leave` | a 70 px oltre il recinto (isteresi) |
 | Un ostile «è nel cortile» · un agente è ostile | `GUARD_TUNE.foeMargin` · `copRange` | recinto +70 px · solo se ha il giocatore a meno di 340 px, ricercato, e non sta ammanettando |
 | Ingaggio delle guardie | `GUARD_TUNE.hold` · `range` | 150 px · 330 px (`life.engage`) |
+| Peso delle vie non arteriali per le volanti | `CHASE.side` | 1,6. A 1 (A* puro) Busan era più lenta del greedy; 2,5 e 4 non si separano da 1,6 nel rumore di sei prove |
+
+| **— l'Atto III, M9 e M10 (§5.43) —** | | |
+| Alba di M9 · finestra | `m9.ALBA` · `ALBA_DA`–`ALBA_A` | 05:10 · da 05:01 alle 09:00 (dopo, si aspetta il giorno dopo) |
+| Nebbia della Gyeongbu | `m9.nebbia` | 0,82 alla prima area di servizio, zero a metà strada; `dayCycle.fog` segue a 0,35/s |
+| Convoglio | `CONVOGLIO_X` · `_DAVANTI` · `_VEL` · `SUPERATO` | parte a x 9300 · 950 px davanti · 150 px/s · superato a 620 px |
+| Blocco all'ingresso di Busan | `BLOCCO_RAGGIO` · stelle | 1500 px · quattro (heat 92) |
+| Riga del passeggero | `passenger` `BASE` · `PER_CHAR` · `MIN`–`MAX` · `GAP` | 1,7 s + 0,04 s a carattere, fra 2,2 e 8 s · 0,5 s fra due righe |
+| Ko riceve | `m10.KO_DA`–`KO_A` | 15:30–17:00 (si aspetta le 16:00) |
+| Corsa in baia | `PARTENZA` · `RISATA_A` · `COLPO_DOPO` · `SOGLIA_SCAFO` | stelle a 380 px dal molo · risata a 1250 px dal ponte · colpo 3,2 s dopo · scafo mai sotto 22 |
+| Rotta delle motovedette | `boatnav` `CELL` · `SIDE` · `PYLON_MARGIN` | griglia 96 px · acqua a 34 px dai quattro lati · piloni chiusi a 60 px; ricalcolo ogni 0,45–0,75 s |
+| Gomma elastica delle motovedette | `v.pace` | 1 + (d − 520)/1600, fino a 1,3 |
 
 | **— l'Atto II, seconda metà (§5.42) —** | | |
 | Fascia del fermo di M7 | `m7.SERA` · mezzanotte | si può farsi arrestare dalle **20:00 alla mezzanotte**; prima si aspetta, dopo «il fermo è chiuso» e si riparte da domani sera. Con le sei ore del `bustPlayer` l'uscita cade fra le 02 e le 06 |

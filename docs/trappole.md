@@ -154,6 +154,26 @@ partenza (§5.44).
 c'è, la distanza non cala, e lo speronamento (`tier.ram`) punta dritto nell'acqua. Il segnale è `ai.stallT` (3,5 s senza
 guadagnare 30 px), e finché dura lo speronamento è sospeso (§5.44).
 
+**L'A* più corto non è il più veloce per chi insegue.** A Busan (strade di `netgen`, §5.41) il percorso più corto passa per
+stradine tortuose, e un'auto civile ferma su un arco di 80 px tappa la volante per dieci secondi: su sei prove per posto
+l'A* puro arrivava *dopo* il greedy che c'era prima. `route.solve(…, side)` pesa gli archi non arteriali (`CHASE.side`,
+§5.44). Il segno era una volante con `pathOn` acceso, `stallT` che sale e velocità zero, non un percorso sbagliato.
+
+**Una guardia del cortile tuo colpita da un nemico scappava.** `hurt` manda in `flee` chiunque non sappia reagire, e la
+scorta si svuotava al primo colpo: ora resta e risponde (§5.44). Nelle scene, una guardia sul bordo del cortile **schiva le
+auto** come ogni passante (2,4 s di `flee`): «tornano alla ronda» si controlla aspettando, non in un fotogramma.
+
+**In una scena, `respawnPlayer()` da solo non è una morte.** Il conto (`stats.deaths`) lo fa `onPlayerDeath()`, e le
+missioni che riprendono «dall'ultima area di servizio» (M9) lo leggono: senza, la ripresa non scatta e la prova passa per
+la ragione sbagliata (§5.43).
+
+**Un carico perso in mare restava in mezzo alla baia** (§5.43): `carry.fall` lo posava dov'era il giocatore. Ora cade sul
+punto asciutto più vicino (`carry.landNear`), per tutte le missioni.
+
+**Le miniature di `cutscene-sheet` mentono sulle sovrapposizioni.** Scalate, le righe dei pannelli sembrano accavallarsi al
+riquadro del narratore; a grandezza vera (`cutscene-panel`) no. Un difetto visto in miniatura si conferma sul pannello
+singolo prima di correggerlo (§5.43).
+
 ## 4bis. Chiuso: il traffico si muoveva male
 
 **Segnalazione dell'utente:** *«il traffico si muove spesso in modo strano e fanno molti
