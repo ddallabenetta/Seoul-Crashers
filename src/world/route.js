@@ -173,9 +173,10 @@ export class RouteGuide {
    * `avoid` (opzionale) è un arco che dal nodo di partenza non si può riprendere:
    * lo usa la polizia, che parte dal nodo *davanti* alla volante e non può rientrare
    * per la strada da cui sta arrivando. `into` (opzionale) è un array in cui scrivere gli
-   * *id* dei nodi del percorso invece di restituire i nodi.
+   * *id* dei nodi del percorso invece di restituire i nodi. `side` (≥ 1) moltiplica la
+   * lunghezza degli archi non arteriali: chi insegue preferisce le vie larghe (§5.44).
    */
-  solve(graph, start, goal, avoid = null, into = null) {
+  solve(graph, start, goal, avoid = null, into = null, side = 1) {
     if (!start || !goal) return null;
     const nodes = graph.nodes;
     const n = nodes.length;
@@ -222,7 +223,7 @@ export class RouteGuide {
         // `out` guarda l'arco dal proprio capo: con `dir` 1 l'altro estremo è `b`.
         const nb = o.dir > 0 ? o.edge.b : o.edge.a;
         if (closed[nb] === gen) continue;
-        const ng = base + o.edge.len;
+        const ng = base + (o.edge.arterial ? o.edge.len : o.edge.len * side);
         if (seen[nb] === gen && g[nb] <= ng) continue;
         seen[nb] = gen;
         g[nb] = ng;

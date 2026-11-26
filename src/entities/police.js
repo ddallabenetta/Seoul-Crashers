@@ -113,6 +113,9 @@ export const CHASE = {
   every: 1.0,     // secondi massimi fra due calcoli della stessa volante
   perFrame: 1,    // calcoli A* concessi a tutta la polizia in un frame: mai a grappolo
   stall: 3.5,     // secondi senza avvicinarsi di 30 px: il greedy è in un minimo locale
+  // Peso delle vie non arteriali nell'A*: il più corto a Busan passa per stradine tortuose in cui
+  // un'auto ferma tappa tutto, e lì il greedy (che resta sulle vie larghe) arrivava prima.
+  side: 1.6,
 };
 
 /** True se il punto è fuori dal rettangolo inquadrato (con margine). */
@@ -1171,7 +1174,7 @@ export class PoliceSystem {
     const goal = graph.nearestNode(tx, ty);
     // `avoid`: dal nodo davanti non si rientra per l'arco da cui si arriva (niente U).
     const buf = ai.pathBuf || (ai.pathBuf = []);
-    const ids = game.route.solve(graph, start, goal, ai.edge, buf);
+    const ids = game.route.solve(graph, start, goal, ai.edge, buf, CHASE.side);
     const cs = this.chaseStats;
     const ms = performance.now() - t0;
     cs.n++; cs.ms += ms; cs.frameMs += ms;
