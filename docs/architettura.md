@@ -18,7 +18,10 @@ src/core/
   tail.js             il pedinamento: due soglie di distanza, due serbatoi, e due eventi
                       sul bus — non sa **chi** stia seguendo chi
   carry.js            l'oggetto di missione che si porta in mano, e che morendo si perde
-                      per terra invece di sparire
+                      per terra (sulla riva più vicina, se si muore in acqua) invece di sparire
+  passenger.js        il passeggero che parla mentre si guida: una coda di righe che scorre
+                      da sola solo in macchina, `phone` e `hush` (§5.43) — terzo modo di
+                      parlare, dopo il dialogo e 까치
   audio.js            sintetizzatore WebAudio: colpi secchi + letti continui, mix, muto
   music.js            musica generata: tema del menu, caccia, apertura, stacchi — e la regia
   radio.js            stazioni coreane in streaming (`<audio>`, fuori dal grafo audio)
@@ -77,6 +80,8 @@ src/entities/
   pickups.js          armi/munizioni/kit medici a terra, con ricomparsa
   wanted.js           heat, 5 livelli di ricercato, raffreddamento a vista
   police.js           pattuglie, volanti, sbarchi, posti di blocco, chiodi, SWAT, elicottero
+  boatnav.js          la rotta delle motovedette: griglia d'acqua e visita in ampiezza, solo
+                      per sapere da che parte girare quando la retta è bagnata (§5.43)
   projectiles.js      esplosivi con proiettili veri: granate, molotov, mine, onda d'urto
   shops.js            interni: entrata/uscita, piani, gente dentro, casse, listini, officine
   turfs.js            i cortili delle bande: chi comanda, come si conquista, la busta
@@ -96,6 +101,7 @@ src/ui/
   text.js             a capo automatico e paragrafi: corpo fisso, misura condivisa
   cutscene.js         il lettore di pannelli: avanzamento, stacchi, salto con ESC
   dialogue.js         due che parlano senza uscire dal gioco: mondo fermo, città a schermo
+  passengercall.js    il riquadro del passeggero e della chiamata al telefono (§5.43)
   radiocall.js        il riquadro di 까치: quadrante, una battuta, e sotto il fruscio
 
 src/story/
