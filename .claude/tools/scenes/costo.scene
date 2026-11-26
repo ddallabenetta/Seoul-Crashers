@@ -126,6 +126,7 @@ try {
     g.camera.snapTo(g.player.x, g.player.y);
     const frames = [];
     const per = {};          // label -> ms di ogni frame misurato
+    const modi = {};         // in che modalità erano i frame misurati: fuori da `play` non si misura la città
     let prev = {};
     for (let f = 0; f < WARM + FRAMES; f++) {
       if (extra?.guida) guida(f);
@@ -136,6 +137,7 @@ try {
       g.render();
       if (f >= WARM) {
         frames.push(performance.now() - t0);
+        modi[g.mode.id] = (modi[g.mode.id] || 0) + 1;
         for (const k in acc) { per[k].push(acc[k] - (prev[k] || 0)); prev[k] = acc[k]; }
       }
     }
@@ -166,6 +168,7 @@ try {
       msPerFrame: r,
       msMedia: { 'update.TOT': media['update.TOT'], 'render.TOT': media['render.TOT'] },
       frame: { media: +(frames.reduce((x, y) => x + y, 0) / frames.length).toFixed(2), mediana: +q(frames, 0.5).toFixed(2) },
+      modi,
       popolazione: {
         veicoli: g.vehicles.length, pedoni: g.peds.length, volanti: g.police.cops?.length ?? null,
         stelle: g.wanted.level,

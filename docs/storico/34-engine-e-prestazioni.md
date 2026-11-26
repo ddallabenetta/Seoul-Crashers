@@ -44,6 +44,23 @@ frame e non il frame singolo.
 - **`won()`** chiamava `toLocaleString` a ogni frame con lo stesso numero, per l'HUD: una cache
   piccola, svuotata sopra 512 voci.
 
+### Quanto si è guadagnato
+
+Tre coppie in parallelo, albero prima di T4 contro albero dopo (che contiene anche G1 e la correzione delle
+guardie: di G1 nel disegno c'è solo il velo della nebbia, che fuori da M9 è spento), mediana delle tre, ms di JS per frame:
+
+| Scenario | `update` totale | `render.scena` | Nota |
+| --- | --- | --- | --- |
+| centro | 0,67 → 0,61 | 11,4 → 12,4 | il disegno oscilla di ±1 ms fra coppie: pari |
+| inseguimento | 0,84 → 0,81 | 18,6 → 16,8 | è qui che le macchie fuori campo pesano: −1,7 ms |
+| notte | 0,37 → 0,37 | 14,4 → 12,3 | una coppia su tre rumorosa (19 contro 12) |
+
+**Il guadagno è piccolo**, e onestamente fuori dal rumore solo nell'inseguimento. Era quello che la misura
+diceva prima di toccare niente: il JS della simulazione sta sotto il millisecondo, e il resto è disegno su
+canvas, che in headless costa molto più che su una GPU. Lo scenario `busan` in due coppie su tre aveva
+misurato una modalità diversa da `play` per un blocco intero (tutto a zero): la scena adesso scrive `modi`, il
+conto dei frame per modalità, e un risultato vale solo se è `play: 800`.
+
 ## 3. Tre rami in meno in `main.js`
 
 `main.update` aveva tre rami scritti a mano (cutscene, titolo, dialogo) e `main.render` due. Ora

@@ -18,8 +18,18 @@ sigillate, marcatori, testo su più righe). Quello che resta è **contenuto**, i
 | ~~4~~ | ~~**D**~~ | ~~Kkachi: stazione `91.45`, tabella con predicato, le otto chiamate dell'Atto I e le dodici righe di servizio~~ — **fatta**, §5.32 | — |
 | ~~5~~ | ~~**E**~~ | ~~Atto I completo (M3, M4) + R1~~, e con loro **pedinamento** e **oggetto trasportabile** — **fatta**, §5.33 | — |
 | ~~6~~ | ~~**F**~~ | ~~Atto II (M5-M8) + R2, R3 + le otto chiamate dell'Atto II~~ — **fatta**, §5.40 (M5, M6, R2, tre chiamate, Jo) e §5.42 (M7, M8, R3, le altre cinque chiamate, il commesso) | — |
-| 7 | **G** | Atto III (M9-M12) + R4 + le otto chiamate dell'Atto III **e l'incontro facoltativo di Busan** | il viaggio: ha bisogno di tutto quello di prima |
-| 8 | **H** | i tre finali, i titoli di coda, la scena dopo | e a quel punto la Fase 3 è chiusa |
+| ~~7~~ | ~~**G1**~~ | ~~M9 «Gyeongbu» e M10 «자갈치»~~, e con loro **il passeggero che parla**, **la nebbia** e **le motovedette che girano la costa** — **fatta**, §5.43 | `atto-3.scene` |
+| 8 | **G1b** | **l'incontro facoltativo di Busan** («Le sedie arancioni», fra M10 e M11: la sala `waiting` e i suoi mobili ci sono già, manca `story/terminale.js`); **Chun-sik dopo M9** (ordina per uno e parla al passato: `missions.standing`, §5.40); **il conto delle occasioni su Dulchae** (la terza condizione del finale C: la prima occasione è in M8, la seconda è questo incontro); **le chiamate 17 e 18** di 까치 (la 17 si innesca «da solo», che con il passeggero è già vero: `passenger.aboard` zittisce la radio) | `atto-3.scene` allungata in coda, `kkachi.scene` per le due chiamate |
+| 9 | **G2** | **M11** «Il traghetto delle 04:10» (Jeju via mare: ci si arriva solo così), **R4** «Il quarto salvataggio», **M12** «한성», e le chiamate 19-24 (la 22 legge gli slot di salvataggio, la 24 è l'ultimo viaggio). M12 legge `stats.deaths` per le fatture del 병원 e alza il flag `m12`, che fa partire la scena dopo, già cablata | `atto-3.scene` fino in fondo; il viaggio a Jeju va guidato a mano una volta |
+| 10 | **H** | i tre finali (A, B, e C con le sue tre condizioni, nessuna segnalata: la domanda giusta a Jo dopo M6, venti chiamate su ventiquattro, **Dulchae mai ucciso** nelle tre occasioni — M8, l'incontro di Busan, l'assedio di M12), i **titoli di coda** (con le chiamate perse di 까치: è l'unico posto in cui compaiono; una modalità con `frame` in `core/modes.js`, §5.45) e la scena dopo | una scena `finali.scene` che arriva ai tre finali da tre salvataggi preparati; e a quel punto la Fase 3 è chiusa |
+
+**Come si lavora su queste tappe** (dalla chiusura della PR #30): **una tappa, un ramo da `main`, una PR**. La
+PR si apre quando la tappa comincia e si chiude quando passano le sue scene e le scene di regressione:
+`impianto-campagna`, `missioni-run`, `kkachi`, `cortili`, `atto-1`, `atto-2`, `atto-3`, `arresto`, `guardie`,
+`walkers-census`, `cutscene-run` (con `--menu`), più `regioni-census` se si tocca la geografia. Due per volta al
+massimo: con tre probe in parallelo `atto-1`, `arresto` e `guardie` danno falsi `false` (sotto, «Scene che a volte
+falliscono»). I pannelli nuovi si guardano con `cutscene-sheet` **e** `cutscene-panel`, perché le miniature
+ingannano (`docs/trappole.md`).
 
 **Il filo del 병원 è fatto** ([`storia/09-ospedale.md`](storia/09-ospedale.md), §5.29): è stato
 agganciato alla B come previsto, e da adesso si accumula. Il conto delle morti **non è un
@@ -197,11 +207,26 @@ il §5.21 altre undici — fra cui le due che erano tornate in cima.
 - `atto-1.scene` → `gruSiSale` e `arresto.scene` → `attraversaLeFasi`/`campione9su10` sono falliti una volta ciascuno
   con la macchina carica di altri probe, e passano alla riprova (tre su tre anche su `main`). Aspettano a tempo
   di orologio, non di simulazione: vanno portate a passi di `game.loop` prima di farne un controllo di CI.
+- Alla chiusura del rework (tre probe in parallelo): di nuovo `gruSiSale`, `campione9su10` (8/10, con un agente che
+  muore durante la camminata o una camminata che non arriva alla volante: succede anche sull'albero prima di G1,
+  9/10) e una volta `guardie` → `poliziaNonPerPrime`. Da sole passano. `guardie.scene` è stata resa ripetibile
+  (§5.44); le altre due no.
 
 **Rimasto indietro dalle cuciture** (§5.38):
 - **Fra l'ultimo isolato di Seoul e il prato resta una striscia di terra scura** (~150 px a zoom 1, a sud e a est):
   la sfumatura parte da `GROUND_RIM` px dentro il confine dell'area, non dal bordo dell'ultimo isolato. Va
   ancorata agli isolati di bordo: è naturale farlo in T9c, che su quel bordo prolunga i viali in provinciali.
+
+**Rimasto indietro dalla polizia** (§5.44):
+- **Di là dalla baia di Busan la volante arriva ancora più tardi del greedy di prima** (Gwangalli: ~34 s contro ~27,
+  con molto rumore; Haeundae è pari e Seoul è molto meglio, 10 s contro 17). Il resto del tempo è traffico civile
+  fermo sulle stradine di `netgen`: la prossima cosa da provare è una volante che **sorpassa o spinge** un'auto
+  ferma davanti, non un altro peso sull'A*.
+
+**Rimasto indietro dall'Atto III, prima parte** (§5.43):
+- La scena teletrasporta lungo la Gyeongbu: **il viaggio vero da Seoul a Busan va guidato a mano** una volta,
+  con Chun-sik a bordo, prima di chiudere l'atto. È anche il posto giusto per sentire se la coda delle righe
+  regge quattrocento chilometri.
 
 **Rimasto indietro dai cortili** (§5.31):
 - **Le guardie del cortile tuo ti seguono ma non si possono chiamare** (§5.44): ti scortano e ti

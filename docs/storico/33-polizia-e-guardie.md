@@ -21,7 +21,8 @@ però, la scelta locale migliore è la riva: la volante ci arriva, la distanza s
 e lo speronamento (`tier.ram`, che punta in linea d'aria quando c'è vista) la manda dritta nel Han.
 
 Adesso la volante tiene un **percorso A*** sul grafo (`route.solve`, lo stesso del §5.30), e
-`chooseEdge` lo segue quando c'è. Si accende in due casi:
+`chooseEdge` lo segue quando c'è. Gli archi non arteriali pesano `CHASE.side` volte la loro lunghezza: chi
+insegue preferisce le vie larghe, perché su una stradina un'auto ferma tappa tutto. Si accende in due casi:
 
 - **da lontano**: oltre `CHASE.near` (520 px) dal bersaglio, e si spegne sotto il 70% di quella
   distanza (isteresi). Da vicino la guida diretta è più reattiva, e un percorso rifatto ogni
@@ -85,8 +86,27 @@ La ronda (`postX`, `idleT`) usava `Math.random`: adesso usa `this.rng`, come il 
   `nonTiBloccano` e `nonHostili`: una scorta che ti impedisce di passare, o che dopo il tuo
   sparo diventa ostile, è peggio di nessuna scorta.
 
+### I numeri
+
+`inseguimento.scene` sull'albero di partenza (greedy puro) e su quello finale (A* con `side` 1,6), una passata
+intera per albero, secondi di gioco al primo contatto e secondi persi in un minimo locale:
+
+| Gruppo | Greedy | A* |
+| --- | --- | --- |
+| Seoul, vicino (10 prove) | 17,5 s · 5,4 s persi | **10,2 s · 0,6 s persi** |
+| di là da un fiume o una baia (4) | 31,0 s · 1 non arrivata | 34,1 s · 2 non arrivate |
+| Busan (4) | 38,1 s · 1 non arrivata | 29,3 s · 1 non arrivata |
+
+L'A* **puro** (senza `side`) a Busan andava peggio del greedy: su sei prove per posto, Haeundae 31 s contro 23 e
+Gwangalli 45 contro 27, con una volante che non arrivava. Il motivo e la correzione stanno in
+`docs/trappole.md`; dopo la correzione Haeundae è pari (26 s, 6/6) e Gwangalli scende a ~34 s. Lo scarto di là
+dalla baia resta nel backlog. Il rumore è grande: per un confronto, un posto solo (`__SOLO`) e `__REP = 3` su
+due alberi in parallelo. L'A* costa al massimo 0,2 ms in un frame.
+
 ## 4. Cose da sapere
 
+- **Una guardia colpita da un nemico resta e risponde** invece di scappare (prima la scorta si svuotava al
+  primo colpo). Una guardia sul bordo del cortile continua invece a schivare le auto come ogni passante.
 - **Le guardie non si chiamano.** Ti scortano solo dentro il cortile; un comando per mandarle da
   qualche parte è nel backlog (§6, «Rimasto indietro dai cortili»).
 - **Le motovedette** non sono toccate da questa tappa: per l'acqua c'è un navigatore a parte
