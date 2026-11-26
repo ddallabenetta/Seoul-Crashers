@@ -1288,6 +1288,9 @@ export class PedestrianSystem {
       // gira il ferro verso chi l'ha colpito. Senza questa riga la prima
       // pallottola scioglieva l'evento e restava una banda di gente che corre.
       if (source && source !== game.player) p.aggro = source;
+    } else if (GUARD_TUNE.escort && p.state === 'guard' && p.turf && game.turfs?.mine(p.turf)) {
+      // Una guardia del cortile tuo colpita da un nemico resta e risponde: l'ostile è già nel
+      // conto di `watchYard`. Con la fuga di prima la scorta si svuotava al primo colpo (§5.44).
     } else {
       p.panic = Math.max(p.panic, 5);
       p.fleeFromX = p.x - dx * 90;

@@ -24,6 +24,9 @@ const T = game.turfs;
 const shot = async (n) => { if (window.__shot) await window.__shot(n); };
 
 pl.damage = () => {};          // la scena prova le guardie, non la mira degli agenti
+// Niente cronaca nera di `life.js` durante la prova: una guerra che cade per caso su questo cortile
+// manda le guardie in `errand`, ed è una meccanica legittima ma non è quella che si prova qui.
+if (game.life) game.life.eventT = 1e9;
 pl.setWeapon('pistol');
 pl.onFoot = true;
 
@@ -130,6 +133,9 @@ const ids = crew().map((p) => p.id);
 tp(yard.cx, yard.y - 115);   // fuori dall'isteresi (70 px) ma vicino: più lontano lo streaming le porta via
 await wait(7);
 const rest = crew().filter((p) => ids.includes(p.id));
+// Una guardia sul bordo del cortile schiva un'auto che le punta addosso (2,4 s di `flee`, come ogni
+// passante): «tornano» vuol dire entro qualche secondo, non in questo fotogramma.
+for (let i = 0; i < 25 && !rest.every((p) => p.state === 'guard' && inside(p, 10)); i++) await wait(0.2);
 out.escono = rest.length > 0;
 out.nonTiSeguonoFuori = rest.every((p) => inside(p, 10));
 out.tornanoAllaRonda = rest.every((p) => p.state === 'guard');
