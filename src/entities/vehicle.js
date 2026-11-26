@@ -63,7 +63,8 @@ export function collisionCircles(v, spec = VEHICLE_TYPES[v.kind]) {
 
 export function vehicleTopSpeed(v) {
   const spec = VEHICLE_TYPES[v.kind];
-  return spec.topSpeed * (v.hp < spec.hp * 0.4 ? 0.75 : 1) * (v.flatTires ? 0.6 : 1);
+  // `pace` è la gomma elastica di una motovedetta rimasta indietro (`police.driveBoat`, §5.43).
+  return spec.topSpeed * (v.hp < spec.hp * 0.4 ? 0.75 : 1) * (v.flatTires ? 0.6 : 1) * (v.pace || 1);
 }
 
 /** Un velivolo è "in volo" quando ha staccato: sopra questa quota niente lo tocca. */
@@ -113,7 +114,9 @@ export function updateVehicle(v, dt, world) {
   // Accelerazione / frenata
   if (throttle > 0.01) {
     const boost = v.speed < 0 ? 2.2 : 1; // frenata da retro più decisa
-    v.speed += spec.accel * throttle * boost * dt;
+    // `pace`: la gomma elastica di una motovedetta (§5.43). La velocità massima è il punto in cui la
+    // spinta uguaglia la resistenza (accel / 0,42): per andare più forte bisogna spingere di più.
+    v.speed += spec.accel * (v.pace || 1) * throttle * boost * dt;
   } else if (throttle < -0.01) {
     if (v.speed > 6) {
       v.speed += spec.accel * throttle * 2.1 * (1 - wet * 0.14) * dt; // freno

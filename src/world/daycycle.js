@@ -121,6 +121,11 @@ export class DayCycle {
     this.wind = 0.1;
     this.flash = 0;    // lampo del temporale, in [0,1]
     this._flashT = 6;
+    // La nebbia bassa (M9, §5.43). Non è un meteo: non cambia luce, traffico né pioggia, e **non
+    // sta nel salvataggio** — la scrive una missione a ogni frame (`fogTarget`) e svanisce da sola
+    // appena nessuno la chiede, così un caricamento a metà viaggio non resta nella nebbia.
+    this.fog = 0;
+    this.fogTarget = 0;
     this.apply();
   }
 
@@ -182,6 +187,7 @@ export class DayCycle {
 
   update(dt) {
     if (!this.paused) this.step(dt);
+    this.updateFog(dt);
     this.apply();
   }
 
@@ -225,6 +231,13 @@ export class DayCycle {
     }
     this.flash = 0;
     this.apply();
+  }
+
+  /** La nebbia segue la richiesta, e ricade a zero se nessuno la rinnova. */
+  updateFog(dt) {
+    const want = this.fogTarget;
+    this.fogTarget = 0;
+    this.fog += Math.max(-dt * 0.35, Math.min(dt * 0.35, want - this.fog));
   }
 
   updateWeather(dt) {

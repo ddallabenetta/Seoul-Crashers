@@ -58,9 +58,33 @@ export class CarrySystem {
     this.dropped = null;
   }
 
+  /**
+   * Il punto asciutto e libero più vicino a (x, y). Chi muore su una barca lascia cadere la cassa
+   * **a riva** e non in mezzo alla baia: un oggetto che nessuno può raccogliere non è una perdita, è
+   * una missione senza uscita (M10, §5.43). In terraferma torna il punto stesso.
+   */
+  landNear(game, x, y) {
+    const city = game.city;
+    const wet = (px, py) => (city.isNavigable ? city.isNavigable(px, py) : city.isWater?.(px, py));
+    if (!wet(x, y)) return { x, y };
+    const free = (px, py) => !wet(px, py)
+      && !(city.solidGrid?.queryCircle(px, py, 18) || []).some((o) => px > o.x - 14 && px < o.x + o.w + 14 && py > o.y - 14 && py < o.y + o.h + 14);
+    for (let r = 40; r <= 2400; r += 40) {
+      const n = Math.max(12, Math.round(r / 18));
+      for (let i = 0; i < n; i++) {
+        const a = (i * Math.PI * 2) / n;
+        const px = x + Math.cos(a) * r;
+        const py = y + Math.sin(a) * r;
+        if (free(px, py)) return { x: px, y: py };
+      }
+    }
+    return { x, y };
+  }
+
   fall(game) {
     if (!this.item) return;
-    this.dropped = { item: this.item, x: this._x, y: this._y };
+    const at = this.landNear(game, this._x, this._y);
+    this.dropped = { item: this.item, x: at.x, y: at.y };
     this.item = null;
     game.hud.toast(`${this.dropped.item.label} — ti è rimasto dov'eri`, 4);
   }
