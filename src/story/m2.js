@@ -31,7 +31,7 @@ import { figure, unitScale } from '../render/pixelkit.js';
 /** Quanto vuole il capocortile del 철마파 per una cassetta che non è sua. */
 const PREZZO_CASSETTA = 120000;
 
-function sites(game) {
+export function sites(game) {
   if (M2._sites) return M2._sites;
   const from = game.city.spawn;
   const pawn = findShop(game, 'pawn', { district: 'hongdae', near: from });
@@ -334,15 +334,7 @@ export const M2 = {
     // 16, e una missione che si può cominciare a qualunque ora non può dipendere
     // dalla saracinesca di nessuno (vedi `shops.hold`).
     for (const a of [s.pawn, s.nore, s.flat]) if (a) game.shops.hold(a.id);
-    if (!s.pawn) return;
-    game.actors.define('jo', {
-      indoor: true, shop: s.pawn.id, level: s.pawn.level,
-      kind: 'civil', name: 'Jo Ok-bun', hangul: '조옥분',
-      angle: Math.PI / 2,
-      place: (f) => (f.till
-        ? { x: f.till.x - 26, y: f.till.y - 20 }
-        : freeSpot(f)),
-    });
+    defineJo(game);
   },
 
   phases: [
@@ -553,6 +545,25 @@ export const M2 = {
     game.hud.toast('저당 — completata', 3.2);
   },
 };
+
+/**
+ * Jo Ok-bun dietro il suo banco. Sta fuori da `prepare` perché **la rivuole chiunque la
+ * cerchi dopo M2** (`story/visite.js`): `prepare` gira solo per la missione in corso, e
+ * dopo un caricamento la definizione di un personaggio nato in una missione finita
+ * non c'è più — senza questo il banco tornava a un commesso qualunque.
+ */
+export function defineJo(game) {
+  const s = sites(game);
+  if (!s.pawn) return;
+  game.actors.define('jo', {
+    indoor: true, shop: s.pawn.id, level: s.pawn.level,
+    kind: 'civil', name: 'Jo Ok-bun', hangul: '조옥분',
+    angle: Math.PI / 2,
+    place: (f) => (f.till
+      ? { x: f.till.x - 26, y: f.till.y - 20 }
+      : freeSpot(f)),
+  });
+}
 
 // --- attrezzi della missione ------------------------------------------------------------
 

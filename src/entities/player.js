@@ -457,7 +457,10 @@ export class Player {
       if (v.z > 8) game.hud.toast('Prima atterra (Shift per scendere)', 1.6);
       else this.exitVehicle(game);
     }
-    if (input.wasPressed('KeyH')) game.audio?.honk(v);
+    if (input.wasPressed('KeyH')) {
+      game.audio?.honk(v);
+      game.emit('honk', v);
+    }
 
     // Drive-by: dal finestrino si usano solo le armi che si tengono con una mano
     // (`driveby: false` esclude fucile, sniper e minigun), e si mira peggio quanto

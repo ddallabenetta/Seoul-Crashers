@@ -1,0 +1,178 @@
+// L'inseguimento della polizia (§5.44): quanto ci mette una volante a prendere un giocatore
+// fermo, e quanto tempo butta in un minimo locale. Presa **dall'esterno** (posizioni, tempo di
+// gioco), così gira uguale sull'albero di partenza (greedy puro) e su quello nuovo (A*).
+//
+//   node .claude/tools/probe.mjs --seconds 0 --quiet --script .claude/tools/scenes/inseguimento.scene
+//
+// Sette posti: cinque a Seoul (quattro commissariati, uno dei quali due volte: una vicino e una
+// di là dal Han) e due a Busan (di là da una baia). Il bersaglio è scelto da una regola e non a
+// occhio — fra i punti a 700-1500 px dal commissariato, quello in cui la strada è più lunga della
+// linea d'aria (per i posti «di là» con acqua in mezzo) — quindi è lo stesso su ogni albero.
+// Ogni posto a 3 e 5 stelle; la polizia è quella vera (`reinforce`, dal commissariato).
+//
+//   contatto    secondi (di gioco) al primo contatto: volante a <260 px (a 230 sbarca l'equipaggio);
+//               50 se non arriva
+//   dMedia      distanza media volante-giocatore nel tratto, px
+//   persi       secondi per volante spesi senza accorciare di 40 px la **strada ancora da fare** (A*
+//               esterno, a 1 Hz) per più di 4 s: è un minimo locale, o una volante piantata. Non la
+//               distanza in linea d'aria: un giro largo attorno a una baia la allontana, ed è giusto
+//   a*          ms dell'A* (somma/n e picco di un frame), solo sull'albero nuovo
+//   police      ms di `police.update` per frame, media e picco — confrontabile fra gli alberi
+//
+// `window.__REP` ripete ogni prova (default 1), `window.__SOLO` = indice di un posto solo,
+// `window.__STARS` = [3] o [5]. Le prove durano fino a 50 s di gioco: ~12 minuti per albero.
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const frame = () => new Promise((r) => requestAnimationFrame(r));
+const city = game.city, graph = city.graph;
+const pl = game.player;
+const TIMEOUT = 50;
+
+// Il giocatore resta in piedi e non muore: si misura la volante, non la mira degli agenti.
+pl.damage = () => {};
+pl.setWeapon('pistol');   // a mani vuote le prime stelle si chiudono con le manette
+
+const crosses = (a, b) => {
+  let n = 0;
+  for (let t = 0; t <= 1; t += 0.02) if (city.isWater(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)) n++;
+  return n;
+};
+function candidates(s) {
+  const out = [];
+  const st = graph.nearestNode(s.x, s.y);
+  for (let i = 0; i < 1500; i++) {
+    const a = i * 2.399963, r = 700 + (i * 37 % 800);
+    const x = s.x + Math.cos(a) * r, y = s.y + Math.sin(a) * r;
+    if (x < 100 || y < 100 || x > city.w - 100 || y > city.h - 100) continue;
+    if (city.isWater(x, y)) continue;
+    const nd = graph.nearestNode(x, y);
+    if (Math.hypot(nd.x - x, nd.y - y) > 250) continue;
+    const ch = game.route.solve(graph, st, nd);
+    if (!ch) continue;
+    let len = Math.hypot(st.x - s.x, st.y - s.y) + Math.hypot(nd.x - x, nd.y - y);
+    for (let k = 1; k < ch.length; k++) len += Math.hypot(ch[k].x - ch[k - 1].x, ch[k].y - ch[k - 1].y);
+    out.push({ x, y, r, len, w: crosses(s, { x, y }), ratio: len / r });
+  }
+  return out.sort((a, b) => b.ratio - a.ratio);
+}
+const byName = (n) => city.stations.find((s) => s.name === n);
+const SITES = [
+  { name: 'Hongdae', st: 'Hongdae', across: false },
+  { name: 'Myeongdong', st: 'Myeongdong', across: false },
+  { name: 'Itaewon-Han', st: 'Itaewon', across: true },
+  { name: 'Gangnam', st: 'Gangnam', across: false },
+  { name: 'Itaewon', st: 'Itaewon', across: false },
+  { name: 'Haeundae', st: 'Haeundae', across: false, busan: true },
+  { name: 'Gwangalli-baia', st: 'Gwangalli', across: true, busan: true },
+];
+for (const s of SITES) {
+  const st = byName(s.st);
+  const c = candidates(st).filter((q) => s.across ? q.w > 2 : q.w === 0);
+  s.at = c[0];
+  s.station = st;
+}
+
+// Il costo di `police.update`, uguale su ogni albero.
+const upd = { sum: 0, n: 0, peak: 0 };
+const baseUpdate = game.police.update.bind(game.police);
+game.police.update = (dt, g) => {
+  const t0 = performance.now();
+  baseUpdate(dt, g);
+  const ms = performance.now() - t0;
+  upd.sum += ms; upd.n++; if (ms > upd.peak) upd.peak = ms;
+};
+
+const rows = [];
+async function trial(site, stars, rep) {
+  game.police.standDown(game, true);
+  game.wanted.reset();
+  pl.x = site.at.x; pl.y = site.at.y; pl.vx = 0; pl.vy = 0;
+  game.camera.snapTo(pl.x, pl.y);
+  await wait(3000);   // lo streaming rifà la gente attorno alla nuova posizione
+  upd.sum = 0; upd.n = 0; upd.peak = 0;
+  const cs = game.police.chaseStats;
+  if (cs) { cs.n = 0; cs.ms = 0; cs.peak = 0; cs.frameMs = 0; cs.framePeak = 0; }
+  // Il commissariato lo decide il posto, non la vicinanza: di là dal fiume il più vicino al
+  // giocatore è quello della sua riva, e non sarebbe più la prova che si vuole fare.
+  game.police.nearestStation = () => site.station;
+  game.wanted.add(stars === 5 ? 150 : 56, game);
+  const keep = setInterval(() => { game.wanted.unseenT = 0; }, 100);
+
+  const tr = new Map();
+  const goalNode = graph.nearestNode(pl.x, pl.y);
+  const t0 = game.time;
+  let last = t0, nextSample = t0, contact = null, frames = 0;
+  let dSum = 0, dN = 0;
+  while (game.time - t0 < TIMEOUT && contact === null) {
+    await frame();
+    frames++;
+    const now = game.time;
+    if (now - last <= 0) continue;
+    const dt = now - last; last = now;
+    for (const v of game.police.cars) {
+      if (v.dead) continue;
+      const d = Math.hypot(v.x - pl.x, v.y - pl.y);
+      let r = tr.get(v);
+      if (!r) {
+        r = { bestR: Infinity, nextR: 0, tBest: now, lost: 0, st: Math.hypot(v.x - site.station.x, v.y - site.station.y) < 700 };
+        tr.set(v, r);
+      }
+      if (now >= r.nextR) {
+        r.nextR = now + 1;
+        const a = graph.nearestNode(v.x, v.y);
+        const ch = a ? game.route.solve(graph, a, goalNode) : null;
+        let len = ch ? Math.hypot(a.x - v.x, a.y - v.y) : d * 2;
+        if (ch) for (let k = 1; k < ch.length; k++) len += Math.hypot(ch[k].x - ch[k - 1].x, ch[k].y - ch[k - 1].y);
+        if (len < r.bestR - 40) { r.bestR = len; r.tBest = now; }
+      }
+      if (now - r.tBest > 4 && !v.deployed && d > 260) r.lost += dt;
+      if (now >= nextSample) { dSum += d; dN++; }
+      if (d < 260 && contact === null) contact = now - t0;
+    }
+    if (now >= nextSample) nextSample = now + 0.25;
+  }
+  clearInterval(keep);
+  delete game.police.nearestStation;
+  const cars = [...tr.values()];
+  const lostAvg = cars.length ? cars.reduce((a, r) => a + r.lost, 0) / cars.length : 0;
+  const row = {
+    site: site.name, stars, rep, across: site.across, busan: !!site.busan,
+    contatto: contact === null ? TIMEOUT : +contact.toFixed(1), arrivata: contact !== null,
+    dMedia: dN ? Math.round(dSum / dN) : null, persi: +lostAvg.toFixed(1), volanti: cars.length, daStazione: cars.filter((r) => r.st).length,
+    astarN: cs ? cs.n : null,
+    astarMsMedio: cs && frames ? +(cs.ms / frames).toFixed(4) : null,
+    astarMsPicco: cs ? +cs.framePeak.toFixed(2) : null,
+    policeMs: +(upd.sum / Math.max(1, upd.n)).toFixed(3), policePicco: +upd.peak.toFixed(2),
+  };
+  rows.push(row);
+  return row;
+}
+
+const stars = window.__STARS || [3, 5];
+const reps = window.__REP || 1;
+for (let rep = 0; rep < reps; rep++) {
+  for (let i = 0; i < SITES.length; i++) {
+    if (window.__SOLO !== undefined && window.__SOLO !== i) continue;
+    for (const s of stars) await trial(SITES[i], s, rep);
+  }
+}
+game.police.standDown(game, true);
+game.wanted.reset();
+game.police.update = baseUpdate;
+
+const mean = (a, f) => a.length ? +(a.reduce((x, r) => x + f(r), 0) / a.length).toFixed(2) : null;
+const agg = (rs) => ({
+  n: rs.length, contattoMedio: mean(rs, (r) => r.contatto), nonArrivate: rs.filter((r) => !r.arrivata).length,
+  dMedia: mean(rs, (r) => r.dMedia), persi: mean(rs, (r) => r.persi),
+  astarMsMedio: mean(rs, (r) => r.astarMsMedio || 0), astarMsPicco: Math.max(0, ...rs.map((r) => r.astarMsPicco || 0)),
+  policeMs: mean(rs, (r) => r.policeMs), policePicco: Math.max(0, ...rs.map((r) => r.policePicco)),
+});
+return {
+  siti: SITES.map((s) => `${s.name}: ${Math.round(s.station.x)},${Math.round(s.station.y)} -> ${Math.round(s.at.x)},${Math.round(s.at.y)} r${Math.round(s.at.r)} strada${Math.round(s.at.len)} acqua${s.at.w}`),
+  righe: rows,
+  tutto: agg(rows),
+  per3: agg(rows.filter((r) => r.stars === 3)),
+  per5: agg(rows.filter((r) => r.stars === 5)),
+  diLa: agg(rows.filter((r) => r.across)),
+  vicino: agg(rows.filter((r) => !r.across)),
+  busan: agg(rows.filter((r) => r.busan)),
+};

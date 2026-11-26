@@ -1,0 +1,122 @@
+// Regia sonora dei pannelli (§5.37): misura sul master, non a orecchio.
+//
+//   node .claude/tools/probe.mjs --menu --seconds 40 \
+//     --script .claude/tools/scenes/cutscene-audio.scene
+//
+// Verifica tre cose: (a) i pannelli agganciati suonano e gli altri restano al
+// pavimento; (b) dopo `ESC` il livello torna a zero in ~0,3 s; (c) i livelli
+// stanno sotto gli spari (picco di una pistola ~0.3). La musica del tema è
+// chiusa per la misura: il tema c'è sempre, e coprirebbe proprio i fruscii.
+const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
+const out = { pannelli: {}, controlli: [] };
+const check = (nome, ok, extra) => out.controlli.push({ nome, ok: !!ok, ...(extra !== undefined ? { extra } : {}) });
+
+const A = game.audio;
+A.unlock();
+await wait(1.2);
+if (!A.ready) return { errore: 'contesto audio non partito' };
+const an = A.ctx.createAnalyser();
+an.fftSize = 2048;
+A.master.connect(an);
+const buf = new Float32Array(an.fftSize);
+const meas = async (secs) => {
+  let sum = 0, n = 0, peak = 0;
+  const t0 = performance.now();
+  while (performance.now() - t0 < secs * 1000) {
+    an.getFloatTimeDomainData(buf);
+    for (let i = 0; i < buf.length; i++) { sum += buf[i] * buf[i]; peak = Math.max(peak, Math.abs(buf[i])); }
+    n += buf.length;
+    await new Promise((r) => setTimeout(r, 10));
+  }
+  return { rms: +Math.sqrt(sum / n).toFixed(4), picco: +peak.toFixed(3) };
+};
+
+const iNew = game.startMenu.items.findIndex((i) => i.id === 'new');
+game.startMenu.index = iNew;
+game.startMenu.activate(game);
+await wait(0.5);
+const C = game.cutscene;
+check('la cutscene è partita', C.active);
+A.mus.gain.value = 0;            // misura il solo effetto, vedi in testa
+const goto = (n, t = 0) => { C.i = n - 1; C.t = t; C.trans = 0; C.pending = -1; C.enter(game); };
+
+// 1. Ogni pannello: 1,5 s di misura dopo che i letti hanno avuto il tempo di salire.
+const pannelli = [2, 3, 7, 1, 8, 23, 25, 26, 27];
+for (const n of pannelli) {
+  goto(n, n === 1 ? 8.0 : 0);   // il pannello 1 parte vicino al cane, per misurarlo
+  await wait(1.0);              // rampa dei letti (smooth 0.3)
+  out.pannelli[n] = await meas(n === 1 ? 1.8 : n === 27 ? 1.6 : 1.5);
+}
+const base = out.pannelli[2];
+const sonori = [1, 8, 23, 25, 26, 27];
+for (const n of sonori) check(`il pannello ${n} suona sopra il silenzio`, out.pannelli[n].rms > base.rms + 0.001, `${out.pannelli[n].rms} vs ${base.rms}`);
+for (const n of [3, 7]) check(`il pannello ${n} non è cambiato`, out.pannelli[n].rms < base.rms + 0.002, `${out.pannelli[n].rms} vs ${base.rms}`);
+// il cane del pannello 27: t=0 → 1.6 s nella finestra? misurato sopra con 1.0+1.6 s
+const massimo = Math.max(...sonori.map((n) => out.pannelli[n].picco));
+check('il picco massimo resta sotto una pistola (0.30)', massimo < 0.3, massimo);
+
+// 2. ESC mentre suonano fruscio + sirena (23) e fruscio + cane (1). Si rilancia la
+// cutscene fra un giro e l'altro: dopo il salto il gioco è cominciato davvero.
+const { INTRO } = await import('/src/story/intro.js');
+for (const [n, t] of [[23, 0], [1, 8.0]]) {
+  if (!C.active) { C.play(game, INTRO, 'intro'); await wait(0.3); A.mus.gain.value = 0; }
+  goto(n, t);
+  await wait(n === 1 ? 1.1 : 1.6);
+  const prima = await meas(0.3);
+  game.input.justPressed.add('Escape');
+  await wait(0.3);                     // il «close» dell'interfaccia dura 0,16 s
+  const dopo = await meas(0.3);
+  out.pannelli[`esc_${n}`] = { prima, dopo };
+  check(`ESC dal pannello ${n}: dopo 0,3 s il livello è azzerato`, dopo.rms < 0.003 || dopo.rms < prima.rms * 0.15, `${prima.rms} -> ${dopo.rms}`);
+  check(`ESC dal pannello ${n}: i letti di scena sono a zero`, A.sceneLv.kkachi === 0 && A.sceneLv.sirenFar === 0);
+  await wait(1.2);
+}
+// 3. I pannelli dell'Atto II (§5.40). La radio sul frigo di R2 è **accesa** nel ricordo
+// (fruscio sotto la voce dell'uomo) e **muta** nella cucina di oggi — è il silenzio la cosa
+// che cambia fra i due pannelli —, e il quadrante di M6 ha lo stesso fruscio di M4/pannello 26.
+const R2 = await import('/src/story/r2.js');
+const M6 = await import('/src/story/m6.js');
+const suona = (seq, i, id) => {
+  if (C.active) C.finish(game, true);
+  C.play(game, seq, id);
+  C.i = i; C.t = 0; C.trans = 0; C.pending = -1;
+  C.enter(game);
+  A.mus.gain.value = 0;
+};
+for (const [nome, seq, i] of [['r2-2', R2.PANNELLI, 1], ['r2-1', R2.PANNELLI, 0], ['m6-7', M6.CHIUSURA, 2]]) {
+  suona(seq, i, `prova-${nome}`);
+  await wait(1.0);
+  out.pannelli[nome] = await meas(1.5);
+}
+check('la cucina di R2 con la radio accesa suona sopra la cucina vuota',
+  out.pannelli['r2-1'].rms > out.pannelli['r2-2'].rms + 0.001, `${out.pannelli['r2-1'].rms} vs ${out.pannelli['r2-2'].rms}`);
+check('la cucina vuota di oggi è al pavimento', out.pannelli['r2-2'].rms < base.rms + 0.002, `${out.pannelli['r2-2'].rms} vs ${base.rms}`);
+check('il quadrante di M6 ha il suo fruscio', out.pannelli['m6-7'].rms > out.pannelli['r2-2'].rms + 0.001, `${out.pannelli['m6-7'].rms}`);
+check('il picco dei pannelli dell\'Atto II sta sotto una pistola (0.30)', Math.max(out.pannelli['r2-1'].picco, out.pannelli['m6-7'].picco) < 0.3);
+// 4. I pannelli della seconda metà dell'atto (§5.42). Il fruscio c'è dove c'è una radio (i due
+// pannelli di Kkachi di M7, i tre di R3 con i dischi accesi e il quadrante) e **non c'è** dove il
+// copione tace: la cella non ha pannelli sonori, e nemmeno la telefonata della notizia.
+const M7 = await import('/src/story/m7.js');
+const M8 = await import('/src/story/m8.js');
+const R3 = await import('/src/story/r3.js');
+const prove = [
+  ['m7-1', M7.APERTURA, 0], ['m7-2', M7.APERTURA, 1], ['m7-3', M7.APERTURA, 2], ['m7-6', M7.CHIUSURA, 2],
+  ['m8-1', M8.APERTURA, 0], ['m8-7', M8.CHIUSURA, 0],
+  ['r3-1', R3.PANNELLI, 0], ['r3-2', R3.PANNELLI, 1], ['r3-5', R3.PANNELLI, 4],
+];
+for (const [nome, seq, i] of prove) {
+  suona(seq, i, `prova-${nome}`);
+  await wait(1.0);
+  out.pannelli[nome] = await meas(1.4);
+}
+for (const n of ['m7-2', 'm7-3', 'r3-1', 'r3-2', 'r3-5']) {
+  check(`il pannello ${n} ha il suo fruscio`, out.pannelli[n].rms > base.rms + 0.0008, `${out.pannelli[n].rms} vs ${base.rms}`);
+}
+for (const n of ['m7-1', 'm7-6', 'm8-1', 'm8-7']) {
+  check(`il pannello ${n} è muto`, out.pannelli[n].rms < base.rms + 0.002, `${out.pannelli[n].rms} vs ${base.rms}`);
+}
+check('il fruscio di M7-3 è appena sopra quello di M7-2 (la sillaba mangiata)', out.pannelli['m7-3'].rms >= out.pannelli['m7-2'].rms * 0.9);
+check('il picco dei pannelli di M7 e R3 sta sotto una pistola (0.30)', Math.max(...['m7-2', 'm7-3', 'r3-1', 'r3-2', 'r3-5'].map((n) => out.pannelli[n].picco)) < 0.3);
+if (C.active) C.finish(game, true);
+out.letti = A.stats.letti;
+return out;

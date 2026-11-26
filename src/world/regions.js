@@ -4,6 +4,7 @@
 // accessi metro solidi, indici spaziali, limiti del mondo.
 import { SpatialGrid } from '../core/spatial.js';
 import { createKorea, AREAS } from './korea.js';
+import { vitaNegliIsolati } from './blocklife.js';
 import { nearestActiveLine, rectIntersectsRoad, rectsOverlap } from './roadclearance.js';
 
 const ENTRANCE_W = 86;
@@ -277,7 +278,9 @@ function reindex(city) {
  * storici: non esiste più una regione da scegliere, esiste dove si atterra.
  */
 export function createRegion() {
-  return reindex(createKorea());
+  // §5.39: la vita negli isolati gira per ultima, con rng suoi, sui dati già
+  // pronti (accessi metro e stalli compresi): non sposta niente di quello che c'era.
+  return vitaNegliIsolati(reindex(createKorea()));
 }
 
 export const REGION_IDS = AREAS.map((a) => a.id);

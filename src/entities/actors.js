@@ -149,6 +149,7 @@ export class ActorSystem {
         p.angle = d.angle;
         p.faceA = d.angle;
         p.state = d.state;
+        if (d.look) p.look = d.look;
         p.indoor = true;
         // `staff` tiene un personaggio fuori dalla folla di passaggio: non se ne
         // va alla chiusura e non lo si ritrova diverso alla visita dopo.
@@ -178,6 +179,7 @@ export class ActorSystem {
       p.angle = d.angle;
       p.faceA = d.angle;
       p.state = d.state;
+      if (d.look) p.look = d.look;
       // Un attore non vaga: sta dove la storia lo ha messo. `home` è il posto suo,
       // e ci torna da solo se lo spostano — è quello che legge lo stato `post`.
       p.home = { x: d.x, y: d.y };

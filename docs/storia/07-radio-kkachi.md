@@ -4,8 +4,13 @@
 >
 > **Implementato dalla tappa D** (§5.32, [`../storico/21-kkachi.md`](../storico/21-kkachi.md)):
 > la stazione, le sei regole, le **otto chiamate dell'Atto I** e tutte le righe di servizio.
-> Restano da scrivere le sedici chiamate degli Atti II e III (tappe F e G) e le tre «visite che
-> cambiano», che vanno con le missioni a cui appartengono. Chi ne aggiunge una: una riga in
+> **Dalla T7 (§5.40)** ci sono tre delle otto chiamate dell'Atto II (11, 12 e 14) e la prima delle
+> «visite che cambiano» (Jo dopo M6); **dalla T8 (§5.42) le otto dell'Atto II sono tutte** (le altre cinque:
+> 9, 10, 13, 15, 16) e c'è anche il commesso dopo M8. Restano le otto dell'Atto III e la visita di
+> Chun-sik, che vanno con le missioni a cui appartengono. **Due origini non sono quelle del copione**:
+> la 9 è di Byeon (M7) e non di Ryu, la 16 è del narratore della camera ardente e non di Chun-sik — le
+> righe che il copione indicava non esistono nelle scene come sono scritte, e la regola 3 vuole che
+> l'originale esista. Chi ne aggiunge una: una riga in
 > `src/story/kkachi.js`, con la sua `// origine:` — la colonna qui sotto **è** quel commento.
 
 Il «codec» di Seoul Crashers. Ventiquattro conversazioni facoltative, più una manciata di

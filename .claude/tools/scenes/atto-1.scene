@@ -381,6 +381,11 @@ nota('chiusura R1');
 out.r1Completato = M.isDone('r1');
 out.attoUnoChiuso = M.flag('atto1');
 out.fogliPosati = !game.carry.item && !game.carry.dropped;
+// R1 non chiude la campagna: da §5.40 l'Atto II comincia dove l'Atto I finisce, quindi
+// subito dopo c'è M5 con il suo blip. Quello che interessa è che **R1 non lasci niente
+// appeso** — e per provarlo si ferma M5 e si guarda cosa resta.
+out.attoDueParte = M.active === 'm5' && fase() === 'm5/chunsik';
+M.abandon(game);
 out.nessunaMissioneAppesa = M.active === null && game.markers.length === 0;
 
 out.unBlipSolo = maxBlip <= 1;

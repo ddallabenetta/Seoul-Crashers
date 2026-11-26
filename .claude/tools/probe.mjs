@@ -12,7 +12,7 @@
 // va bene come check da CI o da hook.
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import net from 'node:net';
@@ -42,6 +42,7 @@ function parseArgs(argv) {
       case '--eval': case '-e': opts.evals.push(next()); break;
       case '--script': opts.scripts.push(next()); break;
       case '--shot': opts.shot = next(); break;
+      case '--shot-dir': opts.shotDir = next(); break;
       case '--clip': opts.clip = next().split(',').map(Number); break;
       case '--zoom': opts.zoom = parseFloat(next()); break;
       case '--size': opts.size = next(); break;
@@ -63,6 +64,8 @@ const HELP = `probe.mjs — avvia il gioco headless e lo interroga
   --script file.js   file iniettato come corpo di funzione async prima degli --eval
                      (ripetibile): serve a preparare la scena — armi, stelle, teletrasporti
   --shot out.png     screenshot a fine corsa
+  --shot-dir DIR     una scena può scattare a metà corsa: await window.__shot('nome') salva
+                     DIR/nome.png (serve a seguire una sequenza, vedi arresto.scene)
   --clip x,y,w,h     ritaglia lo screenshot (per guardare un angolo dell'HUD)
   --zoom N           fattore del device pixel ratio: 2 raddoppia i pixel dello scatto
   --size WxH         viewport (default 1280x720)
@@ -141,6 +144,16 @@ async function main() {
     // resta sul titolo, che è l'unico modo di fotografarlo.
     const qs = opts.menu ? '' : '?autostart=1';
     await page.goto(`http://127.0.0.1:${port}/index.html${qs}`, { waitUntil: 'load' });
+
+    // Scatti a richiesta della scena: lo script gira *dentro* la pagina e da lì
+    // non può fotografarsi, quindi gli si presta il `page` del probe.
+    if (opts.shotDir) {
+      mkdirSync(resolve(process.cwd(), opts.shotDir), { recursive: true });
+      await page.exposeFunction('__shot', async (name) => {
+        await page.screenshot({ path: resolve(process.cwd(), opts.shotDir, `${name}.png`) });
+        return true;
+      });
+    }
 
     log(`[probe] boot… (porta ${port})`);
     await page.waitForFunction(() => window.game && window.game.loop && window.game.city, null,

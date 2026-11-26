@@ -63,7 +63,8 @@ export function collisionCircles(v, spec = VEHICLE_TYPES[v.kind]) {
 
 export function vehicleTopSpeed(v) {
   const spec = VEHICLE_TYPES[v.kind];
-  return spec.topSpeed * (v.hp < spec.hp * 0.4 ? 0.75 : 1) * (v.flatTires ? 0.6 : 1);
+  // `pace` è la gomma elastica di una motovedetta rimasta indietro (`police.driveBoat`, §5.43).
+  return spec.topSpeed * (v.hp < spec.hp * 0.4 ? 0.75 : 1) * (v.flatTires ? 0.6 : 1) * (v.pace || 1);
 }
 
 /** Un velivolo è "in volo" quando ha staccato: sopra questa quota niente lo tocca. */
@@ -113,7 +114,9 @@ export function updateVehicle(v, dt, world) {
   // Accelerazione / frenata
   if (throttle > 0.01) {
     const boost = v.speed < 0 ? 2.2 : 1; // frenata da retro più decisa
-    v.speed += spec.accel * throttle * boost * dt;
+    // `pace`: la gomma elastica di una motovedetta (§5.43). La velocità massima è il punto in cui la
+    // spinta uguaglia la resistenza (accel / 0,42): per andare più forte bisogna spingere di più.
+    v.speed += spec.accel * (v.pace || 1) * throttle * boost * dt;
   } else if (throttle < -0.01) {
     if (v.speed > 6) {
       v.speed += spec.accel * throttle * 2.1 * (1 - wet * 0.14) * dt; // freno
@@ -308,6 +311,7 @@ function sink(v, dt, world) {
  */
 function resolveMarine(v, spec, world, dt) {
   const city = world.city;
+  const wet = city.isNavigable ? (x, y) => city.isNavigable(x, y) : (x, y) => city.isWater(x, y);
   const cos = Math.cos(v.angle);
   const sin = Math.sin(v.angle);
   const half = spec.len * 0.44;
@@ -317,12 +321,12 @@ function resolveMarine(v, spec, world, dt) {
     { x: v.x - cos * half, y: v.y - sin * half, at: -1 },
   ];
   for (const p of probes) {
-    if (city.isWater(p.x, p.y)) continue;
+    if (wet(p.x, p.y)) continue;
     let nx = 0;
     let ny = 0;
     for (let a = 0; a < 8; a++) {
       const ang = (a * Math.PI) / 4;
-      if (city.isWater(p.x + Math.cos(ang) * 46, p.y + Math.sin(ang) * 46)) {
+      if (wet(p.x + Math.cos(ang) * 46, p.y + Math.sin(ang) * 46)) {
         nx += Math.cos(ang);
         ny += Math.sin(ang);
       }

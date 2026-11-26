@@ -1,82 +1,101 @@
-// Jeju (제주) è una regione generata da una topologia propria: un'isola vulcanica
-// con una strada anulare, due insediamenti costieri e un interno rurale.
+// Jeju (제주): un'isola vulcanica. Rifatta nel §5.41.
+//
+// Prima era un rettangolo con gli angoli arrotondati su un reticolo uniforme, con
+// un fiume dritto che lo tagliava in due. Adesso:
+//  - la **costa** è un poligono rugoso (maschera a 8 px, `coastmask.js`), più gli
+//    isolotti (Udo, Chagwido, Gapado, Marado) che non si raggiungono su gomma;
+//  - **Hallasan** è un cono al centro: sopra la sua quota alta non c'è una strada, e
+//    ai suoi piedi corre un anello interno collegato alla costa da raggi di campagna;
+//  - la **strada costiera** (일주도로) è un anello a gradini che segue la riva a
+//    distanza, e dove attraversa Jeju-si e Seogwipo resta dritta;
+//  - **Jeju-si** a nord (con l'aeroporto e il porto), **Seogwipo** a sud e una
+//    manciata di villaggi sul litorale; in mezzo, campagna con mandarini e
+//    muretti di pietra lavica.
+// La geografia sta qui; edifici, vetrine e landmark sono in `regionkit.js`.
 import { Rng } from '../core/rng.js';
-import { SpatialGrid } from '../core/spatial.js';
-import { buildRoadGraph } from './roadgraph.js';
-import { BUSINESSES, DISTRICT_MIX } from './interiors.js';
-import { rectIntersectsRoad, rectsOverlap } from './roadclearance.js';
+import { createMask, blobPoly, roughen, valueNoise, smooth } from './coastmask.js';
+import { pathLegs, staircase, buildNetwork, makeRoadHit, clipLegs, farmRoads, horizontalAt } from './netgen.js';
+import * as kit from './regionkit.js';
 
 export const JEJU_SEED = 20260808;
+export const JEJU_WORLD = { w: 7200, h: 4800, margin: 220 };
 
-const WORLD = { w: 5400, h: 5400, margin: 220 };
-const SIDEWALK = 20;
-// Un torrente più basso del cono sommitale: Hallasan resta il centro asciutto
-// dell'isola, mentre tre ponti tengono insieme i due versanti agricoli.
-const RIVER = { y0: 3030, y1: 3150 };
-const ISLAND = { cx: WORLD.w * 0.5, cy: WORLD.h * 0.5, rx: 2460, ry: 2380, power: 8 };
+const REGION = 'jeju';
+// Il centro dell'isola e il cono. Il cono è un'ellisse più larga che alta, come la
+// vera Hallasan: il lato lungo corre est-ovest.
+const CENTER = { x: 3600, y: 2400 };
+const HALLA = { x: 3600, y: 2480, rx: 1500, ry: 600, h: 300 };
 
 // Gli id sono compatibili con traffico, pedoni, negozi e salvataggi. Posizioni,
-// colori e pesi, però, descrivono solo Jeju e non copiano i distretti di Seoul.
+// colori, pesi e **mix di negozi** descrivono solo Jeju.
 const DISTRICTS = [
   {
-    id: 'hongdae', name: 'Jeju City', hangul: '제주시', subtitle: 'Dongmun, porto e vicoli pieni di lanterne',
-    seed: { x: 0.31, y: 0.2 }, block: { minLot: 56, maxLot: 118, gapChance: 0.11 }, grid: { step: [150, 245], superblock: 0.14, jog: 0.2 },
-    heights: [36, 128], styles: ['brick', 'concrete', 'panel'], facade: ['#a56e57', '#8d6574', '#73849b', '#b4875a'], roof: '#4b3c3a',
-    accent: '#ff9b5f', accent2: '#7cf3ff', ground: '#30333b', sidewalk: '#57545d', signDensity: 0.86, treeDensity: 0.16,
-    trafficDensity: 1, pedDensity: 1.55, pedMix: ['student', 'tourist', 'civil', 'civil', 'gangster'], vehicleMix: ['hatch', 'sedan', 'taxi', 'scooter', 'van', 'bus'],
+    id: 'hongdae', name: 'Jeju City', hangul: '제주시', subtitle: 'Dongmun, il mercato e i vicoli sotto il vulcano',
+    seed: { x: 0.45, y: 0.25 }, block: { minLot: 56, maxLot: 118, gapChance: 0.11 }, grid: { step: [150, 245], superblock: 0.14, jog: 0.2 },
+    heights: [34, 120], styles: ['stone', 'concrete', 'panel'], facade: ['#b4a58c', '#8f8b82', '#a58f7a', '#7d8c90', '#c0b090'], roof: '#52443d',
+    accent: '#ff9b5f', accent2: '#7cf3ff', ground: '#30333b', sidewalk: '#5a575a', signDensity: 0.86, treeDensity: 0.16,
+    signWords: ['동문시장', '흑돼지', '감귤', '카페', '편의점', '해산물', '민박', '렌터카'],
+    mix: {
+      ground: ['conv', 'conv', 'heuk', 'heuk', 'hoe', 'cafe', 'cafe', 'bunsik', 'pharma', 'pawn', 'clothes', 'bar'],
+      upper: ['home', 'home', 'pcbang', 'noraebang', 'office', 'bar', 'cafe'],
+    },
+    trafficDensity: 1, pedDensity: 1.5, pedMix: ['tourist', 'tourist', 'civil', 'civil', 'student', 'worker'], vehicleMix: ['hatch', 'sedan', 'taxi', 'suv', 'van', 'bus'],
   },
   {
-    id: 'myeongdong', name: 'Seongsan', hangul: '성산', subtitle: 'Il cratere dell’alba e la costa orientale',
-    seed: { x: 0.81, y: 0.23 }, block: { minLot: 72, maxLot: 154, gapChance: 0.12 }, grid: { step: [170, 280], superblock: 0.2, jog: 0.12 },
-    heights: [30, 112], styles: ['concrete', 'panel', 'brick'], facade: ['#a47a61', '#7a8d91', '#b08a6a', '#6f777d'], roof: '#4b4744',
-    accent: '#ffd36a', accent2: '#ff7a6a', ground: '#33342f', sidewalk: '#5a554b', signDensity: 0.68, treeDensity: 0.24,
-    trafficDensity: 0.82, pedDensity: 1.05, pedMix: ['tourist', 'civil', 'worker', 'student'], vehicleMix: ['hatch', 'sedan', 'suv', 'taxi', 'van', 'bus'],
+    id: 'myeongdong', name: 'Seongsan', hangul: '성산', subtitle: 'Il cratere dell’alba e le case di pietra',
+    seed: { x: 0.86, y: 0.36 }, block: { minLot: 72, maxLot: 154, gapChance: 0.14 }, grid: { step: [170, 280], superblock: 0.2, jog: 0.12 },
+    heights: [26, 78], styles: ['stone', 'stone', 'panel'], facade: ['#6c6a64', '#7a766c', '#5f6460', '#8a806e'], roof: '#3a3633',
+    accent: '#ffd36a', accent2: '#ff7a6a', ground: '#33342f', sidewalk: '#5a554b', signDensity: 0.6, treeDensity: 0.26,
+    signWords: ['해녀', '전복', '민박', '일출봉', '성게', '카페', '편의점'],
+    mix: { ground: ['hoe', 'hoe', 'heuk', 'cafe', 'conv', 'bunsik', 'pawn'], upper: ['home', 'home', 'home', 'bar'] },
+    trafficDensity: 0.78, pedDensity: 1, pedMix: ['tourist', 'tourist', 'civil', 'worker'], vehicleMix: ['hatch', 'suv', 'suv', 'taxi', 'van', 'bus'],
   },
   {
     id: 'itaewon', name: 'Aewol', hangul: '애월', subtitle: 'Caffè sul mare, muretti di pietra e surfisti',
-    seed: { x: 0.19, y: 0.44 }, block: { minLot: 64, maxLot: 142, gapChance: 0.19 }, grid: { step: [190, 330], superblock: 0.3, jog: 0.16 },
-    heights: [28, 96], styles: ['brick', 'panel', 'concrete'], facade: ['#8c765d', '#6c8278', '#a07868', '#6b6f82'], roof: '#403b34',
-    accent: '#4ad9d1', accent2: '#ffad5e', ground: '#2f3530', sidewalk: '#555a4e', signDensity: 0.62, treeDensity: 0.33,
-    trafficDensity: 0.7, pedDensity: 0.9, pedMix: ['tourist', 'civil', 'student', 'worker'], vehicleMix: ['hatch', 'suv', 'scooter', 'van', 'sedan'],
+    seed: { x: 0.14, y: 0.42 }, block: { minLot: 64, maxLot: 142, gapChance: 0.19 }, grid: { step: [190, 330], superblock: 0.3, jog: 0.16 },
+    heights: [26, 84], styles: ['panel', 'stone', 'brick'], facade: ['#9fc4bd', '#e0b8a0', '#b4c8d8', '#d8d0a8', '#c8a0a8'], roof: '#4a4440',
+    accent: '#4ad9d1', accent2: '#ffad5e', ground: '#2f3530', sidewalk: '#555a4e', signDensity: 0.64, treeDensity: 0.33,
+    signWords: ['카페', '서핑', '펜션', '브런치', '바다', '감귤', '민박', '편의점'],
+    mix: { ground: ['cafe', 'cafe', 'cafe', 'bar', 'clothes', 'conv', 'bunsik', 'hoe'], upper: ['home', 'home', 'bar', 'cafe'] },
+    trafficDensity: 0.7, pedDensity: 0.95, pedMix: ['tourist', 'tourist', 'student', 'civil', 'worker'], vehicleMix: ['hatch', 'suv', 'scooter', 'van', 'sedan'],
   },
   {
     id: 'gangnam', name: 'Seogwipo', hangul: '서귀포', subtitle: 'Cascate, alberghi e il lungomare del sud',
-    seed: { x: 0.72, y: 0.79 }, block: { minLot: 92, maxLot: 198, gapChance: 0.08 }, grid: { step: [220, 360], superblock: 0.33, jog: 0.08 },
-    heights: [56, 210], styles: ['glass', 'concrete', 'panel'], facade: ['#4d7185', '#597e89', '#55708f', '#708b98'], roof: '#314553',
-    accent: '#5fe3ff', accent2: '#d49aff', ground: '#2d3337', sidewalk: '#53616b', signDensity: 0.57, treeDensity: 0.25,
-    trafficDensity: 1.08, pedDensity: 1.2, pedMix: ['office', 'tourist', 'civil', 'civil'], vehicleMix: ['sedan', 'suv', 'sport', 'taxi', 'bus', 'van'],
+    seed: { x: 0.56, y: 0.78 }, block: { minLot: 92, maxLot: 198, gapChance: 0.08 }, grid: { step: [220, 360], superblock: 0.33, jog: 0.08 },
+    heights: [50, 190], styles: ['glass', 'concrete', 'panel'], facade: ['#dfe4e2', '#c9d6d8', '#a6c4cc', '#e4d4b8', '#96b4bc'], roof: '#3b5058',
+    accent: '#5fe3ff', accent2: '#d49aff', ground: '#2d3337', sidewalk: '#53616b', signDensity: 0.58, treeDensity: 0.25,
+    signWords: ['호텔', '리조트', '감귤', '카페', '폭포', '렌터카', '횟집', '편의점'],
+    mix: { ground: ['cafe', 'hoe', 'hoe', 'conv', 'clothes', 'pharma', 'bar', 'pawn', 'heuk'], upper: ['office', 'home', 'home', 'noraebang', 'cafe', 'pcbang'] },
+    trafficDensity: 1.05, pedDensity: 1.25, pedMix: ['tourist', 'tourist', 'office', 'civil', 'civil'], vehicleMix: ['sedan', 'suv', 'sport', 'taxi', 'bus', 'van'],
   },
   {
     id: 'docks', name: 'Jeju Port', hangul: '제주항', subtitle: 'Traghetti, container e carichi senza domande',
-    seed: { x: 0.12, y: 0.2 }, block: { minLot: 180, maxLot: 330, gapChance: 0.3 }, grid: { step: [300, 520], superblock: 0.5, jog: 0.04 },
-    heights: [24, 70], styles: ['warehouse', 'warehouse', 'panel'], facade: ['#65736d', '#53676d', '#72736a', '#52605a'], roof: '#39453f',
+    seed: { x: 0.68, y: 0.22 }, block: { minLot: 120, maxLot: 230, gapChance: 0.25 }, grid: { step: [300, 520], superblock: 0.5, jog: 0.04 },
+    heights: [24, 70], styles: ['warehouse', 'warehouse', 'panel'], facade: ['#5c7a80', '#4d6a72', '#6f7a70', '#58666a'], roof: '#34464a',
     accent: '#ffd15a', accent2: '#63e0aa', ground: '#292e30', sidewalk: '#4a5351', signDensity: 0.25, treeDensity: 0.04,
+    signWords: ['여객터미널', '물류', '냉동창고', '수산', '해운', '세관'],
+    mix: { ground: ['pawn', 'guns', 'bar', 'conv', 'hoe'], upper: ['home', 'office', 'billiards'] },
     trafficDensity: 0.55, pedDensity: 0.42, pedMix: ['worker', 'worker', 'gangster', 'civil'], vehicleMix: ['truck', 'truck', 'van', 'suv', 'sedan'],
   },
   {
     id: 'gimpo', name: 'Jeju Airport', hangul: '제주공항', subtitle: 'Piste, hangar e la porta dell’isola',
-    seed: { x: 0.2, y: 0.14 }, block: { minLot: 150, maxLot: 290, gapChance: 0.35 }, grid: { step: [320, 560], superblock: 0.52, jog: 0.04 },
-    heights: [22, 62], styles: ['warehouse', 'panel', 'warehouse'], facade: ['#70818b', '#5f707a', '#7f8589', '#66766f'], roof: '#46525a',
+    seed: { x: 0.33, y: 0.3 }, block: { minLot: 90, maxLot: 190, gapChance: 0.25 }, grid: { step: [320, 560], superblock: 0.52, jog: 0.04 },
+    heights: [22, 62], styles: ['warehouse', 'panel', 'warehouse'], facade: ['#c8d0d4', '#aab4ba', '#8d99a0', '#b4bcc0'], roof: '#46525a',
     accent: '#6fd8ff', accent2: '#ffe77c', ground: '#30362e', sidewalk: '#4e5a55', signDensity: 0.2, treeDensity: 0.18,
-    trafficDensity: 0.6, pedDensity: 0.52, pedMix: ['worker', 'tourist', 'civil', 'office'], vehicleMix: ['van', 'truck', 'sedan', 'bus', 'suv'],
+    signWords: ['공항', '렌터카', '택시', '주차', '면세점'],
+    mix: { ground: ['conv', 'cafe', 'bunsik', 'pharma', 'pawn'], upper: ['office', 'home', 'pcbang'] },
+    trafficDensity: 0.6, pedDensity: 0.52, pedMix: ['worker', 'tourist', 'tourist', 'civil', 'office'], vehicleMix: ['van', 'truck', 'sedan', 'bus', 'suv', 'taxi'],
   },
   {
-    id: 'gyeonggi', name: 'Hallasan', hangul: '한라산', subtitle: 'Boschi, sentieri e pendici vulcaniche',
-    seed: { x: 0.5, y: 0.51 }, block: { minLot: 170, maxLot: 340, gapChance: 0.46 }, grid: { step: [380, 680], superblock: 0.62, jog: 0.02 },
-    heights: [18, 58], styles: ['warehouse', 'brick', 'panel'], facade: ['#73775a', '#617255', '#847a61', '#5d6d54'], roof: '#454b38',
+    id: 'gyeonggi', name: 'Hallasan', hangul: '한라산', subtitle: 'Mandarini, muretti di basalto e boschi di cedro',
+    seed: { x: 0.5, y: 0.52 }, block: { minLot: 80, maxLot: 170, gapChance: 0.25 }, grid: { step: [380, 680], superblock: 0.62, jog: 0.02 },
+    heights: [18, 52], styles: ['stone', 'stone', 'greenhouse'], facade: ['#6a6c5a', '#5f705a', '#7c7462', '#586a54'], roof: '#3f4a36',
     accent: '#a7e45a', accent2: '#ffd05a', ground: '#343b28', sidewalk: '#4f5542', signDensity: 0.1, treeDensity: 0.58,
+    signWords: ['감귤', '농장', '민박', '흑돼지'],
+    mix: { ground: ['conv', 'bunsik', 'heuk', 'pawn', 'cafe'], upper: ['home', 'home', 'billiards'] },
     trafficDensity: 0.32, pedDensity: 0.25, pedMix: ['worker', 'civil', 'civil', 'tourist'], vehicleMix: ['tractor', 'truck', 'van', 'hatch', 'suv'],
   },
 ];
-const DISTRICT_BY_ID = Object.fromEntries(DISTRICTS.map((d) => [d.id, d]));
-
-function cloneDistrict(d) {
-  return {
-    ...d,
-    seed: { ...d.seed }, block: { ...d.block }, grid: { ...d.grid, step: [...d.grid.step] },
-    heights: [...d.heights], styles: [...d.styles], facade: [...d.facade], pedMix: [...d.pedMix], vehicleMix: [...d.vehicleMix],
-  };
-}
 
 const GANGS = [
   { id: 'baekho', name: 'Tigre Bianca', hangul: '백호파', color: '#e8e2d0', trade: 'armi' },
@@ -85,698 +104,426 @@ const GANGS = [
   { id: 'hwangso', name: 'Bue Giallo', hangul: '황소파', color: '#ffd23f', trade: 'usura' },
 ];
 
+// I landmark cercano un lotto vicino all'ancora (normalizzata) fra gli isolati.
 const LANDMARKS = [
-  // I landmark occupano celle libere fra gli assi stradali: restano ampi e
-  // leggibili, ma nessun volume solido si sovrappone al grafo navigabile.
-  { id: 'hallasan', name: 'Hallasan', hangul: '한라산', label: 'Monte Hallasan', kind: 'mountain', district: 'gyeonggi', target: [0.5093, 0.5278], style: 'hill', w: 150, h: 104, h3d: 360, color: '#3d6746', roofColor: '#294231' },
-  { id: 'dongmun-market', name: 'Dongmun Market', hangul: '동문시장', label: 'Mercato Dongmun', kind: 'market', district: 'hongdae', target: [0.3, 0.2074], style: 'warehouse', w: 150, h: 126, h3d: 82, color: '#ae7152', roofColor: '#554139' },
-  { id: 'seongsan-ilchulbong', name: 'Seongsan Ilchulbong', hangul: '성산일출봉', label: 'Picco dell’alba di Seongsan', kind: 'coastal', district: 'myeongdong', target: [0.8407, 0.2074], style: 'hill', w: 170, h: 140, h3d: 210, color: '#527b58', roofColor: '#38543c' },
-  { id: 'jusangjeolli', name: 'Jusangjeolli Coast', hangul: '주상절리', label: 'Scogliere di Jusangjeolli', kind: 'coastal', district: 'gangnam', target: [0.8407, 0.7778], style: 'hill', w: 170, h: 150, h3d: 124, color: '#4e6664', roofColor: '#364b4c' },
-  { id: 'jeju-city', name: 'Jeju City', hangul: '제주시', label: 'Città di Jeju', kind: 'city', district: 'hongdae', target: [0.2519, 0.163], style: 'tower', w: 140, h: 136, h3d: 185, color: '#6e8a94', roofColor: '#394e57' },
-  { id: 'seogwipo', name: 'Seogwipo', hangul: '서귀포', label: 'Città di Seogwipo', kind: 'city', district: 'gangnam', target: [0.7315, 0.7796], style: 'glass', w: 170, h: 150, h3d: 210, color: '#527b95', roofColor: '#304654' },
+  { id: 'dongmun-market', name: 'Dongmun Market', hangul: '동문시장', label: 'Mercato Dongmun', kind: 'market', district: 'hongdae', target: [0.45, 0.25], style: 'warehouse', w: 150, h: 110, h3d: 70, color: '#ae7152', roofColor: '#554139', types: ['urban'] },
+  { id: 'jeju-city', name: 'Jeju City', hangul: '제주시', label: 'Città di Jeju', kind: 'city', district: 'hongdae', target: [0.5, 0.27], style: 'tower', w: 100, h: 100, h3d: 175, color: '#6e8a94', roofColor: '#394e57', types: ['urban'] },
+  { id: 'seongsan-ilchulbong', name: 'Seongsan Ilchulbong', hangul: '성산일출봉', label: 'Picco dell’alba di Seongsan', kind: 'coastal', district: 'myeongdong', target: [0.91, 0.31], style: 'hill', w: 170, h: 140, h3d: 190, color: '#527b58', roofColor: '#38543c' },
+  { id: 'jusangjeolli', name: 'Jusangjeolli Coast', hangul: '주상절리', label: 'Scogliere di Jusangjeolli', kind: 'coastal', district: 'gangnam', target: [0.46, 0.79], style: 'hill', w: 170, h: 120, h3d: 110, color: '#4e6664', roofColor: '#364b4c' },
+  { id: 'seogwipo', name: 'Seogwipo', hangul: '서귀포', label: 'Città di Seogwipo', kind: 'city', district: 'gangnam', target: [0.57, 0.75], style: 'glass', w: 100, h: 100, h3d: 190, color: '#527b95', roofColor: '#304654', types: ['urban'] },
+  { id: 'hallasan', name: 'Hallasan', hangul: '한라산', label: 'Monte Hallasan', kind: 'mountain', district: 'gyeonggi', target: [0.5, 0.5], style: 'hill', w: 150, h: 104, h3d: 360, color: '#3d6746', roofColor: '#294231', types: ['park'] },
 ];
 
 const TRANSIT = [
-  { id: 'jeju-city', name: 'Jeju City Station', label: 'Stazione Jeju City', hangul: '제주시청역', target: [0.28, 0.18], lines: ['Jeju-1'] },
-  { id: 'dongmun', name: 'Dongmun Market Station', label: 'Stazione Dongmun Market', hangul: '동문시장역', target: [0.32, 0.2], lines: ['Jeju-1', 'Port'] },
-  { id: 'jeju-airport', name: 'Jeju Airport Station', label: 'Stazione Aeroporto di Jeju', hangul: '제주공항역', target: [0.2, 0.14], lines: ['Airport', 'Jeju-1'] },
-  { id: 'aewol', name: 'Aewol Station', label: 'Stazione costiera di Aewol', hangul: '애월역', target: [0.17, 0.43], lines: ['West Coast'] },
-  { id: 'hallasan', name: 'Hallasan Trailhead', label: 'Capolinea sentieri Hallasan', hangul: '한라산입구', target: [0.5, 0.5], lines: ['Mountain'] },
-  { id: 'seogwipo', name: 'Seogwipo Terminal', label: 'Terminal degli autobus di Seogwipo', hangul: '서귀포버스터미널', target: [0.72, 0.8], lines: ['Jeju-Express'] },
-  { id: 'seongsan', name: 'Seongsan Station', label: 'Stazione Seongsan', hangul: '성산역', target: [0.82, 0.2], lines: ['East Coast'] },
+  { id: 'jeju-city', name: 'Jeju City Station', label: 'Stazione Jeju City', hangul: '제주시청역', target: [0.44, 0.27], lines: ['Jeju-1'] },
+  { id: 'dongmun', name: 'Dongmun Market Station', label: 'Stazione Dongmun Market', hangul: '동문시장역', target: [0.5, 0.26], lines: ['Jeju-1', 'Port'] },
+  { id: 'jeju-airport', name: 'Jeju Airport Station', label: 'Stazione Aeroporto di Jeju', hangul: '제주공항역', target: [0.32, 0.375], lines: ['Airport', 'Jeju-1'] },
+  { id: 'aewol', name: 'Aewol Station', label: 'Stazione costiera di Aewol', hangul: '애월역', target: [0.14, 0.42], lines: ['West Coast'] },
+  { id: 'hallasan', name: 'Hallasan Trailhead', label: 'Capolinea sentieri Hallasan', hangul: '한라산입구', target: [0.5, 0.37], lines: ['Mountain'] },
+  { id: 'seogwipo', name: 'Seogwipo Terminal', label: 'Terminal degli autobus di Seogwipo', hangul: '서귀포버스터미널', target: [0.56, 0.78], lines: ['Jeju-Express'] },
+  { id: 'seongsan', name: 'Seongsan Station', label: 'Stazione Seongsan', hangul: '성산역', target: [0.86, 0.36], lines: ['East Coast'] },
 ];
 
-const XS = [520, 760, 1000, 1240, 1480, 1760, 2040, 2320, 2600, 2900, 3200, 3500, 3800, 4100, 4400, 4680, 4900];
-const YS = [520, 760, 1000, 1240, 1480, 1760, 2040, 2320, 2600, 2730, 2960, 3250, 3550, 3800, 4050, 4350, 4680, 4900];
-const AIRPORT = { x: 820, y: 620, w: 900, h: 520 };
-const PORT = { x: 540, y: 900, w: 520, h: 520 };
+// ---------------------------------------------------------------------------
+// GEOGRAFIA
+// ---------------------------------------------------------------------------
 
-function near(a, b, e = 1) { return Math.abs(a - b) < e; }
-
-function hashNoise(x, y, seed) {
-  let h = Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263) ^ Math.imul(seed | 0, 2246822519);
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+function makeCoast(seed) {
+  const { w, h } = JEJU_WORLD;
+  const mask = createMask(w, h, 8);
+  // L'isola principale: un'ellisse lunga e stretta (73×31 km veri) con la
+  // rugosità di una costa lavica; poi il promontorio di Seongsan a est.
+  const main = roughen(blobPoly(CENTER.x, CENTER.y, 3040, 1640, seed ^ 0x11, { n: 120, rough: 0.07, rot: -0.04 }), seed ^ 0x12, { depth: 3, amp: 0.15 });
+  mask.paint(main, 1);
+  mask.paint(roughen(blobPoly(6560, 1470, 300, 210, seed ^ 0x13, { n: 36, rough: 0.12 }), seed ^ 0x14, { depth: 2, amp: 0.2 }), 1);
+  // Isolotti: Udo (nord-est), Chagwido (nord-ovest), Gapado e Marado (sud).
+  const islets = [[6820, 1010, 120, 90], [900, 900, 70, 55], [2250, 4300, 95, 70], [2020, 4560, 55, 40]];
+  islets.forEach(([x, y, rx, ry], i) => mask.paint(roughen(blobPoly(x, y, rx, ry, seed ^ (0x20 + i), { n: 24, rough: 0.15 }), seed ^ (0x30 + i), { depth: 2, amp: 0.2 }), 1));
+  return mask;
 }
 
-function valueNoise(x, y, seed) {
-  const xi = Math.floor(x), yi = Math.floor(y);
-  const u = x - xi, v = y - yi;
-  const s = (n) => n * n * (3 - 2 * n);
-  const a = hashNoise(xi, yi, seed), b = hashNoise(xi + 1, yi, seed);
-  const c = hashNoise(xi, yi + 1, seed), d = hashNoise(xi + 1, yi + 1, seed);
-  return (a + (b - a) * s(u)) + ((c + (d - c) * s(u)) - (a + (b - a) * s(u))) * s(v);
+/** Spiagge e scogliere: bassa frequenza, deterministica. Sabbia chiara o basalto scuro. */
+export function shoreKind(x, y) {
+  return valueNoise(x / 900, y / 900, 0x5ea) > 0.5 ? 'sand' : 'basalt';
 }
 
-function islandRatio(x, y) {
-  const nx = Math.abs((x - ISLAND.cx) / ISLAND.rx);
-  const ny = Math.abs((y - ISLAND.cy) / ISLAND.ry);
-  return nx ** ISLAND.power + ny ** ISLAND.power;
-}
-
-function insideIsland(x, y) { return islandRatio(x, y) <= 1; }
-
-function coastAt(y) {
-  const ny = Math.abs((y - ISLAND.cy) / ISLAND.ry);
-  if (ny >= 1) return ISLAND.cx;
-  const span = ISLAND.rx * Math.pow(Math.max(0, 1 - ny ** ISLAND.power), 1 / ISLAND.power);
-  return ISLAND.cx - span;
-}
-
-function districtAtNorm(nx, ny) {
-  let best = DISTRICTS[0], bd = Infinity;
-  for (const d of DISTRICTS) {
-    const dx = nx - d.seed.x, dy = ny - d.seed.y;
-    let dd = dx * dx + dy * dy;
-    if (d.id === 'gyeonggi') dd *= 0.75;
-    if (dd < bd) { bd = dd; best = d; }
+/** Campiona un anello a distanza `inset` dalla riva lungo raggi dal centro. */
+function ringSamples(mask, { inset, n = 720, rx = 3040, ry = 1640, from = -Math.PI / 2, erode = 7, blur = 9 }) {
+  const rad = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const t = from + (i / n) * Math.PI * 2;
+    const c = Math.cos(t);
+    const s = Math.sin(t);
+    let r = 1.35;
+    while (r > 0.2) {
+      const x = CENTER.x + c * rx * r;
+      const y = CENTER.y + s * ry * r;
+      if (mask.land(x, y) && mask.shoreDist(x, y) >= inset) break;
+      r -= 0.004;
+    }
+    rad[i] = r;
   }
-  return best;
-}
-
-function urbanityAt(x, y) {
-  const nx = x / WORLD.w, ny = y / WORLD.h;
-  const blobs = [
-    { x: 0.3, y: 0.2, r: 0.23, w: 1 }, { x: 0.81, y: 0.22, r: 0.15, w: 0.7 },
-    { x: 0.72, y: 0.79, r: 0.2, w: 1 }, { x: 0.18, y: 0.44, r: 0.12, w: 0.56 },
-  ];
-  let u = 0;
-  for (const b of blobs) {
-    const d = Math.hypot(nx - b.x, ny - b.y) / b.r;
-    if (d < 1) u += (1 - d) * (1 - d) * (3 - 2 * (1 - d)) * b.w;
+  // Erosione (minimo) per non seguire le baie piccole, poi media per ammorbidire.
+  const er = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    let m = Infinity;
+    for (let k = -erode; k <= erode; k++) m = Math.min(m, rad[(i + k + n) % n]);
+    er[i] = m;
   }
-  u += (valueNoise(x / 620, y / 620, 0x4a39) - 0.5) * 0.16;
-  return Math.max(0, Math.min(1, u));
-}
-
-function elevationAt(x, y) {
-  if (!insideIsland(x, y) || (y > RIVER.y0 && y < RIVER.y1)) return 0;
-  const dx = (x - ISLAND.cx) / 1120, dy = (y - ISLAND.cy) / 1080;
-  const peak = Math.max(0, 1 - Math.hypot(dx, dy));
-  const foothill = Math.max(0, 1 - Math.hypot((x - ISLAND.cx) / 2200, (y - ISLAND.cy) / 2050));
-  const n = (valueNoise(x / 480, y / 480, 0x8b1d) - 0.5) * 22;
-  return Math.max(0, 24 * foothill + 295 * peak * peak + n * Math.min(1, foothill));
-}
-
-function districtFor(city, x, y) {
-  const id = districtAtNorm(x / city.w, y / city.h).id;
-  return city.districtById?.[id] || DISTRICT_BY_ID[id];
-}
-
-function makeBuilding(rng, district, x, y, w, h, opts = {}) {
-  const style = opts.style || rng.pick(district.styles);
-  const b = {
-    x, y, w, h, h3d: opts.h3d ?? Math.round(district.heights[0] + rng.next() * (district.heights[1] - district.heights[0])),
-    elev: 0, style, color: opts.color || rng.pick(district.facade), roofColor: opts.roofColor || district.roof,
-    variant: rng.int(0, 3), litSeed: rng.int(0, 9999), district: district.id, districtName: district.name, districtHangul: district.hangul,
-    solid: opts.solid !== false, signs: [], edges: opts.streetEdges || [], landmark: !!opts.landmark,
-    ac: opts.ac ?? rng.int(0, 2), water: opts.water ?? rng.chance(0.18), region: 'jeju',
-  };
-  const sd = opts.signChance ?? district.signDensity;
-  if (b.h3d > 30 && b.edges.length && !b.landmark) {
-    for (const edge of b.edges) if (rng.chance(sd)) b.signs.push({ edge, t: rng.range(0.18, 0.82), word: rng.pick(['동문', '카페', '편의점', '분식', '호텔', '시장']), color: rng.chance(0.5) ? district.accent : district.accent2, vertical: rng.chance(0.6), h: rng.range(0.35, 0.8) });
-  }
-  return b;
-}
-
-function splitSpan(rng, start, len, lo, hi) {
-  const out = []; let p = 0;
-  while (len - p > lo * 0.72) {
-    let n = rng.range(lo, hi);
-    if (len - p - n < lo * 0.72) n = len - p;
-    out.push({ a: start + p, len: n }); p += n + rng.range(2, 6);
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    let sum = 0;
+    for (let k = -blur; k <= blur; k++) sum += er[(i + k + n) % n];
+    const r = sum / (2 * blur + 1);
+    const t = from + (i / n) * Math.PI * 2;
+    out.push([CENTER.x + Math.cos(t) * rx * r, CENTER.y + Math.sin(t) * ry * r]);
   }
   return out;
 }
 
-function fillUrban(rng, city, block, d) {
-  const pad = Math.min(SIDEWALK, Math.max(8, (Math.min(block.w, block.h) - 48) / 2));
-  const x = block.x + pad, y = block.y + pad, w = block.w - pad * 2, h = block.h - pad * 2;
-  if (w < 42 || h < 42) return;
-  const push = (bx, by, bw, bh, edges, corner = false) => {
-    if (bw < 30 || bh < 28) return;
-    if (rng.chance(d.block.gapChance)) { block.yards.push({ x: bx, y: by, w: bw, h: bh }); return; }
-    city.buildings.push(makeBuilding(rng, d, bx, by, bw, bh, { streetEdges: edges, arterial: block.onArterial, corner, h3d: undefined }));
+function makeElevation(city, mask, seed) {
+  return (x, y) => {
+    if (!mask.land(x, y)) return 0;
+    const s = mask.shoreDist(x, y);
+    // Rampa costiera: l'isola sale dolcemente dalla riva, senza gradino sulla battigia.
+    let e = (12 + 34 * smooth(s / 1500)) * smooth(s / 170);
+    const d = Math.hypot((x - HALLA.x) / HALLA.rx, (y - HALLA.y) / HALLA.ry);
+    if (d < 1) {
+      e += HALLA.h * Math.pow(1 - d, 1.35);
+      // Il cratere: una conca sommitale.
+      if (d < 0.07) e -= 28 * (1 - d / 0.07);
+    }
+    for (const o of city.oreums || []) {
+      const dd = Math.hypot(x - o.x, y - o.y) / o.r;
+      if (dd < 1) e += o.h * (1 - dd) * (1 - dd);
+    }
+    e += (valueNoise(x / 420, y / 420, seed ^ 0x8b1d) - 0.5) * 14 * smooth(s / 300);
+    return Math.max(0, e);
   };
-  const courtyard = w > 145 && h > 145;
-  const dt = courtyard ? rng.range(48, Math.min(100, h * 0.34)) : h * 0.5 - 2;
-  const db = courtyard ? rng.range(48, Math.min(100, h * 0.34)) : h - dt - 4;
-  const dl = courtyard ? rng.range(48, Math.min(100, w * 0.32)) : 0;
-  const dr = courtyard ? rng.range(48, Math.min(100, w * 0.32)) : 0;
-  const top = splitSpan(rng, x, w, d.block.minLot, d.block.maxLot);
-  const bot = splitSpan(rng, x, w, d.block.minLot, d.block.maxLot);
-  top.forEach((q, i) => push(q.a, y, q.len - 3, dt, ['top'], i === 0));
-  bot.forEach((q, i) => push(q.a, y + h - db, q.len - 3, db, ['bottom'], i === 0));
-  if (courtyard) {
-    const iy = y + dt + 3, ih = h - dt - db - 6;
-    const left = splitSpan(rng, iy, ih, d.block.minLot, d.block.maxLot);
-    const right = splitSpan(rng, iy, ih, d.block.minLot, d.block.maxLot);
-    left.forEach((q, i) => push(x, q.a, dl, q.len - 3, ['left'], i === 0));
-    right.forEach((q, i) => push(x + w - dr, q.a, dr, q.len - 3, ['right'], i === 0));
-    block.courtyard = { x: x + dl + 3, y: iy, w: w - dl - dr - 6, h: ih };
-    block.yards.push(block.courtyard);
-    if (rng.chance(0.68)) {
-      const aw = Math.min(48, block.courtyard.w * 0.35);
-      const alley = { x: block.x + block.w / 2 - aw / 2, y: block.y, w: aw, h: block.h, through: true };
-      block.alleys.push(alley); block.yards.push(alley); block.reachable = true;
-    }
-  } else {
-    const cols = Math.max(1, Math.floor(w / 100)), rows = Math.max(1, Math.floor(h / 100));
-    for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
-      const bw = w / cols - 5, bh = h / rows - 5;
-      const edges = [];
-      if (j === 0) edges.push('top'); if (j === rows - 1) edges.push('bottom'); if (i === 0) edges.push('left'); if (i === cols - 1) edges.push('right');
-      push(x + i * w / cols, y + j * h / rows, bw, bh, edges, edges.length > 1);
-    }
+}
+
+// ---------------------------------------------------------------------------
+// TRACCIATI DI SERVIZIO
+// ---------------------------------------------------------------------------
+
+/** Villaggio: una piccola griglia addossata a un tratto dell'anello, sul lato dell'isola. */
+function villageLegs(legs, target, { cols = 3, spacing = 300, depth = 380 }, ok) {
+  let best = null;
+  let bd = Infinity;
+  for (const l of legs) {
+    if (!l.arterial || l.b - l.a < cols * spacing + 120) continue;
+    const half = (cols * spacing) / 2 + 60;
+    const along = Math.max(l.a + half, Math.min(l.b - half, l.axis === 'h' ? target.x : target.y));
+    const px = l.axis === 'h' ? along : l.c;
+    const py = l.axis === 'h' ? l.c : along;
+    const d = Math.hypot(px - target.x, py - target.y);
+    if (d < bd) { bd = d; best = { l, along }; }
   }
-}
-
-function decorateEdges(rng, city, block, d) {
-  const edgeInset = 20;
-  const sides = [
-    { x: block.x, y: block.y + edgeInset, dx: 1, dy: 0, len: block.w }, { x: block.x, y: block.y + block.h - edgeInset, dx: 1, dy: 0, len: block.w },
-    { x: block.x + edgeInset, y: block.y, dx: 0, dy: 1, len: block.h }, { x: block.x + block.w - edgeInset, y: block.y, dx: 0, dy: 1, len: block.h },
-  ];
-  for (const e of sides) {
-    for (let i = 70; i < e.len - 20; i += 132) {
-      const x = e.x + e.dx * i, y = e.y + e.dy * i, roll = rng.next();
-      if (roll < 0.42) city.props.push({ type: 'lamp', x, y, rot: e.dx ? 0 : Math.PI / 2, z: 96, solid: false, r: 6 });
-      else if (roll < 0.42 + d.treeDensity) city.props.push({ type: 'tree', x, y, rot: rng.range(0, 6.28), z: 64, solid: false, r: 12, tint: rng.int(0, 2) });
-      else if (roll < 0.62) city.props.push({ type: 'vending', x, y, rot: e.dx ? 0 : Math.PI / 2, z: 34, solid: true, r: 12 });
-      else if (roll < 0.72) city.props.push({ type: 'bench', x, y, rot: e.dx ? 0 : Math.PI / 2, z: 14, solid: false, r: 14 });
-      else if (roll < 0.86) city.props.push({ type: 'busstop', x, y, rot: e.dx ? 0 : Math.PI / 2, z: 44, solid: false, r: 20 });
-      else city.props.push({ type: 'bin', x, y, rot: 0, z: 22, solid: false, r: 9 });
-    }
+  if (!best) return null;
+  const { l, along } = best;
+  const p0 = Math.round((along - (cols * spacing) / 2) / 20) * 20;
+  const toward = l.axis === 'h' ? (CENTER.y > l.c ? 1 : -1) : (CENTER.x > l.c ? 1 : -1);
+  const far = l.c + toward * depth;
+  const out = [];
+  for (let k = 0; k <= cols; k++) {
+    const p = p0 + k * spacing;
+    out.push({ axis: l.axis === 'h' ? 'v' : 'h', c: p, a: Math.min(l.c, far), b: Math.max(l.c, far), arterial: false });
   }
+  out.push({ axis: l.axis, c: far, a: p0, b: p0 + cols * spacing, arterial: false });
+  out.push({ axis: l.axis, c: Math.round((l.c + far) / 40) * 20, a: p0, b: p0 + cols * spacing, arterial: false });
+  const lo = Math.min(l.c, far) - 80;
+  const hi = Math.max(l.c, far) + 80;
+  const rect = l.axis === 'h'
+    ? { x0: p0 - 80, x1: p0 + cols * spacing + 80, y0: lo, y1: hi }
+    : { x0: lo, x1: hi, y0: p0 - 80, y1: p0 + cols * spacing + 80 };
+  for (const o of out) if (!ok(o.axis, o.c, o.a, o.b)) return null;
+  return { legs: out, rect };
 }
 
-function decorateYards(rng, city, block) {
-  for (const y of block.yards) {
-    const n = Math.min(8, Math.floor((y.w * y.h) / 9000));
-    for (let i = 0; i < n; i++) {
-      const x = y.x + rng.range(12, Math.max(13, y.w - 12)), py = y.y + rng.range(12, Math.max(13, y.h - 12));
-      const roll = rng.next();
-      if (roll < 0.32) city.props.push({ type: 'bin', x, y: py, rot: rng.range(0, 6.28), z: 24, solid: false, r: 10 });
-      else if (roll < 0.58) city.props.push({ type: 'pallet', x, y: py, rot: rng.range(0, 6.28), z: 10, solid: false, r: 12 });
-      else if (roll < 0.78) city.props.push({ type: 'ac_unit', x, y: py, rot: rng.range(0, 6.28), z: 26, solid: true, r: 11 });
-      else city.props.push({ type: 'barrier', x, y: py, rot: rng.range(0, 6.28), z: 20, solid: false, r: 13 });
-    }
-  }
-}
+// ---------------------------------------------------------------------------
+// GENERAZIONE
+// ---------------------------------------------------------------------------
 
-function fillRural(rng, city, block, d) {
-  const pad = 14, x = block.x + pad, y = block.y + pad, w = block.w - pad * 2, h = block.h - pad * 2;
-  block.fields = [];
-  if (w < 70 || h < 70) { block.yards.push({ x, y, w, h }); return; }
-  const cols = Math.max(1, Math.round(w / 270)), rows = Math.max(1, Math.round(h / 250));
-  for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
-    const f = { x: x + i * w / cols + 5, y: y + j * h / rows + 5, w: w / cols - 10, h: h / rows - 10, wet: rng.chance(0.52) };
-    block.fields.push(f);
-    if (rng.chance(0.26)) city.props.push({ type: 'tree', x: f.x + f.w * rng.range(0.15, 0.85), y: f.y + f.h * rng.range(0.15, 0.85), rot: rng.range(0, 6.28), z: 58, solid: false, r: 13, tint: rng.int(0, 2) });
-    if (rng.chance(0.15) && f.w > 80 && f.h > 80) city.buildings.push(makeBuilding(rng, d, f.x + f.w * 0.22, f.y + f.h * 0.22, f.w * 0.56, f.h * 0.42, { style: rng.chance(0.55) ? 'greenhouse' : 'warehouse', h3d: rng.int(24, 50), signChance: 0, streetEdges: [] }));
-  }
-  block.yards.push({ x, y, w, h });
-}
-
-function fillPark(rng, city, block, d) {
-  block.yards.push({ x: block.x, y: block.y, w: block.w, h: block.h });
-  const n = Math.min(34, Math.floor((block.w * block.h) / 5200));
-  for (let i = 0; i < n; i++) city.props.push({ type: 'tree', x: block.x + rng.range(18, Math.max(19, block.w - 18)), y: block.y + rng.range(18, Math.max(19, block.h - 18)), rot: rng.range(0, 6.28), z: rng.range(48, 82), solid: false, r: 13, tint: rng.int(0, 2) });
-}
-
-function fillDock(rng, city, block, d, opts = {}) {
-  const x = block.x + SIDEWALK, y = block.y + SIDEWALK, w = block.w - SIDEWALK * 2, h = block.h - SIDEWALK * 2;
-  block.yards.push({ x, y, w, h, turfSafe: opts.roadSafe ? false : undefined });
-  if (w < 70 || h < 70) return;
-  // Il piazzale del porto interseca volutamente gli assi della griglia. Per il
-  // suo sotto-blocco usiamo solo la cella interna (760..1000, 1000..1240):
-  // i container restano visibili senza diventare ostacoli ad archi stradali.
-  if (opts.roadSafe) {
-    const palette = ['#c8493a', '#3f7ea8', '#cf9a2f', '#4a8f5e', '#8f5aa8'];
-    // Una sola fila 2×1 entra davvero nella cella compresa fra le carreggiate
-    // x=760/1000 e y=1000/1240 (larghezze incluse).
-    const cols = Math.min(2, Math.floor((w - 20) / 58));
-    const rows = Math.min(1, Math.floor((h - 180) / 116));
-    for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
-      if (rng.chance(0.27)) continue;
-      city.buildings.push({ x: x + 10 + i * 58, y: y + 128 + j * 80, w: 40, h: 66, h3d: 26 * rng.int(1, 3), elev: 0, style: 'container', color: rng.pick(palette), roofColor: '#2c3336', variant: rng.int(1, 3), litSeed: rng.int(0, 9999), district: d.id, districtName: d.name, districtHangul: d.hangul, solid: true, signs: [], edges: [], landmark: false, ac: 0, water: false, region: 'jeju' });
-    }
-    city.props.push({ type: 'crane', x: x + 50, y: y + 190, rot: 0, z: 150, solid: true, r: 18 });
-    return;
-  }
-  if (rng.chance(0.52)) city.buildings.push(makeBuilding(rng, d, x + w * 0.18, y + h * 0.2, w * 0.62, h * 0.54, { style: 'warehouse', h3d: rng.int(38, 68), streetEdges: ['top', 'bottom'], signChance: 0.25 }));
-  const palette = ['#c8493a', '#3f7ea8', '#cf9a2f', '#4a8f5e', '#8f5aa8'];
-  for (let i = 0; i < Math.floor(w / 58); i++) for (let j = 0; j < Math.floor(h / 116); j++) {
-    if (rng.chance(0.27)) continue;
-    city.buildings.push({ x: x + 10 + i * 58, y: y + 10 + j * 116, w: 40, h: 90, h3d: 26 * rng.int(1, 3), elev: 0, style: 'container', color: rng.pick(palette), roofColor: '#2c3336', variant: rng.int(1, 3), litSeed: rng.int(0, 9999), district: d.id, districtName: d.name, districtHangul: d.hangul, solid: true, signs: [], edges: [], landmark: false, ac: 0, water: false, region: 'jeju' });
-  }
-  city.props.push({ type: 'crane', x: x + w * 0.55, y: y + h * 0.45, rot: 0, z: 150, solid: true, r: 26 });
-}
-
-function fillAirport(rng, city, block, d) {
-  const r = AIRPORT;
-  const runway = { x: r.x + 30, y: r.y + r.h * 0.08, w: r.w - 60, h: 100, horiz: true, name: '07/25' };
-  city.runways.push(runway);
-  city.taxiways.push({ x: r.x + 80, y: r.y + r.h * 0.3, w: r.w - 160, h: 40, horiz: true });
-  city.aprons.push({ x: r.x + 150, y: r.y + r.h * 0.48, w: r.w - 300, h: r.h * 0.28 });
-  city.helipads.push({ x: r.x + r.w * 0.82, y: r.y + r.h * 0.67, r: 44 });
-  for (let i = 0; i < 4; i++) city.airSpots.push({ x: r.x + 200 + i * 170, y: r.y + r.h * 0.62, angle: -Math.PI / 2, kind: i === 2 ? 'heli' : 'plane' });
-  // Il terminale resta fra le *carreggiate* x=1240/1480 e y=760/1000; la pista e
-  // l'apron conservano l'impronta grande dello scalo senza bloccare il grafo.
-  city.buildings.push(makeBuilding(rng, d, 1312, 814, 94, 110, { style: 'glass', h3d: 70, signChance: 0 }));
-  city.props.push({ type: 'windsock', x: r.x + 100, y: r.y + r.h * 0.26, rot: 0, z: 62, solid: false, r: 9 });
-  city.props.push({ type: 'windsock', x: r.x + r.w - 100, y: r.y + r.h * 0.26, rot: 0, z: 62, solid: false, r: 9 });
-  block.yards.push({ x: r.x + 140, y: r.y + r.h * 0.45, w: r.w - 280, h: r.h * 0.32 });
-}
-
-function addPier(city, x, y, w, h, kind = 'ferry') {
-  const p = { x, y, w, h, islandPier: true };
-  city.piers.push(p);
-  for (let k = 1; k < Math.floor(w / 90); k++) city.props.push({ type: 'bollard', x: x + k * 90, y: y + 8, rot: 0, z: 16, solid: false, r: 7 });
-  city.boatSpots.push({ x: x + w * 0.25, y: y + h + 36, angle: Math.PI, kind });
-}
-
-function fillPort(rng, city, block, d) {
-  const r = PORT;
-  // Il rettangolo complessivo resta disponibile al renderer, ma non è un
-  // cortile valido per i props: contiene gli assi x=760/1000 e y=1000/1240.
-  block.yards.push({ x: r.x + 20, y: r.y + 20, w: r.w - 40, h: r.h - 40, turfSafe: false });
-  // Zona libera a sud del molo: anche il margine del prop (r=12) resta nella
-  // cella x=520..760, y=1000..1240, lontano dai centri degli archi.
-  block.yards.push({ x: 600, y: 1080, w: 100, h: 108, turfSafe: true });
-  // Magazzino sul lato sud-ovest, nella cella x=520..760/y=1240..1480.
-  city.buildings.push(makeBuilding(rng, d, 594, 1318, 118, 104, { style: 'warehouse', h3d: 58, streetEdges: [], signChance: 0.3 }));
-  city.helipads.push({ x: r.x + r.w * 0.72, y: r.y + r.h * 0.78, r: 42 });
-  fillDock(rng, city, { x: r.x + 240, y: r.y + 30, w: r.w - 260, h: r.h - 60, yards: block.yards }, d, { roadSafe: true });
-}
-
-function lineIsOn(axis, c, mid) {
-  if (!insideIsland(axis === 'v' ? c : mid, axis === 'v' ? mid : c)) return false;
-  if (axis === 'v' && mid > RIVER.y0 && mid < RIVER.y1 && ![1240, 2600, 4100].some((x) => near(c, x, 2))) return false;
-  const north = c >= 700 && c <= 3000 && mid >= 500 && mid <= 1800;
-  const south = c >= 2450 && c <= 4920 && mid >= 3450 && mid <= 4920;
-  const west = c >= 480 && c <= 1550 && mid >= 1650 && mid <= 4380;
-  const east = c >= 3700 && c <= 4920 && mid >= 800 && mid <= 2550;
-  const ring = axis === 'v'
-    ? ((near(c, 520) || near(c, 4900)) && mid >= 520 && mid <= 4900) || ((near(c, 1000) || near(c, 4400)) && mid >= 1000 && mid <= 4400)
-    : ((near(c, 520) || near(c, 4900)) && mid >= 520 && mid <= 4900) || ((near(c, 1000) || near(c, 4400)) && mid >= 1000 && mid <= 4400);
-  const spine = axis === 'v' ? (near(c, 2600) || near(c, 2320) || near(c, 2900)) : (near(c, 2600) || near(c, 2960) || near(c, 3250));
-  const coastal = axis === 'h' && (near(c, 760) || near(c, 4550)) && mid >= 520 && mid <= 4900;
-  return ring || spine || north || south || west || east || coastal;
-}
-
-function buildLines() {
-  const make = (coords, axis) => coords.map((c) => {
-    const arterial = near(c, 520) || near(c, 4900) || near(c, 1000) || near(c, 4400) || near(c, 2600);
-    const line = { c, width: arterial ? 132 : 72, arterial, segments: [], on: new Array((axis === 'v' ? YS : XS).length - 1).fill(false) };
-    const perp = axis === 'v' ? YS : XS;
-    for (let i = 0; i < perp.length - 1; i++) line.on[i] = lineIsOn(axis, c, (perp[i] + perp[i + 1]) / 2);
-    let start = null;
-    for (let i = 0; i < line.on.length; i++) {
-      if (line.on[i] && start === null) start = perp[i];
-      if ((!line.on[i] || i === line.on.length - 1) && start !== null) {
-        const end = line.on[i] && i === line.on.length - 1 ? perp[i + 1] : perp[i];
-        line.segments.push([start, end]); start = null;
-      }
-    }
-    return line;
-  });
-  return { vLines: make(XS, 'v'), hLines: make(YS, 'h') };
-}
-
-function doorPoint(b, edge) {
-  const nx = edge === 'left' ? -1 : edge === 'right' ? 1 : 0;
-  const ny = edge === 'top' ? -1 : edge === 'bottom' ? 1 : 0;
-  const x = edge === 'left' ? b.x : edge === 'right' ? b.x + b.w : b.x + b.w / 2;
-  const y = edge === 'top' ? b.y : edge === 'bottom' ? b.y + b.h : b.y + b.h / 2;
-  return { x: x + nx * 11, y: y + ny * 11, nx, ny, edge };
-}
-
-function shopCandidate(b) { return b.edges?.length && !b.landmark && !b.flat && !b.transitEntrance && b.w >= 40 && b.h >= 40 && b.style !== 'container'; }
-
-function makeShop(city, rng, b, edge, id, mix) {
-  const door = doorPoint(b, edge), levels = Math.max(1, Math.min(4, 1 + Math.floor((b.h3d - 30) / 46)));
-  const biz = [id]; for (let i = 1; i < levels; i++) biz.push(rng.pick(mix.upper));
-  const first = BUSINESSES[id] || BUSINESSES.conv;
-  const s = { id: city.shops.length, x: door.x, y: door.y, nx: door.nx, ny: door.ny, edge, w: b.w, h: b.h, building: b, district: b.district, districtName: b.districtName, districtHangul: b.districtHangul, biz, name: first.label, hangul: first.hangul, blip: first.blip || null, seed: (city.seed + b.x * 7919 + b.y * 104729 + city.shops.length * 31) >>> 0 };
-  b.shop = s; city.shops.push(s); return s;
-}
-
-function retitleShop(s, id) { const b = BUSINESSES[id]; if (!b) return; s.biz[0] = id; s.name = b.label; s.hangul = b.hangul; s.blip = b.blip || null; }
-
-function placeShops(city) {
-  const rng = new Rng((city.seed ^ 0x5e0c1) >>> 0), doors = new SpatialGrid(city.w, city.h, 160), near = [];
-  city.shops = [];
-  for (const b of city.buildings) {
-    if (!shopCandidate(b)) continue;
-    const d = DISTRICT_BY_ID[b.district], mix = DISTRICT_MIX[b.district] || DISTRICT_MIX.hongdae;
-    if (!rng.chance((d.signDensity || 0.4) * 0.58)) continue;
-    const edge = rng.pick(b.edges), p = doorPoint(b, edge);
-    doors.queryCircle(p.x, p.y, 80, near);
-    if (near.some((q) => (q.px - p.x) ** 2 + (q.py - p.y) ** 2 < 80 * 80)) continue;
-    const s = makeShop(city, rng, b, edge, rng.pick(mix.ground), mix);
-    doors.insertRect({ x: p.x - 1, y: p.y - 1, w: 2, h: 2, px: s.x, py: s.y });
-  }
-  for (const h of city.hospitals) {
-    let best = null, bd = Infinity;
-    for (const b of city.buildings) if (shopCandidate(b) && b.district === h.district) {
-      const dd = (b.x + b.w / 2 - h.x) ** 2 + (b.y + b.h / 2 - h.y) ** 2;
-      if (dd < bd) { bd = dd; best = b; }
-    }
-    if (!best) continue;
-    if (best.shop) retitleShop(best.shop, 'clinic'); else makeShop(city, rng, best, rng.pick(best.edges), 'clinic', DISTRICT_MIX[best.district] || DISTRICT_MIX.hongdae);
-    h.x = best.shop.x; h.y = best.shop.y; h.shop = best.shop;
-  }
-  const have = new Set(city.shops.filter((s) => s.biz[0] === 'pawn').map((s) => s.district));
-  for (const d of DISTRICTS) {
-    if (have.has(d.id)) continue;
-    const candidates = city.buildings.filter((b) => shopCandidate(b) && !b.shop && b.district === d.id);
-    const b = candidates[0];
-    if (b) makeShop(city, rng, b, rng.pick(b.edges), 'pawn', DISTRICT_MIX[d.id] || DISTRICT_MIX.hongdae);
-  }
-}
-
-function placeGarages(city) {
-  city.garages = [];
-  for (const d of DISTRICTS) {
-    let best = null, edge = null, bd = Infinity;
-    for (const b of city.buildings) {
-      if (!shopCandidate(b) || b.shop || b.garage || b.district !== d.id) continue;
-      for (const e of b.edges) {
-        const span = e === 'top' || e === 'bottom' ? b.w : b.h;
-        if (span < 84) continue;
-        const dd = (b.x + b.w / 2 - d.seed.x * city.w) ** 2 + (b.y + b.h / 2 - d.seed.y * city.h) ** 2;
-        if (dd < bd) { bd = dd; best = b; edge = e; }
-      }
-    }
-    if (!best) continue;
-    best.garage = true;
-    const p = doorPoint(best, edge), horiz = edge === 'top' || edge === 'bottom', w = horiz ? 78 : 56, h = horiz ? 56 : 78;
-    const cx = p.x + p.nx * 16, cy = p.y + p.ny * 16;
-    city.garages.push({ x: cx - w / 2, y: cy - h / 2, w, h, cx, cy, edge, horiz, door: { x: p.x, y: p.y }, building: best, district: d.id, name: d.name });
-  }
-}
-
-function placeHospitalsAndPolice(city) {
-  city.hospitals = []; city.stations = [];
-  for (const d of DISTRICTS) {
-    const pool = city.buildings.filter((b) => b.district === d.id && b.edges?.length && !b.landmark && b.w >= 100 && b.h >= 80);
-    if (!pool.length) continue;
-    const target = d.seed.x * city.w, ty = d.seed.y * city.h;
-    pool.sort((a, b) => ((a.x + a.w / 2 - target) ** 2 + (a.y + a.h / 2 - ty) ** 2) - ((b.x + b.w / 2 - target) ** 2 + (b.y + b.h / 2 - ty) ** 2));
-    const hospital = pool[0]; hospital.hospital = true;
-    const hp = doorPoint(hospital, hospital.edges[0]);
-    city.hospitals.push({ x: hp.x, y: hp.y, district: d.id, name: d.name, districtName: d.name, districtHangul: d.hangul });
-    const police = pool.find((b) => b !== hospital && (b.x - hospital.x) ** 2 + (b.y - hospital.y) ** 2 > 320 * 320) || pool[1];
-    if (police) {
-      police.station = true;
-      const pp = doorPoint(police, police.edges[police.edges.length - 1]);
-      city.stations.push({ x: pp.x, y: pp.y, district: d.id, name: d.name, districtName: d.name, districtHangul: d.hangul });
-    }
-  }
-}
-
-function placeTurfs(city) {
-  city.turfs = [];
-  const anchors = [
-    ['baekho', 'hongdae'], ['hwangso', 'myeongdong'], ['heuksa', 'docks'], ['cheolma', 'gangnam'], ['heuksa', 'itaewon'],
-  ];
-  const rng = new Rng((city.seed ^ 0x9a11d) >>> 0);
-  for (const [gangId, districtId] of anchors) {
-    const g = GANGS.find((q) => q.id === gangId), candidates = city.blocks.filter((b) => b.district === districtId && b.yards.some((y) => y.turfSafe !== false && y.w > 100 && y.h > 74));
-    if (!g || !candidates.length) continue;
-    const b = candidates[city.turfs.length % candidates.length], a = b.yards.find((y) => y.turfSafe !== false && y.w > 100 && y.h > 74);
-    const t = { x: a.x, y: a.y, w: a.w, h: a.h, cx: a.x + a.w / 2, cy: a.y + a.h / 2, gang: g.id, name: g.name, hangul: g.hangul, color: g.color, trade: g.trade, place: b.type === 'dock' ? 'Piazzale dei container' : 'Cortile dietro il mercato', district: districtId, tag: rng.int(0, 3) };
-    b.turf = t; city.turfs.push(t);
-    for (let i = 0; i < 4; i++) city.props.push({ type: i % 2 ? 'crate' : 'drum', x: a.x + rng.range(16, Math.max(17, a.w - 16)), y: a.y + rng.range(16, Math.max(17, a.h - 16)), rot: rng.range(0, 6.28), z: 26, solid: true, r: 12 });
-  }
-}
-
-function nearestRoadPoint(city, target) {
-  const tx = target[0] * city.w, ty = target[1] * city.h;
-  let best = null, bd = Infinity, fallback = null, fd = Infinity;
-  for (const n of city.graph.usableNodes) {
-    if (!insideIsland(n.x, n.y) || city.isWater(n.x, n.y)) continue;
-    const dd = (n.x - tx) ** 2 + (n.y - ty) ** 2;
-    if (dd < fd) { fd = dd; fallback = n; }
-    const blocked = city.buildings.some((b) => b.solid && n.x > b.x - 22 && n.x < b.x + b.w + 22 && n.y > b.y - 22 && n.y < b.y + b.h + 22);
-    if (!blocked && dd < bd) { bd = dd; best = n; }
-  }
-  const chosen = best || fallback;
-  return chosen ? { x: chosen.x, y: chosen.y } : { x: ISLAND.cx, y: ISLAND.cy };
-}
-
-function landmarkSite(city, spec) {
-  const wanted = { x: spec.target[0] * city.w, y: spec.target[1] * city.h };
-  // I generatori riempiono gli isolati prima dei landmark. Riserviamo quindi il
-  // lotto più vicino all'ancora e liberiamo soltanto il suo cortile: il volume
-  // resta nel luogo riconoscibile, senza essere costretto a migrare di chilometri
-  // per evitare i palazzi procedurali già nati lì.
-  const lots = city.blocks
-    .filter((b) => b.type !== 'airport' && b.type !== 'port'
-      && b.w >= spec.w + 20 && b.h >= spec.h + 20)
-    .map((b) => ({
-      block: b,
-      score: (b.x + b.w / 2 - wanted.x) ** 2 + (b.y + b.h / 2 - wanted.y) ** 2
-        + (b.district === spec.district ? 0 : 900 * 900),
-    }))
-    .sort((a, b) => a.score - b.score);
-  for (const { block } of lots) {
-    const rect = {
-      x: block.x + (block.w - spec.w) / 2,
-      y: block.y + (block.h - spec.h) / 2,
-      w: spec.w,
-      h: spec.h,
-    };
-    if (rectIntersectsRoad(city, rect, 12)) continue;
-    if (city.buildings.some((b) => b.landmark && rectsOverlap(rect, b, 18))) continue;
-    let wet = false;
-    for (const fy of [0.04, 0.5, 0.96]) for (const fx of [0.04, 0.5, 0.96]) {
-      if (city.isWater(rect.x + rect.w * fx, rect.y + rect.h * fy)) wet = true;
-    }
-    if (wet) continue;
-    city.buildings = city.buildings.filter((b) => b.landmark || !rectsOverlap(rect, b, 14));
-    city.props = city.props.filter((p) => !rectsOverlap(rect, {
-      x: p.x - (p.r || 0), y: p.y - (p.r || 0), w: (p.r || 0) * 2, h: (p.r || 0) * 2,
-    }, 10));
-    block.jejuLandmark = spec.id;
-    return rect;
-  }
-
-  const candidate = (cx, cy) => {
-    const rect = { x: cx - spec.w / 2, y: cy - spec.h / 2, w: spec.w, h: spec.h };
-    if (rect.x < 72 || rect.y < 72 || rect.x + rect.w > city.w - 72 || rect.y + rect.h > city.h - 72) return null;
-    for (const fy of [0.04, 0.5, 0.96]) for (const fx of [0.04, 0.5, 0.96]) {
-      if (city.isWater(rect.x + rect.w * fx, rect.y + rect.h * fy)) return null;
-    }
-    if (rectIntersectsRoad(city, rect, 12)) return null;
-    if (city.buildings.some((b) => b.solid && rectsOverlap(rect, b, 8))) return null;
-    if (city.props.some((p) => p.solid && rectsOverlap(rect, {
-      x: p.x - (p.r || 0), y: p.y - (p.r || 0), w: (p.r || 0) * 2, h: (p.r || 0) * 2,
-    }, 5))) return null;
-    return rect;
-  };
-  for (let radius = 0; radius <= 1500; radius += 24) {
-    const count = radius ? Math.max(16, Math.ceil(Math.PI * 2 * radius / 32)) : 1;
-    for (let i = 0; i < count; i++) {
-      const a = radius ? Math.PI * 2 * i / count : 0;
-      const found = candidate(wanted.x + Math.cos(a) * radius, wanted.y + Math.sin(a) * radius);
-      if (found) return found;
-    }
-  }
-  throw new Error(`Nessun lotto libero per il landmark ${spec.id}`);
-}
-
-function landmarkBuilding(city, spec) {
-  const site = landmarkSite(city, spec);
-  const d = city.districtById[spec.district], b = makeBuilding(new Rng((city.seed ^ spec.id.length * 811) >>> 0), d, site.x, site.y, site.w, site.h, { style: spec.style, h3d: spec.h3d, color: spec.color, roofColor: spec.roofColor, landmark: true, signChance: 0, ac: 0, water: false, solid: true, streetEdges: [] });
-  b.name = spec.name; b.hangul = spec.hangul; b.label = spec.label; b.kind = spec.kind; b.region = 'jeju'; b.districtName = d.name; b.districtHangul = d.hangul;
-  city.buildings.push(b);
-  return b;
-}
-
-function addLandmarks(city) {
-  city.landmarks = [];
-  for (const spec of LANDMARKS) {
-    const b = landmarkBuilding(city, spec);
-    city.landmarks.push({ id: spec.id, name: spec.name, hangul: spec.hangul, label: spec.label, kind: spec.kind, district: spec.district, region: 'jeju', x: b.x + b.w / 2, y: b.y + b.h / 2, building: b });
-  }
-  city.landmarks.push({ id: 'jeju-international-airport', name: 'Jeju International Airport', hangul: '제주국제공항', label: 'Aeroporto Internazionale di Jeju', kind: 'airport', district: 'gimpo', region: 'jeju', x: AIRPORT.x + AIRPORT.w * 0.66, y: AIRPORT.y + AIRPORT.h * 0.84 });
-  city.landmarks.push({ id: 'jeju-port', name: 'Jeju Port Ferry Terminal', hangul: '제주항 여객터미널', label: 'Terminal dei traghetti di Jeju', kind: 'port', district: 'docks', region: 'jeju', x: PORT.x + PORT.w * 0.55, y: PORT.y + PORT.h * 0.35 });
-  city.regionalLandmarks = city.landmarks;
-}
-
-function addTransit(city) {
-  city.transitStations = [];
-  city.metroEntrances = [];
-  for (const spec of TRANSIT) {
-    const p = nearestRoadPoint(city, spec.target);
-    const station = { id: spec.id, name: spec.name, label: spec.label, hangul: spec.hangul, x: p.x, y: p.y, arrivalX: p.x, arrivalY: p.y, lines: [...spec.lines], region: 'jeju' };
-    city.transitStations.push(station);
-    // x/y sono il centro: il registro delle regioni può poi spostare il vano
-    // sul marciapiede senza reinterpretare la coordinata editoriale.
-    const entrance = { x: p.x, y: p.y, w: 56, h: 36, stationId: station.id, name: spec.name, hangul: spec.hangul, region: 'jeju' };
-    city.metroEntrances.push(entrance);
-    // L'accesso visibile è il prop normalizzato da `regions.reindex`: un secondo
-    // volume edilizio qui verrebbe estruso con la quota di Hallasan e resterebbe
-    // sul nodo originario anche se la scala viene spostata sul marciapiede.
-    city.props.push({ type: 'busstop', x: p.x, y: p.y - 34, rot: 0, z: 44, solid: false, r: 20, stationId: station.id, transit: true });
-  }
-  city.transitEntrances = city.metroEntrances;
-}
-
-function addIntersections(city) {
-  city.intersections = []; city.crosswalks = [];
-  for (let i = 0; i < city.vLines.length; i++) for (let j = 0; j < city.hLines.length; j++) {
-    const v = city.vLines[i], h = city.hLines[j];
-    const up = j > 0 && v.on[j - 1], down = j < city.hLines.length - 1 && v.on[j];
-    const left = i > 0 && h.on[i - 1], right = i < city.vLines.length - 1 && h.on[i];
-    if (!(up || down) || !(left || right)) continue;
-    city.intersections.push({ x: v.c, y: h.c, vw: v.width, hw: h.width, arterial: v.arterial && h.arterial, vi: i, hi: j });
-    const off = 8;
-    if (up) city.crosswalks.push({ x: v.c, y: h.c - h.width / 2 - off, w: v.width, h: 16, horiz: true });
-    if (down) city.crosswalks.push({ x: v.c, y: h.c + h.width / 2 + off, w: v.width, h: 16, horiz: true });
-    if (left) city.crosswalks.push({ x: v.c - v.width / 2 - off, y: h.c, w: 16, h: h.width, horiz: false });
-    if (right) city.crosswalks.push({ x: v.c + v.width / 2 + off, y: h.c, w: 16, h: h.width, horiz: false });
-  }
-}
-
-function indexCity(city) {
-  city.buildingGrid = new SpatialGrid(city.w, city.h, 300);
-  for (const b of city.buildings) { b.elev = b.elev || elevationAt(b.x + b.w / 2, b.y + b.h / 2); city.buildingGrid.insertRect(b); }
-  city.propGrid = new SpatialGrid(city.w, city.h, 220);
-  for (const p of city.props) city.propGrid.insertRect({ x: p.x - p.r, y: p.y - p.r, w: p.r * 2, h: p.r * 2, prop: p });
-  city.solidGrid = new SpatialGrid(city.w, city.h, 260);
-  for (const b of city.buildings) if (b.solid) city.solidGrid.insertRect(b);
-  for (const p of city.props) if (p.solid) city.solidGrid.insertRect({ x: p.x - p.r, y: p.y - p.r, w: p.r * 2, h: p.r * 2, prop: p, solid: true });
-  for (const s of city.stairs) city.solidGrid.insertRect(s);
-  city.blockGrid = new SpatialGrid(city.w, city.h, 400);
-  for (const b of city.blocks) city.blockGrid.insertRect(b);
-}
-
-function addPiers(city) {
-  city.piers = []; city.boatSpots = [];
-  addPier(city, Math.max(40, coastAt(1080) - 260), 1030, 300, 76, 'ferry');
-  addPier(city, Math.max(40, coastAt(1240) - 220), 1190, 250, 72, 'boat');
-  // La costa sud-est resta acqua anche senza l'helper grafico della battigia ovest.
-  city.piers.push({ x: 4070, y: 4800, w: 84, h: 300, islandPier: true });
-  city.boatSpots.push({ x: 4110, y: 5160, angle: Math.PI / 2, kind: 'boat' });
-}
+const SUBURBS = [
+  { x0: 1000, x1: 2400, y0: 1850, y1: 3200 }, { x0: 4700, x1: 6300, y0: 1750, y1: 3300 }, { x0: 1900, x1: 4900, y0: 3050, y1: 3700 }, { x0: 2000, x1: 3100, y0: 1750, y1: 2500 }, { x0: 4700, x1: 6000, y0: 3300, y1: 3800 },
+];
+const inRect = (x, y, r) => x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1;
 
 export function createJejuCity(seed = JEJU_SEED) {
   const rng = new Rng(seed);
-  const localDistricts = DISTRICTS.map(cloneDistrict);
-  const localDistrictById = Object.fromEntries(localDistricts.map((d) => [d.id, d]));
+  const { w: W, h: H } = JEJU_WORLD;
+  const districts = DISTRICTS.map((d) => kit.cloneDistrict(d, REGION));
+  // Lotti più stretti e meno vuoti di quelli di Seoul: sulla costa si costruisce fitto.
+  const LOT = { hongdae: 0.6, myeongdong: 0.62, itaewon: 0.6, gangnam: 0.7, docks: 0.9, gimpo: 0.85, gyeonggi: 0.85 };
+  for (const d of districts) { d.lotScale = (LOT[d.id] ?? 0.85) * 0.78; d.gapScale = 0.5; d.shopScale = 1.6; }
+  const byId = Object.fromEntries(districts.map((d) => [d.id, d]));
   const city = {
-    w: WORLD.w, h: WORLD.h, seed, region: { id: 'jeju', name: 'Jeju', hangul: '제주' }, name: 'Jeju', nameIt: 'Jeju', hangul: '제주',
-    vLines: [], hLines: [], river: { id: 'hancheon-stream', name: 'Hancheon Stream', hangul: '한천', label: 'Torrente Hancheon', y0: RIVER.y0, y1: RIVER.y1, bridges: [{ x: 1240, w: 132 }, { x: 2600, w: 132 }, { x: 4100, w: 132 }] },
+    w: W, h: H, margin: JEJU_WORLD.margin, seed, region: { id: 'jeju', name: 'Jeju', hangul: '제주' }, name: 'Jeju', nameIt: 'Jeju', hangul: '제주',
+    vLines: [], hLines: [], river: { id: 'hancheon-stream', name: 'Hancheon Stream', hangul: '한천', label: 'Torrente Hancheon', y0: 0, y1: 0, bridges: [] },
     blocks: [], buildings: [], props: [], landmarks: [], crosswalks: [], intersections: [], runways: [], taxiways: [], aprons: [], helipads: [], piers: [], airSpots: [], boatSpots: [], stairs: [],
-    districts: localDistricts, districtById: localDistrictById, getDistrict: (id) => localDistrictById[id] || null,
+    districts, districtById: byId, getDistrict: (id) => byId[id] || null, oreums: [],
   };
-  city.elevationAt = elevationAt;
-  city.urbanAt = urbanityAt;
-  city.districtAt = (x, y) => districtFor(city, x, y);
-  city.coastAt = coastAt;
-  city.waterX = coastAt(ISLAND.cy);
+  const mask = makeCoast(seed);
+  city.mask = mask;
+
+  // --- acqua, quota, distretti ---------------------------------------------
+  // I moli sono terra calpestabile dentro l'acqua: l'eccezione si legge al volo.
+  city.isWater = (x, y) => {
+    for (const p of city.piers) if (x > p.x && x < p.x + p.w && y > p.y && y < p.y + p.h) return false;
+    return !mask.land(x, y);
+  };
+  city.elevationAt = makeElevation(city, mask, seed);
+  city.shoreDist = (x, y) => mask.shoreDist(x, y);
+  city.shoreKind = shoreKind;
+  const seeds = districts.map((d) => ({ d, x: d.seed.x * W, y: d.seed.y * H, k: d.id === 'gyeonggi' ? 0.55 : 1 }));
+  city.districtAt = (x, y) => {
+    let best = seeds[0].d;
+    let bd = Infinity;
+    for (const s of seeds) {
+      const dd = ((x - s.x) ** 2 + (y - s.y) ** 2) * s.k;
+      if (dd < bd) { bd = dd; best = s.d; }
+    }
+    return best;
+  };
+  city.urbanZones = [];
+  city.urbanAt = (x, y) => {
+    if (!mask.land(x, y)) return 0;
+    for (const z of city.urbanZones) if (inRect(x, y, z)) return 0.8;
+    return 0.12;
+  };
+  const scan = {
+    north: (x) => { for (let y = 0; y < H; y += 8) if (mask.land(x, y)) return y; return null; },
+    south: (x) => { for (let y = H - 1; y > 0; y -= 8) if (mask.land(x, y)) return y; return null; },
+  };
+  const spanMin = (f, a, b, step = 40) => { let m = Infinity; for (let v = a; v <= b; v += step) m = Math.min(m, f(v)); return m; };
+  void spanMin;
+
+  // --- strade --------------------------------------------------------------
+  // Gli assi delle due cittadine: la strada costiera vi passa **dritta**, a quota fissa.
+  const AIRPORT_ZONE = { lo: 1400, hi: 3040, ringY: 1800 };
+  const JEJU_SI = { lo: 3040, hi: 5400, ringY: 1290, x0: 3160, x1: 5300 };
+  const SEOGWIPO = { lo: 3000, hi: 4700 };
+  const overrides = [
+    { lo: AIRPORT_ZONE.lo, hi: AIRPORT_ZONE.hi, value: AIRPORT_ZONE.ringY, north: true },
+    { lo: JEJU_SI.lo, hi: JEJU_SI.hi, value: JEJU_SI.ringY, north: true },
+  ];
+  const samples = ringSamples(mask, { inset: 380 }).map(([x, y]) => {
+    for (const o of overrides) if (x >= o.lo && x <= o.hi && (o.north ? y < CENTER.y : y > CENTER.y)) return [x, o.value, true];
+    return [x, y];
+  });
+  const ring = staircase(samples, { thr: 230, snap: 20, closed: true });
+  const legs = pathLegs(ring, true);
+  const ringLegsAll = legs.slice();
+  const loopSamples = [];
+  for (let i = 0; i < 360; i++) {
+    const t = -Math.PI / 2 + (i / 360) * Math.PI * 2;
+    loopSamples.push([HALLA.x + Math.cos(t) * HALLA.rx * 0.9, HALLA.y + Math.sin(t) * HALLA.ry * 0.9]);
+  }
+  const loopLegs = pathLegs(staircase(loopSamples, { thr: 200, snap: 20, closed: true }), false);
+  legs.push(...loopLegs);
+  const loopY = (x, north) => {
+    let best = null;
+    for (const l of loopLegs) if (l.axis === 'h' && x >= l.a + 30 && x <= l.b - 30 && (north ? l.c < HALLA.y : l.c > HALLA.y)) if (best === null || (north ? l.c < best : l.c > best)) best = l.c;
+    return best;
+  };
+
+  const sampleOk = (axis, c, a, b) => {
+    for (let t = a; t <= b; t += 70) {
+      const x = axis === 'v' ? c : t;
+      const y = axis === 'v' ? t : c;
+      if (!mask.land(x, y) || mask.shoreDist(x, y) < 150) return false;
+      if (Math.hypot((x - HALLA.x) / HALLA.rx, (y - HALLA.y) / HALLA.ry) < 0.8) return false;
+    }
+    return true;
+  };
+
+  // Jeju-si: lungomare (a gradini, segue la riva), tre file di isolati attorno alla
+  // strada costiera e una via che chiude a sud. Le verticali attraversano l'anello.
+  const wfSamples = [];
+  for (let x = JEJU_SI.x0; x <= JEJU_SI.x1; x += 40) wfSamples.push([x, scan.north(x) + 190]);
+  const xsN = [];
+  for (let x = JEJU_SI.x0 + 100; x <= JEJU_SI.x1 - 60; x += 290 + Math.round(rng.range(-25, 30))) xsN.push(Math.round(x / 20) * 20);
+  const wfN = clipLegs(pathLegs(staircase(wfSamples, { thr: 200, snap: 20 }), false), xsN[0], xsN[xsN.length - 1]);
+  legs.push(...wfN);
+  const townRowY = JEJU_SI.ringY + 340;
+  const townSouthY = JEJU_SI.ringY + 560;
+  xsN.forEach((x, i) => {
+    const wf = horizontalAt(wfN, x);
+    if (!wf) return;
+    // La verticale scende fino all'anello interno se lo incontra, altrimenti si ferma
+    // alla seconda fila: oltre, il cono.
+    const ly = loopY(x, true);
+    const end = ly !== null && ly - JEJU_SI.ringY < 700 ? ly : townRowY;
+    legs.push({ axis: 'v', c: x, a: wf.c, b: end, arterial: i === Math.floor(xsN.length * 0.35) });
+  });
+  legs.push({ axis: 'h', c: townRowY, a: xsN[0], b: xsN[xsN.length - 1], arterial: false });
+
+  // Seogwipo: specchio a sud. L'anello interno fa da limite settentrionale.
+  const wfSSamples = [];
+  for (let x = SEOGWIPO.lo + 100; x <= SEOGWIPO.hi - 100; x += 40) wfSSamples.push([x, scan.south(x) - 190]);
+  const xsS = [];
+  for (let x = SEOGWIPO.lo + 200; x <= SEOGWIPO.hi - 220; x += 290 + Math.round(rng.range(-25, 30))) xsS.push(Math.round(x / 20) * 20);
+  const wfS = clipLegs(pathLegs(staircase(wfSSamples, { thr: 200, snap: 20 }), false), xsS[0], xsS[xsS.length - 1]);
+  legs.push(...wfS);
+  const ringSouth = (x) => { let best = null; for (const l of ringLegsAll) if (l.axis === 'h' && l.c > HALLA.y && x >= l.a + 30 && x <= l.b - 30) best = l; return best; };
+  xsS.forEach((x, i) => {
+    const wf = horizontalAt(wfS, x);
+    if (!wf) return;
+    const ly = loopY(x, false);
+    const rs = ringSouth(x);
+    const start = ly !== null && rs && rs.c - ly < 700 ? ly : (rs ? rs.c - 280 : wf.c - 560);
+    legs.push({ axis: 'v', c: x, a: start, b: wf.c, arterial: i === Math.floor(xsS.length * 0.5) });
+  });
+
+  // Aeroporto: il rettangolo sta fra la costa e la strada costiera, e quella è la
+  // sua strada d'accesso (il terminale ha la facciata sul lato dell'anello).
+  const AP = { x: 1900, y: 1290, w: 880, h: 380 };
+  const keepOut = [AP];
+  const okFarm = (axis, c, a, b) => sampleOk(axis, c, a, b) && !keepOut.some((r) => (axis === 'v'
+    ? c > r.x - 120 && c < r.x + r.w + 120 && b > r.y && a < r.y + r.h
+    : c > r.y - 120 && c < r.y + r.h + 120 && b > r.x && a < r.x + r.w));
+
+  // Villaggi sul litorale.
+  const villages = [];
+  const VILLAGES = [
+    { id: 'aewol', at: { x: 1050, y: 2000 }, cols: 3 },
+    { id: 'hallim', at: { x: 1150, y: 2900 }, cols: 3 },
+    { id: 'seongsan', at: { x: 6150, y: 1800 }, cols: 3 },
+    { id: 'pyoseon', at: { x: 5600, y: 3300 }, cols: 3 },
+    { id: 'jungmun', at: { x: 2300, y: 3350 }, cols: 3 },
+    { id: 'gujwa', at: { x: 5700, y: 1620 }, cols: 2 },
+  ];
+  const ringLegs = legs.filter((l) => l.arterial);
+  for (const v of VILLAGES) {
+    const free = (axis, c, a, b) => sampleOk(axis, c, a, b)
+      && !legs.some((l) => l.axis === axis && !l.arterial && Math.abs(l.c - c) < 200 && Math.min(b, l.b) - Math.max(a, l.a) > 60);
+    const g = villageLegs(ringLegs, v.at, { cols: v.cols + 1, spacing: 280, depth: 560 }, free)
+      || villageLegs(ringLegs, v.at, { cols: v.cols, spacing: 300, depth: 560 }, free)
+      || villageLegs(ringLegs, v.at, { cols: v.cols, spacing: 300, depth: 400 }, free)
+      || villageLegs(ringLegs, v.at, { cols: 2, spacing: 300, depth: 400 }, free);
+    if (!g) continue;
+    legs.push(...g.legs);
+    villages.push({ id: v.id, rect: g.rect });
+  }
+
+  // La strada del promontorio di Seongsan: dall'anello al piede dell'Ilchulbong.
+  {
+    let ringE = null;
+    for (const l of ringLegsAll) if (l.axis === 'v' && l.a < 1560 && l.b > 1440 && (!ringE || l.c > ringE.c)) ringE = l;
+    if (ringE) {
+      let xEnd = ringE.c;
+      for (let x = ringE.c; x < 6760; x += 20) { if (!mask.land(x, 1500) || mask.shoreDist(x, 1500) < 90) break; xEnd = x; }
+      if (xEnd - ringE.c > 240) legs.push({ axis: 'h', c: 1500, a: ringE.c, b: xEnd, arterial: false });
+    }
+  }
+
+  // Strade di campagna: reticolo largo fra anello e anello interno.
+  const lat = (from, to, step) => { const out = []; for (let v = from; v <= to; v += step) out.push(v); return out; };
+  legs.push(...farmRoads(legs, { axis: 'v', lattice: lat(1000, 6400, 360), ok: okFarm, clearance: 170, minGap: 330 }));
+  legs.push(...farmRoads(legs, { axis: 'h', lattice: lat(1700, 3400, 420), ok: okFarm, clearance: 190, minGap: 380 }));
+
+  buildNetwork(city, legs);
+  city.isOnRoad = makeRoadHit(city);
+
+  // --- oreum: i piccoli coni parassiti ------------------------------------------
+  const roadHit = city.isOnRoad;
+  for (let tries = 0; tries < 400 && city.oreums.length < 14; tries++) {
+    const x = rng.range(600, W - 600);
+    const y = rng.range(900, H - 700);
+    const r = rng.range(110, 210);
+    if (!mask.land(x, y) || mask.shoreDist(x, y) < 420) continue;
+    if (Math.hypot((x - HALLA.x) / HALLA.rx, (y - HALLA.y) / HALLA.ry) < 1.05) continue;
+    if (city.oreums.some((o) => Math.hypot(o.x - x, o.y - y) < o.r + r + 260)) continue;
+    let clear = !roadHit(x, y, 120);
+    for (let a = 0; a < 8 && clear; a++) for (const k of [0.6, 1.2]) if (roadHit(x + Math.cos(a * 0.785) * r * k, y + Math.sin(a * 0.785) * r * k, 90)) clear = false;
+    if (!clear || inRect(x, y, { x0: AP.x - 200, x1: AP.x + AP.w + 200, y0: AP.y - 200, y1: AP.y + AP.h + 200 })) continue;
+    city.oreums.push({ x, y, r, h: rng.range(40, 84) });
+  }
+
+  // --- isolati ---------------------------------------------------------------
+  const townN = { x0: xsN[0] - 160, x1: xsN[xsN.length - 1] + 160, y0: 0, y1: townSouthY + 60 };
+  const townS = { x0: xsS[0] - 160, x1: xsS[xsS.length - 1] + 160, y0: 3000, y1: H };
+  city.urbanZones = [townN, townS, ...villages.map((v) => v.rect)];
+  const DOCK_X0 = 4700;
+  const landFn = (x, y) => mask.land(x, y);
+  // L'aeroporto è un isolato a parte.
+  const apBlock = { ...AP, type: 'airport', district: 'gimpo', onArterial: true, yards: [], alleys: [] };
+  city.blocks.push(apBlock);
+  city.airport = { ...AP, district: 'gimpo' };
+  kit.makeBlocks(city, rng, {
+    reserved: [AP], land: landFn, hit: roadHit, districtAt: city.districtAt, byId, region: REGION,
+    carve: { steps: [200, 100], minSize: 56, maxW: 480, maxH: 480, inset: 120 },
+    classify: ({ cx, cy, rect, roadSides }) => {
+      const d = Math.hypot((cx - HALLA.x) / HALLA.rx, (cy - HALLA.y) / HALLA.ry);
+      const town = inRect(cx, cy, townN) || inRect(cx, cy, townS) || villages.some((v) => inRect(cx, cy, v.rect));
+      // Periferia: dove le strade di campagna chiudono due lati la campagna si fa abitata.
+      if (SUBURBS.some((z) => inRect(cx, cy, z)) && roadSides >= 2 && rect.w >= 110 && rect.h >= 100 && d > 1.0) return 'urban';
+      if (town && roadSides >= 1 && rect.w >= 70 && rect.h >= 60) return inRect(cx, cy, townN) && cx > DOCK_X0 ? 'dock' : 'urban';
+      if (d < 0.97 || mask.shoreDist(cx, cy) < 280) return 'park';
+      return 'rural';
+    },
+  });
+  for (const b of city.blocks) if (b.type === 'rural') b.stoneWalls = true;
+
+  // Aeroporto: pista, raccordo, piazzale, eliporto, terminale sul lato della strada.
+  {
+    const r = AP;
+    city.runways.push({ x: r.x + 30, y: r.y + 28, w: r.w - 60, h: 90, horiz: true, name: '07/25' });
+    city.taxiways.push({ x: r.x + 90, y: r.y + 140, w: r.w - 180, h: 34, horiz: true });
+    city.aprons.push({ x: r.x + 150, y: r.y + 190, w: r.w - 300, h: 100 });
+    city.helipads.push({ x: r.x + r.w * 0.84, y: r.y + 240, r: 40 });
+    for (let i = 0; i < 4; i++) city.airSpots.push({ x: r.x + 220 + i * 150, y: r.y + 240, angle: -Math.PI / 2, kind: i === 2 ? 'heli' : 'plane' });
+    const d = byId.gimpo;
+    city.buildings.push(kit.makeBuilding(rng, d, REGION, r.x + r.w / 2 - 70, r.y + r.h - 62, 140, 52, { style: 'glass', h3d: 60, signChance: 0.9, streetEdges: ['bottom'] }));
+    city.props.push({ type: 'windsock', x: r.x + 100, y: r.y + 125, rot: 0, z: 62, solid: false, r: 9 });
+    city.props.push({ type: 'windsock', x: r.x + r.w - 100, y: r.y + 125, rot: 0, z: 62, solid: false, r: 9 });
+    apBlock.yards.push({ x: r.x + 140, y: r.y + 180, w: r.w - 280, h: 120 });
+  }
+
+  // Moli: il porto di Jeju-si e il pontile di Seogwipo.
+  const pier = (x, yShore, w, depth, kind, side = 'n') => {
+    const y0 = side === 'n' ? yShore - depth : yShore - 30;
+    const p = { x, y: y0, w, h: depth + 30, islandPier: true };
+    city.piers.push(p);
+    for (let k = 1; k < Math.floor(p.h / 90); k++) city.props.push({ type: 'bollard', x: x + 8, y: p.y + k * 90, rot: 0, z: 16, solid: false, r: 7 });
+    city.boatSpots.push({ x: x + w / 2, y: side === 'n' ? p.y - 44 : p.y + p.h + 44, angle: side === 'n' ? -Math.PI / 2 : Math.PI / 2, kind });
+  };
+  for (const [x, kind] of [[4780, 'ferry'], [4960, 'boat'], [5160, 'ferry']]) pier(x, scan.north(x + 50), 110, 250, kind, 'n');
+  pier(4160, scan.south(4200), 100, 230, 'boat', 's');
+  pier(3320, scan.north(3360), 90, 200, 'boat', 'n');
+
+  // --- luoghi nominati --------------------------------------------------------
+  kit.addLandmarks(city, LANDMARKS, REGION);
+  city.landmarks.push({ id: 'jeju-international-airport', name: 'Jeju International Airport', hangul: '제주국제공항', label: 'Aeroporto Internazionale di Jeju', kind: 'airport', district: 'gimpo', region: REGION, x: AP.x + AP.w / 2, y: AP.y + 240 });
+  city.landmarks.push({ id: 'jeju-port', name: 'Jeju Port Ferry Terminal', hangul: '제주항 여객터미널', label: 'Terminale dei traghetti di Jeju', kind: 'port', district: 'docks', region: REGION, x: 4960, y: scan.north(5000) + 60 });
+  city.regionalLandmarks = city.landmarks;
+  city.regionLandmarks = city.landmarks;
+  kit.addTransit(city, TRANSIT, REGION);
+  kit.placeHospitalsAndPolice(city, districts);
+  kit.placeShops(city, districts);
+  kit.placeGarages(city, districts);
+  kit.placeTurfs(city, GANGS, [
+    ['baekho', 'hongdae', 'Il cortile dietro il mercato'], ['hwangso', 'myeongdong'], ['heuksa', 'docks', 'Il piazzale dei container'],
+    ['cheolma', 'gangnam'], ['heuksa', 'itaewon'], ['hwangso', 'hongdae'],
+  ]);
+
+  // --- compatibilità con chi legge i campi dell'acqua ---------------------------------
+  city.coastAt = (y) => { for (let x = 0; x < W; x += 8) if (mask.land(x, y)) return x; return W / 2; };
+  city.waterX = city.coastAt(H / 2);
   city.quayX = city.waterX + 170;
   city.coastLine = { c: city.quayX, width: 132, arterial: true, keep: true };
   city.coastIdx = 0;
-  city.water = { id: 'jeju-coast', name: 'Jeju Coast', hangul: '제주 해안', label: 'Costa di Jeju', kind: 'island', type: 'island', isIsland: true, island: true, region: 'jeju', x: city.waterX, coastAt };
-  city.sea = city.water;
-  city.coast = city.water;
-  city.coastline = city.water;
-  city.island = { id: 'jeju-do', name: 'Jeju Island', hangul: '제주도', label: 'Isola di Jeju', kind: 'island', type: 'island', isIsland: true, island: true, region: 'jeju' };
+  city.riverCell = -1;
+  city.doglegs = 0;
+  city.port = { x: 4700, y: 700, w: 700, h: 450, district: 'docks' };
+  city.water = { id: 'jeju-coast', name: 'Jeju Coast', hangul: '제주 해안', label: 'Costa di Jeju', kind: 'island', type: 'island', isIsland: true, island: true, region: REGION, x: city.waterX, coastAt: city.coastAt };
+  city.sea = city.water; city.coast = city.water; city.coastline = city.water;
+  city.island = { id: 'jeju-do', name: 'Jeju Island', hangul: '제주도', label: 'Isola di Jeju', kind: 'island', type: 'island', isIsland: true, island: true, region: REGION };
   city.isIsland = true;
   city.waterIdentity = { id: 'jeju-do', name: 'Jeju Island', hangul: '제주도', label: 'Isola di Jeju', island: city.island, coast: city.water, river: city.river };
-  city.waterBoundary = { type: 'superellipse', cx: ISLAND.cx, cy: ISLAND.cy, rx: ISLAND.rx, ry: ISLAND.ry, power: ISLAND.power };
-
-  ({ vLines: city.vLines, hLines: city.hLines } = buildLines());
-  city.riverCell = -1; city.doglegs = 0;
-  city.airport = { ...AIRPORT, district: 'gimpo' };
-  city.port = { ...PORT, district: 'docks' };
-
-  // La maschera d'acqua è definita prima di creare i blocchi: così nessun
-  // isolato viene allocato nel torrente o oltre la sagoma dell'isola.
-  city.isWater = (x, y) => {
-    if (city.piers.some((p) => x > p.x && x < p.x + p.w && y > p.y && y < p.y + p.h)) return false;
-    if (y > RIVER.y0 && y < RIVER.y1) {
-      if (city.river.bridges.some((b) => Math.abs(x - b.x) < b.w / 2)) return false;
-      return true;
-    }
-    return !insideIsland(x, y);
-  };
-
-  // Le celle sovrapposte ai due grandi scali vengono sostituite da un unico
-  // rettangolo: il resto della rete conserva una maglia irregolare e anulare.
-  for (let i = 0; i < XS.length - 1; i++) for (let j = 0; j < YS.length - 1; j++) {
-    const x = XS[i] + city.vLines[i].width / 2, y = YS[j] + city.hLines[j].width / 2;
-    const w = XS[i + 1] - city.vLines[i + 1].width / 2 - x, h = YS[j + 1] - city.hLines[j + 1].width / 2 - y;
-    if (w < 36 || h < 36) continue;
-    const cx = x + w / 2, cy = y + h / 2;
-    if (!insideIsland(cx, cy) || city.isWater(cx, cy)) continue;
-    const r = { x, y, w, h };
-    if (rectOverlap(r, AIRPORT) || rectOverlap(r, PORT)) continue;
-    const d = districtFor(city, cx, cy), u = city.urbanAt(cx, cy);
-    const nearHill = Math.hypot(cx - ISLAND.cx, cy - ISLAND.cy) < 920;
-    const settlement = u > 0.45 || (cx < 1600 && cy < 1800) || (cx > 2450 && cy > 3450) || (cx > 3700 && cy < 2550) || (cx < 1550 && cy > 1650);
-    let type = nearHill ? 'park' : settlement ? 'urban' : (rng.chance(0.18) ? 'park' : 'rural');
-    if (d.id === 'docks' && (cx < 1150 && cy < 1500)) type = 'dock';
-    const block = { ...r, type, district: d.id, onArterial: city.vLines[i].arterial || city.vLines[i + 1].arterial || city.hLines[j].arterial || city.hLines[j + 1].arterial, yards: [], alleys: [] };
-    city.blocks.push(block);
-    if (type === 'urban') fillUrban(rng, city, block, d);
-    else if (type === 'park') fillPark(rng, city, block, d);
-    else if (type === 'dock') fillDock(rng, city, block, d);
-    else fillRural(rng, city, block, d);
-    if (type !== 'rural') decorateEdges(rng, city, block, d);
-    decorateYards(rng, city, block);
-  }
-  const airportBlock = { ...AIRPORT, type: 'airport', district: 'gimpo', onArterial: true, yards: [], alleys: [] };
-  city.blocks.push(airportBlock); fillAirport(rng, city, airportBlock, DISTRICT_BY_ID.gimpo);
-  const portBlock = { ...PORT, type: 'port', district: 'docks', onArterial: true, yards: [], alleys: [] };
-  city.blocks.push(portBlock); fillPort(rng, city, portBlock, DISTRICT_BY_ID.docks);
-  addPiers(city);
-
-  addIntersections(city);
-  city.graph = buildRoadGraph(city);
-  addLandmarks(city);
-  addTransit(city);
-  placeHospitalsAndPolice(city);
-  placeShops(city);
-  placeGarages(city);
-  placeTurfs(city);
-
-  for (const b of city.blocks) for (const a of b.alleys) {
-    if (!a.through || a.h < 130 && a.w < 130) continue;
-    const vertical = a.h > a.w, len = vertical ? a.h : a.w;
-    const a0 = vertical ? { x: a.x + a.w / 2, y: a.y } : { x: a.x, y: a.y + a.h / 2 };
-    const a1 = vertical ? { x: a0.x, y: a.y + a.h } : { x: a.x + a.w, y: a0.y };
-    if (Math.abs(elevationAt(a1.x, a1.y) - elevationAt(a0.x, a0.y)) / len > 0.018) {
-      a.stairs = true; city.stairs.push({ x: a.x, y: a.y, w: a.w, h: a.h, vehicleOnly: true });
-    }
-  }
-
-  city.isWater = (x, y) => {
-    if (city.piers.some((p) => x > p.x && x < p.x + p.w && y > p.y && y < p.y + p.h)) return false;
-    if (y > RIVER.y0 && y < RIVER.y1) {
-      if (city.river.bridges.some((b) => Math.abs(x - b.x) < b.w / 2)) return false;
-      return true;
-    }
-    return !insideIsland(x, y);
-  };
-  city.isOnRoad = (x, y) => {
-    for (const l of city.vLines) if (Math.abs(x - l.c) < l.width / 2 && l.segments.some((s) => y >= s[0] && y <= s[1])) return true;
-    for (const l of city.hLines) if (Math.abs(y - l.c) < l.width / 2 && l.segments.some((s) => x >= s[0] && x <= s[1])) return true;
-    return false;
-  };
-  city.coastAt = coastAt;
+  city.waterBoundary = { type: 'polygon-mask', res: mask.res };
   city.spawn = { x: city.transitStations[0].arrivalX, y: city.transitStations[0].arrivalY, angle: 0 };
-  indexCity(city);
-  city.stats = {
-    buildings: city.buildings.length, props: city.props.length, blocks: city.blocks.length, nodes: city.graph.usableNodes.length, edges: city.graph.edges.length,
-    doglegs: city.doglegs, stairs: city.stairs.length, shops: city.shops.length, venues: city.shops.reduce((n, s) => n + s.biz.length, 0), garages: city.garages.length,
-    rural: city.blocks.filter((b) => b.type === 'rural').length, piers: city.piers.length, turfs: city.turfs.length, landmarks: city.landmarks.length, transitStations: city.transitStations.length,
-  };
+  kit.indexCity(city, city.elevationAt);
+  city.stats = kit.makeStats(city);
   return city;
 }
-
-function rectOverlap(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }

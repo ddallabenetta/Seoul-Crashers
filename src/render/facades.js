@@ -107,6 +107,30 @@ function drawBrick(g, cols, rows, variant) {
 }
 
 /**
+ * Pietra lavica (§5.41): le case di Jeju sono di basalto scuro a corsi irregolari, con
+ * finestre piccole. Il rumore dei conci viene da un hash di coordinate, non da
+ * `Math.random`, così la texture è uguale a ogni avvio.
+ */
+function drawStone(g, cols, rows, variant) {
+  const hs = (x, y) => {
+    let h = Math.imul((x * 7 + variant * 131) | 0, 374761393) ^ Math.imul((y * 13 + 17) | 0, 668265263);
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  };
+  for (let y = 0, row = 0; y < FTH; y += 7, row++) {
+    const off = row % 2 ? 5 : 0;
+    for (let x = -off; x < FTW; x += 11) {
+      const r = hs(x, row);
+      g.fillStyle = r < 0.5 ? `rgba(0,0,0,${0.07 + r * 0.2})` : `rgba(255,255,255,${0.02 + (r - 0.5) * 0.07})`;
+      g.fillRect(x + 1, y + 1, 9.2, 5.2);
+    }
+    g.fillStyle = 'rgba(0,0,0,0.26)';
+    g.fillRect(0, y, FTW, 1);
+  }
+  drawWindowGrid(g, cols, rows, variant, { mw: 0.36, mh: 0.38, skip: 12, band: false });
+}
+
+/**
  * Serra (비닐하우스): telo di plastica teso su centine. Non ha finestre né porte —
  * ed è proprio l'assenza di aperture a farla leggere come una serra e non come un
  * capannone basso.
@@ -219,6 +243,7 @@ export function facadeTexture(style, cols, rows, variant) {
     case 'concrete': drawWindowGrid(g, cols, rows, variant, { band: true, balcony: true }); break;
     case 'panel': drawWindowGrid(g, cols, rows, variant, { mw: 0.72, mh: 0.42, band: true, skip: 4 }); break;
     case 'brick': drawBrick(g, cols, rows, variant); break;
+    case 'stone': drawStone(g, cols, rows, variant); break;
     case 'warehouse': drawWarehouse(g, cols, rows, variant); break;
     case 'greenhouse': drawGreenhouse(g, cols, rows, variant); break;
     case 'container': drawContainer(g, cols, rows, variant); break;
@@ -319,6 +344,7 @@ export function facadeLights(style, cols, rows, variant) {
     case 'concrete': litWindows(make(), cols, rows, variant, { lit: 52 }); break;
     case 'panel': litWindows(make(), cols, rows, variant, { mw: 0.72, mh: 0.42, skip: 4, lit: 58 }); break;
     case 'brick': litWindows(make(), cols, rows, variant, { mw: 0.44, mh: 0.42, skip: 10, lit: 44 }); break;
+    case 'stone': litWindows(make(), cols, rows, variant, { mw: 0.36, mh: 0.38, skip: 12, lit: 40 }); break;
     case 'warehouse': litWarehouse(make()); break;
     case 'greenhouse': litGreenhouse(make()); break;
     case 'tower': litTower(make()); break;

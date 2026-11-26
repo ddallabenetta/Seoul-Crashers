@@ -91,6 +91,8 @@ copione la usa e basta. Chi aggiunge una scena controlla qui prima di glossare d
 | *hyung* | fratello maggiore | M5, uscita dal cortile |
 | `피시방` | la sala computer | M8, pannello 1 |
 | `둘째` | «il secondo» — come Hanseong chiama l'altro Jae-min | M8, pannello 7 |
+| `8층` | l'ottavo piano — è il biglietto che Ha-eun lascia sul parabrezza | M6, innesco (implementato: §5.40) |
+| `윤` | Yoon, la sigla di Ha-eun in fondo alla planimetria | M6, pannello 4 |
 | `요양` | casa di cura | M11, svolgimento 2 |
 | `서명 취득` | firma acquisita | M11, svolgimento 5 |
 

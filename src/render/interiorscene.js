@@ -396,6 +396,29 @@ const FURNITURE = {
     },
   },
   stool: { color: '#4d4a46', top: '#635e57' },
+  // La sedia di plastica arancione di una sala d'attesa, vista dall'alto: il sedile e lo schienale.
+  seat: {
+    color: '#c46a1c',
+    top: '#f08a2a',
+    detail: (ctx, x, y, w, h) => {
+      ctx.fillStyle = 'rgba(0,0,0,0.18)';
+      ctx.fillRect(x + 2, y + 2, w - 4, 4);
+      ctx.fillStyle = 'rgba(255,214,150,0.45)';
+      ctx.fillRect(x + 3, y + h - 6, w - 6, 3);
+    },
+  },
+  // Il distributore automatico acceso: l'unica luce della sala.
+  vend: {
+    color: '#2b3a52',
+    top: '#3d5a80',
+    detail: (ctx, x, y, w, h, pal, game) => {
+      const puls = 0.78 + 0.12 * Math.sin((game ? game.time : 0) * 2.2);
+      ctx.fillStyle = `rgba(150,225,255,${puls})`;
+      ctx.fillRect(x + 3, y + 3, w - 6, h - 9);
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      for (let i = 0; i < 4; i++) ctx.fillRect(x + 6 + i * ((w - 14) / 4), y + 6, 3, h - 15);
+    },
+  },
   chair: { color: '#3e434b', top: '#525963' },
   desk: {
     color: '#5d5a54',
@@ -465,6 +488,60 @@ const FURNITURE = {
       const puls = 0.35 + 0.3 * Math.sin((game ? game.time : 0) * 5 + y);
       ctx.fillStyle = rgba(pal.accent, puls);
       ctx.fillRect(x + 2, y + 2, w - 4, h - 4);
+    },
+  },
+  // --- le due stanze della storia (§5.42) ---
+  grate: {
+    color: '#2a2d33',
+    top: '#3b4048',
+    // Sbarre: da sopra sono una fila di tratti chiari su una rotaia scura.
+    detail: (ctx, x, y, w, h) => {
+      ctx.fillStyle = 'rgba(196,210,228,0.85)';
+      if (w >= h) for (let i = 4; i < w - 2; i += 7) ctx.fillRect(x + i, y + 1, 2, h - 2);
+      else for (let j = 4; j < h - 2; j += 7) ctx.fillRect(x + 1, y + j, w - 2, 2);
+    },
+  },
+  cot: {
+    color: '#575c63',
+    top: '#8b9199',
+    detail: (ctx, x, y, w, h) => {
+      ctx.fillStyle = '#6a7467';
+      ctx.fillRect(x + 12, y + 2, w - 14, h - 4);
+      ctx.fillStyle = '#d6d3c8';
+      ctx.fillRect(x + 2, y + 3, 9, h - 6);
+    },
+  },
+  crate: {
+    color: '#5d4930',
+    top: '#85683f',
+    detail: (ctx, x, y, w, h) => {
+      ctx.strokeStyle = 'rgba(30,20,10,0.55)';
+      ctx.lineWidth = 1.4;
+      ctx.strokeRect(x + 2, y + 2, w - 4, h - 4);
+      ctx.beginPath();
+      ctx.moveTo(x + 2, y + 2); ctx.lineTo(x + w - 2, y + h - 2);
+      ctx.moveTo(x + w - 2, y + 2); ctx.lineTo(x + 2, y + h - 2);
+      ctx.stroke();
+    },
+  },
+  drum: {
+    color: '#33424f',
+    top: '#4d6275',
+    detail: (ctx, x, y, w, h) => {
+      ctx.strokeStyle = 'rgba(10,16,24,0.6)';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.arc(x + w / 2, y + h / 2, Math.min(w, h) * 0.34, 0, 6.2832); ctx.stroke();
+    },
+  },
+  // La telecamera: una scatola scura sul muro con il led rosso che lampeggia. Sono quattro, e
+  // il pannello dice che guardano tutte nello stesso punto.
+  cam: {
+    color: '#1d2026',
+    top: '#2c313a',
+    detail: (ctx, x, y, w, h, pal, game) => {
+      const on = Math.sin((game ? game.time : 0) * 4) > -0.2;
+      ctx.fillStyle = on ? '#ff4a3a' : '#5a1d19';
+      ctx.fillRect(x + w - 6, y + 2, 4, 4);
     },
   },
   plant: {

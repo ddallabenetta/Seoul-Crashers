@@ -1,0 +1,108 @@
+// Censimento delle tre regioni (§5.22-5.24 e §5.41): le verifiche di `docs/verifica.md`
+// «regioni e metro» in un colpo solo, più quello che serve a Busan e Jeju rifatte.
+// *Asserisce*: ogni voce di `problemi` deve essere `[]` (o 0).
+//
+//   node .claude/tools/probe.mjs --seconds 0 --quiet \
+//     --script .claude/tools/scenes/regioni-census.scene
+//
+//  · fermate: arrivo dentro i confini, asciutto, fuori strada e fuori dai solidi
+//  · ingressi: ogni fermata ha un vano visibile e un prop `metro_entrance` solido
+//  · confini: il bordo fisico esiste ai quattro angoli
+//  · carreggiata: nessun edificio ordinario, prop solido o ingresso invade una strada
+//    (`rectIntersectsRoad`, larghezza compresa)
+//  · acqua: nessun campione di strada in acqua (i ponti sono terra), moli e barche in acqua
+//  · luoghi di Busan: ogni chiave di `story/places.js` si risolve, sta dove deve
+//    (asciutto, tranne la baia), non dentro un solido, e il suo nodo stradale è
+//    raggiungibile **guidando da Seoul**
+//  · vicoli ciechi: solo dove c'è una testata
+const { rectIntersectsRoad } = await import('/src/world/roadclearance.js');
+const { findBusan, BUSAN_PLACES } = await import('/src/story/places.js');
+const city = game.city;
+const solidAt = (x, y, r = 12) => city.solidGrid.queryCircle(x, y, r).some((o) => x > o.x - r && x < o.x + o.w + r && y > o.y - r && y < o.y + o.h + r);
+const areaOf = (o) => city.areaAt(o.x, o.y)?.id || 'campagna';
+
+const problemi = {};
+const out = { problemi };
+
+problemi.fermate = city.transitStations.filter((s) =>
+  s.arrivalX < 0 || s.arrivalY < 0 || s.arrivalX > city.w || s.arrivalY > city.h
+  || city.isWater(s.arrivalX, s.arrivalY) || city.isOnRoad(s.arrivalX, s.arrivalY) || solidAt(s.arrivalX, s.arrivalY)).map((s) => s.id);
+problemi.ingressi = city.transitStations.filter((s) =>
+  !s.entrance?.visible || !city.props.some((p) => p.stationId === s.id && p.type === 'metro_entrance'
+    && p.solid && p.collisionW === s.entrance.w && p.collisionH === s.entrance.h)).map((s) => s.id);
+problemi.confini = [[1, 1], [city.w - 1, 1], [1, city.h - 1], [city.w - 1, city.h - 1]]
+  .filter(([x, y]) => !city.solidGrid.queryCircle(x, y, 1).some((o) => o.isBoundary));
+
+// Edifici ordinari e prop solidi sulla carreggiata, per regione.
+const sulla = { seoul: 0, busan: 0, jeju: 0, campagna: 0 };
+for (const b of city.buildings) {
+  if (b.solid === false || b.isBelt || b.isBank || (b.style === 'wall' && b.flat)) continue;
+  if (rectIntersectsRoad(city, b, 0)) sulla[areaOf(b)]++;
+}
+for (const p of city.props) {
+  if (!p.solid || p.stationId) continue;
+  if (rectIntersectsRoad(city, { x: p.x - p.r, y: p.y - p.r, w: p.r * 2, h: p.r * 2 }, 0)) sulla[areaOf(p)]++;
+}
+for (const e of city.metroEntrances) {
+  if (rectIntersectsRoad(city, { x: e.x - e.w / 2, y: e.y - e.h / 2, w: e.w, h: e.h }, 0)) sulla[areaOf(e)]++;
+}
+problemi.suLaCarreggiata = sulla;
+
+// Acqua: strade, moli, barche.
+let stradaInAcqua = 0;
+for (const l of city.vLines) for (const [a, b] of l.segments) for (let y = a; y <= b; y += 40) if (city.isWater(l.c, y)) stradaInAcqua++;
+for (const l of city.hLines) for (const [a, b] of l.segments) for (let x = a; x <= b; x += 40) if (city.isWater(x, l.c)) stradaInAcqua++;
+problemi.stradaInAcqua = stradaInAcqua;
+problemi.barcheAsciutte = city.boatSpots.filter((s) => areaOf(s) !== 'seoul' && !city.isWater(s.x, s.y)).length;
+problemi.moliAsciutti = city.piers.filter((p) => p.islandPier !== undefined || true).filter((p) => city.isWater(p.x + p.w / 2, p.y + p.h / 2)).length;
+
+// Raggiungibilità su gomma dal punto di partenza di Seoul.
+const graph = city.graph;
+const start = graph.usableNodes.find((n) => areaOf(n) === 'seoul');
+const seen = new Set([start]);
+const queue = [start];
+while (queue.length) {
+  const n = queue.shift();
+  for (const o of n.out) {
+    const m = graph.nodeById(o.dir > 0 ? o.edge.b : o.edge.a);
+    if (m && !seen.has(m)) { seen.add(m); queue.push(m); }
+  }
+}
+const reach = (x, y) => { const n = graph.nearestNode(x, y); return seen.has(n) && Math.hypot(n.x - x, n.y - y) < 420; };
+
+const luoghi = {};
+const guasti = [];
+for (const key of Object.keys(BUSAN_PLACES)) {
+  const p = findBusan(game, key);
+  if (!p || !p.landmark) { guasti.push(`${key}: manca`); continue; }
+  const wet = city.isWater(p.x, p.y);
+  const isBuilding = !!p.landmark.building;
+  const dentroUnSolido = !isBuilding && solidAt(p.x, p.y, 4);
+  if (key === 'baia' ? !wet : (wet && key !== 'ponte')) guasti.push(`${key}: acqua/terra sbagliata`);
+  if (dentroUnSolido) guasti.push(`${key}: dentro un solido`);
+  if (!reach(p.approach.x, p.approach.y) && key !== 'baia') guasti.push(`${key}: irraggiungibile guidando`);
+  luoghi[key] = [Math.round(p.x), Math.round(p.y), p.landmark.id];
+}
+problemi.luoghiBusan = guasti;
+out.luoghiBusan = luoghi;
+
+// Vicoli ciechi: devono avere una testata.
+const testate = new Set((city.testate || []).map((t) => t.nodeId));
+problemi.vicoliCiechiSenzaTestata = graph.usableNodes
+  .filter((n) => n.out.length === 1 && !testate.has(n.id) && areaOf(n) !== 'campagna' && !(n.x < 300 || n.y < 300 || n.x > city.w - 300))
+  .map((n) => [Math.round(n.x), Math.round(n.y)]).slice(0, 12);
+
+// Jeju: pista e piazzale esistono.
+const jeju = city.areas.find((a) => a.id === 'jeju');
+problemi.jejuSenzaPista = city.runways.filter((r) => r.x > jeju.x0 && r.x < jeju.x1 && r.y > jeju.y0 && r.y < jeju.y1).length === 0;
+
+out.regioni = city.areas.map((a) => {
+  const inA = (o) => o.x >= a.x0 && o.x < a.x1 && o.y >= a.y0 && o.y < a.y1;
+  return {
+    id: a.id, edifici: city.buildings.filter(inA).length, isolati: city.blocks.filter(inA).length,
+    nodi: graph.usableNodes.filter(inA).length, negozi: city.shops.filter(inA).length,
+    landmark: city.landmarks.filter(inA).length, fermate: city.transitStations.filter(inA).length,
+    vicoliCiechi: graph.usableNodes.filter((n) => inA(n) && n.out.length === 1).length,
+  };
+});
+return out;

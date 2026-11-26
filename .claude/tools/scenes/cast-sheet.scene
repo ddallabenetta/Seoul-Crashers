@@ -8,6 +8,7 @@
 //
 //   node .claude/tools/probe.mjs --seconds 0.4 --size 1700x1150 --shot /tmp/cast.png \
 //     --script .claude/tools/scenes/cast-sheet.scene
+//   echo 'window.__CAST = ["pyo", "bambino", "kumangi"];' > /tmp/c.js   # solo alcuni
 const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
 const pk = await import('/src/render/pixelkit.js');
 
@@ -22,7 +23,9 @@ ctx.fillStyle = '#171a21';
 ctx.fillRect(0, 0, W, H);
 
 const P = { ctx, x: 0, y: 0, w: W, h: H, t: 1 };
-const ids = Object.keys(pk.CAST);
+// Con `window.__CAST = ['pyo', 'bambino']` davanti si guardano solo quelli: a dodici
+// personaggi la riga è bassa 90 px e le teste da 120 si sovrappongono.
+const ids = window.__CAST || Object.keys(pk.CAST);
 const MOODS = ['fermo', 'parla', 'ride', 'giu'];
 const POSES = ['stand', 'walk', 'hug', 'lean', 'curb', 'back'];
 

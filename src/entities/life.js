@@ -426,7 +426,7 @@ export class LifeSystem {
       const px = x + Math.cos(a) * d;
       const py = y + Math.sin(a) * d;
       if (px < 120 || py < 120 || px > city.w - 120 || py > city.h - 120) continue;
-      if (!city.isWater(px, py)) continue;
+      if (!(city.isNavigable || city.isWater).call(city, px, py)) continue;
       return { x: px, y: py };
     }
     return null;
@@ -437,7 +437,7 @@ export class LifeSystem {
     const city = this.city;
     for (let i = 1; i <= 8; i++) {
       const t = i / 8;
-      if (!city.isWater(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t)) return false;
+      if (!(city.isNavigable || city.isWater).call(city, x0 + (x1 - x0) * t, y0 + (y1 - y0) * t)) return false;
     }
     return true;
   }
@@ -488,10 +488,11 @@ export class LifeSystem {
     // sensore lungo mezzo fiume trova sempre l'altra sponda — la barca passa la
     // vita a scansare una riva che non stava per toccare, e non arriva mai in
     // velocità (misurato: 112 px/s contro i 208 di crociera).
+    const nav = (x, y) => (city.isNavigable ? city.isNavigable(x, y) : city.isWater(x, y));
     const look = 130 + Math.abs(v.speed) * 0.35;
-    if (!city.isWater(v.x + cos * look, v.y + sin * look)) {
-      const left = city.isWater(v.x + Math.cos(v.angle - 1) * look, v.y + Math.sin(v.angle - 1) * look);
-      const right = city.isWater(v.x + Math.cos(v.angle + 1) * look, v.y + Math.sin(v.angle + 1) * look);
+    if (!nav(v.x + cos * look, v.y + sin * look)) {
+      const left = nav(v.x + Math.cos(v.angle - 1) * look, v.y + Math.sin(v.angle - 1) * look);
+      const right = nav(v.x + Math.cos(v.angle + 1) * look, v.y + Math.sin(v.angle + 1) * look);
       if (left && !right) ai.turn = -1;
       else if (right && !left) ai.turn = 1;
       aim = v.angle + ai.turn * 1.3;
@@ -844,6 +845,38 @@ export class LifeSystem {
     this.startRobbery(game);
   }
 
+  /**
+   * Un punto a piedi accanto all'auto della fuga, non sopra. I rapinatori nascevano a
+   * ±26 px dal centro, cioè dentro la carrozzeria (il cerchio solido arriva a 22), e
+   * quando il lato più corto per uscirne dava su un muro restavano incastrati fra
+   * muro e lamiera per tutta la rapina: era la causa di `dentroLamiera` di
+   * `walkers-census` (§5.36). Si prova prima il fianco, poi muso e coda.
+   */
+  besideCar(car, i, game) {
+    const spec = VEHICLE_TYPES[car.kind];
+    const cos = Math.cos(car.angle), sin = Math.sin(car.angle);
+    const side = i % 2 ? -1 : 1;
+    const w = spec.wid * 0.5 + 18, l = spec.len * 0.5 + 18;
+    const cands = [[0, side * w], [0, -side * w], [l, 0], [-l, 0]];
+    for (const [f, s] of cands) {
+      const x = car.x + cos * f - sin * s;
+      const y = car.y + sin * f + cos * s;
+      let free = true;
+      for (const o of this.city.solidGrid.queryRect(x - 14, y - 14, 28, 28)) {
+        if (!o.vehicleOnly && circleRectPush(x, y, 9, o)) { free = false; break; }
+      }
+      // E nemmeno dentro un'altra carrozzeria: due auto ferme che si toccano non si vedono, e il
+      // pedone nato nel punto dove si sovrappongono non ne esce.
+      for (const o of free ? game.vehicleGrid.queryCircle(x, y, 90) : []) {
+        if (o === car) continue;
+        const os = VEHICLE_TYPES[o.kind];
+        if (os && Math.hypot(o.x - x, o.y - y) < os.len * 0.5 + 12) { free = false; break; }
+      }
+      if (free) return { x, y };
+    }
+    return { x: car.x - sin * w * side, y: car.y + cos * w * side };
+  }
+
   /** Chi era dentro un evento e ne è uscito torna a essere un passante qualunque. */
   release(p) {
     p.ev = null;
@@ -926,7 +959,8 @@ export class LifeSystem {
     };
     const n = this.rng.int(1, 2);
     for (let i = 0; i < n; i++) {
-      const p = createPed('gangster', car.x + this.rng.range(-26, 26), car.y + this.rng.range(-26, 26), this.rng);
+      const at = this.besideCar(car, i, game);
+      const p = createPed('gangster', at.x + this.rng.range(-4, 4), at.y + this.rng.range(-4, 4), this.rng);
       p.armed = true;
       p.role = 'robber';
       p.ev = ev;
@@ -1061,6 +1095,9 @@ export class LifeSystem {
       const s = this.rng.range(20, Math.max(24, edge.len - 20));
       const pt = lanePoint(edge, dir, laneCount(edge) - 1, s, this.tmp);
       if (dist(pt.x, pt.y, shop.x, shop.y) > 340) continue;
+      // Non sopra un'altra auto: l'auto della fuga resta ferma per tutta la rapina, e chi le
+      // sta accanto finirebbe dentro quella che c'era già (§5.36).
+      if (game.vehicles.some((o) => dist(o.x, o.y, pt.x, pt.y) < 90)) continue;
       return { x: pt.x, y: pt.y, angle: pt.angle, spot: null };
     }
     return null;
