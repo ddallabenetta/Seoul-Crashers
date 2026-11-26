@@ -290,6 +290,9 @@ export class MissionSystem {
 
   update(dt, game) {
     this.actions.length = 0;
+    // Un punto fisso può avere da fare anche quando nessuno lo preme (chi se ne va dalla sala
+    // d'attesa di Busan, `story/terminale.js`): non ha fasi, e non ha altro posto dove farlo.
+    for (const p of this.fixed) if (p.tick) p.tick(dt, game);
     if (!this.active) { this.collectActions(game); return; }
     const ph = this.phaseDef;
     const ctx = this.context(game);

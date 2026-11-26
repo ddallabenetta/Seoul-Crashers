@@ -10,8 +10,9 @@
 //
 // `[]` vuol dire tutto a posto; `window.__LOG` è la fila delle fasi attraversate. Con `--shot-dir` fa
 // cinque scatti (nebbia col passeggero, convoglio, confessione, corsa sotto il ponte, darsena). Se si
-// ferma a metà, `__errore` e `__fase` dicono dove. Quando arriveranno l'incontro di Busan, M11, R4 e
-// M12, la scena si allunga da qui in fondo.
+// ferma a metà, `__errore` e `__fase` dicono dove. In coda c'è la tappa G1b (§5.46): Chun-sik al 당구장
+// dopo M9, le sedie arancioni vissute e poi con Dulchae ucciso, e il conto nei flag. Quando arriveranno
+// M11, R4 e M12, la scena si allunga da qui in fondo.
 //
 // Cinque voci sono invarianti:
 //   · `unBlipSolo` — i marcatori a schermo non passano mai da uno
@@ -277,6 +278,99 @@ out.m10ManiVuote = !game.carry.has(MOD10.CARICO.id) && !game.carry.dropped;
 out.m10StelleCadute = game.wanted.level === 0;
 await shot('m10-2-darsena');
 nota('m10 fatta');
+
+// ---- 8. G1b: Chun-sik dopo M9, le sedie arancioni, il conto su Dulchae (§5.46) -----------------------
+const MOD1 = await import('/src/story/m1.js');
+const { WEAPONS, shoot } = await import('/src/entities/weapons.js');
+const pool = MOD1.poolSite(game);
+out.g1bChunsikTornatoDopoM10 = game.actors.defs.has('chunsik');
+if (pl.vehicle) pl.exitVehicle(game, true);
+ora(20);
+teleport(pool.x, pool.y);
+game.shops.enter(pool.shop, game);
+await wait(0.4);
+for (let i = 0; i < (pool.level || 0) && game.shops.active; i++) { game.shops.useStairs(1, game); await wait(0.3); }
+const visita = M.fixed.find((p) => p.id === 'chunsik-visita');
+const cs = game.actors.get('chunsik');
+if (cs) game.shops.placeOnFloor(game, { x: cs.x, y: cs.y + 22, angle: -Math.PI / 2 });
+await wait(0.3);
+out.g1bChunsikSiPuoParlare = M.actions.some((a) => a.id === 'chunsik-visita');
+visita.run(M.context(game));
+await wait(0.1);
+const righe = (game.dialogue.lines || []).map((l) => l.text).join(' ');
+out.g1bChunsikOrdinaPerUno = /Uno solo/.test(righe) && /Adesso lo posso dire/.test(righe) && /prendeva/.test(righe);
+await chiudiDialogo();
+game.shops.leave(game);
+nota('chunsik dopo m9');
+
+// La sala d'attesa, all'una di notte: vuota. Ci si siede, e l'orologio va alle 03:31.
+const porta = M.fixed.find((p) => p.id === 'sala-porta');
+const sedia = M.fixed.find((p) => p.id === 'sala-sedia');
+const uscita = M.fixed.find((p) => p.id === 'sala-uscita');
+ora(1);
+out.g1bPortaDellaSala = !!porta.when(game);
+teleport(porta.x, porta.y);
+await wait(0.3);
+out.g1bPortaSiVede = M.actions.some((a) => a.id === 'sala-porta');
+porta.run(M.context(game));
+await wait(0.4);
+const fs = game.shops.floor;
+out.g1bDentroLaSala = game.indoors && fs?.biz.id === 'waiting';
+out.g1bAllUnaEVuota = !fs?.people.some((p) => p.actor === 'dulchae-terminale');
+game.shops.placeOnFloor(game, { x: sedia.x, y: sedia.y, angle: 0 });
+await wait(0.3);
+out.g1bSediaSiVede = M.actions.some((a) => a.id === 'sala-sedia');
+await shot('g1b-1-sala');
+sedia.run(M.context(game));
+await wait(0.3);
+out.g1bAlle0331 = Math.abs(game.dayCycle.hour - (3 + 31 / 60)) < 0.05;
+out.g1bLuiCEGia = !!game.shops.floor.people.find((p) => p.actor === 'dulchae-terminale' && !p.dead);
+out.g1bQuattroPannelli = game.cutscene.active && game.cutscene.seq?.length === 4;
+await saltaPannelli();
+out.g1bScenaSegnata = M.flag('sedie');
+const d1 = game.shops.floor.people.find((p) => p.actor === 'dulchae-terminale');
+const p0 = d1 && { x: d1.x, y: d1.y };
+await wait(1.5);
+out.g1bSeNeVaCamminando = !!d1 && Math.hypot(d1.x - p0.x, d1.y - p0.y) > 20;
+await shot('g1b-2-se-ne-va');
+let g8 = 0;
+while (uscita.d && g8++ < 60) await wait(0.25);
+out.g1bSparitoAllaPorta = !uscita.d && !game.shops.floor.people.includes(d1) && !game.actors.defs.has('dulchae-terminale');
+out.g1bVivo = !M.flag('dulchaeUcciso');
+out.g1bLaSediaNonCePiu = !sedia.when(game);
+game.shops.leave(game);
+nota('sedie viste');
+
+// La seconda volta, da capo: alle tre lui c'è già, seduto, e gli si spara prima di sedersi.
+M.setFlag('sedie', false);
+M.seen.delete('sedie');
+ora(3);
+teleport(porta.x, porta.y);
+await wait(0.2);
+porta.run(M.context(game));
+await wait(0.4);
+const d2 = game.shops.floor.people.find((p) => p.actor === 'dulchae-terminale');
+out.g1bAlleTreCEGia = !!d2;
+if (d2) {
+  pl.weapons = pl.weapons || {};
+  game.shops.placeOnFloor(game, { x: d2.x, y: d2.y + 70, angle: -Math.PI / 2 });
+  for (let i = 0; i < 12 && !d2.dead; i++) {
+    const a = Math.atan2(d2.y - pl.y, d2.x - pl.x);
+    shoot(game, pl, WEAPONS.pistol, pl.x + Math.cos(a) * 12, pl.y + Math.sin(a) * 12, a);
+    await wait(0.15);
+  }
+}
+await wait(0.3);
+out.g1bSiPuoUcciderlo = !!d2?.dead;
+out.g1bContatoUcciso = M.flag('dulchaeUcciso') && M.flag('dulchae@busan') && !M.flag('dulchae@m8');
+out.g1bNessunaScena = !game.cutscene.active && !sedia.when(game);
+game.shops.leave(game);
+// Il conto sopravvive a un salvataggio: sta nei flag della storia.
+const snapF = M.snapshot();
+M.restore(JSON.parse(JSON.stringify(snapF)), game);
+out.g1bContoNelSalvataggio = M.flag('dulchaeUcciso') && M.flag('dulchae@busan');
+nota('dulchae ucciso al terminal');
+
 contaBlip();
 out.unBlipSolo = maxBlip <= 1;
 } catch (e) {

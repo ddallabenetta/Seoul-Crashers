@@ -355,7 +355,44 @@ export const CHIAMATE = [
       { kkachi: true, text: '«Le buste bianche si contano il giorno dopo. Chi ha messo di più, di solito, è chi ha più da farsi perdonare.»' },
     ],
   },
+
+  // --- l'Atto III -------------------------------------------------------------------
+  {
+    // origine: Ko Eun-bi, M10 («Quattrocento chilometri e non cambia niente…»). **Aspetta M10**, perché
+    // la si copia dopo averla sentita: è quindi il ritorno verso Seoul, o un altro viaggio dopo. «Da
+    // solo» non è un controllo in più — con un passeggero a bordo 까치 tace già.
+    id: 'a3-gyeongbu',
+    when: (game) => game.missions.isDone('m10') && sullaGyeongbu(game),
+    lines: [
+      { kkachi: true, text: '«Quattrocento chilometri e non cambia niente. È tutto lo stesso paese, e questo è il problema: non c\'è un posto dove non arrivano.»' },
+    ],
+  },
+  {
+    // origine: Chun-sik, tutto l'Atto I («tuo padre dice»). **Aspetta M9**: Jae-min dice «diceva»
+    // perché la confessione glielo ha insegnato, e Kkachi si corregge al contrario. La prima volta a
+    // Busan è dentro M9, con Chun-sik a bordo e la radio zitta: quindi vale la prima volta da soli.
+    id: 'a3-busan',
+    when: (game) => {
+      const pl = game.player;
+      return game.missions.isDone('m9') && !!pl.vehicle && !pl.onFoot
+        && game.areaAt(pl.x, pl.y)?.id === 'busan';
+    },
+    lines: [
+      { kkachi: true, text: '«Qui parlano diverso. Tuo padre diceva che a Busan si mente più forte ma meno spesso.»' },
+      { who: 'Jae-min', text: '«Diceva.»' },
+      { kkachi: true, text: '«Dice.»' },
+    ],
+  },
 ];
+
+/** Sulla Gyeongbu, fuori dalle tre città: la stessa fascia in cui M9 mette la nebbia. */
+function sullaGyeongbu(game) {
+  const ex = game.city.expressway;
+  const pl = game.player;
+  const v = pl.vehicle;
+  if (!ex || !v || pl.onFoot || airborne(v) || game.areaAt(pl.x, pl.y)) return false;
+  return Math.abs(pl.y - ex.y) < 400 && pl.x > ex.exit.x - 400;
+}
 
 // --- le righe di servizio ------------------------------------------------------------
 //

@@ -174,11 +174,47 @@ try {
   out.slotV4SiMigra = `errore: ${e.message}`;
 }
 
+// ---- 8b. L'ATTO III: LA GYEONGBU DA SOLI (17) E LA PRIMA VOLTA A BUSAN (18) --------------------
+// Tappa G1b (§5.46). La 17 è copiata da Ko, quindi **prima di M10 non c'è**; la 18 aspetta M9, perché
+// «Diceva.» lo sa dire solo chi ha sentito la confessione.
+{
+  const { createVehicle } = await import('/src/entities/vehicle.js');
+  const { findBusan } = await import('/src/story/places.js');
+  const M = game.missions;
+  for (const id of ['m1', 'm2', 'm3', 'm4', 'r1', 'm5', 'm6', 'r2', 'm7', 'm8', 'r3', 'm9']) M.done.add(id);
+  const ex = game.city.expressway;
+  const porta = (x, y) => {
+    if (pl.vehicle) pl.exitVehicle(game, true);
+    pl.x = x; pl.y = y; pl.onFoot = true;
+    const v = createVehicle('sedan', x, y, 0, 4);
+    game.vehicles.push(v);
+    pl.enterVehicle(v, game);
+    game.camera.snapTo(x, y);
+  };
+  while (K.talking) await wait(0.3);
+  if (!R.isKkachi) R.tuneTo(R.stations.findIndex((q) => q.kkachi));
+  porta((ex.exit.x + ex.entry.x) / 2, ex.y + 38);
+  K.serviceT = 0;
+  await wait(4);
+  out.a3GyeongbuAspettaM10 = !K.done.has('a3-gyeongbu') && K.call?.id !== 'a3-gyeongbu';
+  while (K.talking) await wait(0.3);
+  M.done.add('m10');
+  K.serviceT = 0;
+  out.a3GyeongbuDaSolo = await ascolta(5) && K.call?.id === 'a3-gyeongbu';
+  while (K.talking) await wait(0.3);
+  const b = findBusan(game, 'piazzale');
+  porta(b.approach.x, b.approach.y);
+  K.serviceT = 0;
+  out.a3BusanPrimaVolta = await ascolta(5) && K.call?.id === 'a3-busan';
+  out.a3BusanSiCorreggeAlContrario = K.call?.lines?.[2]?.text === '«Dice.»' && K.call?.lines?.[1]?.text === '«Diceva.»';
+  while (K.talking) await wait(0.3);
+}
+
 // ---- 9. UNA PARTITA NUOVA NON EREDITA NIENTE -----------------------------------------
 game.newGame();
 out.nuovaPartitaAzzera = K.done.size === 0 && K.heard === 0 && K.direct.length === 0;
-// Otto dell'Atto I e otto dell'Atto II (§5.40, §5.42): il numero cresce con le tappe, e la scena lo dice.
-out.tabellaRestaRegistrata = K.calls.length === 16 && K.service.length >= 16;
+// Otto dell'Atto I, otto dell'Atto II (§5.40, §5.42), la 17 e la 18 (§5.46): il numero cresce con le tappe.
+out.tabellaRestaRegistrata = K.calls.length === 18 && K.service.length >= 16;
 out.primaRigaDetta = primaRiga;
 out.primoIdDiServizio = primoId;
 

@@ -6,8 +6,8 @@
 > la stazione, le sei regole, le **otto chiamate dell'Atto I** e tutte le righe di servizio.
 > **Dalla T7 (§5.40)** ci sono tre delle otto chiamate dell'Atto II (11, 12 e 14) e la prima delle
 > «visite che cambiano» (Jo dopo M6); **dalla T8 (§5.42) le otto dell'Atto II sono tutte** (le altre cinque:
-> 9, 10, 13, 15, 16) e c'è anche il commesso dopo M8. Restano le otto dell'Atto III e la visita di
-> Chun-sik, che vanno con le missioni a cui appartengono. **Due origini non sono quelle del copione**:
+> 9, 10, 13, 15, 16) e c'è anche il commesso dopo M8. **Dalla G1b (§5.46)** ci sono la 17 e la 18 e la visita di
+> Chun-sik; restano le altre sei dell'Atto III, che vanno con le missioni a cui appartengono. **Due origini non sono quelle del copione**:
 > la 9 è di Byeon (M7) e non di Ryu, la 16 è del narratore della camera ardente e non di Chun-sik — le
 > righe che il copione indicava non esistono nelle scene come sono scritte, e la regola 3 vuole che
 > l'originale esista. Chi ne aggiunge una: una riga in
@@ -79,7 +79,7 @@ doveva diventare un fatto tipografico ([`08-domande-aperte.md`](08-domande-apert
 
 | # | Si innesca quando… | Scambio | Origine |
 | --- | --- | --- | --- |
-| 17 | primo tratto della Gyeongbu da solo | K: «Quattrocento chilometri e non cambia niente. È tutto lo stesso paese, e questo è il problema: non c'è un posto dove non arrivano.» | Ko Eun-bi, M10 |
+| 17 | primo tratto della Gyeongbu da solo | K: «Quattrocento chilometri e non cambia niente. È tutto lo stesso paese, e questo è il problema: non c'è un posto dove non arrivano.» | Ko Eun-bi, M10 — la riga **è stata aggiunta a M10** dalla G1b, perché Ko non la diceva; quindi la chiamata aspetta M10 |
 | 18 | prima volta a Busan | K: «Qui parlano diverso. Tuo padre diceva che a Busan si mente più forte ma meno spesso.» / J: «Diceva.» / K: «Dice.» | Chun-sik, tutto l'Atto I — **e Kkachi si corregge al contrario** |
 | 19 | in barca, motore acceso, al largo | K: «…perdo… la banda…» *(fruscio)* «…c'è troppa acqua fra noi.» | M11 |
 | 20 | tornati a Seoul dopo Jeju | J: «Ti ricordi la cucina?» / K: «Quale cucina.» / J: «Quella con la radio sul frigo.» / K: *(quattro secondi)* «C'era la radio accesa.» | R2 — **parola per parola** |
@@ -140,7 +140,7 @@ storia è avanzata; chi ci torna trova qualcosa.
 | Chi | Prima di… | Dopo… |
 | --- | --- | --- |
 | **Jo Ok-bun** (전당포 di Hongdae) | M6: «Torna quando sai fare la domanda giusta.» | M6: la domanda giusta è dirle che 구만기 è inciso sul proprio orologio. Allora gli mette in mano l'accendino inciso: «Tuo padre lo ha impegnato il giorno che ti ha preso. Non è mai tornato a riprenderlo.» **È una delle tre condizioni del finale C**, ed è l'accendino con cui si brucia il registro nel finale A. |
-| **Chun-sik** (당구장) | M9: ordina cibo per due e parla di Dong-hyeok al presente | M9: ordina per uno e parla al passato. Una riga sola: «Adesso lo posso dire.» |
+| **Chun-sik** (당구장) | M9: ordina cibo per due e parla di Dong-hyeok al presente | M9: ordina per uno e parla al passato. Una riga sola: «Adesso lo posso dire.» *(Dopo M9 resta a Busan: al suo sgabello torna a M10 finita, §5.46.)* |
 | **Il commesso del 편의점 di Itaewon** | M8: «…di nuovo?» | M8: «Ah, lei è l'altro.» *(e non aggiunge niente, mai, per tutto il resto del gioco)* |
 
 ---

@@ -337,6 +337,13 @@
 | Ingaggio delle guardie | `GUARD_TUNE.hold` · `range` | 150 px · 330 px (`life.engage`) |
 | Peso delle vie non arteriali per le volanti | `CHASE.side` | 1,6. A 1 (A* puro) Busan era più lenta del greedy; 2,5 e 4 non si separano da 1,6 nel rumore di sei prove |
 
+| **— G1b: le sedie arancioni, Chun-sik, Dulchae (§5.46) —** | | |
+| Dulchae già seduto · l'ora del narratore · l'imbarco | `terminale.DA` · `ORA` · `IMBARCO` | 02:30 · 03:31 (sedersi prima fa girare l'orologio fin lì) · 04:10 |
+| I due posti | `terminale.FILA` · `SUO` · `MIO` | fila di mezzo · secondo e quinto posto: tre sedie di distanza |
+| Passo di chi se ne va | `baseSpeed` di Dulchae (sala · cortile) | 52 · 58 px/s, cioè 31 · 35 al passo degli interni (0,6) |
+| Dulchae colpibile | `hp` prima e dopo i pannelli di M8 | 9999 · 30 (come un pedone qualunque) |
+| La Gyeongbu della chiamata 17 | `story/kkachi.sullaGyeongbu` | fuori dalle città, ±400 px dalla carreggiata, oltre l'uscita di Seoul |
+
 | **— l'Atto III, M9 e M10 (§5.43) —** | | |
 | Alba di M9 · finestra | `m9.ALBA` · `ALBA_DA`–`ALBA_A` | 05:10 · da 05:01 alle 09:00 (dopo, si aspetta il giorno dopo) |
 | Nebbia della Gyeongbu | `m9.nebbia` | 0,82 alla prima area di servizio, zero a metà strada; `dayCycle.fog` segue a 0,35/s |

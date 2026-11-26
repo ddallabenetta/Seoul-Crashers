@@ -1013,6 +1013,8 @@ async function arrestoVero(at) {
   out.m8QuattroTelecamere = game.shops.floor.furni.filter((o) => o.type === 'cam').length === 4;
   out.m8LaPortaVeraNonCambiata = !game.shops.cache.has(s.porta.id) || game.shops.cache.get(s.porta.id).floors[0].biz.id !== 'yard';
   out.m8DulchaeNelCortile = !!game.actors.get('dulchae-cortile') && game.actors.get('dulchae-cortile').look === 'hero';
+  // Prima dei pannelli è intoccabile (§5.46): l'occasione viene dopo.
+  out.m8IntoccabilePrimaDeiPannelli = (game.actors.get('dulchae-cortile')?.hp || 0) >= 9999;
   await shot('m8-3-cortile');
   await wait(1.6);
   out.m8Chiusura = fase() === 'm8/m8-chiusura' && game.cutscene.active;
@@ -1020,8 +1022,26 @@ async function arrestoVero(at) {
   await saltaPannelli();
   nota('chiusura M8');
   out.m8Fuori = fase() === 'm8/fuori';
-  out.m8DulchaeSeNeVa = !game.actors.get('dulchae-cortile') && !game.shops.floor.people.some((p) => p.actor === 'dulchae-cortile');
-  await shot('m8-4-cortile-vuoto');
+  // **La prima occasione su Dulchae** (§5.46): dopo i pannelli se ne va camminando verso l'unica porta,
+  // con le ferite di un uomo qualunque. Qui gli si spara, e il conto lo segna.
+  const dc = game.shops.floor.people.find((p) => p.actor === 'dulchae-cortile');
+  const dc0 = dc && { x: dc.x, y: dc.y };
+  await wait(1.2);
+  out.m8DulchaeSeNeVa = !!dc && !dc.dead && dc.hp < 100 && Math.hypot(dc.x - dc0.x, dc.y - dc0.y) > 15;
+  await shot('m8-4-se-ne-va');
+  if (dc) {
+    const { WEAPONS, shoot } = await import('/src/entities/weapons.js');
+    for (let i = 0; i < 12 && !dc.dead; i++) {
+      const a = Math.atan2(dc.y - pl.y, dc.x - pl.x);
+      shoot(game, pl, WEAPONS.pistol, pl.x + Math.cos(a) * 12, pl.y + Math.sin(a) * 12, a);
+      await wait(0.15);
+    }
+  }
+  await wait(0.3);
+  out.m8OccasioneContata = !!dc?.dead && M.flag('dulchaeUcciso') && M.flag('dulchae@m8');
+  // Gli spari lasciano stelle addosso, e con le stelle i tornelli della metro (chiamata 13, più giù) restano chiusi.
+  game.wanted.reset();
+  game.police.standDown(game, true);
   game.shops.leave(game);
   await wait(0.6);
   out.m8Completata = M.isDone('m8') && M.flag('dulchae') && M.flag('sorella');

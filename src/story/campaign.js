@@ -20,6 +20,8 @@ import { M10 } from './m10.js';
 import { attachHospital } from './hospital.js';
 import { attachKkachi } from './kkachi.js';
 import { attachVisite } from './visite.js';
+import { attachDulchae } from './dulchae.js';
+import { attachTerminale } from './terminale.js';
 
 const CAMPAGNA = [M1, M2, M3, M4, R1, M5, M6, R2, M7, M8, R3, M9, M10];
 
@@ -50,6 +52,9 @@ export function registerCampaign(game) {
   // Le «visite che cambiano» non sono missioni e non hanno un ordine: un personaggio
   // che c'è sempre e risponde in modo diverso (`07-radio-kkachi.md`).
   attachVisite(game);
+  // Il conto delle occasioni su Dulchae (finale C), e la sala d'attesa di Busan, che è la seconda.
+  attachDulchae(game);
+  attachTerminale(game);
   game.on('missionDone', (id) => {
     const next = DOPO[id];
     if (next) game.missions.start(next, game);
